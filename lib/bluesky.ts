@@ -81,7 +81,10 @@ export async function fetchBlueskySource(
   let posts: Array<{ post: Record<string, unknown> }> = [];
 
   try {
-    if (source.mode === "timeline") {
+    if (source.mode === "feed" && source.feed_uri) {
+      const res = await bsky.app.bsky.feed.getFeed({ feed: source.feed_uri, limit: 30 });
+      posts = res.data.feed as unknown as typeof posts;
+    } else if (source.mode === "timeline") {
       const res = await bsky.getTimeline({ limit: 50 });
       posts = res.data.feed as unknown as typeof posts;
     } else if (source.mode === "account" && source.handle) {
@@ -92,7 +95,7 @@ export async function fetchBlueskySource(
       });
       posts = res.data.feed as unknown as typeof posts;
     } else {
-      console.error(`[bluesky] Source ${source.id} needs mode + handle`);
+      console.error(`[bluesky] Source ${source.id} needs mode + handle or feed_uri`);
       return 0;
     }
   } catch (err) {

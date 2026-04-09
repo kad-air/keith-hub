@@ -32,9 +32,11 @@ sources:
     url: https://feeds.kottke.org/main
 
   # --- Bluesky ---
-  - id: bluesky-timeline
+  # "Popular With Friends" algorithmic feed — posts your network engages with
+  - id: bluesky-friends
     name: Bluesky
     type: bluesky
     category: bluesky
-    mode: timeline
+    mode: feed
+    feed_uri: at://did:plc:z72i7hdynmk6r22z27h6tvur/app.bsky.feed.generator/with-friends
     poll_interval_minutes: 10
