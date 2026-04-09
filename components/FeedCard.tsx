@@ -36,6 +36,23 @@ function relativeDate(isoString: string): string {
   });
 }
 
+function formatDuration(raw: string): string {
+  // Handles HH:MM:SS, MM:SS, or plain seconds
+  const parts = raw.split(":").map(Number);
+  if (parts.length === 3) {
+    const [h, m] = parts;
+    return h > 0 ? `${h}h ${m}m` : `${m}m`;
+  }
+  if (parts.length === 2) return `${parts[0]}m`;
+  const secs = Number(raw);
+  if (!isNaN(secs)) {
+    const h = Math.floor(secs / 3600);
+    const m = Math.floor((secs % 3600) / 60);
+    return h > 0 ? `${h}h ${m}m` : `${m}m`;
+  }
+  return raw;
+}
+
 export default function FeedCard({ item, onDismiss, onSaveToggle }: FeedCardProps) {
   const [saved, setSaved] = useState(!!item.saved_at);
   const [dismissed, setDismissed] = useState(false);
@@ -44,10 +61,15 @@ export default function FeedCard({ item, onDismiss, onSaveToggle }: FeedCardProp
   const category = item.source_category || "reading";
   const colors = CATEGORY_COLORS[category] || CATEGORY_COLORS.reading;
   const isBluesky = category === "bluesky";
+  const isPodcast = category === "podcasts";
 
-  const bskyMeta = isBluesky && item.metadata
-    ? (() => { try { return JSON.parse(item.metadata) as { handle?: string; avatar_url?: string; like_count?: number; reply_count?: number; repost_count?: number }; } catch { return null; } })()
-    : null;
+  const parseMeta = <T,>(): T | null => {
+    if (!item.metadata) return null;
+    try { return JSON.parse(item.metadata) as T; } catch { return null; }
+  };
+
+  const bskyMeta = isBluesky ? parseMeta<{ handle?: string; avatar_url?: string; like_count?: number; reply_count?: number; repost_count?: number }>() : null;
+  const podcastMeta = isPodcast ? parseMeta<{ show_name?: string; duration?: string; audio_url?: string; artwork_url?: string }>() : null;
 
   if (dismissed) return null;
 
@@ -157,8 +179,43 @@ export default function FeedCard({ item, onDismiss, onSaveToggle }: FeedCardProp
         </span>
       </div>
 
-      {/* Title — for Bluesky posts (no title), render body text as the main content */}
-      {item.title ? (
+      {/* Podcast layout: artwork left, content right */}
+      {isPodcast ? (
+        <div style={{ display: "flex", gap: "0.875rem", alignItems: "flex-start" }}>
+          {(podcastMeta?.artwork_url || item.image_url) && (
+            <img
+              src={podcastMeta?.artwork_url || item.image_url || ""}
+              alt=""
+              width={64}
+              height={64}
+              style={{ borderRadius: "6px", flexShrink: 0, objectFit: "cover" }}
+            />
+          )}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h2
+              style={{
+                fontFamily: "Georgia, serif",
+                fontSize: "0.9375rem",
+                fontWeight: 600,
+                color: "#f0f0f2",
+                margin: "0 0 0.25rem 0",
+                lineHeight: 1.4,
+              }}
+            >
+              {item.title}
+            </h2>
+            <div style={{ fontSize: "0.75rem", color: "#8888a0", display: "flex", gap: "0.5rem", alignItems: "center" }}>
+              {podcastMeta?.show_name && <span>{podcastMeta.show_name}</span>}
+              {podcastMeta?.duration && (
+                <>
+                  <span style={{ opacity: 0.4 }}>·</span>
+                  <span>{formatDuration(podcastMeta.duration)}</span>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : item.title ? (
         <h2
           style={{
             fontFamily: "Georgia, serif",
@@ -187,8 +244,8 @@ export default function FeedCard({ item, onDismiss, onSaveToggle }: FeedCardProp
         </p>
       )}
 
-      {/* Body excerpt — only shown for titled items */}
-      {item.title && item.body_excerpt && (
+      {/* Body excerpt — only shown for non-podcast titled items */}
+      {!isPodcast && item.title && item.body_excerpt && (
         <p
           style={{
             fontSize: "0.875rem",
@@ -238,6 +295,43 @@ export default function FeedCard({ item, onDismiss, onSaveToggle }: FeedCardProp
           style={{ display: "flex", alignItems: "center", gap: "0.25rem" }}
           onClick={(e) => e.stopPropagation()}
         >
+          {/* Podcast: Listen in Apple Podcasts button */}
+          {isPodcast && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                const podcastUrl = `podcast://${item.url.replace(/^https?:\/\//, "")}`;
+                window.location.href = podcastUrl;
+              }}
+              title="Listen in Podcasts"
+              style={{
+                background: "none",
+                border: "1px solid #2e2e38",
+                borderRadius: "6px",
+                cursor: "pointer",
+                padding: "4px 10px",
+                color: "#34d399",
+                fontSize: "0.75rem",
+                fontWeight: 500,
+                display: "flex",
+                alignItems: "center",
+                gap: "4px",
+                transition: "all 0.15s ease",
+                marginRight: "4px",
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.backgroundColor = "rgba(52, 211, 153, 0.1)";
+                (e.currentTarget as HTMLButtonElement).style.borderColor = "#34d399";
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.backgroundColor = "transparent";
+                (e.currentTarget as HTMLButtonElement).style.borderColor = "#2e2e38";
+              }}
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
+              Listen
+            </button>
+          )}
           {/* Save button */}
           <button
             onClick={handleSave}

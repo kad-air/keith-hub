@@ -12,6 +12,7 @@ export interface SourceConfig {
   mode?: "timeline" | "account" | "feed";
   handle?: string;
   feed_uri?: string;
+  apple_id?: string;
 }
 
 export interface AppConfig {
