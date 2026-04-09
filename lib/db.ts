@@ -60,3 +60,17 @@ export function getDb(): Database.Database {
 
   return dbInstance;
 }
+
+// Ranked sort for the "All" feed.
+// Reviews and podcasts get a time boost so they surface above social noise.
+// Bluesky gets a penalty so it fills in gaps without dominating.
+export const RANKED_ORDER = `
+  CASE s.category
+    WHEN 'podcasts' THEN datetime(i.published_at, '+8 hours')
+    WHEN 'music'    THEN datetime(i.published_at, '+6 hours')
+    WHEN 'film'     THEN datetime(i.published_at, '+6 hours')
+    WHEN 'reading'  THEN i.published_at
+    WHEN 'bluesky'  THEN datetime(i.published_at, '-12 hours')
+    ELSE i.published_at
+  END DESC
+`;

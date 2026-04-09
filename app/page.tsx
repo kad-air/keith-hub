@@ -1,5 +1,5 @@
 import { ensureInitialized } from "@/lib/init";
-import { getDb } from "@/lib/db";
+import { getDb, RANKED_ORDER } from "@/lib/db";
 import type { Item } from "@/lib/types";
 import FeedClient from "@/components/FeedClient";
 
@@ -23,7 +23,7 @@ function getInitialItems(): Item[] {
         LEFT JOIN item_state ist ON ist.item_id = i.id
         JOIN sources s ON s.id = i.source_id
         WHERE ist.read_at IS NULL
-        ORDER BY i.published_at DESC
+        ORDER BY ${RANKED_ORDER}
         LIMIT 50
       `
       )

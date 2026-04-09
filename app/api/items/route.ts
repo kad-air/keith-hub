@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
+import { getDb, RANKED_ORDER } from "@/lib/db";
 import type { Item, ItemsResponse } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -43,7 +43,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
           JOIN sources s ON s.id = i.source_id
           WHERE ist.read_at IS NULL AND s.category = ?
           ORDER BY i.published_at DESC
-          LIMIT ? OFFSET ?`
+          LIMIT ? OFFSET ?`  // category filter: pure recency
         )
         .all(categoryFilter, limit, offset) as Item[];
     } else {
@@ -70,7 +70,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
           LEFT JOIN item_state ist ON ist.item_id = i.id
           JOIN sources s ON s.id = i.source_id
           WHERE ist.read_at IS NULL
-          ORDER BY i.published_at DESC
+          ORDER BY ${RANKED_ORDER}
           LIMIT ? OFFSET ?`
         )
         .all(limit, offset) as Item[];
