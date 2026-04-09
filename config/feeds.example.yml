@@ -1,0 +1,32 @@
+app:
+  name: "The Feed"
+  port: 3000
+  poll_interval_minutes: 15
+  items_per_page: 50
+  retention_days: 30
+
+sources:
+  - id: pitchfork
+    name: Pitchfork
+    type: rss
+    category: music
+    url: https://pitchfork.com/feed/feed-news/rss
+    poll_interval_minutes: 30
+
+  - id: aquarium-drunkard
+    name: Aquarium Drunkard
+    type: rss
+    category: music
+    url: https://aquariumdrunkard.com/feed/
+
+  - id: rogerebert
+    name: RogerEbert.com
+    type: rss
+    category: film
+    url: https://www.rogerebert.com/feed
+
+  - id: kottke
+    name: Kottke.org
+    type: rss
+    category: reading
+    url: https://feeds.kottke.org/main
