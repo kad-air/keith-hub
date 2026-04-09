@@ -69,12 +69,16 @@ export default function FeedCard({ item, onDismiss, onSaveToggle }: FeedCardProp
   };
 
   const bskyMeta = isBluesky ? parseMeta<{ handle?: string; avatar_url?: string; like_count?: number; reply_count?: number; repost_count?: number }>() : null;
-  const podcastMeta = isPodcast ? parseMeta<{ show_name?: string; duration?: string; audio_url?: string; artwork_url?: string }>() : null;
+  const podcastMeta = isPodcast ? parseMeta<{ show_name?: string; duration?: string; audio_url?: string; artwork_url?: string; apple_id?: string }>() : null;
+
+  const tapUrl = isPodcast && podcastMeta?.apple_id
+    ? `https://podcasts.apple.com/podcast/id${podcastMeta.apple_id}`
+    : item.url;
 
   if (dismissed) return null;
 
   async function handleOpenAndRead() {
-    window.open(item.url, "_blank", "noopener,noreferrer");
+    window.open(tapUrl, "_blank", "noopener,noreferrer");
     // Mark as read
     try {
       await fetch(`/api/items/${item.id}/read`, { method: "POST" });
@@ -295,44 +299,6 @@ export default function FeedCard({ item, onDismiss, onSaveToggle }: FeedCardProp
           style={{ display: "flex", alignItems: "center", gap: "0.25rem" }}
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Podcast: Listen in Apple Podcasts button */}
-          {isPodcast && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                // Open the audio file directly — macOS/iOS will hand it off to Podcasts
-                const audioUrl = podcastMeta?.audio_url || item.url;
-                window.open(audioUrl, "_blank", "noopener,noreferrer");
-              }}
-              title="Listen in Podcasts"
-              style={{
-                background: "none",
-                border: "1px solid #2e2e38",
-                borderRadius: "6px",
-                cursor: "pointer",
-                padding: "4px 10px",
-                color: "#34d399",
-                fontSize: "0.75rem",
-                fontWeight: 500,
-                display: "flex",
-                alignItems: "center",
-                gap: "4px",
-                transition: "all 0.15s ease",
-                marginRight: "4px",
-              }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.backgroundColor = "rgba(52, 211, 153, 0.1)";
-                (e.currentTarget as HTMLButtonElement).style.borderColor = "#34d399";
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.backgroundColor = "transparent";
-                (e.currentTarget as HTMLButtonElement).style.borderColor = "#2e2e38";
-              }}
-            >
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
-              Listen
-            </button>
-          )}
           {/* Save button */}
           <button
             onClick={handleSave}

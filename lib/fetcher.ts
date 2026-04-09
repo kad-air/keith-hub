@@ -120,6 +120,7 @@ export async function fetchRssSource(
           duration: (ext["itunes:duration"] as string) || null,
           audio_url: audioUrl,
           artwork_url: imageUrl,
+          apple_id: source.apple_id || null,
         })
       : null;
 
