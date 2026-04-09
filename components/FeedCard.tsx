@@ -276,7 +276,7 @@ export default function FeedCard({ item, onDismiss, onSaveToggle }: FeedCardProp
         }}
       >
         <span style={{ fontSize: "0.75rem", color: "#8888a0", display: "flex", alignItems: "center", gap: "0.625rem" }}>
-          <span>{relativeDate(item.published_at)}</span>
+          <span suppressHydrationWarning>{relativeDate(item.published_at)}</span>
           {isBluesky && bskyMeta && (
             <>
               {!!bskyMeta.reply_count && (
