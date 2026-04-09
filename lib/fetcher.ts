@@ -1,6 +1,6 @@
 import Parser from "rss-parser";
 import type Database from "better-sqlite3";
-import { getConfig, type SourceConfig } from "@/lib/config";
+import { getConfig, invalidateConfig, type SourceConfig } from "@/lib/config";
 import { fetchBlueskySource } from "@/lib/bluesky";
 
 const parser = new Parser({
@@ -150,6 +150,7 @@ export async function fetchRssSource(
 }
 
 export async function fetchAllSources(db: Database.Database): Promise<number> {
+  invalidateConfig(); // Re-read feeds.yml on every poll cycle
   const config = getConfig();
 
   // Sync sources table with config
@@ -162,7 +163,11 @@ export async function fetchAllSources(db: Database.Database): Promise<number> {
       category = excluded.category
   `);
 
+  const configIds = config.sources.map((s) => s.id);
+  const placeholders = configIds.map(() => "?").join(",");
+
   const syncSources = db.transaction(() => {
+    // Upsert sources from config
     for (const source of config.sources) {
       upsertSource.run({
         id: source.id,
@@ -171,6 +176,10 @@ export async function fetchAllSources(db: Database.Database): Promise<number> {
         category: source.category,
       });
     }
+    // Remove sources (and their items) no longer in config
+    db.prepare(`DELETE FROM item_state WHERE item_id IN (SELECT id FROM items WHERE source_id NOT IN (${placeholders}))`).run(...configIds);
+    db.prepare(`DELETE FROM items WHERE source_id NOT IN (${placeholders})`).run(...configIds);
+    db.prepare(`DELETE FROM sources WHERE id NOT IN (${placeholders})`).run(...configIds);
   });
 
   syncSources();

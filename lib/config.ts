@@ -28,6 +28,10 @@ export interface AppConfig {
 
 let cachedConfig: AppConfig | null = null;
 
+export function invalidateConfig(): void {
+  cachedConfig = null;
+}
+
 export function getConfig(): AppConfig {
   if (cachedConfig) {
     return cachedConfig;
