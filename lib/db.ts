@@ -62,15 +62,38 @@ export function getDb(): Database.Database {
 }
 
 // Ranked sort for the "All" feed.
-// Reviews and podcasts get a time boost so they surface above social noise.
-// Bluesky gets a penalty so it fills in gaps without dominating.
+//
+// Score = weight / (age_hours + C)
+//
+// Hyperbolic decay — same family as Hacker News. Score falls continuously
+// as items age, so nothing is artificially frozen at a rank. Two items of
+// equal age rank purely by weight; two items of equal weight rank purely
+// by recency. C=2 flattens the curve in the first two hours so a podcast
+// published 10 minutes ago doesn't bury a review published 90 minutes ago.
+//
+// Weights are relative — only the ratios matter:
+//   podcasts (8) vs bluesky (1) = an 8h-old episode beats a brand-new post
+//   music/film (6) vs reading (3) = reviews surface above general articles
+//
+// To tune: adjust the weight values below. C rarely needs changing.
+
+const WEIGHTS = {
+  podcasts: 8,
+  music:    6,
+  film:     6,
+  reading:  3,
+  bluesky:  1,
+} as const;
+
+const C = 2; // hours — decay curve flattening constant
+
 export const RANKED_ORDER = `
-  CASE s.category
-    WHEN 'podcasts' THEN datetime(i.published_at, '+8 hours')
-    WHEN 'music'    THEN datetime(i.published_at, '+6 hours')
-    WHEN 'film'     THEN datetime(i.published_at, '+6 hours')
-    WHEN 'reading'  THEN i.published_at
-    WHEN 'bluesky'  THEN datetime(i.published_at, '-12 hours')
-    ELSE i.published_at
-  END DESC
+  (CASE s.category
+    WHEN 'podcasts' THEN ${WEIGHTS.podcasts}.0
+    WHEN 'music'    THEN ${WEIGHTS.music}.0
+    WHEN 'film'     THEN ${WEIGHTS.film}.0
+    WHEN 'reading'  THEN ${WEIGHTS.reading}.0
+    WHEN 'bluesky'  THEN ${WEIGHTS.bluesky}.0
+    ELSE             ${WEIGHTS.reading}.0
+  END) / ((julianday('now') - julianday(i.published_at)) * 24.0 + ${C}.0) DESC
 `;
