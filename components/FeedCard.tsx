@@ -14,6 +14,7 @@ const CATEGORY_COLORS: Record<string, { bg: string; text: string; label: string 
   film: { bg: "rgba(245, 158, 11, 0.15)", text: "#fbbf24", label: "Film" },
   reading: { bg: "rgba(59, 130, 246, 0.15)", text: "#60a5fa", label: "Reading" },
   podcasts: { bg: "rgba(16, 185, 129, 0.15)", text: "#34d399", label: "Podcasts" },
+  bluesky: { bg: "rgba(0, 133, 255, 0.12)", text: "#38bdf8", label: "Bluesky" },
 };
 
 function relativeDate(isoString: string): string {
@@ -141,23 +142,38 @@ export default function FeedCard({ item, onDismiss, onSaveToggle }: FeedCardProp
         </span>
       </div>
 
-      {/* Title */}
-      <h2
-        style={{
-          fontFamily: "Georgia, serif",
-          fontSize: "1rem",
-          fontWeight: 600,
-          color: "#f0f0f2",
-          margin: "0 0 0.375rem 0",
-          lineHeight: 1.4,
-          letterSpacing: "-0.01em",
-        }}
-      >
-        {item.title || "Untitled"}
-      </h2>
+      {/* Title — for Bluesky posts (no title), render body text as the main content */}
+      {item.title ? (
+        <h2
+          style={{
+            fontFamily: "Georgia, serif",
+            fontSize: "1rem",
+            fontWeight: 600,
+            color: "#f0f0f2",
+            margin: "0 0 0.375rem 0",
+            lineHeight: 1.4,
+            letterSpacing: "-0.01em",
+          }}
+        >
+          {item.title}
+        </h2>
+      ) : (
+        <p
+          style={{
+            fontSize: "0.9375rem",
+            color: "#e0e0ee",
+            margin: "0 0 0.75rem 0",
+            lineHeight: 1.6,
+            whiteSpace: "pre-wrap",
+            wordBreak: "break-word",
+          }}
+        >
+          {item.body_excerpt}
+        </p>
+      )}
 
-      {/* Body excerpt */}
-      {item.body_excerpt && (
+      {/* Body excerpt — only shown for titled items */}
+      {item.title && item.body_excerpt && (
         <p
           style={{
             fontSize: "0.875rem",

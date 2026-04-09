@@ -30,3 +30,11 @@ sources:
     type: rss
     category: reading
     url: https://feeds.kottke.org/main
+
+  # --- Bluesky ---
+  - id: bluesky-timeline
+    name: Bluesky
+    type: bluesky
+    category: bluesky
+    mode: timeline
+    poll_interval_minutes: 10

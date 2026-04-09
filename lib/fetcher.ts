@@ -1,6 +1,7 @@
 import Parser from "rss-parser";
 import type Database from "better-sqlite3";
 import { getConfig, type SourceConfig } from "@/lib/config";
+import { fetchBlueskySource } from "@/lib/bluesky";
 
 const parser = new Parser({
   timeout: 10000,
@@ -144,10 +145,18 @@ export async function fetchAllSources(db: Database.Database): Promise<number> {
   syncSources();
 
   let totalFetched = 0;
-  const rssSources = config.sources.filter((s) => s.type === "rss");
 
+  const rssSources = config.sources.filter(
+    (s) => s.type === "rss" || s.type === "podcast"
+  );
   for (const source of rssSources) {
     const count = await fetchRssSource(source, db);
+    totalFetched += count;
+  }
+
+  const blueskySources = config.sources.filter((s) => s.type === "bluesky");
+  for (const source of blueskySources) {
+    const count = await fetchBlueskySource(source, db);
     totalFetched += count;
   }
 

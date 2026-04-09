@@ -9,6 +9,8 @@ export interface SourceConfig {
   category: string;
   url?: string;
   poll_interval_minutes?: number;
+  mode?: "timeline" | "account";
+  handle?: string;
 }
 
 export interface AppConfig {
