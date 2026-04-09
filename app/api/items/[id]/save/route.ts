@@ -18,19 +18,22 @@ export async function POST(
     let saved_at: string | null;
 
     if (existing?.saved_at) {
-      // Already saved — toggle off
+      // Already saved — toggle off (does NOT touch read_at)
       db.prepare(
         "UPDATE item_state SET saved_at = NULL WHERE item_id = ?"
       ).run(id);
       saved_at = null;
     } else {
-      // Not saved — save it
+      // Not saved — save it AND mark as read so it leaves the main feed.
+      // Each item gets a verdict: this is the triage principle.
       const now = new Date().toISOString();
       db.prepare(`
-        INSERT INTO item_state (item_id, saved_at)
-        VALUES (?, ?)
-        ON CONFLICT(item_id) DO UPDATE SET saved_at = excluded.saved_at
-      `).run(id, now);
+        INSERT INTO item_state (item_id, saved_at, read_at)
+        VALUES (?, ?, ?)
+        ON CONFLICT(item_id) DO UPDATE SET
+          saved_at = excluded.saved_at,
+          read_at = COALESCE(item_state.read_at, excluded.read_at)
+      `).run(id, now, now);
       saved_at = now;
     }
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb, RANKED_ORDER } from "@/lib/db";
+import { getCategoryCounts } from "@/lib/queries";
 import type { Item, ItemsResponse } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -77,11 +78,13 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     }
 
     const total = totalRow.count;
+    const counts = getCategoryCounts(db);
 
     const response: ItemsResponse = {
       items: rows,
       total,
       hasMore: offset + rows.length < total,
+      counts,
     };
 
     return NextResponse.json(response);

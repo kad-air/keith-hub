@@ -20,8 +20,18 @@ export interface Item {
   notes?: string | null;
 }
 
+export interface CategoryCounts {
+  all: number;
+  reading: number;
+  music: number;
+  film: number;
+  podcasts: number;
+  bluesky: number;
+}
+
 export interface ItemsResponse {
   items: Item[];
   total: number;
   hasMore: boolean;
+  counts: CategoryCounts;
 }

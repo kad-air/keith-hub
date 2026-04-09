@@ -1,14 +1,15 @@
 import { ensureInitialized } from "@/lib/init";
 import { getDb, RANKED_ORDER } from "@/lib/db";
-import type { Item } from "@/lib/types";
+import { getCategoryCounts } from "@/lib/queries";
+import type { Item, CategoryCounts } from "@/lib/types";
 import FeedClient from "@/components/FeedClient";
 
 export const dynamic = "force-dynamic";
 
-function getInitialItems(): Item[] {
+function getInitialData(): { items: Item[]; counts: CategoryCounts } {
   try {
     const db = getDb();
-    const rows = db
+    const items = db
       .prepare(
         `
         SELECT
@@ -28,16 +29,27 @@ function getInitialItems(): Item[] {
       `
       )
       .all() as Item[];
-    return rows;
+    const counts = getCategoryCounts(db);
+    return { items, counts };
   } catch (err) {
     console.error("[page] Failed to load initial items:", err);
-    return [];
+    return {
+      items: [],
+      counts: {
+        all: 0,
+        reading: 0,
+        music: 0,
+        film: 0,
+        podcasts: 0,
+        bluesky: 0,
+      },
+    };
   }
 }
 
 export default function HomePage() {
   ensureInitialized();
-  const initialItems = getInitialItems();
+  const { items, counts } = getInitialData();
 
-  return <FeedClient initialItems={initialItems} />;
+  return <FeedClient initialItems={items} initialCounts={counts} />;
 }

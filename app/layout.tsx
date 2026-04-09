@@ -1,6 +1,23 @@
 import type { Metadata } from "next";
+import { Newsreader, JetBrains_Mono } from "next/font/google";
 import Link from "next/link";
 import "./globals.css";
+
+const displayFont = Newsreader({
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700"],
+  style: ["normal", "italic"],
+  variable: "--font-display",
+  display: "swap",
+  adjustFontFallback: false,
+});
+
+const monoFont = JetBrains_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500"],
+  variable: "--font-mono",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "The Feed",
@@ -9,59 +26,43 @@ export const metadata: Metadata = {
 
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+}: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className="dark">
-      <body
-        style={{
-          backgroundColor: "#0a0a0c",
-          color: "#f0f0f2",
-          fontFamily:
-            '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-          margin: 0,
-          padding: 0,
-        }}
-      >
-        <header
-          style={{
-            borderBottom: "1px solid #1e1e24",
-            padding: "0 1.5rem",
-            height: "52px",
-            display: "flex",
-            alignItems: "center",
-            position: "sticky",
-            top: 0,
-            zIndex: 50,
-            backgroundColor: "#0a0a0c",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", maxWidth: "680px" }}>
-            <Link href="/" style={{ textDecoration: "none" }}>
+    <html
+      lang="en"
+      className={`dark ${displayFont.variable} ${monoFont.variable}`}
+    >
+      <body className="font-display text-cream bg-ink min-h-screen">
+        <header className="sticky top-0 z-40 border-b border-rule/60 bg-ink/85 backdrop-blur-md">
+          <div className="mx-auto flex h-14 max-w-[720px] items-center justify-between px-6">
+            <Link href="/" className="group inline-flex items-baseline gap-1.5">
+              <span className="font-display text-[1.4rem] font-medium italic leading-none tracking-tight text-cream transition-colors group-hover:text-accent">
+                The&nbsp;Feed
+              </span>
               <span
-                style={{
-                  fontFamily: "Georgia, serif",
-                  fontSize: "1.125rem",
-                  fontWeight: 600,
-                  color: "#f0f0f2",
-                  letterSpacing: "-0.01em",
-                }}
+                aria-hidden
+                className="hidden font-mono text-[0.6rem] uppercase tracking-kicker text-cream-dimmer sm:inline"
               >
-                The Feed
+                — est. 2026
               </span>
             </Link>
-            <Link href="/saved" style={{ textDecoration: "none" }}>
-              <span style={{ fontSize: "0.8125rem", color: "#8888a0", display: "flex", alignItems: "center", gap: "0.375rem" }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
-                </svg>
+            <nav className="flex items-center gap-6">
+              <Link
+                href="/"
+                className="font-mono text-[0.68rem] uppercase tracking-kicker text-cream-dim transition-colors hover:text-cream"
+              >
+                Today
+              </Link>
+              <Link
+                href="/saved"
+                className="font-mono text-[0.68rem] uppercase tracking-kicker text-cream-dim transition-colors hover:text-cream"
+              >
                 Saved
-              </span>
-            </Link>
+              </Link>
+            </nav>
           </div>
         </header>
-        <main>{children}</main>
+        <main className="relative z-10">{children}</main>
       </body>
     </html>
   );
