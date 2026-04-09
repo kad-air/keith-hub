@@ -8,10 +8,6 @@ const parser = new Parser({
   headers: {
     "User-Agent": "TheFeed/0.1 (personal RSS reader)",
   },
-  customFields: {
-    feed: ["itunes:image"] as string[],
-    item: ["itunes:duration", "itunes:image", "itunes:episode", "itunes:summary"] as string[],
-  },
 });
 
 interface ItemRow {
@@ -85,39 +81,34 @@ export async function fetchRssSource(
   });
 
   const isPodcast = source.type === "podcast";
-  // Feed-level artwork fallback for podcasts
-  const feedArtwork =
-    (feed as Record<string, unknown>)["itunes:image"] as { href?: string } | string | null | undefined;
-  const feedArtworkUrl =
-    typeof feedArtwork === "string"
-      ? feedArtwork
-      : feedArtwork?.href ?? null;
+  // Feed-level artwork: rss-parser exposes itunes namespace under feed.itunes
+  const feedItunes = (feed as Record<string, unknown>).itunes as Record<string, unknown> | undefined;
+  const feedArtworkUrl = (feedItunes?.image as string) || null;
 
   const itemsToInsert: ItemRow[] = (feed.items || []).map((item) => {
     const ext = item as Record<string, unknown>;
+    const itunes = (ext.itunes as Record<string, unknown>) || {};
+
     const rawContent =
       item.content ||
       (ext["content:encoded"] as string) ||
       item.summary ||
-      (ext["itunes:summary"] as string) ||
+      (itunes.summary as string) ||
       "";
     const bodyExcerpt = stripHtml(rawContent);
     const externalId = String(item.guid || item.id || item.link || "");
 
-    // Podcast image: item-level itunes:image > feed-level > enclosure
-    const itemArtwork = ext["itunes:image"] as { href?: string } | string | null | undefined;
-    const itemArtworkUrl =
-      typeof itemArtwork === "string" ? itemArtwork : itemArtwork?.href ?? null;
-    const imageUrl = itemArtworkUrl || feedArtworkUrl || item.enclosure?.url || null;
+    // Podcast image: item itunes.image > feed itunes.image (no enclosure fallback — that's audio)
+    const imageUrl = (itunes.image as string) || feedArtworkUrl || null;
 
-    // Audio URL for podcast handoff
+    // Audio URL
     const audioUrl =
       item.enclosure?.type?.startsWith("audio") ? item.enclosure.url : null;
 
     const metadata = isPodcast
       ? JSON.stringify({
           show_name: feed.title || source.name,
-          duration: (ext["itunes:duration"] as string) || null,
+          duration: (itunes.duration as string) || null,
           audio_url: audioUrl,
           artwork_url: imageUrl,
           apple_id: source.apple_id || null,
