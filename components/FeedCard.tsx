@@ -300,8 +300,9 @@ export default function FeedCard({ item, onDismiss, onSaveToggle }: FeedCardProp
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                const podcastUrl = `podcast://${item.url.replace(/^https?:\/\//, "")}`;
-                window.location.href = podcastUrl;
+                // Open the audio file directly — macOS/iOS will hand it off to Podcasts
+                const audioUrl = podcastMeta?.audio_url || item.url;
+                window.open(audioUrl, "_blank", "noopener,noreferrer");
               }}
               title="Listen in Podcasts"
               style={{
