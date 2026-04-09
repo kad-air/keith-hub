@@ -14,6 +14,7 @@ const CATEGORIES = [
   { id: "music", label: "Music" },
   { id: "film", label: "Film" },
   { id: "podcasts", label: "Podcasts" },
+  { id: "bluesky", label: "Bluesky" },
 ];
 
 export default function FeedClient({ initialItems }: FeedClientProps) {
