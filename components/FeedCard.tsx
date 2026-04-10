@@ -1,7 +1,13 @@
 "use client";
 
 import { forwardRef } from "react";
-import type { Item } from "@/lib/types";
+import type {
+  Item,
+  BlueskyMetadata,
+  BlueskyImage,
+  BlueskyExternalCard,
+  BlueskyQuotedPost,
+} from "@/lib/types";
 
 interface FeedCardProps {
   item: Item;
@@ -55,14 +61,6 @@ function formatDuration(raw: string): string {
   return raw;
 }
 
-interface BlueskyMeta {
-  handle?: string;
-  avatar_url?: string;
-  like_count?: number;
-  reply_count?: number;
-  repost_count?: number;
-}
-
 interface PodcastMeta {
   show_name?: string;
   duration?: string;
@@ -90,7 +88,7 @@ const FeedCard = forwardRef<HTMLElement, FeedCardProps>(function FeedCard(
   const isPodcast = category === "podcasts";
   const saved = !!item.saved_at;
 
-  const bsky = isBluesky ? parseMeta<BlueskyMeta>(item.metadata) : null;
+  const bsky = isBluesky ? parseMeta<BlueskyMetadata>(item.metadata) : null;
   const podcast = isPodcast ? parseMeta<PodcastMeta>(item.metadata) : null;
 
   // Limit stagger to first 8 cards so the page never feels slow
@@ -124,6 +122,22 @@ const FeedCard = forwardRef<HTMLElement, FeedCardProps>(function FeedCard(
         ].join(" ")}
       />
 
+      {/* Repost banner — when this post appears in the feed via someone reposting it */}
+      {isBluesky && bsky?.reposted_by && (
+        <div className="mb-1.5 flex items-center gap-1.5 font-mono text-[0.6rem] uppercase tracking-kicker text-cream-dimmer">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="17 1 21 5 17 9" />
+            <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+            <polyline points="7 23 3 19 7 15" />
+            <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+          </svg>
+          <span>
+            Reposted by{" "}
+            {bsky.reposted_by.display_name || `@${bsky.reposted_by.handle}`}
+          </span>
+        </div>
+      )}
+
       {/* Kicker line: source · category · time */}
       <div className="mb-2.5 flex items-center gap-2 font-mono text-[0.65rem] uppercase tracking-kicker text-cream-dim">
         {isBluesky && bsky?.avatar_url && (
@@ -135,7 +149,16 @@ const FeedCard = forwardRef<HTMLElement, FeedCardProps>(function FeedCard(
           />
         )}
         <span className="truncate">
-          {isBluesky && bsky?.handle ? `@${bsky.handle}` : item.source_name}
+          {isBluesky && bsky?.handle ? (
+            <>
+              {bsky.display_name && (
+                <span className="text-cream">{bsky.display_name} </span>
+              )}
+              <span className="text-cream-dim">@{bsky.handle}</span>
+            </>
+          ) : (
+            item.source_name
+          )}
         </span>
         <span className="text-cream-dimmer">·</span>
         <span className={cat.klass}>{cat.label}</span>
@@ -189,9 +212,7 @@ const FeedCard = forwardRef<HTMLElement, FeedCardProps>(function FeedCard(
           </div>
         </div>
       ) : isBluesky ? (
-        <p className="whitespace-pre-wrap break-words font-display text-[1rem] leading-[1.55] text-cream opsz-body">
-          {item.body_excerpt}
-        </p>
+        <BlueskyBody item={item} bsky={bsky} />
       ) : (
         <>
           <h2 className="font-display text-[1.4rem] font-medium leading-[1.2] tracking-[-0.012em] text-cream opsz-display">
@@ -291,6 +312,221 @@ function ActionButton({ label, active, onClick, children }: ActionButtonProps) {
     >
       {children}
     </button>
+  );
+}
+
+// ─── Bluesky rich rendering ─────────────────────────────────────────────────
+
+interface BlueskyBodyProps {
+  item: Item;
+  bsky: BlueskyMetadata | null;
+}
+
+function BlueskyBody({ item, bsky }: BlueskyBodyProps) {
+  const text = item.body_excerpt || "";
+  return (
+    <>
+      {bsky?.reply_to && <ReplyContext reply={bsky.reply_to} />}
+      {text && (
+        <p className="whitespace-pre-wrap break-words font-display text-[1rem] leading-[1.55] text-cream opsz-body">
+          {text}
+        </p>
+      )}
+      {bsky?.images && bsky.images.length > 0 && (
+        <div className="mt-3">
+          <ImageGrid images={bsky.images} />
+        </div>
+      )}
+      {bsky?.external && (
+        <div className="mt-3">
+          <ExternalCard external={bsky.external} />
+        </div>
+      )}
+      {bsky?.quoted && (
+        <div className="mt-3">
+          <QuotedPost post={bsky.quoted} />
+        </div>
+      )}
+    </>
+  );
+}
+
+function ReplyContext({ reply }: { reply: { handle: string; display_name?: string; text: string } }) {
+  return (
+    <div className="mb-2 flex gap-2 border-l-2 border-rule pl-3 text-cream-dim">
+      <div className="min-w-0 flex-1">
+        <div className="font-mono text-[0.6rem] uppercase tracking-kicker text-cream-dimmer">
+          ↳ replying to {reply.display_name || `@${reply.handle}`}
+        </div>
+        <div className="mt-0.5 line-clamp-2 font-display text-[0.85rem] italic leading-snug text-cream-dim opsz-body">
+          {reply.text}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ImageGrid({ images }: { images: BlueskyImage[] }) {
+  // 1 image: full width, respect aspect ratio (capped)
+  // 2 images: side-by-side
+  // 3 images: first full-width, two below
+  // 4+ images: 2x2 grid
+  const count = images.length;
+
+  if (count === 1) {
+    const img = images[0];
+    const ar = img.aspect_ratio;
+    // Cap max height so portrait shots don't dominate the card
+    const aspectStyle = ar
+      ? { aspectRatio: `${ar.width} / ${ar.height}`, maxHeight: "32rem" }
+      : { maxHeight: "32rem" };
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={img.fullsize}
+        alt={img.alt}
+        loading="lazy"
+        style={aspectStyle}
+        className="w-full rounded-sm object-cover ring-1 ring-rule"
+      />
+    );
+  }
+
+  if (count === 2) {
+    return (
+      <div className="grid grid-cols-2 gap-1.5">
+        {images.slice(0, 2).map((img, i) => (
+          <BlueskyImageThumb key={i} img={img} aspect="square" />
+        ))}
+      </div>
+    );
+  }
+
+  if (count === 3) {
+    return (
+      <div className="grid grid-cols-2 gap-1.5">
+        <div className="row-span-2">
+          <BlueskyImageThumb img={images[0]} aspect="portrait" />
+        </div>
+        <BlueskyImageThumb img={images[1]} aspect="square" />
+        <BlueskyImageThumb img={images[2]} aspect="square" />
+      </div>
+    );
+  }
+
+  // 4+
+  return (
+    <div className="grid grid-cols-2 gap-1.5">
+      {images.slice(0, 4).map((img, i) => (
+        <BlueskyImageThumb key={i} img={img} aspect="square" />
+      ))}
+    </div>
+  );
+}
+
+function BlueskyImageThumb({
+  img,
+  aspect,
+}: {
+  img: BlueskyImage;
+  aspect: "square" | "portrait";
+}) {
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={img.thumb}
+      alt={img.alt}
+      loading="lazy"
+      className={[
+        "h-full w-full rounded-sm object-cover ring-1 ring-rule",
+        aspect === "square" ? "aspect-square" : "aspect-[3/4]",
+      ].join(" ")}
+    />
+  );
+}
+
+function ExternalCard({ external }: { external: BlueskyExternalCard }) {
+  return (
+    <a
+      href={external.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={(e) => e.stopPropagation()}
+      className="flex overflow-hidden rounded-sm border border-rule bg-ink/60 transition-colors hover:border-rule-strong"
+    >
+      {external.thumb && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={external.thumb}
+          alt=""
+          loading="lazy"
+          className="h-24 w-24 flex-shrink-0 object-cover sm:h-28 sm:w-28"
+        />
+      )}
+      <div className="min-w-0 flex-1 px-3.5 py-2.5">
+        <div className="font-mono text-[0.6rem] uppercase tracking-kicker text-cream-dimmer">
+          {external.domain}
+        </div>
+        <div className="mt-0.5 line-clamp-2 font-display text-[0.92rem] font-medium leading-snug text-cream opsz-body">
+          {external.title}
+        </div>
+        {external.description && (
+          <div className="mt-0.5 line-clamp-2 font-display text-[0.78rem] italic leading-snug text-cream-dim opsz-body">
+            {external.description}
+          </div>
+        )}
+      </div>
+    </a>
+  );
+}
+
+function QuotedPost({ post }: { post: BlueskyQuotedPost }) {
+  return (
+    <a
+      href={post.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={(e) => e.stopPropagation()}
+      className="block rounded-sm border border-rule bg-ink/60 px-3.5 py-3 transition-colors hover:border-rule-strong"
+    >
+      <div className="mb-1.5 flex items-center gap-1.5 font-mono text-[0.6rem] uppercase tracking-kicker text-cream-dim">
+        {post.avatar_url && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={post.avatar_url}
+            alt=""
+            className="h-3.5 w-3.5 flex-shrink-0 rounded-full object-cover"
+          />
+        )}
+        <span className="truncate">
+          {post.display_name && (
+            <span className="text-cream">{post.display_name} </span>
+          )}
+          <span className="text-cream-dim">@{post.handle}</span>
+        </span>
+      </div>
+      {post.text && (
+        <p className="whitespace-pre-wrap break-words font-display text-[0.92rem] leading-snug text-cream opsz-body line-clamp-6">
+          {post.text}
+        </p>
+      )}
+      {post.images && post.images.length > 0 && (
+        <div className="mt-2.5">
+          <ImageGrid images={post.images} />
+        </div>
+      )}
+      {post.external && (
+        <div className="mt-2.5 flex items-center gap-2 text-cream-dim">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+          </svg>
+          <span className="truncate font-mono text-[0.6rem] uppercase tracking-kicker">
+            {post.external.domain}
+          </span>
+        </div>
+      )}
+    </a>
   );
 }
 
