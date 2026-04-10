@@ -405,7 +405,16 @@ export default function FeedClient({
   }, [handleRefresh]);
 
   // ─── Derived ──────────────────────────────────────────────
-  const grouped = useMemo(() => groupByDate(items), [items]);
+  // The All view is stride-interleaved — date headers would chop the
+  // carefully mixed sequence into clumps. Category-filtered views are
+  // pure recency, so date dividers are still useful there.
+  const grouped = useMemo(
+    () =>
+      activeCategory === "all"
+        ? [{ bucket: null, items }]
+        : groupByDate(items),
+    [items, activeCategory]
+  );
 
   // Build a flat order so keyboard nav indices line up with grouped render
   // (groupByDate preserves input order so a flat re-walk gives the same items)
@@ -498,8 +507,8 @@ export default function FeedClient({
           ].join(" ")}
         >
           {grouped.map((group) => (
-            <section key={group.bucket}>
-              <DateDivider label={group.bucket} />
+            <section key={group.bucket ?? "interleaved"}>
+              {group.bucket && <DateDivider label={group.bucket} />}
               {group.items.map((item) => {
                 flatIndex += 1;
                 const myIndex = flatIndex;

@@ -116,16 +116,22 @@ function selectWithSurprise(items: Item[], quota: number): Item[] {
 
 /**
  * Stride-scheduled interleave. Each category emits items at intervals
- * proportional to its quota — high-quota categories appear more often, low-
- * quota less. Phase offsets prevent multiple categories from landing on the
- * same virtual position. INTERLEAVE_JITTER perturbs positions slightly so
- * the cadence isn't perfectly mechanical.
+ * proportional to its actual item count — high-count categories appear
+ * more often, low-count less. Phase offsets prevent multiple categories
+ * from landing on the same virtual position. INTERLEAVE_JITTER perturbs
+ * positions slightly so the cadence isn't perfectly mechanical.
  *
- * With the current quotas {podcasts:100, music:50, film:50, reading:50,
- * bluesky:50}, the deterministic pattern (jitter=0) is roughly P M F P R B
- * repeating — podcasts every other slot, the others rotating in between.
- * No category appears twice in a row unless one category is the only one
- * still contributing items.
+ * Stride is based on the **actual item count**, not the global quota.
+ * The quotas already did their job in the selection phase (picking how
+ * many items each category contributes). Here the goal is purely even
+ * spacing: if Today has 20 bluesky and 5 music items, the 5 music items
+ * should be spread evenly among the 20 bluesky items. Using the quota
+ * (which is equal for those two categories) would give them identical
+ * strides, so music would run out early and bluesky would clump at the
+ * tail.
+ *
+ * No category appears twice in a row unless one category has more items
+ * than all others combined.
  */
 function interleaveByQuota(
   byCategory: Array<{ cat: keyof CategoryCounts; items: Item[] }>
@@ -133,19 +139,15 @@ function interleaveByQuota(
   const active = byCategory.filter((c) => c.items.length > 0);
   if (active.length === 0) return [];
 
-  const totalQuota = active.reduce(
-    (sum, { cat }) => sum + ALL_VIEW_QUOTAS[cat],
-    0
-  );
-  if (totalQuota <= 0) return [];
+  const totalItems = active.reduce((sum, { items }) => sum + items.length, 0);
+  if (totalItems <= 0) return [];
 
   type Slot = { vpos: number; item: Item };
   const slots: Slot[] = [];
 
-  active.forEach(({ cat, items }, catIdx) => {
-    const quota = ALL_VIEW_QUOTAS[cat];
-    if (quota <= 0) return;
-    const stride = totalQuota / quota;
+  active.forEach(({ items }, catIdx) => {
+    const count = items.length;
+    const stride = totalItems / count;
     const phase = (stride * catIdx) / active.length;
     for (let rank = 0; rank < items.length; rank++) {
       const jitter = (Math.random() - 0.5) * stride * INTERLEAVE_JITTER;
@@ -164,15 +166,16 @@ function interleaveByQuota(
  *    to ALL_VIEW_QUOTAS[cat] items, picked from a SURPRISE_POOL_MULTIPLIER-
  *    sized recency window via weighted sampling — newer items strongly
  *    favored, older items occasionally bubbling up for variety.
- * 2. **Stride-scheduled interleave.** The selected items are woven together
- *    so high-quota categories appear more often than low-quota ones, but no
- *    category clumps two-in-a-row under typical conditions. See
- *    interleaveByQuota for the cadence math.
+ * 2. **Count-based stride interleave.** The selected items are woven
+ *    together so each category's items are evenly spaced. Stride is based
+ *    on the actual item count per category, not the quota — the quotas
+ *    already determined composition in step 1. This means a category with
+ *    20 items and one with 5 items get proportional spacing: the 5 items
+ *    are spread evenly among the 20, no clumping at the tail.
  *
- * The output is NOT sorted by published_at — that's exactly what was
- * causing categories to clump whenever a source published in a tight time
- * window. The downstream date-bucketing in groupByDate is order-preserving
- * so the interleave pattern survives the Today/Yesterday/etc. split.
+ * The output is NOT sorted by published_at — that strict recency sort was
+ * exactly what caused categories to clump whenever a source published in a
+ * tight time window.
  */
 export function getMainFeedItems(
   db: Database.Database,
@@ -190,9 +193,6 @@ export function getMainFeedItems(
     [keyof CategoryCounts, number]
   >) {
     if (catKey === "all" || quota <= 0) continue;
-    // Pull a slightly oversampled recency window from SQL, then narrow to
-    // quota in JS via weighted sampling. The pool is at least `quota` items
-    // (no surprise applied if pool == quota).
     const poolSize = Math.max(quota, Math.ceil(quota * SURPRISE_POOL_MULTIPLIER));
     const pool = stmt.all(catKey, poolSize) as Item[];
     byCategory.push({ cat: catKey, items: selectWithSurprise(pool, quota) });
