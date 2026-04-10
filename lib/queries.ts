@@ -33,6 +33,34 @@ export const ALL_VIEW_QUOTAS: Record<keyof CategoryCounts, number> = {
   bluesky:  50,
 };
 
+// ── Variety knobs for the All view ─────────────────────────────────────────
+// The All view used to be quota selection + sort by published_at DESC, which
+// clumped categories whenever a source published in a tight time window
+// (e.g. all four Pitchfork album reviews dropping at the same hour). These
+// knobs control the interleaver and the per-category surprise sampling that
+// replace that strict recency sort.
+
+// SURPRISE_POOL_MULTIPLIER — how much to oversample per category before
+// narrowing to its quota. 1.0 = no surprise (deterministic newest-N).
+// 1.5 = pull a 50%-larger window then sample down, so older-but-still-recent
+// items can occasionally bubble up. Higher = more surprise, but at some
+// point you start surfacing stale stuff.
+export const SURPRISE_POOL_MULTIPLIER = 1.5;
+
+// SURPRISE_RECENCY_BIAS — how strongly the weighted sample favors newer
+// items in the pool. 0 = uniform random across the pool. With bias=3, the
+// newest item in the pool is ~20x more likely to be picked than the oldest;
+// every item still has a real chance, so surprise happens regularly without
+// burying the freshest stuff.
+export const SURPRISE_RECENCY_BIAS = 3;
+
+// INTERLEAVE_JITTER — perturbation applied to stride-scheduled positions
+// when interleaving categories. 0 = perfectly mechanical cadence (with
+// current quotas: P M F P R B repeating). ~0.35 = mild swaps between
+// adjacent slots, breaks the rigid pattern but keeps no-two-in-a-row most
+// of the time. 1.0 = chaotic — categories may clump occasionally.
+export const INTERLEAVE_JITTER = 0.35;
+
 const ITEM_SELECT = `
   SELECT
     i.*,
@@ -48,13 +76,103 @@ const ITEM_SELECT = `
 `;
 
 /**
- * Returns up to `limit` items for the main feed, sampled by per-category
- * quotas. Each category contributes up to ALL_VIEW_QUOTAS[cat] of its
- * most-recent unread items. Result is sorted by published_at DESC for
- * display, then capped at `limit` as a defensive ceiling.
+ * Weighted random sample without replacement using the Efraimidis–Spirakis
+ * algorithm. Each item gets a key = -ln(random) / weight; the k items with
+ * the smallest keys are selected. Returned in original input order so a
+ * recency-sorted input stays approximately recency-sorted on output.
+ */
+function weightedSample<T>(
+  items: T[],
+  k: number,
+  weight: (item: T, index: number) => number
+): T[] {
+  if (items.length <= k) return [...items];
+  const keyed = items.map((item, index) => {
+    const w = Math.max(weight(item, index), 1e-9);
+    const r = Math.random() || 1e-30;
+    return { item, index, key: -Math.log(r) / w };
+  });
+  keyed.sort((a, b) => a.key - b.key);
+  return keyed
+    .slice(0, k)
+    .sort((a, b) => a.index - b.index)
+    .map((entry) => entry.item);
+}
+
+/**
+ * Narrows an already-oversampled recency-sorted pool down to `quota` items
+ * via weighted sampling, with SURPRISE_RECENCY_BIAS favoring newer items.
+ * Output preserves recency order so the interleaver downstream can use rank
+ * as position cleanly. The oversampling itself happens upstream in
+ * getMainFeedItems where the SQL LIMIT is set.
+ */
+function selectWithSurprise(items: Item[], quota: number): Item[] {
+  if (items.length <= quota) return items;
+  const poolSize = items.length;
+  return weightedSample(items, quota, (_item, rank) =>
+    Math.exp((-SURPRISE_RECENCY_BIAS * rank) / Math.max(poolSize - 1, 1))
+  );
+}
+
+/**
+ * Stride-scheduled interleave. Each category emits items at intervals
+ * proportional to its quota — high-quota categories appear more often, low-
+ * quota less. Phase offsets prevent multiple categories from landing on the
+ * same virtual position. INTERLEAVE_JITTER perturbs positions slightly so
+ * the cadence isn't perfectly mechanical.
  *
- * The high-signal categories aren't pinned to the top — they're guaranteed
- * representation via the quotas, then mixed in chronologically.
+ * With the current quotas {podcasts:100, music:50, film:50, reading:50,
+ * bluesky:50}, the deterministic pattern (jitter=0) is roughly P M F P R B
+ * repeating — podcasts every other slot, the others rotating in between.
+ * No category appears twice in a row unless one category is the only one
+ * still contributing items.
+ */
+function interleaveByQuota(
+  byCategory: Array<{ cat: keyof CategoryCounts; items: Item[] }>
+): Item[] {
+  const active = byCategory.filter((c) => c.items.length > 0);
+  if (active.length === 0) return [];
+
+  const totalQuota = active.reduce(
+    (sum, { cat }) => sum + ALL_VIEW_QUOTAS[cat],
+    0
+  );
+  if (totalQuota <= 0) return [];
+
+  type Slot = { vpos: number; item: Item };
+  const slots: Slot[] = [];
+
+  active.forEach(({ cat, items }, catIdx) => {
+    const quota = ALL_VIEW_QUOTAS[cat];
+    if (quota <= 0) return;
+    const stride = totalQuota / quota;
+    const phase = (stride * catIdx) / active.length;
+    for (let rank = 0; rank < items.length; rank++) {
+      const jitter = (Math.random() - 0.5) * stride * INTERLEAVE_JITTER;
+      slots.push({ vpos: phase + rank * stride + jitter, item: items[rank] });
+    }
+  });
+
+  slots.sort((a, b) => a.vpos - b.vpos);
+  return slots.map((s) => s.item);
+}
+
+/**
+ * Returns up to `limit` items for the main feed. Two-phase algorithm:
+ *
+ * 1. **Per-category selection with surprise.** Each category contributes up
+ *    to ALL_VIEW_QUOTAS[cat] items, picked from a SURPRISE_POOL_MULTIPLIER-
+ *    sized recency window via weighted sampling — newer items strongly
+ *    favored, older items occasionally bubbling up for variety.
+ * 2. **Stride-scheduled interleave.** The selected items are woven together
+ *    so high-quota categories appear more often than low-quota ones, but no
+ *    category clumps two-in-a-row under typical conditions. See
+ *    interleaveByQuota for the cadence math.
+ *
+ * The output is NOT sorted by published_at — that's exactly what was
+ * causing categories to clump whenever a source published in a tight time
+ * window. The downstream date-bucketing in groupByDate is order-preserving
+ * so the interleave pattern survives the Today/Yesterday/etc. split.
  */
 export function getMainFeedItems(
   db: Database.Database,
@@ -67,17 +185,20 @@ export function getMainFeedItems(
      LIMIT ?`
   );
 
-  const all: Item[] = [];
-  for (const [cat, quota] of Object.entries(ALL_VIEW_QUOTAS)) {
-    if (cat === "all" || quota <= 0) continue;
-    all.push(...(stmt.all(cat, quota) as Item[]));
+  const byCategory: Array<{ cat: keyof CategoryCounts; items: Item[] }> = [];
+  for (const [catKey, quota] of Object.entries(ALL_VIEW_QUOTAS) as Array<
+    [keyof CategoryCounts, number]
+  >) {
+    if (catKey === "all" || quota <= 0) continue;
+    // Pull a slightly oversampled recency window from SQL, then narrow to
+    // quota in JS via weighted sampling. The pool is at least `quota` items
+    // (no surprise applied if pool == quota).
+    const poolSize = Math.max(quota, Math.ceil(quota * SURPRISE_POOL_MULTIPLIER));
+    const pool = stmt.all(catKey, poolSize) as Item[];
+    byCategory.push({ cat: catKey, items: selectWithSurprise(pool, quota) });
   }
 
-  return all
-    .sort((a, b) =>
-      a.published_at < b.published_at ? 1 : a.published_at > b.published_at ? -1 : 0
-    )
-    .slice(0, limit);
+  return interleaveByQuota(byCategory).slice(0, limit);
 }
 
 /**
