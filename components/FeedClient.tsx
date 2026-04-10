@@ -602,7 +602,7 @@ function FooterActions({ count, onMarkAllRead, onShowHelp }: FooterActionsProps)
           onClick={onMarkAllRead}
           className="border border-rule-strong px-4 py-2 font-mono text-[0.68rem] uppercase tracking-kicker text-cream transition-colors hover:border-accent hover:text-accent"
         >
-          Dismiss all
+          That&rsquo;s enough for now.
         </button>
         <button
           type="button"
