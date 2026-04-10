@@ -103,8 +103,11 @@ const FeedCard = forwardRef<HTMLElement, FeedCardProps>(function FeedCard(
       data-feed-index={index}
       onClick={onOpen}
       onMouseEnter={onFocus}
+      onTouchStart={onFocus}
       className={[
         "group relative cursor-pointer scroll-mt-24 px-6 py-5 transition-colors duration-200 animate-fade-in-up",
+        // Reserve right-side space for the always-visible action buttons on touch
+        "[@media(hover:none)]:pr-28",
         "border-b border-rule/70",
         focused ? "bg-ink-hover" : "hover:bg-ink-raised/60",
       ].join(" ")}
@@ -210,11 +213,13 @@ const FeedCard = forwardRef<HTMLElement, FeedCardProps>(function FeedCard(
         </div>
       )}
 
-      {/* Action row — visible on hover or when focused */}
+      {/* Action row — visible on hover or focus on desktop, always visible on touch devices */}
       <div
         className={[
           "absolute right-5 top-5 flex items-center gap-1 transition-opacity duration-150",
-          focused ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+          focused
+            ? "opacity-100"
+            : "opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100",
         ].join(" ")}
         onClick={(e) => e.stopPropagation()}
       >
@@ -275,6 +280,8 @@ function ActionButton({ label, active, onClick, children }: ActionButtonProps) {
       aria-label={label}
       className={[
         "flex h-7 w-7 items-center justify-center rounded-sm border transition-colors",
+        // Larger hit zone + fully opaque background on touch devices
+        "[@media(hover:none)]:h-11 [@media(hover:none)]:w-11 [@media(hover:none)]:bg-ink",
         active
           ? "border-accent/40 bg-accent-soft text-accent"
           : "border-rule bg-ink/60 text-cream-dim hover:border-rule-strong hover:bg-ink hover:text-cream",

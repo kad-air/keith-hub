@@ -366,6 +366,8 @@ export default function FeedClient({
                 onClick={() => handleCategoryChange(cat.id)}
                 className={[
                   "group flex items-baseline gap-1.5 font-mono text-[0.7rem] uppercase tracking-kicker transition-colors",
+                  // Vertical hit zone bump on touch devices, no visual change
+                  "[@media(hover:none)]:py-2 [@media(hover:none)]:-my-1",
                   isActive
                     ? "text-cream"
                     : "text-cream-dim hover:text-cream",
@@ -404,7 +406,7 @@ export default function FeedClient({
             disabled={refreshing}
             title="Refresh (r)"
             aria-label="Refresh feeds"
-            className="flex h-8 w-8 items-center justify-center rounded-sm border border-rule text-cream-dim transition-colors hover:border-rule-strong hover:text-cream disabled:opacity-50"
+            className="flex h-8 w-8 items-center justify-center rounded-sm border border-rule text-cream-dim transition-colors hover:border-rule-strong hover:text-cream disabled:opacity-50 [@media(hover:none)]:h-11 [@media(hover:none)]:w-11"
           >
             <svg
               width="14"

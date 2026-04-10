@@ -9,6 +9,8 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
   }
 
   body {
@@ -26,6 +28,7 @@
       );
     background-attachment: fixed;
     min-height: 100vh;
+    min-height: 100dvh;
     overscroll-behavior-y: contain;
   }
 
