@@ -7,73 +7,71 @@ import FeedCard from "@/components/FeedCard";
 import KeyboardHelp from "@/components/KeyboardHelp";
 import { useKeyboard } from "@/lib/useKeyboard";
 
-interface SavedClientProps {
+interface ReadClientProps {
   initialItems: Item[];
 }
 
-export default function SavedClient({ initialItems }: SavedClientProps) {
+// /read is the history view: items the user has actually opened (consumed_at
+// is set, distinct from items that were just dismissed). It's append-only
+// from the user's perspective — opening an item from here re-opens the URL
+// in Safari and bumps it to the top, but doesn't remove it. Save toggles
+// behave the same as elsewhere. There's no dismiss-from-read action; this
+// view is the safety net for "I clicked a link and now I want it back."
+export default function ReadClient({ initialItems }: ReadClientProps) {
   const router = useRouter();
   const [items, setItems] = useState<Item[]>(initialItems);
   const [focusedIndex, setFocusedIndex] = useState(0);
   const [helpOpen, setHelpOpen] = useState(false);
   const cardRefs = useRef<Array<HTMLElement | null>>([]);
 
-  const removeFromList = useCallback((id: string) => {
-    setItems((prev) => prev.filter((it) => it.id !== id));
+  const handleOpen = useCallback(async (item: Item) => {
+    const podcastMeta =
+      item.source_category === "podcasts" && item.metadata
+        ? (() => {
+            try {
+              return JSON.parse(item.metadata) as { apple_id?: string };
+            } catch {
+              return null;
+            }
+          })()
+        : null;
+    const url = podcastMeta?.apple_id
+      ? `https://podcasts.apple.com/podcast/id${podcastMeta.apple_id}`
+      : item.url;
+    // Anchor click — see comment in FeedClient.handleOpen for the iOS PWA reason.
+    const a = document.createElement("a");
+    a.href = url;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    // Bump consumed_at so re-opening moves the item to the top of /read.
+    try {
+      await fetch(`/api/items/${item.id}/open`, { method: "POST" });
+    } catch {
+      // best effort
+    }
   }, []);
 
-  const handleOpen = useCallback(
-    async (item: Item) => {
-      const podcastMeta =
-        item.source_category === "podcasts" && item.metadata
-          ? (() => {
-              try {
-                return JSON.parse(item.metadata) as { apple_id?: string };
-              } catch {
-                return null;
-              }
-            })()
-          : null;
-      const url = podcastMeta?.apple_id
-        ? `https://podcasts.apple.com/podcast/id${podcastMeta.apple_id}`
-        : item.url;
-      // Anchor click instead of window.open — see comment in FeedClient.handleOpen.
-      // iOS standalone PWAs open window.open URLs in BOTH Safari and an in-PWA
-      // overlay; an <a target="_blank"> click is a clean handoff.
-      const a = document.createElement("a");
-      a.href = url;
-      a.target = "_blank";
-      a.rel = "noopener noreferrer";
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      // Opening from /saved does NOT remove the item — saved is its own pile.
-      // But we DO record the consume so it shows up in /read too.
-      try {
-        await fetch(`/api/items/${item.id}/open`, { method: "POST" });
-      } catch {
-        // best effort
-      }
-    },
-    []
-  );
+  const handleSave = useCallback(async (item: Item) => {
+    const wasSaved = !!item.saved_at;
+    setItems((prev) =>
+      prev.map((it) =>
+        it.id === item.id
+          ? { ...it, saved_at: wasSaved ? null : new Date().toISOString() }
+          : it
+      )
+    );
+    try {
+      await fetch(`/api/items/${item.id}/save`, { method: "POST" });
+    } catch (err) {
+      console.error("[ReadClient] Save error:", err);
+    }
+  }, []);
 
-  // Toggling save off (unsave) from /saved removes the item from this list.
-  const handleUnsave = useCallback(
-    async (item: Item) => {
-      removeFromList(item.id);
-      try {
-        await fetch(`/api/items/${item.id}/save`, { method: "POST" });
-      } catch (err) {
-        console.error("[SavedClient] Save toggle error:", err);
-      }
-    },
-    [removeFromList]
-  );
-
-  // On the saved page, "dismiss" means "remove from saved" — i.e. unsave.
-  // It does NOT call /read (that would affect the main feed in unexpected ways).
-  const handleDismiss = handleUnsave;
+  // No dismiss action on /read — this is the history view, not a triage queue.
+  // FeedCard hides the dismiss button when onDismiss is omitted.
 
   // Keep focusedIndex in bounds
   useEffect(() => {
@@ -102,15 +100,7 @@ export default function SavedClient({ initialItems }: SavedClientProps) {
       },
       s: () => {
         const it = items[focusedIndex];
-        if (it) void handleUnsave(it);
-      },
-      x: () => {
-        const it = items[focusedIndex];
-        if (it) void handleDismiss(it);
-      },
-      e: () => {
-        const it = items[focusedIndex];
-        if (it) void handleDismiss(it);
+        if (it) void handleSave(it);
       },
       "g h": () => router.push("/"),
       "g s": () => router.push("/saved"),
@@ -124,7 +114,7 @@ export default function SavedClient({ initialItems }: SavedClientProps) {
     <div className="mx-auto max-w-[720px] px-2 pb-32 pt-6">
       <div className="mb-5 flex items-baseline justify-between px-6">
         <h1 className="font-display text-[1.6rem] font-medium italic text-cream opsz-display">
-          Saved
+          Read
         </h1>
         <span className="font-mono text-[0.65rem] uppercase tracking-kicker text-cream-dim tabular-nums">
           {items.length} {items.length === 1 ? "item" : "items"}
@@ -134,11 +124,11 @@ export default function SavedClient({ initialItems }: SavedClientProps) {
       {items.length === 0 ? (
         <div className="px-6 py-24 text-center">
           <h2 className="font-display text-[1.6rem] font-medium italic text-cream opsz-display">
-            Nothing saved yet.
+            No history yet.
           </h2>
           <p className="mt-3 font-display text-[0.95rem] italic text-cream-dim">
-            Press <kbd className="font-mono text-[0.7rem] uppercase">s</kbd> on
-            any item to save it here.
+            Items you open from the feed will land here so you can find them
+            again.
           </p>
         </div>
       ) : (
@@ -154,8 +144,7 @@ export default function SavedClient({ initialItems }: SavedClientProps) {
               }}
               onFocus={() => setFocusedIndex(idx)}
               onOpen={() => void handleOpen(item)}
-              onSave={() => void handleUnsave(item)}
-              onDismiss={() => void handleDismiss(item)}
+              onSave={() => void handleSave(item)}
             />
           ))}
         </div>

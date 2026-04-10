@@ -10,7 +10,7 @@ interface FeedCardProps {
   onFocus: () => void;
   onOpen: () => void;
   onSave: () => void;
-  onDismiss: () => void;
+  onDismiss?: () => void;
 }
 
 const CATEGORY_LABEL: Record<string, { label: string; klass: string }> = {
@@ -241,21 +241,23 @@ const FeedCard = forwardRef<HTMLElement, FeedCardProps>(function FeedCard(
             <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
           </svg>
         </ActionButton>
-        <ActionButton label="Dismiss (x)" onClick={onDismiss}>
-          <svg
-            width="15"
-            height="15"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-        </ActionButton>
+        {onDismiss && (
+          <ActionButton label="Dismiss (x)" onClick={onDismiss}>
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </ActionButton>
+        )}
       </div>
     </article>
   );

@@ -148,7 +148,9 @@ export default function FeedClient({
       removeFromList(item.id);
       decrementCount(item);
       try {
-        await fetch(`/api/items/${item.id}/read`, { method: "POST" });
+        // /open marks the item as both read AND consumed, so it appears
+        // in the /read view. /read alone would only mark it as dismissed.
+        await fetch(`/api/items/${item.id}/open`, { method: "POST" });
       } catch {
         // best effort
       }
@@ -313,6 +315,7 @@ export default function FeedClient({
       r: () => void handleRefresh(),
       "g h": () => router.push("/"),
       "g s": () => router.push("/saved"),
+      "g r": () => router.push("/read"),
       "?": () => setHelpOpen((v) => !v),
     },
     !helpOpen

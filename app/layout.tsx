@@ -96,6 +96,12 @@ export default function RootLayout({
               >
                 Saved
               </Link>
+              <Link
+                href="/read"
+                className="font-mono text-[0.68rem] uppercase tracking-kicker text-cream-dim transition-colors hover:text-cream"
+              >
+                Read
+              </Link>
             </nav>
           </div>
         </header>
