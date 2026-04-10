@@ -3,9 +3,85 @@
 @tailwind utilities;
 
 @layer base {
+  /* ── Dark palette (default) ────────────────────────────────── */
+  /* CSS vars use space-separated RGB channels so Tailwind's
+     /opacity modifier works (e.g. bg-ink/85). */
+  :root {
+    --ink: 12 10 8;
+    --ink-raised: 21 18 14;
+    --ink-hover: 28 24 19;
+    --rule: 42 36 24;
+    --rule-strong: 58 51 34;
+    --cream: 245 239 225;
+    --cream-dim: 138 127 108;
+    --cream-dimmer: 90 81 69;
+    --accent: 212 74 63;
+    --accent-soft: 61 26 22;
+    --cat-podcasts: 95 168 136;
+    --cat-music: 164 126 192;
+    --cat-film: 212 160 74;
+    --cat-reading: 200 184 154;
+    --cat-bluesky: 123 168 201;
+    --selection-bg: #d44a3f;
+    --selection-fg: #f5efe1;
+    --grain-opacity: 0.05;
+    --gradient-a: rgba(212, 74, 63, 0.05);
+    --gradient-b: rgba(212, 160, 74, 0.04);
+  }
+
+  /* ── Light palette ─────────────────────────────────────────── */
+  [data-theme="light"] {
+    --ink: 246 243 238;
+    --ink-raised: 234 230 223;
+    --ink-hover: 224 219 211;
+    --rule: 208 200 186;
+    --rule-strong: 184 174 158;
+    --cream: 26 23 20;
+    --cream-dim: 107 99 89;
+    --cream-dimmer: 154 145 134;
+    --accent: 196 56 50;
+    --accent-soft: 252 232 230;
+    --cat-podcasts: 61 138 106;
+    --cat-music: 127 88 168;
+    --cat-film: 184 132 36;
+    --cat-reading: 122 110 90;
+    --cat-bluesky: 74 130 170;
+    --selection-bg: #c43832;
+    --selection-fg: #f6f3ee;
+    --grain-opacity: 0.03;
+    --gradient-a: rgba(196, 56, 50, 0.04);
+    --gradient-b: rgba(184, 132, 36, 0.04);
+  }
+
+  /* ── Auto: follow system preference ────────────────────────── */
+  @media (prefers-color-scheme: light) {
+    [data-theme="auto"] {
+      --ink: 246 243 238;
+      --ink-raised: 234 230 223;
+      --ink-hover: 224 219 211;
+      --rule: 208 200 186;
+      --rule-strong: 184 174 158;
+      --cream: 26 23 20;
+      --cream-dim: 107 99 89;
+      --cream-dimmer: 154 145 134;
+      --accent: 196 56 50;
+      --accent-soft: 252 232 230;
+      --cat-podcasts: 61 138 106;
+      --cat-music: 127 88 168;
+      --cat-film: 184 132 36;
+      --cat-reading: 122 110 90;
+      --cat-bluesky: 74 130 170;
+      --selection-bg: #c43832;
+      --selection-fg: #f6f3ee;
+      --grain-opacity: 0.03;
+      --gradient-a: rgba(196, 56, 50, 0.04);
+      --gradient-b: rgba(184, 132, 36, 0.04);
+    }
+  }
+
   html {
-    background-color: #0c0a08;
-    color: #f5efe1;
+    background-color: rgb(var(--ink));
+    color: rgb(var(--cream));
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
@@ -14,16 +90,16 @@
   }
 
   body {
-    background-color: #0c0a08;
+    background-color: rgb(var(--ink));
     background-image:
       radial-gradient(
         ellipse at 15% -10%,
-        rgba(212, 74, 63, 0.05) 0%,
+        var(--gradient-a) 0%,
         transparent 50%
       ),
       radial-gradient(
         ellipse at 85% 110%,
-        rgba(212, 160, 74, 0.04) 0%,
+        var(--gradient-b) 0%,
         transparent 55%
       );
     background-attachment: fixed;
@@ -39,14 +115,14 @@
     inset: 0;
     pointer-events: none;
     z-index: 1;
-    opacity: 0.05;
+    opacity: var(--grain-opacity);
     mix-blend-mode: overlay;
     background-image: url("data:image/svg+xml;utf8,%3Csvg viewBox='0 0 240 240' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.96  0 0 0 0 0.94  0 0 0 0 0.88  0 0 0 0.55 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   }
 
   ::selection {
-    background-color: #d44a3f;
-    color: #f5efe1;
+    background-color: var(--selection-bg);
+    color: var(--selection-fg);
   }
 
   ::-webkit-scrollbar {
@@ -57,11 +133,11 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: #2a2418;
+    background: rgb(var(--rule));
     border-radius: 3px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #3a3322;
+    background: rgb(var(--rule-strong));
   }
 
   /* Hide focus ring on mouse, keep for keyboard */
@@ -69,7 +145,7 @@
     outline: none;
   }
   :focus-visible {
-    outline: 1px solid #d44a3f;
+    outline: 1px solid rgb(var(--accent));
     outline-offset: 2px;
     border-radius: 2px;
   }

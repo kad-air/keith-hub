@@ -10,29 +10,29 @@ const config: Config = {
     extend: {
       colors: {
         ink: {
-          DEFAULT: "#0c0a08",
-          raised: "#15120e",
-          hover: "#1c1813",
+          DEFAULT: "rgb(var(--ink) / <alpha-value>)",
+          raised: "rgb(var(--ink-raised) / <alpha-value>)",
+          hover: "rgb(var(--ink-hover) / <alpha-value>)",
         },
         rule: {
-          DEFAULT: "#2a2418",
-          strong: "#3a3322",
+          DEFAULT: "rgb(var(--rule) / <alpha-value>)",
+          strong: "rgb(var(--rule-strong) / <alpha-value>)",
         },
         cream: {
-          DEFAULT: "#f5efe1",
-          dim: "#8a7f6c",
-          dimmer: "#5a5145",
+          DEFAULT: "rgb(var(--cream) / <alpha-value>)",
+          dim: "rgb(var(--cream-dim) / <alpha-value>)",
+          dimmer: "rgb(var(--cream-dimmer) / <alpha-value>)",
         },
         accent: {
-          DEFAULT: "#d44a3f",
-          soft: "#3d1a16",
+          DEFAULT: "rgb(var(--accent) / <alpha-value>)",
+          soft: "rgb(var(--accent-soft) / <alpha-value>)",
         },
         cat: {
-          podcasts: "#5fa888",
-          music: "#a47ec0",
-          film: "#d4a04a",
-          reading: "#c8b89a",
-          bluesky: "#7ba8c9",
+          podcasts: "rgb(var(--cat-podcasts) / <alpha-value>)",
+          music: "rgb(var(--cat-music) / <alpha-value>)",
+          film: "rgb(var(--cat-film) / <alpha-value>)",
+          reading: "rgb(var(--cat-reading) / <alpha-value>)",
+          bluesky: "rgb(var(--cat-bluesky) / <alpha-value>)",
         },
       },
       fontFamily: {

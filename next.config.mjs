@@ -1,3 +1,4 @@
+import { execSync } from "child_process";
 import withSerwistInit from "@serwist/next";
 
 const withSerwist = withSerwistInit({
@@ -9,9 +10,23 @@ const withSerwist = withSerwistInit({
   disable: process.env.NODE_ENV === "development",
 });
 
+// Bake git metadata into the build so the app menu can show version info.
+const GIT_COMMIT = execSync("git rev-parse --short HEAD").toString().trim();
+const GIT_LAST_MERGE_TS = (() => {
+  try {
+    return execSync("git log -1 --merges --format=%cI").toString().trim() || "";
+  } catch {
+    return "";
+  }
+})();
+
 const nextConfig = {
   // Allow better-sqlite3 to be used server-side only
   experimental: {},
+  env: {
+    NEXT_PUBLIC_GIT_COMMIT: GIT_COMMIT,
+    NEXT_PUBLIC_GIT_LAST_MERGE_TS: GIT_LAST_MERGE_TS,
+  },
   webpack: (config, { isServer }) => {
     if (!isServer) {
       // Don't bundle server-only modules on client
