@@ -1,5 +1,6 @@
 import type Database from "better-sqlite3";
 import type { CategoryCounts, Item } from "./types";
+import { bucketFor, type DateBucket } from "./groupByDate";
 
 // ── Tunable knobs ───────────────────────────────────────────────────────────
 // Both of these control the "finite, not infinite" mission. Tweak freely.
@@ -116,16 +117,22 @@ function selectWithSurprise(items: Item[], quota: number): Item[] {
 
 /**
  * Stride-scheduled interleave. Each category emits items at intervals
- * proportional to its quota — high-quota categories appear more often, low-
- * quota less. Phase offsets prevent multiple categories from landing on the
- * same virtual position. INTERLEAVE_JITTER perturbs positions slightly so
- * the cadence isn't perfectly mechanical.
+ * proportional to its actual item count — high-count categories appear
+ * more often, low-count less. Phase offsets prevent multiple categories
+ * from landing on the same virtual position. INTERLEAVE_JITTER perturbs
+ * positions slightly so the cadence isn't perfectly mechanical.
  *
- * With the current quotas {podcasts:100, music:50, film:50, reading:50,
- * bluesky:50}, the deterministic pattern (jitter=0) is roughly P M F P R B
- * repeating — podcasts every other slot, the others rotating in between.
- * No category appears twice in a row unless one category is the only one
- * still contributing items.
+ * Stride is based on the **actual item count**, not the global quota.
+ * The quotas already did their job in the selection phase (picking how
+ * many items each category contributes). Here the goal is purely even
+ * spacing: if Today has 20 bluesky and 5 music items, the 5 music items
+ * should be spread evenly among the 20 bluesky items. Using the quota
+ * (which is equal for those two categories) would give them identical
+ * strides, so music would run out early and bluesky would clump at the
+ * tail.
+ *
+ * No category appears twice in a row unless one category has more items
+ * than all others combined.
  */
 function interleaveByQuota(
   byCategory: Array<{ cat: keyof CategoryCounts; items: Item[] }>
@@ -133,19 +140,15 @@ function interleaveByQuota(
   const active = byCategory.filter((c) => c.items.length > 0);
   if (active.length === 0) return [];
 
-  const totalQuota = active.reduce(
-    (sum, { cat }) => sum + ALL_VIEW_QUOTAS[cat],
-    0
-  );
-  if (totalQuota <= 0) return [];
+  const totalItems = active.reduce((sum, { items }) => sum + items.length, 0);
+  if (totalItems <= 0) return [];
 
   type Slot = { vpos: number; item: Item };
   const slots: Slot[] = [];
 
-  active.forEach(({ cat, items }, catIdx) => {
-    const quota = ALL_VIEW_QUOTAS[cat];
-    if (quota <= 0) return;
-    const stride = totalQuota / quota;
+  active.forEach(({ items }, catIdx) => {
+    const count = items.length;
+    const stride = totalItems / count;
     const phase = (stride * catIdx) / active.length;
     for (let rank = 0; rank < items.length; rank++) {
       const jitter = (Math.random() - 0.5) * stride * INTERLEAVE_JITTER;
@@ -158,21 +161,28 @@ function interleaveByQuota(
 }
 
 /**
- * Returns up to `limit` items for the main feed. Two-phase algorithm:
+ * Returns up to `limit` items for the main feed. Three-phase algorithm:
  *
  * 1. **Per-category selection with surprise.** Each category contributes up
  *    to ALL_VIEW_QUOTAS[cat] items, picked from a SURPRISE_POOL_MULTIPLIER-
  *    sized recency window via weighted sampling — newer items strongly
  *    favored, older items occasionally bubbling up for variety.
- * 2. **Stride-scheduled interleave.** The selected items are woven together
- *    so high-quota categories appear more often than low-quota ones, but no
- *    category clumps two-in-a-row under typical conditions. See
- *    interleaveByQuota for the cadence math.
+ * 2. **Per-bucket interleave.** Items are grouped by date bucket (Today,
+ *    Yesterday, This week, Earlier) and then stride-interleaved *within*
+ *    each bucket. This is critical: a global interleave followed by date
+ *    bucketing destroys the mixing because categories publish at different
+ *    rates — high-frequency categories (bluesky) clump in the tail of each
+ *    bucket while low-frequency ones (music) clump at the head. By
+ *    interleaving inside each bucket, every time section shows a well-mixed
+ *    rotation regardless of publication cadence.
+ * 3. **Concatenation.** The per-bucket results are joined in bucket order
+ *    (Today → Yesterday → This week → Earlier) to produce the final flat
+ *    list. The downstream groupByDate is order-preserving so the per-bucket
+ *    interleave pattern survives the split.
  *
  * The output is NOT sorted by published_at — that's exactly what was
  * causing categories to clump whenever a source published in a tight time
- * window. The downstream date-bucketing in groupByDate is order-preserving
- * so the interleave pattern survives the Today/Yesterday/etc. split.
+ * window.
  */
 export function getMainFeedItems(
   db: Database.Database,
@@ -185,20 +195,52 @@ export function getMainFeedItems(
      LIMIT ?`
   );
 
+  // Phase 1: per-category selection with surprise
   const byCategory: Array<{ cat: keyof CategoryCounts; items: Item[] }> = [];
   for (const [catKey, quota] of Object.entries(ALL_VIEW_QUOTAS) as Array<
     [keyof CategoryCounts, number]
   >) {
     if (catKey === "all" || quota <= 0) continue;
-    // Pull a slightly oversampled recency window from SQL, then narrow to
-    // quota in JS via weighted sampling. The pool is at least `quota` items
-    // (no surprise applied if pool == quota).
     const poolSize = Math.max(quota, Math.ceil(quota * SURPRISE_POOL_MULTIPLIER));
     const pool = stmt.all(catKey, poolSize) as Item[];
     byCategory.push({ cat: catKey, items: selectWithSurprise(pool, quota) });
   }
 
-  return interleaveByQuota(byCategory).slice(0, limit);
+  // Phase 2: bucket items by date, then interleave within each bucket
+  const now = new Date();
+  const BUCKET_ORDER: DateBucket[] = ["Today", "Yesterday", "This week", "Earlier"];
+
+  // Split each category's items into date buckets
+  const catBuckets = new Map<
+    DateBucket,
+    Array<{ cat: keyof CategoryCounts; items: Item[] }>
+  >();
+  for (const bucket of BUCKET_ORDER) {
+    catBuckets.set(bucket, []);
+  }
+  for (const { cat, items } of byCategory) {
+    const perBucket = new Map<DateBucket, Item[]>();
+    for (const item of items) {
+      const bucket = bucketFor(item.published_at, now);
+      const arr = perBucket.get(bucket);
+      if (arr) arr.push(item);
+      else perBucket.set(bucket, [item]);
+    }
+    perBucket.forEach((bucketItems, bucket) => {
+      catBuckets.get(bucket)!.push({ cat, items: bucketItems });
+    });
+  }
+
+  // Phase 3: interleave within each bucket, concatenate in bucket order
+  const result: Item[] = [];
+  for (const bucket of BUCKET_ORDER) {
+    const catSlices = catBuckets.get(bucket)!;
+    if (catSlices.length > 0) {
+      result.push(...interleaveByQuota(catSlices));
+    }
+  }
+
+  return result.slice(0, limit);
 }
 
 /**
