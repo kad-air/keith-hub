@@ -100,6 +100,36 @@ function stripHtml(html: string): string {
   return html.replace(/<[^>]+>/g, "").trim().slice(0, 300);
 }
 
+// ── Per-source item filters ─────────────────────────────────────────────────
+//
+// Some feeds publish a mix of content types and we only want one kind. This
+// is a per-source allow-list keyed by source.id, parallel to the title
+// rewriters above. Sources without an entry pass everything through.
+//
+// We apply the filter in two places:
+//   1. At ingest (the .filter() in the map step) so new fetches drop items.
+//   2. As a SQL cleanup right after the upsert so existing rows that pre-date
+//      the filter get pruned. The cleanup is self-healing on every poll.
+
+function shouldKeepRssItem(sourceId: string, url: string): boolean {
+  if (sourceId === "allmusic") {
+    // AllMusic publishes album reviews, blog posts, interviews, and a weekly
+    // newsletter all in the same feed. Album review URLs contain /album/.
+    return url.includes("/album/");
+  }
+  return true;
+}
+
+// Returns the SQL WHERE clause (without "WHERE") that matches items to
+// REMOVE for this source, or null if no cleanup is needed. Must stay in
+// sync with shouldKeepRssItem.
+function rssCleanupWhereClause(sourceId: string): string | null {
+  if (sourceId === "allmusic") {
+    return "url NOT LIKE '%/album/%'";
+  }
+  return null;
+}
+
 function toIsoString(date: string | Date | undefined): string {
   if (!date) return new Date().toISOString();
   try {
@@ -239,9 +269,37 @@ export async function fetchRssSource(
       fetched_at: now,
       metadata,
     };
-  });
+  })
+  // Drop items that don't pass the per-source allow-list (e.g. AllMusic
+  // blog posts / newsletters in the album-reviews-only feed).
+  .filter((row) => shouldKeepRssItem(source.id, row.url));
 
   insertMany(itemsToInsert);
+
+  // Self-healing cleanup: prune existing rows that pre-date the per-source
+  // filter. Runs every poll cycle. Cheap (indexed scan + small N), idempotent.
+  // Must delete from item_state first because of the FK with no CASCADE.
+  const cleanupWhere = rssCleanupWhereClause(source.id);
+  if (cleanupWhere) {
+    const purgeState = db.prepare(
+      `DELETE FROM item_state WHERE item_id IN (
+         SELECT id FROM items WHERE source_id = ? AND ${cleanupWhere}
+       )`
+    );
+    const purgeItems = db.prepare(
+      `DELETE FROM items WHERE source_id = ? AND ${cleanupWhere}`
+    );
+    const purge = db.transaction(() => {
+      purgeState.run(source.id);
+      const result = purgeItems.run(source.id);
+      if (result.changes > 0) {
+        console.log(
+          `[fetcher] ${source.name}: pruned ${result.changes} item(s) outside the source filter`
+        );
+      }
+    });
+    purge();
+  }
 
   updateSource.run({ last_fetched_at: now, id: source.id });
 
