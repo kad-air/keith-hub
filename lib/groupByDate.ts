@@ -14,7 +14,7 @@ const BUCKET_ORDER: DateBucket[] = [
   "Earlier",
 ];
 
-export function bucketFor(publishedAt: string, now: Date): DateBucket {
+function bucketFor(publishedAt: string, now: Date): DateBucket {
   const then = new Date(publishedAt);
   const diffMs = now.getTime() - then.getTime();
   const diffDays = Math.floor(diffMs / 86_400_000);

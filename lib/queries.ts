@@ -1,6 +1,5 @@
 import type Database from "better-sqlite3";
 import type { CategoryCounts, Item } from "./types";
-import { bucketFor, type DateBucket } from "./groupByDate";
 
 // ── Tunable knobs ───────────────────────────────────────────────────────────
 // Both of these control the "finite, not infinite" mission. Tweak freely.
@@ -161,28 +160,24 @@ function interleaveByQuota(
 }
 
 /**
- * Returns up to `limit` items for the main feed. Three-phase algorithm:
+ * Returns up to `limit` items for the main feed. Two-phase algorithm:
  *
  * 1. **Per-category selection with surprise.** Each category contributes up
  *    to ALL_VIEW_QUOTAS[cat] items, picked from a SURPRISE_POOL_MULTIPLIER-
  *    sized recency window via weighted sampling — newer items strongly
  *    favored, older items occasionally bubbling up for variety.
- * 2. **Per-bucket interleave.** Items are grouped by date bucket (Today,
- *    Yesterday, This week, Earlier) and then stride-interleaved *within*
- *    each bucket. This is critical: a global interleave followed by date
- *    bucketing destroys the mixing because categories publish at different
- *    rates — high-frequency categories (bluesky) clump in the tail of each
- *    bucket while low-frequency ones (music) clump at the head. By
- *    interleaving inside each bucket, every time section shows a well-mixed
- *    rotation regardless of publication cadence.
- * 3. **Concatenation.** The per-bucket results are joined in bucket order
- *    (Today → Yesterday → This week → Earlier) to produce the final flat
- *    list. The downstream groupByDate is order-preserving so the per-bucket
- *    interleave pattern survives the split.
+ * 2. **Count-based stride interleave.** The selected items are woven
+ *    together so each category's items are evenly spaced. Stride is based
+ *    on the actual item count per category, not the quota — the quotas
+ *    already determined composition in step 1. This means a category with
+ *    20 items and one with 5 items get proportional spacing: the 5 items
+ *    are spread evenly among the 20, no clumping at the tail. The
+ *    downstream groupByDate is order-preserving so the interleave pattern
+ *    survives the Today/Yesterday/etc. split.
  *
- * The output is NOT sorted by published_at — that's exactly what was
- * causing categories to clump whenever a source published in a tight time
- * window.
+ * The output is NOT sorted by published_at — that strict recency sort was
+ * exactly what caused categories to clump whenever a source published in a
+ * tight time window.
  */
 export function getMainFeedItems(
   db: Database.Database,
@@ -195,7 +190,6 @@ export function getMainFeedItems(
      LIMIT ?`
   );
 
-  // Phase 1: per-category selection with surprise
   const byCategory: Array<{ cat: keyof CategoryCounts; items: Item[] }> = [];
   for (const [catKey, quota] of Object.entries(ALL_VIEW_QUOTAS) as Array<
     [keyof CategoryCounts, number]
@@ -206,41 +200,7 @@ export function getMainFeedItems(
     byCategory.push({ cat: catKey, items: selectWithSurprise(pool, quota) });
   }
 
-  // Phase 2: bucket items by date, then interleave within each bucket
-  const now = new Date();
-  const BUCKET_ORDER: DateBucket[] = ["Today", "Yesterday", "This week", "Earlier"];
-
-  // Split each category's items into date buckets
-  const catBuckets = new Map<
-    DateBucket,
-    Array<{ cat: keyof CategoryCounts; items: Item[] }>
-  >();
-  for (const bucket of BUCKET_ORDER) {
-    catBuckets.set(bucket, []);
-  }
-  for (const { cat, items } of byCategory) {
-    const perBucket = new Map<DateBucket, Item[]>();
-    for (const item of items) {
-      const bucket = bucketFor(item.published_at, now);
-      const arr = perBucket.get(bucket);
-      if (arr) arr.push(item);
-      else perBucket.set(bucket, [item]);
-    }
-    perBucket.forEach((bucketItems, bucket) => {
-      catBuckets.get(bucket)!.push({ cat, items: bucketItems });
-    });
-  }
-
-  // Phase 3: interleave within each bucket, concatenate in bucket order
-  const result: Item[] = [];
-  for (const bucket of BUCKET_ORDER) {
-    const catSlices = catBuckets.get(bucket)!;
-    if (catSlices.length > 0) {
-      result.push(...interleaveByQuota(catSlices));
-    }
-  }
-
-  return result.slice(0, limit);
+  return interleaveByQuota(byCategory).slice(0, limit);
 }
 
 /**
