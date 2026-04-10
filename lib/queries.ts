@@ -171,9 +171,7 @@ function interleaveByQuota(
  *    on the actual item count per category, not the quota — the quotas
  *    already determined composition in step 1. This means a category with
  *    20 items and one with 5 items get proportional spacing: the 5 items
- *    are spread evenly among the 20, no clumping at the tail. The
- *    downstream groupByDate is order-preserving so the interleave pattern
- *    survives the Today/Yesterday/etc. split.
+ *    are spread evenly among the 20, no clumping at the tail.
  *
  * The output is NOT sorted by published_at — that strict recency sort was
  * exactly what caused categories to clump whenever a source published in a
