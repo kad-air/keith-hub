@@ -3,6 +3,8 @@ import { Newsreader, JetBrains_Mono } from "next/font/google";
 import Link from "next/link";
 import "./globals.css";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
+import ThemeProvider from "@/components/ThemeProvider";
+import AppMenu from "@/components/AppMenu";
 
 const displayFont = Newsreader({
   subsets: ["latin"],
@@ -62,14 +64,24 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`dark ${displayFont.variable} ${monoFont.variable}`}
+      data-theme="auto"
+      className={`${displayFont.variable} ${monoFont.variable}`}
+      suppressHydrationWarning
     >
       <head>
         {/* Manual manifest link — see comment on metadata above for why this
             is hand-rolled instead of using metadata.manifest. */}
         <link rel="manifest" href="/manifest.webmanifest" />
+        {/* Blocking script: apply saved theme before first paint to avoid
+            a flash of the wrong theme. Must run before React hydrates. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem("the-feed-theme");if(t&&["light","dark","auto"].indexOf(t)!==-1){document.documentElement.setAttribute("data-theme",t)}}catch(e){}})()`,
+          }}
+        />
       </head>
       <body className="font-display text-cream bg-ink min-h-screen">
+        <ThemeProvider>
         <header className="sticky top-0 z-40 border-b border-rule/60 bg-ink/85 backdrop-blur-md pt-[env(safe-area-inset-top)]">
           <div className="mx-auto flex min-h-14 max-w-[720px] items-center justify-between pl-[max(1.5rem,env(safe-area-inset-left))] pr-[max(1.5rem,env(safe-area-inset-right))]">
             <Link href="/" className="group inline-flex items-baseline gap-1.5">
@@ -102,11 +114,13 @@ export default function RootLayout({
               >
                 Read
               </Link>
+              <AppMenu />
             </nav>
           </div>
         </header>
         <main className="relative z-10">{children}</main>
         <ServiceWorkerRegister />
+        </ThemeProvider>
       </body>
     </html>
   );
