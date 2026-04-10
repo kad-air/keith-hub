@@ -135,6 +135,37 @@ function stripHtml(html: string): string {
   return html.replace(/<[^>]+>/g, "").trim().slice(0, 300);
 }
 
+// Single-pass HTML entity decoder. Handles numeric (&#39;, &#x27;) and the
+// named entities that actually show up in RSS feeds. Some sources (notably
+// The Verge) XML-escape apostrophes inside <title> as &#8217; — rss-parser
+// hands those through verbatim, so we decode here. Single-pass means
+// `&amp;lt;` correctly stays `&lt;` instead of cascading to `<`.
+function decodeEntities(text: string): string {
+  if (!text) return text;
+  return text.replace(
+    /&(?:#x([0-9a-fA-F]+)|#(\d+)|([a-zA-Z]+));/g,
+    (match, hex, dec, name) => {
+      if (hex !== undefined) {
+        const code = parseInt(hex, 16);
+        return Number.isFinite(code) ? String.fromCodePoint(code) : match;
+      }
+      if (dec !== undefined) {
+        const code = parseInt(dec, 10);
+        return Number.isFinite(code) ? String.fromCodePoint(code) : match;
+      }
+      switch (name) {
+        case "amp":  return "&";
+        case "lt":   return "<";
+        case "gt":   return ">";
+        case "quot": return '"';
+        case "apos": return "'";
+        case "nbsp": return " ";
+        default:     return match;
+      }
+    }
+  );
+}
+
 // ── Per-source item filters ─────────────────────────────────────────────────
 //
 // Some feeds publish a mix of content types and we only want one kind. This
@@ -254,7 +285,7 @@ export async function fetchRssSource(
       item.summary ||
       (itunes.summary as string) ||
       "";
-    const bodyExcerpt = stripHtml(rawContent);
+    const bodyExcerpt = decodeEntities(stripHtml(rawContent));
     const externalId = String(item.guid || item.id || item.link || "");
 
     // Podcast image: item itunes.image > feed itunes.image (no enclosure fallback — that's audio)
@@ -281,6 +312,7 @@ export async function fetchRssSource(
     // normal titles.
     const url: string = (item.link as string) || source.url || "";
     let title: string | null = (item.title as string) || null;
+    if (title) title = decodeEntities(title);
     if (source.id === "pitchfork-reviews" && url.includes("/reviews/albums/") && title) {
       title = rewritePitchforkAlbumTitle(title, url) ?? title;
     } else if (source.id === "allmusic" && url.includes("/album/")) {
