@@ -67,10 +67,13 @@ Standard "the user reports a bug" workflow:
 - **Read history (`/read`)** — items where `consumed_at IS NOT NULL`, ordered by `consumed_at DESC`. Append-only history of things the user actually opened. Re-opening from /read bumps `consumed_at` so the item moves to the top. ReadClient passes no `onDismiss`, so FeedCard hides the dismiss button and left-swipes snap back instead of being destructive.
 
 ### Feed filtering invariants
-- The "All" view uses the **hyperbolic ranked sort** in `RANKED_ORDER` (lib/db.ts): `score = weight / (age_hours + C)` where `C = 2` flattens the curve in the first couple of hours. Current weights: podcasts 8, music/film 6, reading 3, bluesky 1. Tune in the `WEIGHTS` const in lib/db.ts, not in callers.
-- **Category-filtered views use pure recency** (`ORDER BY published_at DESC`), not the ranked sort — see `app/api/items/route.ts`. Intentional: ranking only makes sense when categories are competing.
+- **Main feed cap = 300 items** (`MAIN_FEED_LIMIT` in `app/page.tsx`, `FEED_LIMIT` in `components/FeedClient.tsx` — keep them in sync). Big enough to clear a daily backlog in one session, small enough that 300 cards aren't a perf disaster on iOS. The `/api/items` endpoint caps `limit` at 500 as a defensive ceiling.
+- The "All" view uses **inclusion-based selection, not order-based ranking** (`getMainFeedItems` in `lib/queries.ts`): take all unread podcast/music/film items (capped at the limit if there are more), fill remaining slots with the most recent unread reading/bluesky items, then sort the merged set by `published_at DESC`. The intent is "never miss a podcast/album/movie review" while keeping pure-recency display order. High-signal items are NOT pinned to the top — they're just guaranteed to be IN the 300. In the **backlog phase** (e.g. 5500+ unread podcasts), high-signal saturates the budget and low-signal gets nothing visible until the user clears the backlog. In **steady state** (a daily check-in), there are only ~25 high-signal items per day so the inclusion guarantee is invisible and the feed reads as pure recency.
+- Note: `RANKED_ORDER` (the hyperbolic decay sort) is no longer used by the All view but is still exported from `lib/db.ts` in case anything else wants it.
+- **Category-filtered views use pure recency** (`ORDER BY published_at DESC`), not the inclusion logic — see `app/api/items/route.ts`. Intentional: ranking only makes sense when categories are competing. Categories also respect the 300 cap.
 - **Saving auto-marks-read** (`app/api/items/[id]/save/route.ts`): the save endpoint sets both `saved_at` and `read_at` when toggling on, so saved items leave the main feed and live in `/saved`. Each item gets a verdict — this is the triage principle. Unsaving does NOT touch `read_at` (the item stays read).
 - **Opening auto-marks-read AND consumed** (`app/api/items/[id]/open/route.ts`): `handleOpen` in all three view clients calls `/open` which sets both `read_at` and `consumed_at` in one upsert. Dismiss flows still call `/read` (no consumed_at) so the history view stays clean.
+- **Bulk dismiss is NOT "marked as read"** (`POST /api/items/read-all`, called by the "Dismiss all" button at the bottom of the feed). The handler `markAllUnreadAsRead` in `lib/queries.ts` only sets `read_at`, never `consumed_at`. Bulk-dismissed items do NOT appear in `/read`. The internal name is `markAllUnreadAsRead` (describes the SQL); the user-facing label is "Dismiss all" (describes the intent). Don't conflate the two — a future change that bulk-sets `consumed_at` would dump thousands of items the user never opened into the history view.
 - Per-category counts come from `getCategoryCounts(db)` in `lib/queries.ts` — a single grouped query returned alongside `/api/items` results so the tabs can show `READING · 12` etc.
 
 ### Key files
@@ -107,12 +110,13 @@ Desktop hover behavior is unchanged: action buttons in the top-right corner appe
 - Theme tokens live in `tailwind.config.ts` (`ink`, `cream`, `rule`, `accent`, per-category `cat.*`). Don't hardcode hexes in components — extend the theme
 
 ### API routes
-- `GET  /api/items?category=&limit=&offset=` — lists unread items, ranked for "all", recent for categories. Response includes `counts: CategoryCounts` for the tab labels
-- `POST /api/items/[id]/read` — marks read (upserts `item_state.read_at`). Used by dismiss flows
+- `GET  /api/items?category=&limit=&offset=` — lists unread items. The All view uses inclusion-based selection via `getMainFeedItems` (see Feed filtering invariants). Categories use pure recency. `limit` is capped at 500 server-side. Response includes `counts: CategoryCounts` for the tab labels
+- `POST /api/items/[id]/read` — marks read (upserts `item_state.read_at`). Used by per-item dismiss flows
 - `POST /api/items/[id]/open` — marks BOTH `read_at` AND `consumed_at`. Used by open flows. **Distinct from /read** so the /read history view can distinguish "I clicked this" from "I dismissed this"
 - `POST /api/items/[id]/unread` — clears `read_at` (used by undo)
 - `POST /api/items/[id]/save` — toggles saved. **When toggling on, also sets `read_at`** so the item leaves the main feed
-- `POST /api/items/read-bulk` — body `{ ids: string[], unread?: boolean }`. Bulk mark-read in a single transaction. Used by "Dismiss all" and bulk undo
+- `POST /api/items/read-bulk` — body `{ ids: string[], unread?: boolean }`. Bulk mark-read or bulk-clear-read in a single transaction. Used by undo flows
+- `POST /api/items/read-all` — body `{ category?: string }`. Bulk dismiss every unread item in scope (omit category for "everything"). Returns the affected IDs so the client can build an undo. Backs the "Dismiss all" footer button. **Sets only `read_at`, never `consumed_at`** — see the bulk-dismiss invariant above
 - `POST /api/refresh` — forces an immediate `fetchAllSources()` run
 
 ### Keyboard shortcuts

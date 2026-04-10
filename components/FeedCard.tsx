@@ -302,6 +302,7 @@ const FeedCard = forwardRef<HTMLDivElement, FeedCardProps>(function FeedCard(
           <img
             src={bsky.avatar_url}
             alt=""
+            loading="lazy"
             className="h-4 w-4 flex-shrink-0 rounded-full object-cover"
           />
         )}
@@ -350,6 +351,7 @@ const FeedCard = forwardRef<HTMLDivElement, FeedCardProps>(function FeedCard(
             <img
               src={podcast?.artwork_url || item.image_url || ""}
               alt=""
+              loading="lazy"
               className="h-20 w-20 flex-shrink-0 rounded-sm object-cover ring-1 ring-rule"
             />
           )}
@@ -653,6 +655,7 @@ function QuotedPost({ post }: { post: BlueskyQuotedPost }) {
           <img
             src={post.avatar_url}
             alt=""
+            loading="lazy"
             className="h-3.5 w-3.5 flex-shrink-0 rounded-full object-cover"
           />
         )}

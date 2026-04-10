@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb, RANKED_ORDER } from "@/lib/db";
-import { getCategoryCounts } from "@/lib/queries";
+import { getDb } from "@/lib/db";
+import { getCategoryCounts, getMainFeedItems } from "@/lib/queries";
 import type { Item, ItemsResponse } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -9,7 +9,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
     const { searchParams } = new URL(request.url);
     const category = searchParams.get("category") || null;
-    const limit = Math.min(parseInt(searchParams.get("limit") || "50", 10), 200);
+    // Cap at 500 so a misbehaving client can't ask for the entire DB.
+    // The intended ceiling is 300 — see MAIN_FEED_LIMIT in app/page.tsx and
+    // FeedClient.tsx.
+    const limit = Math.min(parseInt(searchParams.get("limit") || "50", 10), 500);
     const offset = parseInt(searchParams.get("offset") || "0", 10);
 
     const db = getDb();
@@ -57,24 +60,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         )
         .get() as { count: number };
 
-      rows = db
-        .prepare(
-          `SELECT
-            i.*,
-            s.name as source_name,
-            s.category as source_category,
-            ist.read_at,
-            ist.saved_at,
-            ist.consumed_at,
-            ist.notes
-          FROM items i
-          LEFT JOIN item_state ist ON ist.item_id = i.id
-          JOIN sources s ON s.id = i.source_id
-          WHERE ist.read_at IS NULL
-          ORDER BY ${RANKED_ORDER}
-          LIMIT ? OFFSET ?`
-        )
-        .all(limit, offset) as Item[];
+      // Main feed: inclusion-based, not order-based — see getMainFeedItems
+      // for the rationale. Offset is ignored here; the main feed is a
+      // bounded snapshot, not a paginated stream.
+      rows = getMainFeedItems(db, limit);
     }
 
     const total = totalRow.count;

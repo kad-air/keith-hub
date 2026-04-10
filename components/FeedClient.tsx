@@ -14,6 +14,10 @@ interface FeedClientProps {
   initialCounts: CategoryCounts;
 }
 
+// Main feed cap. Matches MAIN_FEED_LIMIT in app/page.tsx — they should
+// stay in sync so initial SSR and client-side refetch return the same shape.
+const FEED_LIMIT = 300;
+
 const CATEGORIES: Array<{ id: keyof CategoryCounts; label: string }> = [
   { id: "all", label: "All" },
   { id: "podcasts", label: "Podcasts" },
@@ -25,7 +29,11 @@ const CATEGORIES: Array<{ id: keyof CategoryCounts; label: string }> = [
 
 interface PendingDismiss {
   ids: string[];
-  items: Item[]; // for restoring
+  // For per-item dismiss/dismiss-all flows we snapshot the items so undo
+  // can restore them in place. For mark-all-as-read the snapshot would be
+  // huge (potentially thousands of items), so we leave it empty and the
+  // undo handler refetches from the server instead.
+  items: Item[];
   message: string;
 }
 
@@ -51,7 +59,10 @@ export default function FeedClient({
     async (category: keyof CategoryCounts) => {
       setSwapping(true);
       try {
-        const params = new URLSearchParams({ limit: "50", offset: "0" });
+        const params = new URLSearchParams({
+          limit: String(FEED_LIMIT),
+          offset: "0",
+        });
         if (category !== "all") params.set("category", category);
         const res = await fetch(`/api/items?${params}`, { cache: "no-store" });
         if (!res.ok) throw new Error("fetch failed");
@@ -200,68 +211,96 @@ export default function FeedClient({
     [removeFromList, decrementCount]
   );
 
-  const handleDismissAll = useCallback(async () => {
-    if (items.length === 0) return;
-    const snapshot = items;
-    const ids = snapshot.map((it) => it.id);
+  // Bulk dismiss: marks every unread item in scope as read — not just the
+  // visible 300, but every unread item in the current category (or globally
+  // on the All view). The server returns the affected IDs so undo can clear
+  // read_at on exactly those rows.
+  //
+  // Important: this is a DISMISS, not a "I read these" action. It only sets
+  // item_state.read_at, never consumed_at, so bulk-dismissed items do NOT
+  // appear in the /read history view (which queries on consumed_at). Same
+  // semantic as the per-card dismiss button.
+  const handleMarkAllRead = useCallback(async () => {
+    // Snapshot the counts before we mutate so we know what to roll back on
+    // undo (and to format the toast message).
+    const totalBefore =
+      activeCategory === "all" ? counts.all : counts[activeCategory];
+    if (totalBefore === 0) return;
+
+    // Optimistic UI: empty the visible list and zero the relevant count(s).
     setItems([]);
     setCounts((prev) => {
-      // Recalculate from snapshot
-      const next = { ...prev };
-      for (const it of snapshot) {
-        next.all = Math.max(0, next.all - 1);
-        const cat = it.source_category as keyof CategoryCounts | undefined;
-        if (cat && cat in next && cat !== "all") {
-          next[cat] = Math.max(0, next[cat] - 1);
-        }
+      if (activeCategory === "all") {
+        return { all: 0, reading: 0, music: 0, film: 0, podcasts: 0, bluesky: 0 };
       }
-      return next;
+      return { ...prev, [activeCategory]: 0, all: Math.max(0, prev.all - totalBefore) };
     });
-    setPending({
-      ids,
-      items: snapshot,
-      message: `Dismissed ${snapshot.length} item${snapshot.length === 1 ? "" : "s"}`,
-    });
+
+    let serverIds: string[] = [];
     try {
-      await fetch("/api/items/read-bulk", {
+      const res = await fetch("/api/items/read-all", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ ids }),
+        body: JSON.stringify({
+          category: activeCategory === "all" ? undefined : activeCategory,
+        }),
       });
+      if (res.ok) {
+        const data = (await res.json()) as { ids: string[] };
+        serverIds = data.ids;
+      }
     } catch {
-      // best effort
+      // best effort — counts/items will reconcile on the next refresh
     }
-  }, [items]);
+
+    setPending({
+      ids: serverIds,
+      // Empty items[] tells handleUndo to refetch instead of restoring in
+      // place — see the PendingDismiss comment above.
+      items: [],
+      message: `Dismissed ${totalBefore} item${totalBefore === 1 ? "" : "s"}`,
+    });
+  }, [activeCategory, counts]);
 
   const handleUndo = useCallback(async () => {
     if (!pending) return;
     const { ids, items: restored } = pending;
-    setItems((prev) => {
-      // Re-merge restored items, dedup, then re-sort by published desc
-      // (good enough — close to original rank order)
-      const map = new Map<string, Item>();
-      for (const it of restored) map.set(it.id, it);
-      for (const it of prev) map.set(it.id, it);
-      return Array.from(map.values()).sort((a, b) =>
-        a.published_at < b.published_at ? 1 : -1
-      );
-    });
-    setCounts((prev) => {
-      const next = { ...prev };
-      for (const it of restored) {
-        next.all += 1;
-        const cat = it.source_category as keyof CategoryCounts | undefined;
-        if (cat && cat in next && cat !== "all") {
-          next[cat] += 1;
+
+    // Two undo paths depending on whether we have an items snapshot:
+    //
+    //  - With snapshot (per-item dismiss / Dismiss-visible flow): merge the
+    //    restored items back into the visible list and bump the counts. The
+    //    server-side unread happens after.
+    //  - Without snapshot (Mark-all-as-read flow): we never had the items
+    //    in memory because there could have been thousands. Clear read_at on
+    //    the saved IDs and refetch the visible list from the server.
+    if (restored.length > 0) {
+      setItems((prev) => {
+        const map = new Map<string, Item>();
+        for (const it of restored) map.set(it.id, it);
+        for (const it of prev) map.set(it.id, it);
+        return Array.from(map.values()).sort((a, b) =>
+          a.published_at < b.published_at ? 1 : -1
+        );
+      });
+      setCounts((prev) => {
+        const next = { ...prev };
+        for (const it of restored) {
+          next.all += 1;
+          const cat = it.source_category as keyof CategoryCounts | undefined;
+          if (cat && cat in next && cat !== "all") {
+            next[cat] += 1;
+          }
         }
-      }
-      return next;
-    });
+        return next;
+      });
+    }
     setPending(null);
+
     try {
       if (ids.length === 1) {
         await fetch(`/api/items/${ids[0]}/unread`, { method: "POST" });
-      } else {
+      } else if (ids.length > 0) {
         await fetch("/api/items/read-bulk", {
           method: "POST",
           headers: { "content-type": "application/json" },
@@ -271,7 +310,14 @@ export default function FeedClient({
     } catch (err) {
       console.error("[FeedClient] Undo error:", err);
     }
-  }, [pending]);
+
+    // Mark-all-undo: refetch the visible list from the server now that
+    // read_at is cleared. This is the only path that takes us through
+    // fetchItems on undo.
+    if (restored.length === 0) {
+      void fetchItems(activeCategory);
+    }
+  }, [pending, fetchItems, activeCategory]);
 
   // ─── Keep focusedIndex within bounds ─────────────────────
   useEffect(() => {
@@ -479,7 +525,7 @@ export default function FeedClient({
           {items.length > 0 && (
             <FooterActions
               count={items.length}
-              onDismissAll={handleDismissAll}
+              onMarkAllRead={handleMarkAllRead}
               onShowHelp={() => setHelpOpen(true)}
             />
           )}
@@ -533,11 +579,11 @@ function EmptyState() {
 
 interface FooterActionsProps {
   count: number;
-  onDismissAll: () => void;
+  onMarkAllRead: () => void;
   onShowHelp: () => void;
 }
 
-function FooterActions({ count, onDismissAll, onShowHelp }: FooterActionsProps) {
+function FooterActions({ count, onMarkAllRead, onShowHelp }: FooterActionsProps) {
   return (
     <div className="mt-10 px-6 pb-2 text-center">
       <div className="mb-4 flex items-center justify-center gap-3 text-cream-dimmer">
@@ -553,7 +599,7 @@ function FooterActions({ count, onDismissAll, onShowHelp }: FooterActionsProps) 
       <div className="flex items-center justify-center gap-3">
         <button
           type="button"
-          onClick={onDismissAll}
+          onClick={onMarkAllRead}
           className="border border-rule-strong px-4 py-2 font-mono text-[0.68rem] uppercase tracking-kicker text-cream transition-colors hover:border-accent hover:text-accent"
         >
           Dismiss all
