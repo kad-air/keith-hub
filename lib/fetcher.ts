@@ -33,6 +33,10 @@ function slugify(s: string): string {
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "") // strip diacritics
+    // Strip quotes/apostrophes BEFORE the alnum replace, otherwise they
+    // become hyphens. Pitchfork drops them entirely: "Wak'a" → "waka",
+    // not "wak-a". Covers ASCII and the common Unicode curly forms.
+    .replace(/['"\u2018\u2019\u201C\u201D\u201A\u201E\u2032\u2035]/g, "")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
 }
@@ -49,19 +53,49 @@ function deslugify(slug: string): string {
 }
 
 // Pitchfork: title is the album name, URL slug is "{artist-slug}-{album-slug}".
-// Slugify the title, find it as a suffix in the URL slug, derive artist from
-// what's before. Loses some characters (& → space, diacritics → ascii) but
-// the result is recognizable.
+// We slugify the title and look for it at the end of the URL slug, then
+// derive the artist from what's before. Loses some characters (& → space,
+// diacritics → ascii) but the result is recognizable.
+//
+// Pitchfork sometimes adds suffixes to the URL slug that aren't in the
+// title (e.g. title "Wak'a" → URL .../los-thuthanaka-waka-ep/). And
+// sometimes the title has a suffix that the URL doesn't. We try a handful
+// of plausible album-slug variants and use the first one that matches.
 function rewritePitchforkAlbumTitle(rawTitle: string, url: string): string | null {
   const slugMatch = url.match(/\/reviews\/albums\/([^/]+)\/?$/);
   if (!slugMatch) return null;
   const fullSlug = slugMatch[1];
-  const albumSlug = slugify(rawTitle);
-  if (!albumSlug || !fullSlug.endsWith(albumSlug)) return null;
-  const artistSlug = fullSlug.slice(0, fullSlug.length - albumSlug.length).replace(/-+$/, "");
-  if (!artistSlug) return null;
-  const artist = deslugify(artistSlug);
-  return `${artist} - ${rawTitle}`;
+  const baseSlug = slugify(rawTitle);
+  if (!baseSlug) return null;
+
+  // Suffixes Pitchfork sometimes adds to or strips from album slugs.
+  const SUFFIXES = ["ep", "lp", "album", "deluxe", "edition", "mixtape"];
+
+  const candidates = new Set<string>();
+  candidates.add(baseSlug);
+  for (const suf of SUFFIXES) {
+    candidates.add(`${baseSlug}-${suf}`);
+    if (baseSlug.endsWith(`-${suf}`)) {
+      candidates.add(baseSlug.slice(0, -suf.length - 1));
+    }
+  }
+
+  // Prefer the longest candidate that matches (so we don't accidentally
+  // match a short word inside a longer artist slug).
+  const matches = Array.from(candidates)
+    .filter((c) => c.length > 0 && fullSlug.endsWith(c))
+    .sort((a, b) => b.length - a.length);
+
+  for (const candidate of matches) {
+    const artistSlug = fullSlug
+      .slice(0, fullSlug.length - candidate.length)
+      .replace(/-+$/, "");
+    if (artistSlug) {
+      return `${deslugify(artistSlug)} - ${rawTitle}`;
+    }
+  }
+
+  return null;
 }
 
 // AllMusic album review items carry the artist as <media:credit role="musician">
