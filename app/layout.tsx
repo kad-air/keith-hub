@@ -1,7 +1,8 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Newsreader, JetBrains_Mono } from "next/font/google";
 import Link from "next/link";
 import "./globals.css";
+import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 
 const displayFont = Newsreader({
   subsets: ["latin"],
@@ -22,6 +23,37 @@ const monoFont = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "The Feed",
   description: "Personal content hub for intentional media consumption.",
+  applicationName: "The Feed",
+  // NOTE: manifest is NOT set here. Next.js 14.2.3 hardcodes
+  // crossOrigin="use-credentials" on the metadata-generated <link rel="manifest">
+  // (see node_modules/next/dist/lib/metadata/generate/basic.js), which causes
+  // iOS Safari to silently fail to fetch the manifest — meaning Add to Home
+  // Screen produces a regular bookmark instead of a real PWA install. We emit
+  // the link manually in the JSX below to avoid the broken attribute.
+  appleWebApp: {
+    capable: true,
+    title: "Feed",
+    statusBarStyle: "black-translucent",
+  },
+  formatDetection: {
+    telephone: false,
+  },
+  icons: {
+    icon: [
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: { url: "/icons/apple-touch-icon.png", sizes: "180x180" },
+    shortcut: "/icons/favicon-32.png",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0c0a08",
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  userScalable: false,
 };
 
 export default function RootLayout({
@@ -32,9 +64,14 @@ export default function RootLayout({
       lang="en"
       className={`dark ${displayFont.variable} ${monoFont.variable}`}
     >
+      <head>
+        {/* Manual manifest link — see comment on metadata above for why this
+            is hand-rolled instead of using metadata.manifest. */}
+        <link rel="manifest" href="/manifest.webmanifest" />
+      </head>
       <body className="font-display text-cream bg-ink min-h-screen">
-        <header className="sticky top-0 z-40 border-b border-rule/60 bg-ink/85 backdrop-blur-md">
-          <div className="mx-auto flex h-14 max-w-[720px] items-center justify-between px-6">
+        <header className="sticky top-0 z-40 border-b border-rule/60 bg-ink/85 backdrop-blur-md pt-[env(safe-area-inset-top)]">
+          <div className="mx-auto flex min-h-14 max-w-[720px] items-center justify-between pl-[max(1.5rem,env(safe-area-inset-left))] pr-[max(1.5rem,env(safe-area-inset-right))]">
             <Link href="/" className="group inline-flex items-baseline gap-1.5">
               <span className="font-display text-[1.4rem] font-medium italic leading-none tracking-tight text-cream transition-colors group-hover:text-accent">
                 The&nbsp;Feed
@@ -63,6 +100,7 @@ export default function RootLayout({
           </div>
         </header>
         <main className="relative z-10">{children}</main>
+        <ServiceWorkerRegister />
       </body>
     </html>
   );
