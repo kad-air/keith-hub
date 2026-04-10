@@ -133,7 +133,18 @@ export default function FeedClient({
         podcastMeta?.apple_id
           ? `https://podcasts.apple.com/podcast/id${podcastMeta.apple_id}`
           : item.url;
-      window.open(url, "_blank", "noopener,noreferrer");
+      // iOS standalone PWA quirk: window.open(url, "_blank") opens the link
+      // in BOTH Safari and an in-PWA SFSafariViewController-style overlay,
+      // because WebKit half-implements the API. Using a programmatic anchor
+      // click instead — iOS treats <a target="_blank"> as a clean handoff to
+      // Safari without the overlay.
+      const a = document.createElement("a");
+      a.href = url;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
       removeFromList(item.id);
       decrementCount(item);
       try {
