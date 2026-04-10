@@ -1,6 +1,7 @@
 "use client";
 
-import { forwardRef } from "react";
+import { forwardRef, useRef, useState } from "react";
+import type { TouchEvent as ReactTouchEvent } from "react";
 import type {
   Item,
   BlueskyMetadata,
@@ -8,6 +9,16 @@ import type {
   BlueskyExternalCard,
   BlueskyQuotedPost,
 } from "@/lib/types";
+
+// Swipe-to-action constants. The article (the inner element) follows the
+// finger horizontally; if released past COMMIT_THRESHOLD it animates off
+// screen and fires the corresponding action. DETECT_THRESHOLD is the dead
+// zone before we lock the gesture as horizontal — anything smaller stays
+// available as a vertical scroll. The COMMIT_ANIM_MS matches the CSS
+// transition duration so the timeout fires when the slide-off finishes.
+const SWIPE_DETECT_THRESHOLD = 6;
+const SWIPE_COMMIT_THRESHOLD = 80;
+const COMMIT_ANIM_MS = 200;
 
 interface FeedCardProps {
   item: Item;
@@ -78,7 +89,7 @@ function parseMeta<T>(raw: string | null): T | null {
   }
 }
 
-const FeedCard = forwardRef<HTMLElement, FeedCardProps>(function FeedCard(
+const FeedCard = forwardRef<HTMLDivElement, FeedCardProps>(function FeedCard(
   { item, index, focused, onFocus, onOpen, onSave, onDismiss },
   ref
 ) {
@@ -95,33 +106,179 @@ const FeedCard = forwardRef<HTMLElement, FeedCardProps>(function FeedCard(
   const animDelay =
     index < 8 ? `${30 + index * 35}ms` : undefined;
 
+  // ─── Swipe state ─────────────────────────────────────────────
+  // dx is the current horizontal translation of the article. animating
+  // toggles the CSS transition so direct-drag updates feel 1:1 (no
+  // transition) while commit/snap-back are smooth (transition on).
+  // wasSwipedRef guards onClick so a swipe doesn't also count as a tap.
+  const [dx, setDx] = useState(0);
+  const [animating, setAnimating] = useState(false);
+  const startRef = useRef<{ x: number; y: number; locked: boolean } | null>(null);
+  const wasSwipedRef = useRef(false);
+
+  function handleTouchStart(e: ReactTouchEvent) {
+    if (animating) return;
+    onFocus();
+    const t = e.touches[0];
+    startRef.current = { x: t.clientX, y: t.clientY, locked: false };
+  }
+
+  function handleTouchMove(e: ReactTouchEvent) {
+    const start = startRef.current;
+    if (!start || animating) return;
+    const t = e.touches[0];
+    const moveX = t.clientX - start.x;
+    const moveY = t.clientY - start.y;
+
+    if (!start.locked) {
+      const absX = Math.abs(moveX);
+      const absY = Math.abs(moveY);
+      if (absX < SWIPE_DETECT_THRESHOLD && absY < SWIPE_DETECT_THRESHOLD) return;
+      if (absY > absX) {
+        // The user is scrolling vertically — bow out so the page can scroll.
+        startRef.current = null;
+        return;
+      }
+      start.locked = true;
+      wasSwipedRef.current = true;
+    }
+    setDx(moveX);
+  }
+
+  function handleTouchEnd() {
+    const start = startRef.current;
+    if (!start) return;
+    startRef.current = null;
+    if (!start.locked) {
+      // Tap, not swipe — let the upcoming click event open the card.
+      return;
+    }
+
+    const finalDx = dx;
+    setAnimating(true);
+
+    const commitSave = finalDx > SWIPE_COMMIT_THRESHOLD;
+    // Only treat a left swipe as a commit if there's actually a dismiss
+    // action to fire — on /read the dismiss button is hidden, so a left
+    // swipe just snaps back instead of doing nothing visible.
+    const commitDismiss = finalDx < -SWIPE_COMMIT_THRESHOLD && !!onDismiss;
+
+    if (commitSave) {
+      setDx(window.innerWidth);
+      window.setTimeout(() => {
+        onSave();
+        // If the parent unmounts us (typical on the main feed), these
+        // setState calls are no-ops. If we stay mounted (e.g. /read where
+        // save toggles in place), reset position WITHOUT animating —
+        // setting animating false first means the next render snaps to 0
+        // instantly instead of sliding back from off-screen.
+        setAnimating(false);
+        setDx(0);
+        wasSwipedRef.current = false;
+      }, COMMIT_ANIM_MS);
+    } else if (commitDismiss) {
+      setDx(-window.innerWidth);
+      window.setTimeout(() => {
+        onDismiss?.();
+        setAnimating(false);
+        setDx(0);
+        wasSwipedRef.current = false;
+      }, COMMIT_ANIM_MS);
+    } else {
+      // Snap back
+      setDx(0);
+      window.setTimeout(() => {
+        setAnimating(false);
+        wasSwipedRef.current = false;
+      }, COMMIT_ANIM_MS);
+    }
+  }
+
+  function handleClick() {
+    if (wasSwipedRef.current) {
+      // The touchend that just preceded this click was the end of a
+      // swipe gesture, not a tap — eat the click and let the gesture
+      // animation finish on its own.
+      wasSwipedRef.current = false;
+      return;
+    }
+    onOpen();
+  }
+
+  // Reveal background icons only after the gesture has clearly started so
+  // that incidental movement doesn't flash them.
+  const showSaveBg = dx > SWIPE_DETECT_THRESHOLD;
+  const showDismissBg = dx < -SWIPE_DETECT_THRESHOLD && !!onDismiss;
+  // Past the commit threshold, intensify the icon to confirm the action
+  // will fire on release.
+  const saveCommitted = dx > SWIPE_COMMIT_THRESHOLD;
+  const dismissCommitted = dx < -SWIPE_COMMIT_THRESHOLD && !!onDismiss;
+
   return (
-    <article
+    <div
       ref={ref}
       data-feed-index={index}
-      onClick={onOpen}
-      onMouseEnter={onFocus}
-      onTouchStart={onFocus}
-      className={[
-        "group relative cursor-pointer scroll-mt-24 px-6 py-5 transition-colors duration-200 animate-fade-in-up",
-        // Reserve right-side space for the always-visible action buttons on touch
-        "[@media(hover:none)]:pr-28",
-        "border-b border-rule/70",
-        focused ? "bg-ink-hover" : "hover:bg-ink-raised/60",
-      ].join(" ")}
+      className="group relative scroll-mt-24 overflow-hidden border-b border-rule/70 animate-fade-in-up"
       style={animDelay ? { animationDelay: animDelay } : undefined}
     >
-      {/* Left edge accent rule — focus state */}
+      {/* Save background — revealed under the article on right swipe */}
+      {showSaveBg && (
+        <div
+          aria-hidden
+          className={[
+            "pointer-events-none absolute inset-0 flex items-center justify-start pl-8 transition-colors duration-150",
+            saveCommitted ? "bg-accent-soft text-accent" : "bg-accent-soft/40 text-accent/60",
+          ].join(" ")}
+        >
+          <svg width="28" height="28" viewBox="0 0 24 24" fill={saveCommitted ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+          </svg>
+        </div>
+      )}
+      {/* Dismiss background — revealed under the article on left swipe */}
+      {showDismissBg && (
+        <div
+          aria-hidden
+          className={[
+            "pointer-events-none absolute inset-0 flex items-center justify-end pr-8 transition-colors duration-150",
+            dismissCommitted ? "bg-rule/60 text-cream" : "bg-rule/30 text-cream-dim",
+          ].join(" ")}
+        >
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </div>
+      )}
+      {/* Left edge accent rule — focus state. Lives on the wrapper (not the
+          article) so it doesn't slide horizontally during a swipe. */}
       <span
         aria-hidden
         className={[
-          "pointer-events-none absolute left-0 top-0 h-full transition-all duration-200",
+          "pointer-events-none absolute left-0 top-0 z-10 h-full transition-all duration-200",
           focused
             ? "w-[3px] bg-accent"
             : "w-[2px] bg-transparent group-hover:bg-cream-dimmer/50",
         ].join(" ")}
       />
-
+      <article
+        onClick={handleClick}
+        onMouseEnter={onFocus}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
+        style={{
+          transform: `translateX(${dx}px)`,
+          transition: animating ? `transform ${COMMIT_ANIM_MS}ms ease-out` : "none",
+          touchAction: "pan-y",
+        }}
+        className={[
+          "relative cursor-pointer px-6 py-5 transition-colors duration-200",
+          // Opaque background so the swipe action area is hidden until revealed
+          focused ? "bg-ink-hover" : "bg-ink hover:bg-ink-raised/60",
+        ].join(" ")}
+      >
       {/* Repost banner — when this post appears in the feed via someone reposting it */}
       {isBluesky && bsky?.reposted_by && (
         <div className="mb-1.5 flex items-center gap-1.5 font-mono text-[0.6rem] uppercase tracking-kicker text-cream-dimmer">
@@ -234,13 +391,15 @@ const FeedCard = forwardRef<HTMLElement, FeedCardProps>(function FeedCard(
         </div>
       )}
 
-      {/* Action row — visible on hover or focus on desktop, always visible on touch devices */}
+      {/* Action row — hover- or focus-revealed on desktop. Hidden entirely
+          on touch devices, where swipe gestures replace the buttons. The
+          @media(hover:none) override comes after the focused/hover classes
+          so it wins the opacity cascade on touch. */}
       <div
         className={[
           "absolute right-5 top-5 flex items-center gap-1 transition-opacity duration-150",
-          focused
-            ? "opacity-100"
-            : "opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100",
+          focused ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+          "[@media(hover:none)]:!opacity-0 [@media(hover:none)]:pointer-events-none",
         ].join(" ")}
         onClick={(e) => e.stopPropagation()}
       >
@@ -280,7 +439,8 @@ const FeedCard = forwardRef<HTMLElement, FeedCardProps>(function FeedCard(
           </ActionButton>
         )}
       </div>
-    </article>
+      </article>
+    </div>
   );
 });
 
@@ -303,8 +463,6 @@ function ActionButton({ label, active, onClick, children }: ActionButtonProps) {
       aria-label={label}
       className={[
         "flex h-7 w-7 items-center justify-center rounded-sm border transition-colors",
-        // Larger hit zone + fully opaque background on touch devices
-        "[@media(hover:none)]:h-11 [@media(hover:none)]:w-11 [@media(hover:none)]:bg-ink",
         active
           ? "border-accent/40 bg-accent-soft text-accent"
           : "border-rule bg-ink/60 text-cream-dim hover:border-rule-strong hover:bg-ink hover:text-cream",
