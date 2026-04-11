@@ -125,6 +125,10 @@ Desktop hover behavior is unchanged: action buttons in the top-right corner appe
 - `POST /api/items/read-bulk` — body `{ ids: string[], unread?: boolean }`. Bulk mark-read or bulk-clear-read in a single transaction. Used by undo flows
 - `POST /api/items/read-all` — body `{ category?: string }`. Bulk dismiss every unread item in scope (omit category for "everything"). Returns the affected IDs so the client can build an undo. Backs the "Dismiss all" footer button. **Sets only `read_at`, never `consumed_at`** — see the bulk-dismiss invariant above
 - `POST /api/refresh` — forces an immediate `fetchAllSources()` run
+- `GET  /api/push/subscribe` — returns `{ subscribed: boolean }`
+- `POST /api/push/subscribe` — saves a Web Push subscription (body is the subscription JSON)
+- `DELETE /api/push/subscribe` — removes the stored subscription
+- `POST /api/push/test` — sends a test push notification (returns `{ sent: boolean }`)
 
 ### Keyboard shortcuts
 Defined in `components/FeedClient.tsx` (and subsets in `SavedClient.tsx` / `ReadClient.tsx`). Source of truth for the user-facing list is `components/KeyboardHelp.tsx`. Keys: `j`/`k` nav, `o`/`enter` open, `s` save, `x`/`e` dismiss, `r` refresh, `g h` / `g s` / `g r` go home/saved/read, `?` toggle help.
@@ -150,6 +154,29 @@ Trackers are backed by Craft.do collections fetched via the Craft Connect API (`
 **Release dates**: `normalizeItems` extracts `releaseDate` from Craft properties. Music, movies, TV, and games all have a `release_date` (date type) property. Books uses `publication_year` (number type) instead — displayed as just the year. `TrackerCard` formats dates as "Mon DD, YYYY" for full dates.
 
 The Craft schema for each collection also includes extra fields not currently surfaced in the UI (e.g. `genre`, `synopsis`, `runtime_minutes`, `in_plex` for movies; `number_of_songs`, `genre` for music; `length_in_pages` for books; `season` for TV). These live in `item.properties` and can be accessed if needed.
+
+### Push notifications (release date alerts)
+Web Push via VAPID, powered by the `web-push` npm package. Single-user, so the subscription is stored as a JSON file (`data/push-subscription.json`), not in the database.
+
+**Flow:**
+1. User taps "Enable release alerts" in AppMenu (gear icon). iOS prompts for notification permission (user gesture required). The browser creates a push subscription and POSTs it to `/api/push/subscribe`.
+2. Every poll cycle (~15 min), `fetchAllSources` calls `checkReleaseNotifications()` from `lib/release-notify.ts`. A date guard (`data/release-notify-last.txt`) ensures it only runs once per calendar day.
+3. The checker fetches all 5 Craft tracker collections, compares each item's `release_date` against today (YYYY-MM-DD), and sends a web push for any matches.
+4. The service worker (`app/sw.ts`) handles `push` events (shows the notification) and `notificationclick` events (focuses or opens the app).
+
+**Key files:**
+- `lib/push.ts` — `getSubscription`, `saveSubscription`, `removeSubscription`, `sendPush`
+- `lib/release-notify.ts` — `checkReleaseNotifications` (daily Craft scan + push dispatch)
+- `app/api/push/subscribe/route.ts` — CRUD for the push subscription
+- `app/api/push/test/route.ts` — `POST` sends a test notification
+- `components/AppMenu.tsx` — "Release alerts" toggle button with permission state handling
+
+**Environment variables:**
+- `VAPID_PUBLIC_KEY` — also exposed to the client as `NEXT_PUBLIC_VAPID_PUBLIC_KEY` via `next.config.mjs`
+- `VAPID_PRIVATE_KEY`
+- `VAPID_SUBJECT` — `mailto:` URI for VAPID identification
+
+**Testing:** `curl -X POST http://localhost:3030/api/push/test` (requires an active subscription).
 
 ## PWA setup (read this before touching app/layout.tsx)
 
@@ -185,11 +212,14 @@ iOS standalone PWAs have a long-standing quirk: `window.open(url, "_blank")` ope
 - `ecosystem.config.js` sets `PORT=3030` and `HOSTNAME=0.0.0.0`. Port 3030 (not 3000) because the Mac Mini MCP server (`/Users/keithadair/Code/mac-mini-mcp-server`) owns 127.0.0.1:3000 on the same machine. `HOSTNAME=0.0.0.0` forces Next.js to bind on IPv4 — its default `::` is IPv6-only on macOS, and Tailscale Serve proxies via 127.0.0.1.
 - Tailnet exposure: `tailscale serve --bg --https=10000 http://localhost:3030` (set out of band, not in repo). Reachable at `https://keiths-mac-mini-1110.tail846fa.ts.net:10000` from Tailscale-connected devices only — not public Funnel.
 - `scripts/deploy.sh` is a cron-based auto-deploy (runs every 2 min, pulls and restarts only if there are new commits). Useful when committing from a different machine; redundant when editing on the Mini directly.
-- Files that live only on the Mini and are never committed: `.env`, `data/the-feed.db`
+- Files that live only on the Mini and are never committed: `.env`, `data/the-feed.db`, `data/push-subscription.json`, `data/release-notify-last.txt`
 
 ## Environment variables
 - `BLUESKY_IDENTIFIER` — Bluesky handle (e.g. `keithadair.com`)
 - `BLUESKY_APP_PASSWORD` — Bluesky app password (not account password)
+- `VAPID_PUBLIC_KEY` — Web Push VAPID public key (also exposed client-side as `NEXT_PUBLIC_VAPID_PUBLIC_KEY`)
+- `VAPID_PRIVATE_KEY` — Web Push VAPID private key
+- `VAPID_SUBJECT` — `mailto:` URI for VAPID identification
 
 ## Git auth
 The repo pushes via HTTPS with a PAT stored in `~/.git-credentials`. SSH doesn't work in this session because the SSH agent routes through 1Password which isn't accessible from Claude Code's shell. The `git push` command will print a benign `failed to store: -25308` warning from `git-credential-osxkeychain` — that's a Keychain access denial, NOT a push failure. Check the `<old>..<new>  main -> main` line to confirm the push actually happened.
