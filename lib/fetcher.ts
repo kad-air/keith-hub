@@ -436,6 +436,15 @@ export async function fetchAllSources(db: Database.Database): Promise<number> {
     console.log(`[fetcher] pruned ${pruned} item(s) over per-category unread cap`);
   }
 
+  // Check tracker release dates and send push notifications (once per day).
+  // Imported dynamically to avoid circular deps and keep the import lightweight.
+  try {
+    const { checkReleaseNotifications } = await import("@/lib/release-notify");
+    await checkReleaseNotifications();
+  } catch (err) {
+    console.error("[fetcher] Release notification check failed:", err);
+  }
+
   return totalFetched;
 }
 

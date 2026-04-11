@@ -26,6 +26,7 @@ const nextConfig = {
   env: {
     NEXT_PUBLIC_GIT_COMMIT: GIT_COMMIT,
     NEXT_PUBLIC_GIT_LAST_MERGE_TS: GIT_LAST_MERGE_TS,
+    NEXT_PUBLIC_VAPID_PUBLIC_KEY: process.env.VAPID_PUBLIC_KEY || "",
   },
   webpack: (config, { isServer }) => {
     if (!isServer) {

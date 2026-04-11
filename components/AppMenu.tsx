@@ -26,9 +26,56 @@ export default function AppMenu() {
   const [open, setOpen] = useState(false);
   const { mode, setMode } = useTheme();
   const menuRef = useRef<HTMLDivElement>(null);
+  const [pushState, setPushState] = useState<"loading" | "unsupported" | "denied" | "off" | "on">("loading");
 
   const commit = process.env.NEXT_PUBLIC_GIT_COMMIT || "dev";
   const mergeTs = process.env.NEXT_PUBLIC_GIT_LAST_MERGE_TS || "";
+
+  // Check push notification state
+  useEffect(() => {
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+      setPushState("unsupported");
+      return;
+    }
+    if (Notification.permission === "denied") {
+      setPushState("denied");
+      return;
+    }
+    // Check if we have an active subscription on the server
+    fetch("/api/push/subscribe")
+      .then((r) => r.json())
+      .then((data: { subscribed: boolean }) => setPushState(data.subscribed ? "on" : "off"))
+      .catch(() => setPushState("off"));
+  }, []);
+
+  const togglePush = async () => {
+    if (pushState === "on") {
+      // Unsubscribe
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+      if (sub) await sub.unsubscribe();
+      await fetch("/api/push/subscribe", { method: "DELETE" });
+      setPushState("off");
+    } else {
+      // Subscribe — permission prompt fires here (requires user gesture)
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") {
+        setPushState("denied");
+        return;
+      }
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+      });
+      await fetch("/api/push/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(sub.toJSON()),
+      });
+      setPushState("on");
+    }
+  };
 
   // Close on outside click
   useEffect(() => {
@@ -101,6 +148,41 @@ export default function AppMenu() {
 
           {/* Divider */}
           <div className="mx-4 h-px bg-rule" />
+
+          {/* Notifications section */}
+          {pushState !== "unsupported" && (
+            <>
+              <div className="px-4 py-3">
+                <h3 className="mb-2.5 font-mono text-[0.6rem] uppercase tracking-kicker text-cream-dimmer">
+                  Notifications
+                </h3>
+                {pushState === "denied" ? (
+                  <p className="font-mono text-[0.6rem] text-cream-dimmer">
+                    Blocked in system settings
+                  </p>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={togglePush}
+                    disabled={pushState === "loading"}
+                    className={[
+                      "w-full rounded-sm px-2 py-1.5 font-mono text-[0.65rem] uppercase tracking-kicker transition-colors border",
+                      pushState === "on"
+                        ? "bg-accent-soft text-accent border-accent/30"
+                        : "text-cream-dim border-rule hover:border-rule-strong hover:text-cream",
+                    ].join(" ")}
+                  >
+                    {pushState === "loading"
+                      ? "..."
+                      : pushState === "on"
+                        ? "Release alerts on"
+                        : "Enable release alerts"}
+                  </button>
+                )}
+              </div>
+              <div className="mx-4 h-px bg-rule" />
+            </>
+          )}
 
           {/* Version section */}
           <div className="px-4 py-3">
