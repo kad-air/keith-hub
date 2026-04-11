@@ -13,7 +13,7 @@
     "@serwist/next": "^9.5.7",
     "better-sqlite3": "^12.8.0",
     "js-yaml": "^4.1.0",
-    "next": "14.2.3",
+    "next": "^14.2.35",
     "react": "^18",
     "react-dom": "^18",
     "rss-parser": "^3.13.0",
