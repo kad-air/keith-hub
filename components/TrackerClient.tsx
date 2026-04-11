@@ -8,6 +8,55 @@ import TrackerCard from "@/components/TrackerCard";
 import Toast from "@/components/Toast";
 import KeyboardHelp from "@/components/KeyboardHelp";
 
+// ── Sort helpers ────────────────────────────────────────────────
+type SortKey = "release-desc" | "release-asc" | "title" | "rating";
+
+const SORT_OPTIONS: { key: SortKey; label: string }[] = [
+  { key: "release-desc", label: "Newest" },
+  { key: "release-asc", label: "Oldest" },
+  { key: "title", label: "Title" },
+  { key: "rating", label: "Rating" },
+];
+
+const RATING_ORDER: Record<string, number> = {
+  "\uD83D\uDE0D": 0, // 😍
+  "\uD83D\uDC4D": 1, // 👍
+  "\uD83D\uDE11": 2, // 😑
+  "\uD83D\uDC4E": 3, // 👎
+};
+
+function parseReleaseDate(d: string | null): number | null {
+  if (!d) return null;
+  if (/^\d{4}$/.test(d)) return parseInt(d, 10);
+  const ts = new Date(d).getTime();
+  return isNaN(ts) ? null : ts;
+}
+
+function sortItems(items: TrackerItem[], sort: SortKey): TrackerItem[] {
+  return [...items].sort((a, b) => {
+    switch (sort) {
+      case "release-desc":
+      case "release-asc": {
+        const da = parseReleaseDate(a.releaseDate);
+        const db = parseReleaseDate(b.releaseDate);
+        if (da === null && db === null) return 0;
+        if (da === null) return 1;
+        if (db === null) return -1;
+        return sort === "release-desc" ? db - da : da - db;
+      }
+      case "title":
+        return a.name.localeCompare(b.name);
+      case "rating": {
+        const ra = RATING_ORDER[a.rating] ?? 4;
+        const rb = RATING_ORDER[b.rating] ?? 4;
+        return ra - rb;
+      }
+      default:
+        return 0;
+    }
+  });
+}
+
 interface TrackerClientProps {
   items: TrackerItem[];
   config: TrackerConfig;
@@ -20,6 +69,7 @@ export default function TrackerClient({
   const router = useRouter();
   const [items, setItems] = useState<TrackerItem[]>(initialItems);
   const [activeStatus, setActiveStatus] = useState("all");
+  const [activeSort, setActiveSort] = useState<SortKey>("release-desc");
   const [focusedIndex, setFocusedIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [showHelp, setShowHelp] = useState(false);
@@ -41,11 +91,14 @@ export default function TrackerClient({
     ];
   }, [items, config.statusOptions]);
 
-  // ── Filtered items ────────────────────────────────────────────
+  // ── Filtered + sorted items ───────────────────────────────────
   const filteredItems = useMemo(() => {
-    if (activeStatus === "all") return items;
-    return items.filter((i) => i.status === activeStatus);
-  }, [items, activeStatus]);
+    const filtered =
+      activeStatus === "all"
+        ? items
+        : items.filter((i) => i.status === activeStatus);
+    return sortItems(filtered, activeSort);
+  }, [items, activeStatus, activeSort]);
 
   // ── Optimistic update ─────────────────────────────────────────
   const handleUpdate = useCallback(
@@ -101,27 +154,45 @@ export default function TrackerClient({
 
   return (
     <article className="mx-auto max-w-[720px] px-[max(1rem,env(safe-area-inset-left))] pb-[max(2rem,env(safe-area-inset-bottom))]">
-      {/* Status filter tabs */}
+      {/* Status filter tabs + sort control */}
       <div className="sticky top-14 z-30 -mx-[max(1rem,env(safe-area-inset-left))] border-b border-rule/40 bg-ink/85 px-[max(1rem,env(safe-area-inset-left))] pt-3 pb-0 backdrop-blur-md">
-        <div className="flex gap-4 overflow-x-auto scrollbar-none">
-          {statusTabs.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => handleStatusChange(tab.id)}
-              className={[
-                "whitespace-nowrap border-b-2 pb-2.5 font-mono text-[0.65rem] uppercase tracking-kicker transition-colors",
-                activeStatus === tab.id
-                  ? `border-current ${config.colorClass}`
-                  : "border-transparent text-cream-dimmer hover:text-cream-dim",
-              ].join(" ")}
-            >
-              {tab.label}
-              <span className="ml-1.5 tabular-nums opacity-60">
-                {tab.count}
-              </span>
-            </button>
-          ))}
+        <div className="flex items-end gap-2">
+          <div className="flex min-w-0 flex-1 gap-4 overflow-x-auto scrollbar-none">
+            {statusTabs.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => handleStatusChange(tab.id)}
+                className={[
+                  "whitespace-nowrap border-b-2 pb-2.5 font-mono text-[0.65rem] uppercase tracking-kicker transition-colors",
+                  activeStatus === tab.id
+                    ? `border-current ${config.colorClass}`
+                    : "border-transparent text-cream-dimmer hover:text-cream-dim",
+                ].join(" ")}
+              >
+                {tab.label}
+                <span className="ml-1.5 tabular-nums opacity-60">
+                  {tab.count}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          {/* Sort dropdown */}
+          <select
+            value={activeSort}
+            onChange={(e) => {
+              setActiveSort(e.target.value as SortKey);
+              setFocusedIndex(0);
+            }}
+            className="mb-1.5 shrink-0 appearance-none border border-rule/60 bg-ink px-2 py-0.5 font-mono text-[0.6rem] uppercase tracking-kicker text-cream-dim transition-colors hover:border-rule-strong focus:border-accent focus:text-cream focus:outline-none"
+          >
+            {SORT_OPTIONS.map((opt) => (
+              <option key={opt.key} value={opt.key}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 
