@@ -25,6 +25,12 @@ sources:
     category: film
     url: https://www.rogerebert.com/feed
 
+  - id: nyt-books
+    name: NYT Book Review
+    type: rss
+    category: books
+    url: https://rss.nytimes.com/services/xml/rss/nyt/BookReview.xml
+
   - id: kottke
     name: Kottke.org
     type: rss

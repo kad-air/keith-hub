@@ -9,10 +9,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
     const { searchParams } = new URL(request.url);
     const category = searchParams.get("category") || null;
-    // Cap at 500 so a misbehaving client can't ask for the entire DB.
-    // The intended ceiling is 300 — see MAIN_FEED_LIMIT in app/page.tsx and
-    // FeedClient.tsx.
-    const limit = Math.min(parseInt(searchParams.get("limit") || "50", 10), 500);
+    // Defensive ceiling. The actual feed size is bounded by TTL pruning,
+    // not this limit. 2000 is generous enough to never clip a real 7-day window.
+    const limit = Math.min(parseInt(searchParams.get("limit") || "50", 10), 2000);
     const offset = parseInt(searchParams.get("offset") || "0", 10);
 
     const db = getDb();

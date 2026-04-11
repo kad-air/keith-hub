@@ -1,0 +1,108 @@
+app:
+  name: "The Feed"
+  port: 3000
+  poll_interval_minutes: 5
+  items_per_page: 50
+  retention_days: 30
+
+sources:
+  # --- Reading ---
+  - id: the-verge
+    name: The Verge
+    type: rss
+    category: reading
+    url: https://www.theverge.com/rss/index.xml
+    poll_interval_minutes: 3
+
+  # --- Books ---
+  - id: nyt-books
+    name: NYT Book Review
+    type: rss
+    category: books
+    url: https://rss.nytimes.com/services/xml/rss/nyt/Books.xml
+
+  - id: nyt-movies
+    name: NYT Movie Review
+    type: rss
+    category: film
+    url: https://rss.nytimes.com/services/xml/rss/nyt/Movies.xml
+
+  # --- Music ---
+  - id: pitchfork-reviews
+    name: Pitchfork Reviews
+    type: rss
+    category: music
+    url: https://pitchfork.com/feed/feed-album-reviews/rss
+    poll_interval_minutes: 3
+
+  - id: allmusic
+    name: AllMusic Reviews
+    type: rss
+    category: music
+    url: https://www.allmusic.com/rss/all
+    poll_interval_minutes: 3
+
+  # --- Podcasts ---
+  - id: vergecast
+    name: Vergecast
+    type: podcast
+    category: podcasts
+    url: https://verge.supportingcast.fm/content/eyJ0IjoicCIsImMiOiIyMDc0OSIsInUiOiIyNjE2OTY4IiwiZCI6IjE3NTk5NjEzODQiLCJrIjoxMDQ5MX18MGZjYzE4NDlhMTRmMzAzMjkwODIzMDJkYTM2ZmIyM2E2NTA4YjFlYmQ1NDYxMGE0YzEwN2MxYzY4MmQyYjI1OQ.rss?t=1761316924303
+    apple_id: "430333725"
+
+  - id: just-king-things
+    name: Just King Things
+    type: podcast
+    category: podcasts
+    url: http://rangedtouch.com/category/just-king-things/feed/
+    apple_id: "1525585763"
+
+  - id: the-big-picture
+    name: The Big Picture
+    type: podcast
+    category: podcasts
+    url: https://feeds.megaphone.fm/the-big-picture
+    apple_id: "1439252196"
+
+  - id: bill-simmons
+    name: The Bill Simmons Podcast
+    type: podcast
+    category: podcasts
+    url: https://feeds.megaphone.fm/the-bill-simmons-podcast
+    apple_id: "1043699613"
+
+  - id: the-rewatchables
+    name: The Rewatchables
+    type: podcast
+    category: podcasts
+    url: https://feeds.megaphone.fm/the-rewatchables
+    apple_id: "1268527882"
+
+  - id: the-watch
+    name: The Watch
+    type: podcast
+    category: podcasts
+    url: https://feeds.megaphone.fm/the-watch
+    apple_id: "1111739567"
+
+  - id: zach-lowe
+    name: The Zach Lowe Show
+    type: podcast
+    category: podcasts
+    url: https://feeds.megaphone.fm/zach-lowe
+    apple_id: "1805478723"
+
+  - id: thinking-basketball
+    name: Thinking Basketball
+    type: podcast
+    category: podcasts
+    url: https://anchor.fm/s/86b2b318/podcast/rss
+    apple_id: "1428290303"
+
+  - id: bluesky-friends
+    name: Bluesky
+    type: bluesky
+    category: bluesky
+    mode: feed
+    feed_uri: at://did:plc:z72i7hdynmk6r22z27h6tvur/app.bsky.feed.generator/with-friends
+    poll_interval_minutes: 10

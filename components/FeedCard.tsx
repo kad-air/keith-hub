@@ -32,6 +32,7 @@ interface FeedCardProps {
 
 const CATEGORY_LABEL: Record<string, { label: string; klass: string }> = {
   music: { label: "Music", klass: "text-cat-music" },
+  books: { label: "Books", klass: "text-cat-books" },
   film: { label: "Film", klass: "text-cat-film" },
   reading: { label: "Reading", klass: "text-cat-reading" },
   podcasts: { label: "Podcast", klass: "text-cat-podcasts" },

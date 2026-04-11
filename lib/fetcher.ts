@@ -2,7 +2,7 @@ import Parser from "rss-parser";
 import type Database from "better-sqlite3";
 import { getConfig, invalidateConfig, type SourceConfig } from "@/lib/config";
 import { fetchBlueskySource } from "@/lib/bluesky";
-import { pruneUnreadCategoryCaps } from "@/lib/queries";
+import { pruneExpiredUnread } from "@/lib/queries";
 
 // Custom fields expose media:* elements that AllMusic uses to carry the
 // artist and album cleanly. media:credit appears multiple times per item
@@ -431,7 +431,7 @@ export async function fetchAllSources(db: Database.Database): Promise<number> {
   // so newly fetched items get a chance to compete for the top slots before
   // older ones get pruned. consumed_at is never set by the prune, so /read
   // history is unaffected.
-  const pruned = pruneUnreadCategoryCaps(db);
+  const pruned = pruneExpiredUnread(db);
   if (pruned > 0) {
     console.log(`[fetcher] pruned ${pruned} item(s) over per-category unread cap`);
   }

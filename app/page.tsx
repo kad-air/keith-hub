@@ -6,9 +6,10 @@ import FeedClient from "@/components/FeedClient";
 
 export const dynamic = "force-dynamic";
 
-// Main feed cap. Big enough to clear daily backlog in one session,
-// small enough that 300 cards aren't a perf disaster on iOS.
-const MAIN_FEED_LIMIT = 300;
+// Safety ceiling passed to getMainFeedItems. The actual feed size is
+// determined by TTL-based pruning, not this limit. 2000 is generous
+// enough to never clip a real 7-day window.
+const MAIN_FEED_LIMIT = 2000;
 
 function getInitialData(): { items: Item[]; counts: CategoryCounts } {
   try {
@@ -23,6 +24,7 @@ function getInitialData(): { items: Item[]; counts: CategoryCounts } {
       counts: {
         all: 0,
         reading: 0,
+        books: 0,
         music: 0,
         film: 0,
         podcasts: 0,

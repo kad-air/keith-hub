@@ -14,14 +14,15 @@ interface FeedClientProps {
   initialCounts: CategoryCounts;
 }
 
-// Main feed cap. Matches MAIN_FEED_LIMIT in app/page.tsx — they should
-// stay in sync so initial SSR and client-side refetch return the same shape.
-const FEED_LIMIT = 300;
+// Safety ceiling for client-side refetch. Matches MAIN_FEED_LIMIT in
+// app/page.tsx. The actual feed size is bounded by TTL pruning, not this.
+const FEED_LIMIT = 2000;
 
 const CATEGORIES: Array<{ id: keyof CategoryCounts; label: string }> = [
   { id: "all", label: "All" },
   { id: "podcasts", label: "Podcasts" },
   { id: "music", label: "Music" },
+  { id: "books", label: "Books" },
   { id: "film", label: "Film" },
   { id: "reading", label: "Reading" },
   { id: "bluesky", label: "Bluesky" },
@@ -231,7 +232,7 @@ export default function FeedClient({
     setItems([]);
     setCounts((prev) => {
       if (activeCategory === "all") {
-        return { all: 0, reading: 0, music: 0, film: 0, podcasts: 0, bluesky: 0 };
+        return { all: 0, reading: 0, books: 0, music: 0, film: 0, podcasts: 0, bluesky: 0 };
       }
       return { ...prev, [activeCategory]: 0, all: Math.max(0, prev.all - totalBefore) };
     });
@@ -450,14 +451,16 @@ export default function FeedClient({
                 >
                   {cat.label}
                 </span>
-                <span
-                  className={[
-                    "tabular-nums text-[0.65rem]",
-                    isActive ? "text-accent" : "text-cream-dimmer",
-                  ].join(" ")}
-                >
-                  {count}
-                </span>
+                {cat.id !== "bluesky" && (
+                  <span
+                    className={[
+                      "tabular-nums text-[0.65rem]",
+                      isActive ? "text-accent" : "text-cream-dimmer",
+                    ].join(" ")}
+                  >
+                    {count}
+                  </span>
+                )}
               </button>
             );
           })}

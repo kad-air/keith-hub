@@ -19,6 +19,7 @@
     --accent-soft: 61 26 22;
     --cat-podcasts: 95 168 136;
     --cat-music: 164 126 192;
+    --cat-books: 180 140 100;
     --cat-film: 212 160 74;
     --cat-reading: 200 184 154;
     --cat-bluesky: 123 168 201;
@@ -43,6 +44,7 @@
     --accent-soft: 252 232 230;
     --cat-podcasts: 61 138 106;
     --cat-music: 127 88 168;
+    --cat-books: 140 100 60;
     --cat-film: 184 132 36;
     --cat-reading: 122 110 90;
     --cat-bluesky: 74 130 170;
@@ -68,6 +70,7 @@
       --accent-soft: 252 232 230;
       --cat-podcasts: 61 138 106;
       --cat-music: 127 88 168;
+      --cat-books: 140 100 60;
       --cat-film: 184 132 36;
       --cat-reading: 122 110 90;
       --cat-bluesky: 74 130 170;

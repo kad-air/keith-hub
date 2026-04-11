@@ -81,6 +81,7 @@ export function getDb(): Database.Database {
 const WEIGHTS = {
   podcasts: 8,
   music:    6,
+  books:    6,
   film:     6,
   reading:  3,
   bluesky:  1,
@@ -92,6 +93,7 @@ export const RANKED_ORDER = `
   (CASE s.category
     WHEN 'podcasts' THEN ${WEIGHTS.podcasts}.0
     WHEN 'music'    THEN ${WEIGHTS.music}.0
+    WHEN 'books'    THEN ${WEIGHTS.books}.0
     WHEN 'film'     THEN ${WEIGHTS.film}.0
     WHEN 'reading'  THEN ${WEIGHTS.reading}.0
     WHEN 'bluesky'  THEN ${WEIGHTS.bluesky}.0

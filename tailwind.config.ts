@@ -30,6 +30,7 @@ const config: Config = {
         cat: {
           podcasts: "rgb(var(--cat-podcasts) / <alpha-value>)",
           music: "rgb(var(--cat-music) / <alpha-value>)",
+          books: "rgb(var(--cat-books) / <alpha-value>)",
           film: "rgb(var(--cat-film) / <alpha-value>)",
           reading: "rgb(var(--cat-reading) / <alpha-value>)",
           bluesky: "rgb(var(--cat-bluesky) / <alpha-value>)",
