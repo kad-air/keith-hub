@@ -54,6 +54,12 @@ export const SURPRISE_POOL_MULTIPLIER = 1.5;
 // burying the freshest stuff.
 export const SURPRISE_RECENCY_BIAS = 3;
 
+// MIN_ITEMS_PER_SOURCE — minimum items each source is guaranteed in the All
+// view's per-category pool AND selection. Prevents a high-volume source from
+// crowding quieter sources completely out of the recency window. Set to 0 to
+// disable source diversity (pure recency + surprise only).
+export const MIN_ITEMS_PER_SOURCE = 3;
+
 // INTERLEAVE_JITTER — perturbation applied to stride-scheduled positions
 // when interleaving categories. 0 = perfectly mechanical cadence (with
 // current quotas: P M F P R B repeating). ~0.35 = mild swaps between
@@ -111,6 +117,55 @@ function selectWithSurprise(items: Item[], quota: number): Item[] {
   const poolSize = items.length;
   return weightedSample(items, quota, (_item, rank) =>
     Math.exp((-SURPRISE_RECENCY_BIAS * rank) / Math.max(poolSize - 1, 1))
+  );
+}
+
+/**
+ * Like selectWithSurprise, but guarantees each source in the pool gets at
+ * least MIN_ITEMS_PER_SOURCE items in the output (if it has that many in the
+ * pool). Remaining quota is filled by weighted sampling (recency-biased).
+ * Output preserves pool order (recency) so the interleaver downstream works.
+ *
+ * Falls back to pure selectWithSurprise when guarantees alone would exceed
+ * quota (rare — requires 17+ sources × 3 = 51 > 50 quota).
+ */
+function selectWithSourceDiversity(pool: Item[], quota: number): Item[] {
+  if (pool.length <= quota) return pool;
+
+  // Group by source, preserving recency order within each group
+  const bySource = new Map<string, Item[]>();
+  for (const item of pool) {
+    if (!bySource.has(item.source_id)) bySource.set(item.source_id, []);
+    bySource.get(item.source_id)!.push(item);
+  }
+
+  // Phase 1: guarantee per-source minimums (newest per source)
+  const guaranteed = new Set<string>();
+  bySource.forEach((items) => {
+    for (let i = 0; i < Math.min(MIN_ITEMS_PER_SOURCE, items.length); i++) {
+      guaranteed.add(items[i].id);
+    }
+  });
+
+  // If guarantees alone exceed quota, fall back to pure weighted sampling
+  if (guaranteed.size >= quota) {
+    return selectWithSurprise(pool, quota);
+  }
+
+  // Phase 2: fill remaining slots via weighted sampling from non-guaranteed items
+  const remaining = pool.filter((item) => !guaranteed.has(item.id));
+  const fill = quota - guaranteed.size;
+  const sampled = weightedSample(remaining, fill, (_item, rank) =>
+    Math.exp(
+      (-SURPRISE_RECENCY_BIAS * rank) / Math.max(remaining.length - 1, 1)
+    )
+  );
+  const sampledIds = new Set(sampled.map((item) => item.id));
+
+  // Return pool items that were either guaranteed or sampled, preserving
+  // original pool order (published_at DESC) for the interleaver
+  return pool.filter(
+    (item) => guaranteed.has(item.id) || sampledIds.has(item.id)
   );
 }
 
@@ -181,12 +236,29 @@ export function getMainFeedItems(
   db: Database.Database,
   limit: number
 ): Item[] {
-  const stmt = db.prepare(
+  const recencyStmt = db.prepare(
     `${ITEM_SELECT}
      WHERE ist.read_at IS NULL AND s.category = ?
      ORDER BY i.published_at DESC
      LIMIT ?`
   );
+
+  // Per-source backfill: fetch newest items from sources that the recency
+  // window crowded out. Only prepared when source diversity is enabled.
+  const perSourceStmt =
+    MIN_ITEMS_PER_SOURCE > 0
+      ? db.prepare(
+          `${ITEM_SELECT}
+           WHERE ist.read_at IS NULL AND i.source_id = ?
+           ORDER BY i.published_at DESC
+           LIMIT ?`
+        )
+      : null;
+
+  const sourcesStmt =
+    MIN_ITEMS_PER_SOURCE > 0
+      ? db.prepare("SELECT id FROM sources WHERE category = ?")
+      : null;
 
   const byCategory: Array<{ cat: keyof CategoryCounts; items: Item[] }> = [];
   for (const [catKey, quota] of Object.entries(ALL_VIEW_QUOTAS) as Array<
@@ -194,8 +266,55 @@ export function getMainFeedItems(
   >) {
     if (catKey === "all" || quota <= 0) continue;
     const poolSize = Math.max(quota, Math.ceil(quota * SURPRISE_POOL_MULTIPLIER));
-    const pool = stmt.all(catKey, poolSize) as Item[];
-    byCategory.push({ cat: catKey, items: selectWithSurprise(pool, quota) });
+    const pool = recencyStmt.all(catKey, poolSize) as Item[];
+
+    // Source diversity: backfill items from sources that the recency window
+    // missed entirely or underrepresented. The pool may grow beyond poolSize;
+    // the selection phase narrows it back to quota.
+    if (perSourceStmt && sourcesStmt) {
+      const poolIds = new Set(pool.map((item) => item.id));
+      const sourceCounts = new Map<string, number>();
+      for (const item of pool) {
+        sourceCounts.set(
+          item.source_id,
+          (sourceCounts.get(item.source_id) || 0) + 1
+        );
+      }
+
+      const sources = sourcesStmt.all(catKey) as Array<{ id: string }>;
+      for (const { id: sourceId } of sources) {
+        const count = sourceCounts.get(sourceId) || 0;
+        if (count < MIN_ITEMS_PER_SOURCE) {
+          const extras = perSourceStmt.all(
+            sourceId,
+            MIN_ITEMS_PER_SOURCE
+          ) as Item[];
+          for (const item of extras) {
+            if (!poolIds.has(item.id)) {
+              pool.push(item);
+              poolIds.add(item.id);
+            }
+          }
+        }
+      }
+
+      // Re-sort expanded pool by recency for weighted sampling
+      pool.sort(
+        (a, b) =>
+          new Date(b.published_at).getTime() -
+          new Date(a.published_at).getTime()
+      );
+
+      byCategory.push({
+        cat: catKey,
+        items: selectWithSourceDiversity(pool, quota),
+      });
+    } else {
+      byCategory.push({
+        cat: catKey,
+        items: selectWithSurprise(pool, quota),
+      });
+    }
   }
 
   return interleaveByQuota(byCategory).slice(0, limit);
