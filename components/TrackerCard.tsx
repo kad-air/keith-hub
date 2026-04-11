@@ -1,0 +1,171 @@
+"use client";
+
+import { useCallback, useRef, useState } from "react";
+import type { TrackerConfig, TrackerItem } from "@/lib/craft-types";
+
+interface TrackerCardProps {
+  item: TrackerItem;
+  config: TrackerConfig;
+  focused: boolean;
+  onFocus: () => void;
+  onUpdate: (
+    itemId: string,
+    updates: Partial<Pick<TrackerItem, "status" | "rating" | "ranking">>,
+  ) => void;
+}
+
+export default function TrackerCard({
+  item,
+  config,
+  focused,
+  onFocus,
+  onUpdate,
+}: TrackerCardProps) {
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [rankingDraft, setRankingDraft] = useState(
+    item.ranking?.toString() ?? "",
+  );
+
+  const handleStatusChange = useCallback(
+    (e: React.ChangeEvent<HTMLSelectElement>) => {
+      onUpdate(item.id, { status: e.target.value });
+    },
+    [item.id, onUpdate],
+  );
+
+  const handleRatingChange = useCallback(
+    (e: React.ChangeEvent<HTMLSelectElement>) => {
+      const value = e.target.value;
+      onUpdate(item.id, { rating: value });
+    },
+    [item.id, onUpdate],
+  );
+
+  const handleRankingCommit = useCallback(() => {
+    const value = rankingDraft.trim();
+    const num = value === "" ? undefined : parseInt(value, 10);
+    if (num !== item.ranking) {
+      onUpdate(item.id, {
+        ranking: isNaN(num as number) ? undefined : num,
+      });
+    }
+  }, [item.id, item.ranking, rankingDraft, onUpdate]);
+
+  const handleRankingKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === "Enter") {
+        (e.target as HTMLInputElement).blur();
+      }
+    },
+    [],
+  );
+
+  // Open external link if available
+  const handleClick = useCallback(() => {
+    if (item.linkUrl) {
+      window.open(item.linkUrl, "_blank", "noopener");
+    }
+  }, [item.linkUrl]);
+
+  return (
+    <div
+      ref={cardRef}
+      onClick={handleClick}
+      onMouseEnter={onFocus}
+      className={[
+        "group relative flex flex-col overflow-hidden border border-rule/40 bg-ink-raised transition-colors",
+        "hover:border-rule-strong",
+        item.linkUrl ? "cursor-pointer" : "",
+        focused ? "ring-1 ring-accent" : "",
+      ].join(" ")}
+    >
+      {/* Cover image */}
+      <div
+        className={[
+          config.aspectClass,
+          "relative w-full overflow-hidden bg-ink",
+        ].join(" ")}
+      >
+        {item.imageUrl ? (
+          <img
+            src={item.imageUrl}
+            alt={item.name}
+            loading="lazy"
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <div
+            className={[
+              "flex h-full w-full items-center justify-center p-3",
+              config.colorClass,
+              "bg-ink-hover",
+            ].join(" ")}
+          >
+            <span className="text-center font-display text-sm italic leading-tight opacity-60">
+              {item.name}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Info */}
+      <div className="flex flex-1 flex-col gap-1 px-2.5 pt-2 pb-2">
+        <h3 className="font-display text-[0.95rem] font-medium italic leading-tight text-cream line-clamp-2">
+          {item.name}
+        </h3>
+        {item.subtitle && (
+          <p className="font-mono text-[0.6rem] uppercase tracking-kicker text-cream-dim line-clamp-1">
+            {item.subtitle}
+          </p>
+        )}
+
+        {/* Inline edit row */}
+        <div
+          className="mt-auto flex items-center gap-1.5 pt-1.5"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Status */}
+          <select
+            value={item.status}
+            onChange={handleStatusChange}
+            className="min-w-0 flex-1 appearance-none truncate border border-rule bg-ink px-1.5 py-1 font-mono text-[0.6rem] uppercase tracking-kicker text-cream-dim transition-colors hover:border-rule-strong focus:border-accent focus:text-cream focus:outline-none"
+          >
+            <option value="">—</option>
+            {config.statusOptions.map((opt) => (
+              <option key={opt} value={opt}>
+                {opt}
+              </option>
+            ))}
+          </select>
+
+          {/* Rating */}
+          <select
+            value={item.rating}
+            onChange={handleRatingChange}
+            className="w-10 appearance-none border border-rule bg-ink px-1 py-1 text-center text-[0.75rem] transition-colors hover:border-rule-strong focus:border-accent focus:outline-none"
+          >
+            <option value="">—</option>
+            {config.ratingOptions.map((opt) => (
+              <option key={opt} value={opt}>
+                {opt}
+              </option>
+            ))}
+          </select>
+
+          {/* Ranking */}
+          <input
+            type="number"
+            min={1}
+            step={1}
+            value={rankingDraft}
+            onChange={(e) => setRankingDraft(e.target.value)}
+            onBlur={handleRankingCommit}
+            onKeyDown={handleRankingKeyDown}
+            placeholder="#"
+            className="w-9 appearance-none border border-rule bg-ink px-1 py-1 text-center font-mono text-[0.65rem] tabular-nums text-cream-dim transition-colors hover:border-rule-strong focus:border-accent focus:text-cream focus:outline-none"
+          />
+        </div>
+      </div>
+    </div>
+  );
+}

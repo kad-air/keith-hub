@@ -1,6 +1,6 @@
 {
-  "name": "The Feed",
-  "short_name": "Feed",
+  "name": "hub",
+  "short_name": "hub",
   "description": "Personal content hub for intentional media consumption.",
   "start_url": "/",
   "scope": "/",

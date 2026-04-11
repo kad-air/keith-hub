@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Newsreader, JetBrains_Mono } from "next/font/google";
 import Link from "next/link";
+import { TRACKER_CONFIGS } from "@/lib/tracker-config";
 import "./globals.css";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 import ThemeProvider from "@/components/ThemeProvider";
@@ -23,9 +24,9 @@ const monoFont = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "The Feed",
+  title: "hub",
   description: "Personal content hub for intentional media consumption.",
-  applicationName: "The Feed",
+  applicationName: "hub",
   // NOTE: manifest is NOT set here. Next.js 14.2.3 hardcodes
   // crossOrigin="use-credentials" on the metadata-generated <link rel="manifest">
   // (see node_modules/next/dist/lib/metadata/generate/basic.js), which causes
@@ -34,7 +35,7 @@ export const metadata: Metadata = {
   // the link manually in the JSX below to avoid the broken attribute.
   appleWebApp: {
     capable: true,
-    title: "Feed",
+    title: "hub",
     statusBarStyle: "black-translucent",
   },
   formatDetection: {
@@ -76,7 +77,7 @@ export default function RootLayout({
             a flash of the wrong theme. Must run before React hydrates. */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem("the-feed-theme");if(t&&["light","dark","auto"].indexOf(t)!==-1){document.documentElement.setAttribute("data-theme",t)}}catch(e){}})()`,
+            __html: `(function(){try{var t=localStorage.getItem("hub-theme");if(t&&["light","dark","auto"].indexOf(t)!==-1){document.documentElement.setAttribute("data-theme",t)}}catch(e){}})()`,
           }}
         />
       </head>
@@ -84,18 +85,12 @@ export default function RootLayout({
         <ThemeProvider>
         <header className="sticky top-0 z-40 border-b border-rule/60 bg-ink/85 backdrop-blur-md pt-[env(safe-area-inset-top)]">
           <div className="mx-auto flex min-h-14 max-w-[720px] items-center justify-between pl-[max(1.5rem,env(safe-area-inset-left))] pr-[max(1.5rem,env(safe-area-inset-right))]">
-            <Link href="/" className="group inline-flex items-baseline gap-1.5">
+            <Link href="/" className="group inline-flex items-baseline">
               <span className="font-display text-[1.4rem] font-medium italic leading-none tracking-tight text-cream transition-colors group-hover:text-accent">
-                The&nbsp;Feed
-              </span>
-              <span
-                aria-hidden
-                className="hidden font-mono text-[0.6rem] uppercase tracking-kicker text-cream-dimmer sm:inline"
-              >
-                — est. 2026
+                hub
               </span>
             </Link>
-            <nav className="flex items-center gap-6">
+            <nav className="flex items-center gap-5">
               <Link
                 href="/"
                 className="font-mono text-[0.68rem] uppercase tracking-kicker text-cream-dim transition-colors hover:text-cream"
@@ -114,6 +109,16 @@ export default function RootLayout({
               >
                 Read
               </Link>
+              <span className="hidden h-3.5 w-px bg-rule sm:inline-block" aria-hidden />
+              {TRACKER_CONFIGS.map((t) => (
+                <Link
+                  key={t.slug}
+                  href={`/trackers/${t.slug}`}
+                  className="hidden font-mono text-[0.68rem] uppercase tracking-kicker text-cream-dim transition-colors hover:text-cream sm:inline"
+                >
+                  {t.label}
+                </Link>
+              ))}
               <AppMenu />
             </nav>
           </div>

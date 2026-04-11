@@ -1,6 +1,6 @@
 module.exports = {
   apps: [{
-    name: 'the-feed',
+    name: 'hub',
     script: 'node_modules/.bin/next',
     args: 'start',
     cwd: './',

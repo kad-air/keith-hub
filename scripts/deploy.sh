@@ -11,6 +11,6 @@ if [ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]; then
   git pull --ff-only
   npm install --production
   npm run build
-  pm2 restart the-feed
+  pm2 restart hub
   echo "$(date): Deployed $(git rev-parse --short HEAD)" >> "$LOG"
 fi
