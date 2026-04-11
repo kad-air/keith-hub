@@ -1,11 +1,11 @@
 import type { Metadata, Viewport } from "next";
 import { Newsreader, JetBrains_Mono } from "next/font/google";
 import Link from "next/link";
-import { TRACKER_CONFIGS } from "@/lib/tracker-config";
 import "./globals.css";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 import ThemeProvider from "@/components/ThemeProvider";
-import AppMenu from "@/components/AppMenu";
+import HeaderNav from "@/components/HeaderNav";
+import BottomNav from "@/components/BottomNav";
 
 const displayFont = Newsreader({
   subsets: ["latin"],
@@ -90,40 +90,11 @@ export default function RootLayout({
                 hub
               </span>
             </Link>
-            <nav className="flex items-center gap-5">
-              <Link
-                href="/"
-                className="font-mono text-[0.68rem] uppercase tracking-kicker text-cream-dim transition-colors hover:text-cream"
-              >
-                Today
-              </Link>
-              <Link
-                href="/saved"
-                className="font-mono text-[0.68rem] uppercase tracking-kicker text-cream-dim transition-colors hover:text-cream"
-              >
-                Saved
-              </Link>
-              <Link
-                href="/read"
-                className="font-mono text-[0.68rem] uppercase tracking-kicker text-cream-dim transition-colors hover:text-cream"
-              >
-                Read
-              </Link>
-              <span className="hidden h-3.5 w-px bg-rule sm:inline-block" aria-hidden />
-              {TRACKER_CONFIGS.map((t) => (
-                <Link
-                  key={t.slug}
-                  href={`/trackers/${t.slug}`}
-                  className="hidden font-mono text-[0.68rem] uppercase tracking-kicker text-cream-dim transition-colors hover:text-cream sm:inline"
-                >
-                  {t.label}
-                </Link>
-              ))}
-              <AppMenu />
-            </nav>
+            <HeaderNav />
           </div>
         </header>
-        <main className="relative z-10">{children}</main>
+        <main className="relative z-10 pb-14 sm:pb-0">{children}</main>
+        <BottomNav />
         <ServiceWorkerRegister />
         </ThemeProvider>
       </body>

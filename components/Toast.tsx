@@ -36,7 +36,7 @@ export default function Toast({
   return (
     <div
       role="status"
-      className="fixed bottom-[max(1.5rem,calc(env(safe-area-inset-bottom)+0.5rem))] left-1/2 z-50 -translate-x-1/2 animate-slide-up"
+      className="fixed bottom-[max(1.5rem,calc(env(safe-area-inset-bottom)+0.5rem))] sm:bottom-[max(1.5rem,calc(env(safe-area-inset-bottom)+0.5rem))] max-sm:bottom-[calc(3.5rem+env(safe-area-inset-bottom)+0.5rem)] left-1/2 z-50 -translate-x-1/2 animate-slide-up"
     >
       <div className="relative overflow-hidden rounded-sm border border-rule-strong bg-ink-raised/95 px-5 py-3 shadow-2xl shadow-black/60 backdrop-blur-md">
         <div className="flex items-center gap-5">

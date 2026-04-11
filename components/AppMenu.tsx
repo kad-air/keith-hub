@@ -1,9 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { useTheme, type ThemeMode } from "@/components/ThemeProvider";
-import { TRACKER_CONFIGS } from "@/lib/tracker-config";
 
 const THEME_OPTIONS: Array<{ value: ThemeMode; label: string }> = [
   { value: "auto", label: "Auto" },
@@ -103,28 +101,6 @@ export default function AppMenu() {
 
           {/* Divider */}
           <div className="mx-4 h-px bg-rule" />
-
-          {/* Trackers section */}
-          <div className="px-4 py-3 sm:hidden">
-            <h3 className="mb-2.5 font-mono text-[0.6rem] uppercase tracking-kicker text-cream-dimmer">
-              Trackers
-            </h3>
-            <div className="flex flex-col gap-2">
-              {TRACKER_CONFIGS.map((t) => (
-                <Link
-                  key={t.slug}
-                  href={`/trackers/${t.slug}`}
-                  onClick={() => setOpen(false)}
-                  className="font-mono text-[0.65rem] uppercase tracking-kicker text-cream-dim transition-colors hover:text-cream"
-                >
-                  {t.label}
-                </Link>
-              ))}
-            </div>
-          </div>
-
-          {/* Divider */}
-          <div className="mx-4 h-px bg-rule sm:hidden" />
 
           {/* Version section */}
           <div className="px-4 py-3">

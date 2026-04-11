@@ -61,6 +61,21 @@ export default function TrackerCard({
   );
 
   // Open external link if available
+  // Format release date for display
+  const formattedDate = (() => {
+    if (!item.releaseDate) return null;
+    // publication_year is just a 4-digit string like "2026"
+    if (/^\d{4}$/.test(item.releaseDate)) return item.releaseDate;
+    // ISO date string from Craft
+    const d = new Date(item.releaseDate);
+    if (isNaN(d.getTime())) return null;
+    return d.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  })();
+
   const handleClick = useCallback(() => {
     if (item.linkUrl) {
       window.open(item.linkUrl, "_blank", "noopener");
@@ -116,6 +131,11 @@ export default function TrackerCard({
         {item.subtitle && (
           <p className="font-mono text-[0.6rem] uppercase tracking-kicker text-cream-dim line-clamp-1">
             {item.subtitle}
+          </p>
+        )}
+        {formattedDate && (
+          <p className="font-mono text-[0.55rem] uppercase tracking-kicker text-cream-dimmer">
+            {formattedDate}
           </p>
         )}
 

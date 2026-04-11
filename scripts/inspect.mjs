@@ -400,7 +400,7 @@ async function html() {
 
 function logs(args) {
   const n = parseInt(args[0] ?? "30", 10);
-  const cmd = spawnSync("pm2", ["logs", "the-feed", "--lines", String(n), "--nostream"], {
+  const cmd = spawnSync("pm2", ["logs", "hub", "--lines", String(n), "--nostream"], {
     encoding: "utf8",
   });
   if (cmd.status !== 0) {

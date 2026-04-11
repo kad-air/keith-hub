@@ -61,5 +61,6 @@ export interface TrackerItem {
   rating: string;
   ranking: number | undefined;
   subtitle: string;
+  releaseDate: string | null;
   properties: CraftItemProperties;
 }

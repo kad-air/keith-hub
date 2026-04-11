@@ -119,6 +119,15 @@ export function normalizeItems(
         ? (item.properties[config.subtitleKey] as string)
         : "";
 
+    // Extract release date: most trackers use `release_date` (ISO date string),
+    // books uses `publication_year` (number).
+    let releaseDate: string | null = null;
+    if (typeof item.properties.release_date === "string" && item.properties.release_date) {
+      releaseDate = item.properties.release_date;
+    } else if (typeof item.properties.publication_year === "number") {
+      releaseDate = String(item.properties.publication_year);
+    }
+
     return {
       id: item.id,
       name,
@@ -128,6 +137,7 @@ export function normalizeItems(
       rating,
       ranking,
       subtitle,
+      releaseDate,
       properties: item.properties,
     };
   });
