@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
   <rect width="1024" height="1024" fill="#0c0a08"/>
   <text
-    x="540"
+    x="512"
     y="680"
     font-family="'Newsreader', 'Source Serif 4', 'Source Serif Pro', Georgia, 'Times New Roman', serif"
     font-style="italic"
@@ -9,5 +9,5 @@
     font-size="600"
     fill="#f5efe1"
     text-anchor="middle"
-  >F</text>
+  >h</text>
 </svg>
