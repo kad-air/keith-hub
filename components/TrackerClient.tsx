@@ -79,34 +79,19 @@ export default function TrackerClient({
   );
 
   // ── Keyboard navigation ───────────────────────────────────────
-  const handleKey = useCallback(
-    (key: string) => {
-      if (showHelp && key !== "?") return;
-      switch (key) {
-        case "j":
-          setFocusedIndex((i) => Math.min(i + 1, filteredItems.length - 1));
-          break;
-        case "k":
-          setFocusedIndex((i) => Math.max(i - 1, 0));
-          break;
-        case "g h":
-          router.push("/");
-          break;
-        case "g s":
-          router.push("/saved");
-          break;
-        case "g r":
-          router.push("/read");
-          break;
-        case "?":
-          setShowHelp((v) => !v);
-          break;
-      }
-    },
-    [filteredItems.length, router, showHelp],
+  const shortcuts = useMemo(
+    () => ({
+      j: () => setFocusedIndex((i) => Math.min(i + 1, filteredItems.length - 1)),
+      k: () => setFocusedIndex((i) => Math.max(i - 1, 0)),
+      "g h": () => router.push("/"),
+      "g s": () => router.push("/saved"),
+      "g r": () => router.push("/read"),
+      "?": () => setShowHelp((v) => !v),
+    }),
+    [filteredItems.length, router],
   );
 
-  useKeyboard(handleKey);
+  useKeyboard(shortcuts, !showHelp);
 
   // Reset focused index when filter changes
   const handleStatusChange = useCallback((status: string) => {
@@ -173,7 +158,7 @@ export default function TrackerClient({
       )}
 
       {/* Keyboard help */}
-      {showHelp && <KeyboardHelp onClose={() => setShowHelp(false)} />}
+      <KeyboardHelp open={showHelp} onClose={() => setShowHelp(false)} />
     </article>
   );
 }
