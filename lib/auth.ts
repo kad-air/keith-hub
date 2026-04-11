@@ -1,3 +1,19 @@
+import type { NextRequest } from "next/server";
+
+/**
+ * Build a redirect URL that respects the reverse proxy's forwarded headers.
+ * Behind Railway/Traefik, request.url resolves to localhost — this reads
+ * x-forwarded-host/proto to reconstruct the public origin.
+ */
+export function publicUrl(path: string, request: NextRequest): URL {
+  const host =
+    request.headers.get("x-forwarded-host") ||
+    request.headers.get("host") ||
+    "localhost";
+  const proto = request.headers.get("x-forwarded-proto") || "http";
+  return new URL(path, `${proto}://${host}`);
+}
+
 /**
  * Derives a deterministic auth token from the password using HMAC-SHA256.
  * Uses Web Crypto API so it works in both Edge (middleware) and Node.js

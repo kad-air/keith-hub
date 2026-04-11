@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { deriveAuthToken } from "@/lib/auth";
+import { deriveAuthToken, publicUrl } from "@/lib/auth";
 
 const AUTH_COOKIE = "hub-auth";
 
@@ -22,7 +22,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  return NextResponse.redirect(new URL("/login", request.url));
+  return NextResponse.redirect(publicUrl("/login", request));
 }
 
 export const config = {
