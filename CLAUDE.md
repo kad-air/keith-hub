@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-**The Feed** — a self-hosted personal content hub. Next.js 14 App Router + SQLite + Tailwind, installable as an iOS PWA. Runs on a Mac Mini, accessible via Tailscale only. Single user, no auth.
+**The Feed** — a personal content hub. Next.js 14 App Router + SQLite + Tailwind, installable as an iOS PWA. Hosted on Railway at `hub.keithadair.com`. Single user, password-protected via middleware.
 
 See `PRODUCT_PLAN.md` for product vision and design principles. The most load-bearing ones: **finite, not infinite** (no infinite scroll — you reach the end and stop), **triage, not consumption** (scan/save/dismiss here, consume in native apps), and **config over UI** (sources are managed by editing `config/feeds.yml` — there's no admin screen).
 
@@ -41,14 +41,14 @@ Standard "the user reports a bug" workflow:
 1. `inspect.mjs counts` to orient
 2. `inspect.mjs items <cat>` or `bsky-rich <kind>` to find the actual item
 3. `inspect.mjs item <id>` to see its data and parsed metadata
-4. Make the fix → `npm run build && pm2 restart hub`
-5. `inspect.mjs html` to verify the rendered output reflects the change
+4. Make the fix → `npm run build` → push to main (Railway auto-deploys)
+5. `inspect.mjs html` to verify the rendered output reflects the change (uses `FEED_BASE` env var or `--password` flag for auth)
 6. **Then** ask the user to test on the phone
 
 ## Architecture
 
 ### Data flow
-1. On first page load, `app/page.tsx` calls `ensureInitialized()` (lib/init.ts) which starts the background polling loop
+1. On server boot, `instrumentation.ts` starts the background polling loop (via `startPolling` from `lib/fetcher.ts`)
 2. The poller calls `fetchAllSources()` (lib/fetcher.ts) on an interval, which re-reads `config/feeds.yml` each cycle, syncs the `sources` table, fetches new content, and **auto-prunes any sources/items removed from config**
 3. The page queries SQLite directly (not via API) for the initial SSR render, then the client uses `/api/items` for filtering/refresh
 
@@ -156,7 +156,7 @@ Trackers are backed by Craft.do collections fetched via the Craft Connect API (`
 The Craft schema for each collection also includes extra fields not currently surfaced in the UI (e.g. `genre`, `synopsis`, `runtime_minutes`, `in_plex` for movies; `number_of_songs`, `genre` for music; `length_in_pages` for books; `season` for TV). These live in `item.properties` and can be accessed if needed.
 
 ### Push notifications (release date alerts)
-Web Push via VAPID, powered by the `web-push` npm package. Single-user, so the subscription is stored as a JSON file (`data/push-subscription.json`), not in the database.
+Web Push via VAPID, powered by the `web-push` npm package. Single-user, so the subscription is stored in the SQLite `kv` table (key `push_subscription`).
 
 **Flow:**
 1. User taps "Enable release alerts" in AppMenu (gear icon). iOS prompts for notification permission (user gesture required). The browser creates a push subscription and POSTs it to `/api/push/subscribe`.
@@ -165,8 +165,8 @@ Web Push via VAPID, powered by the `web-push` npm package. Single-user, so the s
 4. The service worker (`app/sw.ts`) handles `push` events (shows the notification) and `notificationclick` events (focuses or opens the app).
 
 **Key files:**
-- `lib/push.ts` — `getSubscription`, `saveSubscription`, `removeSubscription`, `sendPush`
-- `lib/release-notify.ts` — `checkReleaseNotifications` (daily Craft scan + push dispatch)
+- `lib/push.ts` — `getSubscription`, `saveSubscription`, `removeSubscription`, `sendPush` (backed by SQLite `kv` table)
+- `lib/release-notify.ts` — `checkReleaseNotifications` (daily Craft scan + push dispatch, date guard in SQLite `kv` table)
 - `app/api/push/subscribe/route.ts` — CRUD for the push subscription
 - `app/api/push/test/route.ts` — `POST` sends a test notification
 - `components/AppMenu.tsx` — "Release alerts" toggle button with permission state handling
@@ -176,7 +176,7 @@ Web Push via VAPID, powered by the `web-push` npm package. Single-user, so the s
 - `VAPID_PRIVATE_KEY`
 - `VAPID_SUBJECT` — `mailto:` URI for VAPID identification
 
-**Testing:** `curl -X POST http://localhost:3030/api/push/test` (requires an active subscription).
+**Testing:** `curl -X POST http://localhost:3000/api/push/test` (requires an active subscription; in production, use the auth cookie or `inspect.mjs`).
 
 ## PWA setup (read this before touching app/layout.tsx)
 
@@ -206,17 +206,29 @@ iOS standalone PWAs have a long-standing quirk: `window.open(url, "_blank")` ope
 
 ## Deployment
 
-**This repo runs ON the Mac Mini that is also the dev environment.** There's no separate prod server — `git push` is for backup, the local working tree IS what users hit.
+**Hosted on Railway** at `hub.keithadair.com`. Auto-deploys on push to `main`.
 
-- Process manager: PM2, process name **`hub`**. Restart with `pm2 restart hub`. Logs at `~/.pm2/logs/hub-out-0.log` and `hub-error-0.log`.
-- `ecosystem.config.js` sets `PORT=3030` and `HOSTNAME=0.0.0.0`. Port 3030 (not 3000) because the Mac Mini MCP server (`/Users/keithadair/Code/mac-mini-mcp-server`) owns 127.0.0.1:3000 on the same machine. `HOSTNAME=0.0.0.0` forces Next.js to bind on IPv4 — its default `::` is IPv6-only on macOS, and Tailscale Serve proxies via 127.0.0.1.
-- Tailnet exposure: `tailscale serve --bg --https=10000 http://localhost:3030` (set out of band, not in repo). Reachable at `https://keiths-mac-mini-1110.tail846fa.ts.net:10000` from Tailscale-connected devices only — not public Funnel.
-- `scripts/deploy.sh` is a cron-based auto-deploy (runs every 2 min, pulls and restarts only if there are new commits). Useful when committing from a different machine; redundant when editing on the Mini directly.
-- Files that live only on the Mini and are never committed: `.env`, `data/the-feed.db`, `data/push-subscription.json`, `data/release-notify-last.txt`
+- Railway builds with Nixpacks (auto-detects Next.js). No Dockerfile needed.
+- Railway sets `PORT` dynamically — Next.js respects it automatically.
+- Persistent volume mounted at `/app/data` holds the SQLite database (all persistent state — items, push subscription, release-notify date — lives in the DB's `kv` table).
+- The background poller starts on process boot via `instrumentation.ts` (Next.js instrumentation hook with `experimental.instrumentationHook: true` in `next.config.mjs`).
+- Git version metadata: `next.config.mjs` tries `git rev-parse` first, falls back to Railway's `RAILWAY_GIT_COMMIT_SHA` env var.
+- DNS: CNAME record `hub` → Railway's provided CNAME target, managed in DigitalOcean DNS. Domain registered at Squarespace.
+
+### Auth
+Password-protected via Next.js middleware (`middleware.ts`). A `hub-auth` httpOnly cookie (30-day expiry) gates all routes except the login page, static assets, manifest, and service worker. `FEED_PASSWORD` env var. Log out via gear menu.
+
+### Local dev
+The Mac Mini is still the dev environment. `npm run dev` on port 3000. The `.env` file holds the same env vars as Railway. If `FEED_PASSWORD` is unset, auth is bypassed (so local dev works without logging in).
+
+### Files never committed
+`.env`, `data/the-feed.db`
 
 ## Environment variables
+- `FEED_PASSWORD` — password for the login gate (unset = auth bypassed, for local dev)
 - `BLUESKY_IDENTIFIER` — Bluesky handle (e.g. `keithadair.com`)
 - `BLUESKY_APP_PASSWORD` — Bluesky app password (not account password)
+- `CRAFT_API_KEY` — Craft Connect API key for tracker collections
 - `VAPID_PUBLIC_KEY` — Web Push VAPID public key (also exposed client-side as `NEXT_PUBLIC_VAPID_PUBLIC_KEY`)
 - `VAPID_PRIVATE_KEY` — Web Push VAPID private key
 - `VAPID_SUBJECT` — `mailto:` URI for VAPID identification

@@ -11,7 +11,14 @@ const withSerwist = withSerwistInit({
 });
 
 // Bake git metadata into the build so the app menu can show version info.
-const GIT_COMMIT = execSync("git rev-parse --short HEAD").toString().trim();
+// Railway builds may not have .git — fall back to RAILWAY_GIT_COMMIT_SHA.
+const GIT_COMMIT = (() => {
+  try {
+    return execSync("git rev-parse --short HEAD").toString().trim();
+  } catch {
+    return (process.env.RAILWAY_GIT_COMMIT_SHA || "unknown").slice(0, 7);
+  }
+})();
 const GIT_LAST_MERGE_TS = (() => {
   try {
     return execSync("git log -1 --merges --format=%cI").toString().trim() || "";
@@ -22,7 +29,9 @@ const GIT_LAST_MERGE_TS = (() => {
 
 const nextConfig = {
   // Allow better-sqlite3 to be used server-side only
-  experimental: {},
+  experimental: {
+    instrumentationHook: true,
+  },
   env: {
     NEXT_PUBLIC_GIT_COMMIT: GIT_COMMIT,
     NEXT_PUBLIC_GIT_LAST_MERGE_TS: GIT_LAST_MERGE_TS,

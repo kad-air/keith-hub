@@ -19,7 +19,30 @@ import { spawnSync } from "node:child_process";
 
 const ROOT = process.cwd();
 const DB_PATH = join(ROOT, "data/the-feed.db");
-const FEED_BASE = "https://keiths-mac-mini-1110.tail846fa.ts.net:10000";
+const FEED_BASE = process.env.FEED_BASE || "http://localhost:3000";
+const FEED_PASSWORD = process.env.FEED_PASSWORD || "";
+
+// ── Auth helper for HTTP commands ──────────────────────────────────────────
+
+let _authCookie = null;
+async function getAuthCookie() {
+  if (_authCookie) return _authCookie;
+  const pw = process.argv.includes("--password")
+    ? process.argv[process.argv.indexOf("--password") + 1]
+    : FEED_PASSWORD;
+  if (!pw) return null;
+  const res = await fetch(`${FEED_BASE}/api/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: `password=${encodeURIComponent(pw)}`,
+    redirect: "manual",
+  });
+  const setCookie = res.headers.get("set-cookie");
+  if (setCookie) {
+    _authCookie = setCookie.split(";")[0];
+  }
+  return _authCookie;
+}
 
 // ── ANSI helpers ────────────────────────────────────────────────────────────
 
@@ -363,7 +386,9 @@ async function html() {
   const path = process.argv[3] || "/";
   const url = `${FEED_BASE}${path}?cb=${Date.now()}`;
   header(`GET ${url}`);
-  const res = await fetch(url, { method: "GET" });
+  const cookie = await getAuthCookie();
+  const headers = cookie ? { Cookie: cookie } : {};
+  const res = await fetch(url, { method: "GET", headers, redirect: "manual" });
   const text = await res.text();
   console.log(`  ${c.dim("status")}     ${res.status}`);
   console.log(`  ${c.dim("size")}       ${(text.length / 1024).toFixed(1)}KB`);
@@ -412,7 +437,9 @@ function logs(args) {
 
 async function refresh() {
   header(`POST ${FEED_BASE}/api/refresh`);
-  const res = await fetch(`${FEED_BASE}/api/refresh`, { method: "POST" });
+  const cookie = await getAuthCookie();
+  const headers = cookie ? { Cookie: cookie } : {};
+  const res = await fetch(`${FEED_BASE}/api/refresh`, { method: "POST", headers });
   const json = await res.json().catch(() => ({}));
   console.log(`  ${c.dim("status")}     ${res.status}`);
   console.log(`  ${c.dim("response")}   ${JSON.stringify(json)}`);

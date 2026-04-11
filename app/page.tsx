@@ -1,4 +1,3 @@
-import { ensureInitialized } from "@/lib/init";
 import { getDb } from "@/lib/db";
 import { getCategoryCounts, getMainFeedItems } from "@/lib/queries";
 import type { Item, CategoryCounts } from "@/lib/types";
@@ -35,7 +34,6 @@ function getInitialData(): { items: Item[]; counts: CategoryCounts } {
 }
 
 export default function HomePage() {
-  ensureInitialized();
   const { items, counts } = getInitialData();
 
   return <FeedClient initialItems={items} initialCounts={counts} />;

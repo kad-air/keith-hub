@@ -57,6 +57,11 @@ export function getDb(): Database.Database {
     CREATE INDEX IF NOT EXISTS idx_items_source ON items(source_id, published_at DESC);
     CREATE INDEX IF NOT EXISTS idx_state_saved ON item_state(saved_at) WHERE saved_at IS NOT NULL;
     CREATE INDEX IF NOT EXISTS idx_state_consumed ON item_state(consumed_at) WHERE consumed_at IS NOT NULL;
+
+    CREATE TABLE IF NOT EXISTS kv (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
   `);
 
   return dbInstance;

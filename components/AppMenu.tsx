@@ -208,6 +208,21 @@ export default function AppMenu() {
               </div>
             </div>
           </div>
+
+          {/* Divider */}
+          <div className="mx-4 h-px bg-rule" />
+
+          {/* Log out */}
+          <div className="px-4 py-3">
+            <form action="/api/auth/logout" method="POST">
+              <button
+                type="submit"
+                className="w-full rounded-sm px-2 py-1.5 font-mono text-[0.65rem] uppercase tracking-kicker text-cream-dim border border-rule transition-colors hover:border-rule-strong hover:text-cream"
+              >
+                Log out
+              </button>
+            </form>
+          </div>
         </div>
       )}
     </div>

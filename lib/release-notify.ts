@@ -1,11 +1,7 @@
-import fs from "fs";
-import path from "path";
+import { getDb } from "@/lib/db";
 import { TRACKER_CONFIGS } from "@/lib/tracker-config";
 import { fetchCollectionItems, normalizeItems } from "@/lib/craft";
 import { sendPush } from "@/lib/push";
-
-const DATA_DIR = path.join(process.cwd(), "data");
-const LAST_CHECK_PATH = path.join(DATA_DIR, "release-notify-last.txt");
 
 function todayStr(): string {
   // Local date string YYYY-MM-DD
@@ -15,15 +11,21 @@ function todayStr(): string {
 
 function getLastCheckedDate(): string | null {
   try {
-    return fs.readFileSync(LAST_CHECK_PATH, "utf-8").trim();
+    const db = getDb();
+    const row = db
+      .prepare("SELECT value FROM kv WHERE key = 'release_notify_last'")
+      .get() as { value: string } | undefined;
+    return row?.value ?? null;
   } catch {
     return null;
   }
 }
 
 function setLastCheckedDate(date: string): void {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-  fs.writeFileSync(LAST_CHECK_PATH, date);
+  const db = getDb();
+  db.prepare(
+    "INSERT OR REPLACE INTO kv (key, value) VALUES ('release_notify_last', ?)",
+  ).run(date);
 }
 
 /**

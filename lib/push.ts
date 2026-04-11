@@ -1,9 +1,5 @@
-import fs from "fs";
-import path from "path";
 import webpush from "web-push";
-
-const DATA_DIR = path.join(process.cwd(), "data");
-const SUB_PATH = path.join(DATA_DIR, "push-subscription.json");
+import { getDb } from "@/lib/db";
 
 // Configure web-push with VAPID keys
 if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
@@ -16,22 +12,28 @@ if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
 
 export function getSubscription(): webpush.PushSubscription | null {
   try {
-    if (!fs.existsSync(SUB_PATH)) return null;
-    const raw = fs.readFileSync(SUB_PATH, "utf-8");
-    return JSON.parse(raw) as webpush.PushSubscription;
+    const db = getDb();
+    const row = db
+      .prepare("SELECT value FROM kv WHERE key = 'push_subscription'")
+      .get() as { value: string } | undefined;
+    if (!row) return null;
+    return JSON.parse(row.value) as webpush.PushSubscription;
   } catch {
     return null;
   }
 }
 
 export function saveSubscription(sub: webpush.PushSubscription): void {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-  fs.writeFileSync(SUB_PATH, JSON.stringify(sub, null, 2));
+  const db = getDb();
+  db.prepare(
+    "INSERT OR REPLACE INTO kv (key, value) VALUES ('push_subscription', ?)",
+  ).run(JSON.stringify(sub));
 }
 
 export function removeSubscription(): void {
   try {
-    fs.unlinkSync(SUB_PATH);
+    const db = getDb();
+    db.prepare("DELETE FROM kv WHERE key = 'push_subscription'").run();
   } catch {
     // already gone
   }

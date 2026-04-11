@@ -110,6 +110,27 @@ export default function FeedClient({
     }
   }, [activeCategory, fetchItems, refreshing]);
 
+  // ─── Silent auto-refresh on PWA resume ────────────────────
+  const lastRefreshRef = useRef(0);
+  useEffect(() => {
+    function onVisibilityChange() {
+      if (document.visibilityState !== "visible") return;
+      if (Date.now() - lastRefreshRef.current < 60_000) return;
+      lastRefreshRef.current = Date.now();
+      fetch("/api/refresh", { method: "POST" })
+        .then(() => fetchItems(activeCategory))
+        .catch(() => {});
+    }
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () =>
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+  }, [activeCategory, fetchItems]);
+
+  // Also stamp the ref on manual refresh so the 60s guard works both ways
+  useEffect(() => {
+    if (refreshing) lastRefreshRef.current = Date.now();
+  }, [refreshing]);
+
   // ─── Item actions ─────────────────────────────────────────
   const removeFromList = useCallback((id: string) => {
     setItems((prev) => prev.filter((it) => it.id !== id));
