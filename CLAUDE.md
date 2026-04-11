@@ -31,7 +31,7 @@ node scripts/inspect.mjs item <id-prefix>        # full row + parsed metadata fo
 node scripts/inspect.mjs sources                 # configured sources, item counts, last fetch
 node scripts/inspect.mjs bsky-rich [kind]        # find bsky items with images/external/quoted/reply/repost
 node scripts/inspect.mjs html [path]             # fetch live page, count rendered structural elements
-node scripts/inspect.mjs logs [n]                # last N pm2 log lines for hub
+node scripts/inspect.mjs logs [n]                # last N log lines (Railway: use dashboard; local: pm2 logs)
 node scripts/inspect.mjs refresh                 # POST /api/refresh and report
 ```
 

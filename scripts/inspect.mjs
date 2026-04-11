@@ -6,7 +6,7 @@
  *   node scripts/inspect.mjs <command> [args]
  *
  * Designed so Claude (or you) can verify the current state of the running
- * Feed without poking sqlite/curl/pm2 by hand. Read-only against the DB,
+ * Feed without poking sqlite/curl by hand. Read-only against the DB,
  * read-only against the live HTTP endpoint (except `refresh` which POSTs).
  *
  * Add new commands by registering them in the COMMANDS map at the bottom.
@@ -425,12 +425,13 @@ async function html() {
 
 function logs(args) {
   const n = parseInt(args[0] ?? "30", 10);
+  // Try pm2 first (local dev), fall back to a helpful message for Railway
   const cmd = spawnSync("pm2", ["logs", "hub", "--lines", String(n), "--nostream"], {
     encoding: "utf8",
   });
   if (cmd.status !== 0) {
-    console.error(c.red("pm2 logs failed:"), cmd.stderr);
-    process.exit(1);
+    console.log(c.yellow("pm2 not available — use Railway dashboard for production logs."));
+    return;
   }
   console.log(cmd.stdout);
 }
@@ -462,7 +463,7 @@ ${c.bold("Commands:")}
   ${c.cyan("bsky-rich [kind]")}            Find Bluesky items with rich content
                                 ${c.dim("kinds: images external quoted reply repost")}
   ${c.cyan("html [path]")}                 Fetch live page, count rendered structures
-  ${c.cyan("logs [n]")}                    Last N pm2 log lines (default 30)
+  ${c.cyan("logs [n]")}                    Last N log lines (pm2 locally; use Railway dashboard in prod)
   ${c.cyan("refresh")}                     POST /api/refresh and report
   ${c.cyan("help")}                        This help
 `);

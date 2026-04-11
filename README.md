@@ -1,30 +1,18 @@
 # The Feed
 
-Personal content hub. Self-hosted on Mac Mini, accessible via Tailscale.
+Personal content hub. Hosted on Railway at `hub.keithadair.com`.
 
-## Setup
+## Local dev
 
 ```bash
 npm install
 cp config/feeds.example.yml config/feeds.yml
 # Edit config/feeds.yml with your sources
 cp .env.example .env
-# Edit .env with your Bluesky credentials (optional for v0)
+# Edit .env with your credentials
 npm run dev
 ```
 
-## Production (Mac Mini)
+## Production
 
-```bash
-npm run build
-pm2 start ecosystem.config.js
-pm2 save
-pm2 startup
-```
-
-## Auto-deploy
-
-Add to crontab:
-```
-*/2 * * * * bash ~/projects/keith-hub/scripts/deploy.sh
-```
+Hosted on Railway. Auto-deploys on push to `main`. See `CLAUDE.md` for full deployment details.

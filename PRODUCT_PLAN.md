@@ -1,7 +1,7 @@
 # The Feed — Product Plan
 
 > A personal content hub for intentional media consumption.
-> Self-hosted. Tailscale-only. Fast. Beautiful. Anti-doom-scroll.
+> Fast. Beautiful. Anti-doom-scroll.
 
 ---
 
@@ -16,13 +16,13 @@
 3. **Config over UI.** Sources are managed in a YAML config file in the repo. Claude Code is the admin panel.
 4. **Speed is a feature.** Sub-second loads. No spinners. No layout shift. Server-rendered where it counts.
 5. **Beauty is a feature.** This replaces Reddit. It needs to feel *good* — like opening a well-designed magazine, not a dashboard.
-6. **One person, one purpose.** No auth system, no multi-user, no sharing. It's your personal tool behind your personal Tailscale network.
+6. **One person, one purpose.** No multi-user, no sharing. Single-user password auth. It's your personal tool.
 
 ---
 
 ## 2. Architecture
 
-Next.js 14+ (App Router) + SQLite (better-sqlite3) + Tailwind CSS. Mac Mini deployment via PM2. Auto-deploy via cron pulling from GitHub main.
+Next.js 14+ (App Router) + SQLite (better-sqlite3) + Tailwind CSS. Hosted on Railway, auto-deploys on push to main.
 
 ---
 
@@ -39,7 +39,7 @@ Next.js 14+ (App Router) + SQLite (better-sqlite3) + Tailwind CSS. Mac Mini depl
 ## 4. Milestones
 
 ### v0 — Skeleton ✓ (current)
-- Next.js scaffold, SQLite schema, config parser, RSS fetcher, unified feed view, dark mode, PM2 config
+- Next.js scaffold, SQLite schema, config parser, RSS fetcher, unified feed view, dark mode
 
 ### v1 — Daily Driver
 - Bluesky integration, podcast support, save-for-later, mark as read, category filters, finite scroll, pull-to-refresh, keyboard shortcuts, auto-deploy pipeline
