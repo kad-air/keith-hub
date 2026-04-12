@@ -121,7 +121,7 @@ export default function AppMenu() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-2 z-50 w-56 border border-rule-strong bg-ink-raised shadow-2xl shadow-black/40 animate-fade-in">
+        <div className="absolute right-0 top-full mt-2 z-50 w-64 border border-rule-strong bg-ink-raised shadow-2xl shadow-black/40 animate-fade-in">
           {/* Theme section */}
           <div className="px-4 pt-4 pb-3">
             <h3 className="mb-2.5 font-mono text-[0.68rem] uppercase tracking-kicker text-cream-dim">
