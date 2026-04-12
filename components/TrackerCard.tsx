@@ -1,22 +1,24 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import type { TrackerConfig, TrackerItem } from "@/lib/craft-types";
 
 interface TrackerCardProps {
   item: TrackerItem;
   config: TrackerConfig;
+  index: number;
   focused: boolean;
-  onFocus: () => void;
+  onFocus: (index: number) => void;
   onUpdate: (
     itemId: string,
     updates: Partial<Pick<TrackerItem, "status" | "rating" | "ranking">>,
   ) => void;
 }
 
-export default function TrackerCard({
+export default memo(function TrackerCard({
   item,
   config,
+  index,
   focused,
   onFocus,
   onUpdate,
@@ -103,7 +105,7 @@ export default function TrackerCard({
     <div
       ref={cardRef}
       onClick={handleClick}
-      onMouseEnter={onFocus}
+      onMouseEnter={() => onFocus(index)}
       className={[
         "group relative flex flex-col overflow-hidden border border-rule/40 bg-ink-raised transition-colors",
         "hover:border-rule-strong",
@@ -207,4 +209,4 @@ export default function TrackerCard({
       </div>
     </div>
   );
-}
+});

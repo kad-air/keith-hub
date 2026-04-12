@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Item } from "@/lib/types";
 import FeedCard from "@/components/FeedCard";
@@ -16,7 +16,10 @@ export default function SavedClient({ initialItems }: SavedClientProps) {
   const [items, setItems] = useState<Item[]>(initialItems);
   const [focusedIndex, setFocusedIndex] = useState(0);
   const [helpOpen, setHelpOpen] = useState(false);
+  const SAVED_CHUNK = 30;
+  const [renderedCount, setRenderedCount] = useState(SAVED_CHUNK);
   const cardRefs = useRef<Array<HTMLElement | null>>([]);
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
   const removeFromList = useCallback((id: string) => {
     setItems((prev) => prev.filter((it) => it.id !== id));
@@ -88,9 +91,42 @@ export default function SavedClient({ initialItems }: SavedClientProps) {
     el.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }, [focusedIndex]);
 
+  // ── Chunked rendering ─────────────────────────────────────
+  useEffect(() => {
+    setRenderedCount(SAVED_CHUNK);
+  }, [items]);
+
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setRenderedCount((prev) => Math.min(prev + SAVED_CHUNK, items.length));
+        }
+      },
+      { rootMargin: "600px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [items.length]);
+
+  const visibleItems = useMemo(
+    () => items.slice(0, renderedCount),
+    [items, renderedCount],
+  );
+
   useKeyboard(
     {
-      j: () => setFocusedIndex((i) => Math.min(items.length - 1, i + 1)),
+      j: () => {
+        setFocusedIndex((i) => {
+          const next = Math.min(items.length - 1, i + 1);
+          if (next >= renderedCount) {
+            setRenderedCount((prev) => Math.min(prev + SAVED_CHUNK, items.length));
+          }
+          return next;
+        });
+      },
       k: () => setFocusedIndex((i) => Math.max(0, i - 1)),
       o: () => {
         const it = items[focusedIndex];
@@ -143,7 +179,7 @@ export default function SavedClient({ initialItems }: SavedClientProps) {
         </div>
       ) : (
         <div>
-          {items.map((item, idx) => (
+          {visibleItems.map((item, idx) => (
             <FeedCard
               key={item.id}
               item={item}
@@ -152,12 +188,15 @@ export default function SavedClient({ initialItems }: SavedClientProps) {
               ref={(el) => {
                 cardRefs.current[idx] = el;
               }}
-              onFocus={() => setFocusedIndex(idx)}
-              onOpen={() => void handleOpen(item)}
-              onSave={() => void handleUnsave(item)}
-              onDismiss={() => void handleDismiss(item)}
+              onFocus={setFocusedIndex}
+              onOpen={handleOpen}
+              onSave={handleUnsave}
+              onDismiss={handleDismiss}
             />
           ))}
+          {renderedCount < items.length && (
+            <div ref={sentinelRef} className="h-px" />
+          )}
         </div>
       )}
 

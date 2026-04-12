@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Item } from "@/lib/types";
 import FeedCard from "@/components/FeedCard";
@@ -22,7 +22,10 @@ export default function ReadClient({ initialItems }: ReadClientProps) {
   const [items, setItems] = useState<Item[]>(initialItems);
   const [focusedIndex, setFocusedIndex] = useState(0);
   const [helpOpen, setHelpOpen] = useState(false);
+  const READ_CHUNK = 40;
+  const [renderedCount, setRenderedCount] = useState(READ_CHUNK);
   const cardRefs = useRef<Array<HTMLElement | null>>([]);
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
   const handleOpen = useCallback(async (item: Item) => {
     const podcastMeta =
@@ -86,9 +89,42 @@ export default function ReadClient({ initialItems }: ReadClientProps) {
     el.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }, [focusedIndex]);
 
+  // ── Chunked rendering ─────────────────────────────────────
+  useEffect(() => {
+    setRenderedCount(READ_CHUNK);
+  }, [items]);
+
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setRenderedCount((prev) => Math.min(prev + READ_CHUNK, items.length));
+        }
+      },
+      { rootMargin: "600px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [items.length]);
+
+  const visibleItems = useMemo(
+    () => items.slice(0, renderedCount),
+    [items, renderedCount],
+  );
+
   useKeyboard(
     {
-      j: () => setFocusedIndex((i) => Math.min(items.length - 1, i + 1)),
+      j: () => {
+        setFocusedIndex((i) => {
+          const next = Math.min(items.length - 1, i + 1);
+          if (next >= renderedCount) {
+            setRenderedCount((prev) => Math.min(prev + READ_CHUNK, items.length));
+          }
+          return next;
+        });
+      },
       k: () => setFocusedIndex((i) => Math.max(0, i - 1)),
       o: () => {
         const it = items[focusedIndex];
@@ -133,7 +169,7 @@ export default function ReadClient({ initialItems }: ReadClientProps) {
         </div>
       ) : (
         <div>
-          {items.map((item, idx) => (
+          {visibleItems.map((item, idx) => (
             <FeedCard
               key={item.id}
               item={item}
@@ -142,11 +178,14 @@ export default function ReadClient({ initialItems }: ReadClientProps) {
               ref={(el) => {
                 cardRefs.current[idx] = el;
               }}
-              onFocus={() => setFocusedIndex(idx)}
-              onOpen={() => void handleOpen(item)}
-              onSave={() => void handleSave(item)}
+              onFocus={setFocusedIndex}
+              onOpen={handleOpen}
+              onSave={handleSave}
             />
           ))}
+          {renderedCount < items.length && (
+            <div ref={sentinelRef} className="h-px" />
+          )}
         </div>
       )}
 

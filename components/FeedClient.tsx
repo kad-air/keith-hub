@@ -18,6 +18,12 @@ interface FeedClientProps {
 // app/page.tsx. The actual feed size is bounded by TTL pruning, not this.
 const FEED_LIMIT = 2000;
 
+// ── Chunked rendering ────────────────────────────────────────
+// Render items in progressive chunks instead of all at once to keep
+// initial DOM size small. More chunks load as the user scrolls.
+const INITIAL_CHUNK = 50;
+const CHUNK_SIZE = 50;
+
 const CATEGORIES: Array<{ id: keyof CategoryCounts; label: string }> = [
   { id: "all", label: "All" },
   { id: "podcasts", label: "Podcasts" },
@@ -53,11 +59,34 @@ export default function FeedClient({
   const [focusedIndex, setFocusedIndex] = useState(0);
   const [pending, setPending] = useState<PendingDismiss | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [renderedCount, setRenderedCount] = useState(INITIAL_CHUNK);
   const cardRefs = useRef<Array<HTMLElement | null>>([]);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+
+  // ─── Category cache ──────────────────────────────────────
+  // Avoids redundant network round-trips when switching between tabs.
+  // Entries older than 30s are treated as stale and refetched.
+  const categoryCache = useRef(
+    new Map<string, { items: Item[]; counts: CategoryCounts; ts: number }>(),
+  );
+
+  // ─── Item actions ─────────────────────────────────────────
+  const invalidateCache = useCallback(() => {
+    categoryCache.current.clear();
+  }, []);
 
   // ─── Data fetching ────────────────────────────────────────
   const fetchItems = useCallback(
     async (category: keyof CategoryCounts) => {
+      // Use cached data if fresh (< 30s old)
+      const cached = categoryCache.current.get(category);
+      if (cached && Date.now() - cached.ts < 30_000) {
+        setItems(cached.items);
+        setCounts(cached.counts);
+        setFocusedIndex(0);
+        return;
+      }
+
       setSwapping(true);
       try {
         const params = new URLSearchParams({
@@ -71,6 +100,11 @@ export default function FeedClient({
         setItems(data.items);
         setCounts(data.counts);
         setFocusedIndex(0);
+        categoryCache.current.set(category, {
+          items: data.items,
+          counts: data.counts,
+          ts: Date.now(),
+        });
       } catch (err) {
         console.error("[FeedClient] Fetch error:", err);
       } finally {
@@ -91,6 +125,7 @@ export default function FeedClient({
 
   const handleRefresh = useCallback(async () => {
     if (refreshing) return;
+    invalidateCache();
     setRefreshing(true);
     try {
       const res = await fetch("/api/refresh", { method: "POST" });
@@ -108,7 +143,7 @@ export default function FeedClient({
       setRefreshing(false);
       setTimeout(() => setRefreshMessage(null), 3500);
     }
-  }, [activeCategory, fetchItems, refreshing]);
+  }, [activeCategory, fetchItems, refreshing, invalidateCache]);
 
   // ─── Silent auto-refresh on PWA resume ────────────────────
   const lastRefreshRef = useRef(0);
@@ -131,7 +166,6 @@ export default function FeedClient({
     if (refreshing) lastRefreshRef.current = Date.now();
   }, [refreshing]);
 
-  // ─── Item actions ─────────────────────────────────────────
   const removeFromList = useCallback((id: string) => {
     setItems((prev) => prev.filter((it) => it.id !== id));
   }, []);
@@ -152,6 +186,7 @@ export default function FeedClient({
 
   const handleOpen = useCallback(
     async (item: Item) => {
+      invalidateCache();
       const podcastMeta =
         item.source_category === "podcasts" && item.metadata
           ? (() => {
@@ -188,11 +223,12 @@ export default function FeedClient({
         // best effort
       }
     },
-    [removeFromList, decrementCount]
+    [removeFromList, decrementCount, invalidateCache]
   );
 
   const handleSave = useCallback(
     async (item: Item) => {
+      invalidateCache();
       const wasSaved = !!item.saved_at;
       // Optimistic: when saving (not unsaving), the item leaves the feed
       if (!wasSaved) {
@@ -212,11 +248,12 @@ export default function FeedClient({
         console.error("[FeedClient] Save error:", err);
       }
     },
-    [removeFromList, decrementCount]
+    [removeFromList, decrementCount, invalidateCache]
   );
 
   const handleDismiss = useCallback(
     async (item: Item) => {
+      invalidateCache();
       removeFromList(item.id);
       decrementCount(item);
       setPending({
@@ -230,7 +267,7 @@ export default function FeedClient({
         // best effort
       }
     },
-    [removeFromList, decrementCount]
+    [removeFromList, decrementCount, invalidateCache]
   );
 
   // Bulk dismiss: marks every unread item in scope as read — not just the
@@ -243,6 +280,7 @@ export default function FeedClient({
   // appear in the /read history view (which queries on consumed_at). Same
   // semantic as the per-card dismiss button.
   const handleMarkAllRead = useCallback(async () => {
+    invalidateCache();
     // Snapshot the counts before we mutate so we know what to roll back on
     // undo (and to format the toast message).
     const totalBefore =
@@ -282,7 +320,7 @@ export default function FeedClient({
       items: [],
       message: `Dismissed ${totalBefore} item${totalBefore === 1 ? "" : "s"}`,
     });
-  }, [activeCategory, counts]);
+  }, [activeCategory, counts, invalidateCache]);
 
   const handleUndo = useCallback(async () => {
     if (!pending) return;
@@ -358,7 +396,15 @@ export default function FeedClient({
   // ─── Keyboard shortcuts ──────────────────────────────────
   useKeyboard(
     {
-      j: () => setFocusedIndex((i) => Math.min(items.length - 1, i + 1)),
+      j: () => {
+        setFocusedIndex((i) => {
+          const next = Math.min(items.length - 1, i + 1);
+          if (next >= renderedCount) {
+            setRenderedCount((prev) => Math.min(prev + CHUNK_SIZE, items.length));
+          }
+          return next;
+        });
+      },
       k: () => setFocusedIndex((i) => Math.max(0, i - 1)),
       o: () => {
         const it = items[focusedIndex];
@@ -426,16 +472,44 @@ export default function FeedClient({
     };
   }, [handleRefresh]);
 
+  // ─── Chunked rendering ───────────────────────────────────
+  // Reset chunk count when the item list changes (category switch, refresh)
+  useEffect(() => {
+    setRenderedCount(INITIAL_CHUNK);
+  }, [items]);
+
+  // Load more chunks as the user scrolls near the sentinel
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setRenderedCount((prev) => Math.min(prev + CHUNK_SIZE, items.length));
+        }
+      },
+      { rootMargin: "600px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [items.length]);
+
   // ─── Derived ──────────────────────────────────────────────
+  // Slice to rendered chunk for progressive rendering
+  const visibleItems = useMemo(
+    () => items.slice(0, renderedCount),
+    [items, renderedCount],
+  );
+
   // The All view is stride-interleaved — date headers would chop the
   // carefully mixed sequence into clumps. Category-filtered views are
   // pure recency, so date dividers are still useful there.
   const grouped = useMemo(
     () =>
       activeCategory === "all"
-        ? [{ bucket: null, items }]
-        : groupByDate(items),
-    [items, activeCategory]
+        ? [{ bucket: null, items: visibleItems }]
+        : groupByDate(visibleItems),
+    [visibleItems, activeCategory]
   );
 
   // Build a flat order so keyboard nav indices line up with grouped render
@@ -545,17 +619,22 @@ export default function FeedClient({
                     ref={(el) => {
                       cardRefs.current[myIndex] = el;
                     }}
-                    onFocus={() => setFocusedIndex(myIndex)}
-                    onOpen={() => void handleOpen(item)}
-                    onSave={() => void handleSave(item)}
-                    onDismiss={() => void handleDismiss(item)}
+                    onFocus={setFocusedIndex}
+                    onOpen={handleOpen}
+                    onSave={handleSave}
+                    onDismiss={handleDismiss}
                   />
                 );
               })}
             </section>
           ))}
 
-          {items.length > 0 && (
+          {/* Sentinel for progressive chunk loading */}
+          {renderedCount < items.length && (
+            <div ref={sentinelRef} className="h-px" />
+          )}
+
+          {items.length > 0 && renderedCount >= items.length && (
             <FooterActions
               count={items.length}
               onMarkAllRead={handleMarkAllRead}

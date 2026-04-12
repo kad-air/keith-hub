@@ -6,9 +6,11 @@ import FeedClient from "@/components/FeedClient";
 export const dynamic = "force-dynamic";
 
 // Safety ceiling passed to getMainFeedItems. The actual feed size is
-// determined by TTL-based pruning, not this limit. 2000 is generous
-// enough to never clip a real 7-day window.
-const MAIN_FEED_LIMIT = 2000;
+// determined by TTL-based pruning, not this limit. 500 is generous
+// enough to never clip a real 7-day window while keeping the SSR
+// payload reasonable. The client-side FEED_LIMIT (2000) is used for
+// category refetches which are separate network requests.
+const MAIN_FEED_LIMIT = 500;
 
 function getInitialData(): { items: Item[]; counts: CategoryCounts } {
   try {

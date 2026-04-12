@@ -1,6 +1,6 @@
 "use client";
 
-import { forwardRef, useRef, useState } from "react";
+import { forwardRef, memo, useRef, useState } from "react";
 import type { TouchEvent as ReactTouchEvent } from "react";
 import type {
   Item,
@@ -24,10 +24,10 @@ interface FeedCardProps {
   item: Item;
   index: number;
   focused: boolean;
-  onFocus: () => void;
-  onOpen: () => void;
-  onSave: () => void;
-  onDismiss?: () => void;
+  onFocus: (index: number) => void;
+  onOpen: (item: Item) => void;
+  onSave: (item: Item) => void;
+  onDismiss?: (item: Item) => void;
 }
 
 const CATEGORY_LABEL: Record<string, { label: string; klass: string }> = {
@@ -90,7 +90,7 @@ function parseMeta<T>(raw: string | null): T | null {
   }
 }
 
-const FeedCard = forwardRef<HTMLDivElement, FeedCardProps>(function FeedCard(
+const FeedCard = memo(forwardRef<HTMLDivElement, FeedCardProps>(function FeedCard(
   { item, index, focused, onFocus, onOpen, onSave, onDismiss },
   ref
 ) {
@@ -119,7 +119,7 @@ const FeedCard = forwardRef<HTMLDivElement, FeedCardProps>(function FeedCard(
 
   function handleTouchStart(e: ReactTouchEvent) {
     if (animating) return;
-    onFocus();
+    onFocus(index);
     const t = e.touches[0];
     startRef.current = { x: t.clientX, y: t.clientY, locked: false };
   }
@@ -167,7 +167,7 @@ const FeedCard = forwardRef<HTMLDivElement, FeedCardProps>(function FeedCard(
     if (commitSave) {
       setDx(window.innerWidth);
       window.setTimeout(() => {
-        onSave();
+        onSave(item);
         // If the parent unmounts us (typical on the main feed), these
         // setState calls are no-ops. If we stay mounted (e.g. /read where
         // save toggles in place), reset position WITHOUT animating —
@@ -180,7 +180,7 @@ const FeedCard = forwardRef<HTMLDivElement, FeedCardProps>(function FeedCard(
     } else if (commitDismiss) {
       setDx(-window.innerWidth);
       window.setTimeout(() => {
-        onDismiss?.();
+        onDismiss?.(item);
         setAnimating(false);
         setDx(0);
         wasSwipedRef.current = false;
@@ -203,7 +203,7 @@ const FeedCard = forwardRef<HTMLDivElement, FeedCardProps>(function FeedCard(
       wasSwipedRef.current = false;
       return;
     }
-    onOpen();
+    onOpen(item);
   }
 
   // Reveal background icons only after the gesture has clearly started so
@@ -264,7 +264,7 @@ const FeedCard = forwardRef<HTMLDivElement, FeedCardProps>(function FeedCard(
       />
       <article
         onClick={handleClick}
-        onMouseEnter={onFocus}
+        onMouseEnter={() => onFocus(index)}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
@@ -409,7 +409,7 @@ const FeedCard = forwardRef<HTMLDivElement, FeedCardProps>(function FeedCard(
         <ActionButton
           label={saved ? "Unsave (s)" : "Save (s)"}
           active={saved}
-          onClick={onSave}
+          onClick={() => onSave(item)}
         >
           <svg
             width="15"
@@ -425,7 +425,7 @@ const FeedCard = forwardRef<HTMLDivElement, FeedCardProps>(function FeedCard(
           </svg>
         </ActionButton>
         {onDismiss && (
-          <ActionButton label="Dismiss (x)" onClick={onDismiss}>
+          <ActionButton label="Dismiss (x)" onClick={() => onDismiss(item)}>
             <svg
               width="15"
               height="15"
@@ -445,7 +445,7 @@ const FeedCard = forwardRef<HTMLDivElement, FeedCardProps>(function FeedCard(
       </article>
     </div>
   );
-});
+}));
 
 interface ActionButtonProps {
   label: string;

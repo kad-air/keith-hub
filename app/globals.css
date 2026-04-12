@@ -100,6 +100,20 @@
 
   body {
     background-color: rgb(var(--ink));
+    min-height: 100vh;
+    min-height: 100dvh;
+    overscroll-behavior-y: contain;
+  }
+
+  /* Decorative gradient — fixed-position layer painted once, composited
+     by the GPU on scroll. Replaces background-attachment:fixed which
+     forces a full repaint every scroll frame. */
+  body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
     background-image:
       radial-gradient(
         ellipse at 15% -10%,
@@ -111,13 +125,12 @@
         var(--gradient-b) 0%,
         transparent 55%
       );
-    background-attachment: fixed;
-    min-height: 100vh;
-    min-height: 100dvh;
-    overscroll-behavior-y: contain;
   }
 
-  /* Subtle film-grain noise overlay — fixed, behind content */
+  /* Subtle film-grain noise overlay — fixed, behind content.
+     will-change:transform promotes to own compositor layer so
+     mix-blend-mode doesn't force re-blending on every scroll frame.
+     Hidden on touch devices where the grain is imperceptible. */
   body::before {
     content: "";
     position: fixed;
@@ -126,7 +139,14 @@
     z-index: 1;
     opacity: var(--grain-opacity);
     mix-blend-mode: overlay;
+    will-change: transform;
     background-image: url("data:image/svg+xml;utf8,%3Csvg viewBox='0 0 240 240' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.96  0 0 0 0 0.94  0 0 0 0 0.88  0 0 0 0.55 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  @media (hover: none) {
+    body::before {
+      display: none;
+    }
   }
 
   ::selection {
