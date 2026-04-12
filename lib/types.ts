@@ -79,6 +79,7 @@ export interface Item {
 export interface CategoryCounts {
   all: number;
   reading: number;
+  tech_review: number;
   books: number;
   music: number;
   film: number;

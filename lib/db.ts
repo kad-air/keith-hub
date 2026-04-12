@@ -84,12 +84,13 @@ export function getDb(): Database.Database {
 // To tune: adjust the weight values below. C rarely needs changing.
 
 const WEIGHTS = {
-  podcasts: 8,
-  music:    6,
-  books:    6,
-  film:     6,
-  reading:  3,
-  bluesky:  1,
+  podcasts:    8,
+  music:       6,
+  books:       6,
+  film:        6,
+  tech_review: 6,
+  reading:     3,
+  bluesky:     1,
 } as const;
 
 const C = 2; // hours — decay curve flattening constant
@@ -99,9 +100,10 @@ export const RANKED_ORDER = `
     WHEN 'podcasts' THEN ${WEIGHTS.podcasts}.0
     WHEN 'music'    THEN ${WEIGHTS.music}.0
     WHEN 'books'    THEN ${WEIGHTS.books}.0
-    WHEN 'film'     THEN ${WEIGHTS.film}.0
-    WHEN 'reading'  THEN ${WEIGHTS.reading}.0
-    WHEN 'bluesky'  THEN ${WEIGHTS.bluesky}.0
+    WHEN 'film'        THEN ${WEIGHTS.film}.0
+    WHEN 'tech_review' THEN ${WEIGHTS.tech_review}.0
+    WHEN 'reading'     THEN ${WEIGHTS.reading}.0
+    WHEN 'bluesky'     THEN ${WEIGHTS.bluesky}.0
     ELSE             ${WEIGHTS.reading}.0
   END) / ((julianday('now') - julianday(i.published_at)) * 24.0 + ${C}.0) DESC
 `;

@@ -25,6 +25,7 @@ function getInitialData(): { items: Item[]; counts: CategoryCounts } {
       counts: {
         all: 0,
         reading: 0,
+        tech_review: 0,
         books: 0,
         music: 0,
         film: 0,

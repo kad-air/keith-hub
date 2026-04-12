@@ -30,6 +30,7 @@ const CATEGORIES: Array<{ id: keyof CategoryCounts; label: string }> = [
   { id: "music", label: "Music" },
   { id: "books", label: "Books" },
   { id: "film", label: "Film" },
+  { id: "tech_review", label: "Tech Review" },
   { id: "reading", label: "Reading" },
   { id: "bluesky", label: "Bluesky" },
 ];
@@ -291,7 +292,7 @@ export default function FeedClient({
     setItems([]);
     setCounts((prev) => {
       if (activeCategory === "all") {
-        return { all: 0, reading: 0, books: 0, music: 0, film: 0, podcasts: 0, bluesky: 0 };
+        return { all: 0, reading: 0, tech_review: 0, books: 0, music: 0, film: 0, podcasts: 0, bluesky: 0 };
       }
       return { ...prev, [activeCategory]: 0, all: Math.max(0, prev.all - totalBefore) };
     });
