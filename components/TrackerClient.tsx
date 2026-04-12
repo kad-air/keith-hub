@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { TrackerConfig, TrackerItem } from "@/lib/craft-types";
 import { useKeyboard } from "@/lib/useKeyboard";
 import TrackerCard from "@/components/TrackerCard";
@@ -67,9 +67,24 @@ export default function TrackerClient({
   config,
 }: TrackerClientProps) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  // URL is the source of truth for filter + sort so refreshes and shared
+  // links restore the same view. Unknown values fall back silently.
+  const urlStatus = searchParams.get("status");
+  const urlSort = searchParams.get("sort");
+  const initialStatus =
+    urlStatus &&
+    (urlStatus === "all" || config.statusOptions.includes(urlStatus))
+      ? urlStatus
+      : "all";
+  const initialSort: SortKey =
+    urlSort && SORT_OPTIONS.some((o) => o.key === urlSort)
+      ? (urlSort as SortKey)
+      : "release-desc";
   const [items, setItems] = useState<TrackerItem[]>(initialItems);
-  const [activeStatus, setActiveStatus] = useState("all");
-  const [activeSort, setActiveSort] = useState<SortKey>("release-desc");
+  const [activeStatus, setActiveStatus] = useState(initialStatus);
+  const [activeSort, setActiveSort] = useState<SortKey>(initialSort);
   const [focusedIndex, setFocusedIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [showHelp, setShowHelp] = useState(false);
@@ -182,11 +197,37 @@ export default function TrackerClient({
 
   useKeyboard(shortcuts, !showHelp);
 
+  // Mirror filter + sort into the URL. replace() so each tap doesn't pile
+  // up in browser history. Defaults are omitted to keep canonical URLs clean.
+  const syncUrl = useCallback(
+    (status: string, sort: SortKey) => {
+      const params = new URLSearchParams();
+      if (status !== "all") params.set("status", status);
+      if (sort !== "release-desc") params.set("sort", sort);
+      const qs = params.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    },
+    [pathname, router],
+  );
+
   // Reset focused index when filter changes
-  const handleStatusChange = useCallback((status: string) => {
-    setActiveStatus(status);
-    setFocusedIndex(0);
-  }, []);
+  const handleStatusChange = useCallback(
+    (status: string) => {
+      setActiveStatus(status);
+      setFocusedIndex(0);
+      syncUrl(status, activeSort);
+    },
+    [activeSort, syncUrl],
+  );
+
+  const handleSortChange = useCallback(
+    (sort: SortKey) => {
+      setActiveSort(sort);
+      setFocusedIndex(0);
+      syncUrl(activeStatus, sort);
+    },
+    [activeStatus, syncUrl],
+  );
 
   return (
     <article className="mx-auto max-w-[720px] px-[max(1rem,env(safe-area-inset-left))] pb-[max(2rem,env(safe-area-inset-bottom))]">
@@ -217,10 +258,7 @@ export default function TrackerClient({
           {/* Sort dropdown */}
           <select
             value={activeSort}
-            onChange={(e) => {
-              setActiveSort(e.target.value as SortKey);
-              setFocusedIndex(0);
-            }}
+            onChange={(e) => handleSortChange(e.target.value as SortKey)}
             className="mb-1.5 shrink-0 appearance-none border border-rule/60 bg-ink px-2 py-0.5 font-mono text-[0.6rem] uppercase tracking-kicker text-cream-dim transition-colors hover:border-rule-strong focus:border-accent focus:text-cream focus:outline-none"
           >
             {SORT_OPTIONS.map((opt) => (
