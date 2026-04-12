@@ -8,11 +8,9 @@ import { pruneExpiredUnread } from "@/lib/queries";
 // artist and album cleanly. media:credit appears multiple times per item
 // (one with role="musician" for the artist, one for the publisher), so we
 // keep it as an array and filter by role at use site.
+const RSS_FETCH_TIMEOUT_MS = 10_000;
+
 const parser = new Parser({
-  timeout: 10000,
-  headers: {
-    "User-Agent": "TheFeed/0.1 (personal RSS reader)",
-  },
   customFields: {
     item: [
       ["media:credit", "mediaCredit", { keepArray: true }],
@@ -20,6 +18,13 @@ const parser = new Parser({
     ],
   },
 });
+
+// Sanitize bare & characters in XML that aren't part of valid entities.
+// Some feeds (e.g. AllMusic) contain unescaped ampersands that cause strict
+// XML parsers to reject the entire document.
+function sanitizeXml(xml: string): string {
+  return xml.replace(/&(?!(?:#x[0-9a-fA-F]+|#\d+|[a-zA-Z]\w*);)/g, "&amp;");
+}
 
 // ── Source-specific title rewriters ────────────────────────────────────────
 //
@@ -218,12 +223,28 @@ export async function fetchRssSource(
 
   let feed;
   try {
-    feed = await parser.parseURL(source.url);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), RSS_FETCH_TIMEOUT_MS);
+    let raw: string;
+    try {
+      const res = await fetch(source.url, {
+        signal: controller.signal,
+        headers: { "User-Agent": "TheFeed/0.1 (personal RSS reader)" },
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+      raw = await res.text();
+    } finally {
+      clearTimeout(timer);
+    }
+    feed = await parser.parseString(sanitizeXml(raw));
   } catch (err) {
-    console.error(
-      `[fetcher] Failed to fetch ${source.name}:`,
-      err instanceof Error ? err.message : err
-    );
+    const message =
+      err instanceof Error
+        ? err.name === "AbortError"
+          ? `Request timed out after ${RSS_FETCH_TIMEOUT_MS}ms`
+          : err.message
+        : String(err);
+    console.error(`[fetcher] Failed to fetch ${source.name}:`, message);
     return 0;
   }
 
