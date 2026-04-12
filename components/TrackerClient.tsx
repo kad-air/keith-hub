@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { TrackerConfig, TrackerItem } from "@/lib/craft-types";
 import { useKeyboard } from "@/lib/useKeyboard";
@@ -73,7 +73,10 @@ export default function TrackerClient({
   const [focusedIndex, setFocusedIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [showHelp, setShowHelp] = useState(false);
+  const TRACKER_CHUNK = 30;
+  const [renderedCount, setRenderedCount] = useState(TRACKER_CHUNK);
   const gridRef = useRef<HTMLDivElement>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
   // ── Status tabs with counts ───────────────────────────────────
   const statusTabs = useMemo(() => {
@@ -99,6 +102,31 @@ export default function TrackerClient({
         : items.filter((i) => i.status === activeStatus);
     return sortItems(filtered, activeSort);
   }, [items, activeStatus, activeSort]);
+
+  // ── Chunked rendering ─────────────────────────────────────────
+  useEffect(() => {
+    setRenderedCount(TRACKER_CHUNK);
+  }, [filteredItems]);
+
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setRenderedCount((prev) => Math.min(prev + TRACKER_CHUNK, filteredItems.length));
+        }
+      },
+      { rootMargin: "600px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [filteredItems.length]);
+
+  const visibleItems = useMemo(
+    () => filteredItems.slice(0, renderedCount),
+    [filteredItems, renderedCount],
+  );
 
   // ── Optimistic update ─────────────────────────────────────────
   const handleUpdate = useCallback(
@@ -134,14 +162,22 @@ export default function TrackerClient({
   // ── Keyboard navigation ───────────────────────────────────────
   const shortcuts = useMemo(
     () => ({
-      j: () => setFocusedIndex((i) => Math.min(i + 1, filteredItems.length - 1)),
+      j: () => {
+        setFocusedIndex((i) => {
+          const next = Math.min(i + 1, filteredItems.length - 1);
+          if (next >= renderedCount) {
+            setRenderedCount((prev) => Math.min(prev + TRACKER_CHUNK, filteredItems.length));
+          }
+          return next;
+        });
+      },
       k: () => setFocusedIndex((i) => Math.max(i - 1, 0)),
       "g h": () => router.push("/"),
       "g s": () => router.push("/saved"),
       "g r": () => router.push("/read"),
       "?": () => setShowHelp((v) => !v),
     }),
-    [filteredItems.length, router],
+    [filteredItems.length, renderedCount, router],
   );
 
   useKeyboard(shortcuts, !showHelp);
@@ -201,17 +237,23 @@ export default function TrackerClient({
         ref={gridRef}
         className="grid grid-cols-2 gap-3 pt-4 sm:grid-cols-3"
       >
-        {filteredItems.map((item, i) => (
+        {visibleItems.map((item, i) => (
           <TrackerCard
             key={item.id}
             item={item}
             config={config}
+            index={i}
             focused={i === focusedIndex}
-            onFocus={() => setFocusedIndex(i)}
+            onFocus={setFocusedIndex}
             onUpdate={handleUpdate}
           />
         ))}
       </div>
+
+      {/* Sentinel for progressive chunk loading */}
+      {renderedCount < filteredItems.length && (
+        <div ref={sentinelRef} className="h-px" />
+      )}
 
       {filteredItems.length === 0 && (
         <p className="py-16 text-center font-mono text-[0.7rem] uppercase tracking-kicker text-cream-dimmer">

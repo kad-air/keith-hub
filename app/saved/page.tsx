@@ -21,7 +21,8 @@ function getSavedItems(): Item[] {
         JOIN item_state ist ON ist.item_id = i.id
         JOIN sources s ON s.id = i.source_id
         WHERE ist.saved_at IS NOT NULL
-        ORDER BY ist.saved_at DESC`
+        ORDER BY ist.saved_at DESC
+        LIMIT 200`
       )
       .all() as Item[];
   } catch (err) {

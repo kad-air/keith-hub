@@ -83,7 +83,7 @@ export default function RootLayout({
       </head>
       <body className="font-display text-cream bg-ink min-h-screen">
         <ThemeProvider>
-        <header className="sticky top-0 z-40 border-b border-rule/60 bg-ink/85 backdrop-blur-md pt-[env(safe-area-inset-top)]">
+        <header className="sticky top-0 z-40 border-b border-rule/60 bg-ink/95 pt-[env(safe-area-inset-top)]">
           <div className="mx-auto flex min-h-14 max-w-[720px] items-center justify-between pl-[max(1.5rem,env(safe-area-inset-left))] pr-[max(1.5rem,env(safe-area-inset-right))]">
             <Link href="/" className="group inline-flex items-baseline">
               <span className="font-display text-[1.4rem] font-medium italic leading-none tracking-tight text-cream transition-colors group-hover:text-accent">

@@ -40,7 +40,7 @@ export default function BottomNav() {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-40 border-t border-rule/60 bg-ink/85 backdrop-blur-md sm:hidden"
+      className="fixed bottom-0 left-0 right-0 z-40 border-t border-rule/60 bg-ink/95 sm:hidden"
       role="navigation"
       aria-label="Primary"
     >
