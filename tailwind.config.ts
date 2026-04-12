@@ -33,6 +33,7 @@ const config: Config = {
           books: "rgb(var(--cat-books) / <alpha-value>)",
           film: "rgb(var(--cat-film) / <alpha-value>)",
           reading: "rgb(var(--cat-reading) / <alpha-value>)",
+          tech_review: "rgb(var(--cat-tech_review) / <alpha-value>)",
           bluesky: "rgb(var(--cat-bluesky) / <alpha-value>)",
           games: "rgb(var(--cat-games) / <alpha-value>)",
           tv: "rgb(var(--cat-tv) / <alpha-value>)",

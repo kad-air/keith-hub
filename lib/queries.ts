@@ -12,24 +12,26 @@ import type { CategoryCounts, Item } from "./types";
 // so stale posts naturally fall off as the selection window slides forward.
 // The bluesky tab still shows all unread posts via pure recency.
 export const UNREAD_TTL_HOURS: Record<string, number> = {
-  music:    168,   // 7 days
-  books:    168,   // 7 days
-  film:     168,   // 7 days
-  podcasts: 168,   // 7 days
-  reading:  168,   // 7 days
+  music:       168,   // 7 days
+  books:       168,   // 7 days
+  film:        168,   // 7 days
+  podcasts:    168,   // 7 days
+  reading:     168,   // 7 days
+  tech_review: 168,   // 7 days
 };
 
 // ── Priority weights for interleave ────────────────────────────────────────
 // Higher priority → earlier phase offset → items appear sooner/denser in the
 // All view. Reviews are the highest-signal content, bluesky is social filler.
 export const ALL_VIEW_PRIORITY: Record<keyof CategoryCounts, number> = {
-  all:      0,
-  music:    4,   // album reviews — highest
-  books:    4,   // book reviews — highest
-  film:     4,   // film reviews — highest
-  podcasts: 3,   // daily listening
-  reading:  2,   // Verge articles
-  bluesky:  1,   // social filler
+  all:         0,
+  music:       4,   // album reviews — highest
+  books:       4,   // book reviews — highest
+  film:        4,   // film reviews — highest
+  tech_review: 4,   // Verge reviews — escalated to review tier
+  podcasts:    3,   // daily listening
+  reading:     2,   // Verge articles + quickposts
+  bluesky:     1,   // social filler
 };
 
 // ── Bluesky derivation ────────────────────────────────────────────────────
@@ -174,7 +176,7 @@ export function getMainFeedItems(
 
   // Every unread RSS item flows in (TTL prune is the only bound)
   const rssCategories: Array<keyof CategoryCounts> = [
-    "music", "books", "film", "podcasts", "reading",
+    "music", "books", "film", "tech_review", "podcasts", "reading",
   ];
   for (const cat of rssCategories) {
     const items = stmtAll.all(cat) as Item[];
@@ -291,6 +293,7 @@ export function getCategoryCounts(
   const counts: CategoryCounts = {
     all: 0,
     reading: 0,
+    tech_review: 0,
     books: 0,
     music: 0,
     film: 0,
@@ -305,7 +308,7 @@ export function getCategoryCounts(
   }
 
   // All count = RSS totals + derived bsky contribution (mirrors getMainFeedItems)
-  const totalRss = counts.music + counts.books + counts.film + counts.podcasts + counts.reading;
+  const totalRss = counts.music + counts.books + counts.film + counts.tech_review + counts.podcasts + counts.reading;
   const bskyContribution = totalRss > 0
     ? Math.min(counts.bluesky, Math.max(10, Math.ceil(totalRss / BSKY_INTERLEAVE_RATIO)))
     : Math.min(counts.bluesky, BSKY_FALLBACK_MAX);

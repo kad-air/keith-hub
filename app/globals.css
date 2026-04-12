@@ -22,6 +22,7 @@
     --cat-books: 180 140 100;
     --cat-film: 212 160 74;
     --cat-reading: 200 184 154;
+    --cat-tech_review: 210 130 110;
     --cat-bluesky: 123 168 201;
     --cat-games: 120 180 100;
     --cat-tv: 100 160 200;
@@ -49,6 +50,7 @@
     --cat-books: 140 100 60;
     --cat-film: 184 132 36;
     --cat-reading: 122 110 90;
+    --cat-tech_review: 175 90 70;
     --cat-bluesky: 74 130 170;
     --cat-games: 80 140 60;
     --cat-tv: 60 120 170;
@@ -77,6 +79,7 @@
       --cat-books: 140 100 60;
       --cat-film: 184 132 36;
       --cat-reading: 122 110 90;
+      --cat-tech_review: 175 90 70;
       --cat-bluesky: 74 130 170;
       --cat-games: 80 140 60;
       --cat-tv: 60 120 170;

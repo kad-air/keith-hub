@@ -208,7 +208,7 @@ function items(args) {
   const category = args[0];
   if (!category) {
     console.error(c.red("Usage: items <category> [--unread|--read|--saved|--all] [--limit N]"));
-    console.error(c.dim("Categories: all reading music film podcasts bluesky"));
+    console.error(c.dim("Categories: all reading tech_review music film podcasts bluesky"));
     process.exit(1);
   }
   const filter =
@@ -455,7 +455,7 @@ ${c.bold("Usage:")} node scripts/inspect.mjs <command> [args]
 ${c.bold("Commands:")}
   ${c.cyan("counts")}                      Items by category × state, plus Bluesky rich-content rollup
   ${c.cyan("items <category> [filter]")}   List items
-                                ${c.dim("category: all reading music film podcasts bluesky")}
+                                ${c.dim("category: all reading tech_review music film podcasts bluesky")}
                                 ${c.dim("filter:   --unread (default) --read --saved --all")}
                                 ${c.dim("--limit N (default 20)")}
   ${c.cyan("item <id-prefix>")}            Full detail of one item, parsed metadata

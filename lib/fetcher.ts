@@ -442,6 +442,36 @@ export async function fetchAllSources(db: Database.Database): Promise<number> {
     totalFetched += count;
   }
 
+  // Verge dedup: articles that appear in both verge-full and verge-reviews
+  // should only exist as tech_review (higher priority). Remove the verge-full
+  // copy so the review version wins. Self-healing — runs every cycle.
+  const hasVergeFull = config.sources.some((s) => s.id === "verge-full");
+  const hasVergeReviews = config.sources.some((s) => s.id === "verge-reviews");
+  if (hasVergeFull && hasVergeReviews) {
+    const dedup = db.transaction(() => {
+      const purgeState = db.prepare(`
+        DELETE FROM item_state WHERE item_id IN (
+          SELECT f.id FROM items f
+          WHERE f.source_id = 'verge-full'
+            AND f.url IN (SELECT r.url FROM items r WHERE r.source_id = 'verge-reviews')
+        )
+      `);
+      const purgeItems = db.prepare(`
+        DELETE FROM items
+        WHERE source_id = 'verge-full'
+          AND url IN (SELECT url FROM items WHERE source_id = 'verge-reviews')
+      `);
+      purgeState.run();
+      const result = purgeItems.run();
+      if (result.changes > 0) {
+        console.log(
+          `[fetcher] Verge dedup: removed ${result.changes} full-feed item(s) that also appear in reviews`
+        );
+      }
+    });
+    dedup();
+  }
+
   const blueskySources = config.sources.filter((s) => s.type === "bluesky");
   for (const source of blueskySources) {
     const count = await fetchBlueskySource(source, db);
