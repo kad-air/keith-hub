@@ -147,20 +147,37 @@ export default function FeedClient({
   }, [activeCategory, fetchItems, refreshing, invalidateCache]);
 
   // ─── Silent auto-refresh on PWA resume ────────────────────
+  // When the user switches back to the app, trigger a server-side fetch so
+  // new content is ready, and update the tab badge counts — but do NOT
+  // replace the visible item list or reset focusedIndex, which would yank
+  // the user's scroll position to the top of the feed.
   const lastRefreshRef = useRef(0);
   useEffect(() => {
     function onVisibilityChange() {
       if (document.visibilityState !== "visible") return;
       if (Date.now() - lastRefreshRef.current < 60_000) return;
       lastRefreshRef.current = Date.now();
+      invalidateCache();
       fetch("/api/refresh", { method: "POST" })
-        .then(() => fetchItems(activeCategory))
+        .then(() => {
+          // Fetch fresh data for counts only — don't touch items/scroll
+          const params = new URLSearchParams({
+            limit: String(FEED_LIMIT),
+            offset: "0",
+          });
+          if (activeCategory !== "all") params.set("category", activeCategory);
+          return fetch(`/api/items?${params}`, { cache: "no-store" });
+        })
+        .then((res) => (res.ok ? res.json() : Promise.reject()))
+        .then((data: ItemsResponse) => {
+          setCounts(data.counts);
+        })
         .catch(() => {});
     }
     document.addEventListener("visibilitychange", onVisibilityChange);
     return () =>
       document.removeEventListener("visibilitychange", onVisibilityChange);
-  }, [activeCategory, fetchItems]);
+  }, [activeCategory, invalidateCache]);
 
   // Also stamp the ref on manual refresh so the 60s guard works both ways
   useEffect(() => {
@@ -271,10 +288,10 @@ export default function FeedClient({
     [removeFromList, decrementCount, invalidateCache]
   );
 
-  // Bulk dismiss: marks every unread item in scope as read — not just the
-  // visible 300, but every unread item in the current category (or globally
-  // on the All view). The server returns the affected IDs so undo can clear
-  // read_at on exactly those rows.
+  // Bulk dismiss: marks the currently-visible items as read using their
+  // specific IDs. Only items the user has actually seen get dismissed — any
+  // new items that arrived on the server in the interim survive and will
+  // populate the feed after the dismiss completes.
   //
   // Important: this is a DISMISS, not a "I read these" action. It only sets
   // item_state.read_at, never consumed_at, so bulk-dismissed items do NOT
@@ -282,11 +299,9 @@ export default function FeedClient({
   // semantic as the per-card dismiss button.
   const handleMarkAllRead = useCallback(async () => {
     invalidateCache();
-    // Snapshot the counts before we mutate so we know what to roll back on
-    // undo (and to format the toast message).
-    const totalBefore =
-      activeCategory === "all" ? counts.all : counts[activeCategory];
-    if (totalBefore === 0) return;
+    const dismissIds = items.map((it) => it.id);
+    const dismissCount = dismissIds.length;
+    if (dismissCount === 0) return;
 
     // Optimistic UI: empty the visible list and zero the relevant count(s).
     setItems([]);
@@ -294,34 +309,32 @@ export default function FeedClient({
       if (activeCategory === "all") {
         return { all: 0, reading: 0, tech_review: 0, books: 0, music: 0, film: 0, podcasts: 0, bluesky: 0 };
       }
-      return { ...prev, [activeCategory]: 0, all: Math.max(0, prev.all - totalBefore) };
+      return { ...prev, [activeCategory]: 0, all: Math.max(0, prev.all - dismissCount) };
     });
 
-    let serverIds: string[] = [];
     try {
-      const res = await fetch("/api/items/read-all", {
+      await fetch("/api/items/read-bulk", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          category: activeCategory === "all" ? undefined : activeCategory,
-        }),
+        body: JSON.stringify({ ids: dismissIds }),
       });
-      if (res.ok) {
-        const data = (await res.json()) as { ids: string[] };
-        serverIds = data.ids;
-      }
     } catch {
       // best effort — counts/items will reconcile on the next refresh
     }
 
     setPending({
-      ids: serverIds,
+      ids: dismissIds,
       // Empty items[] tells handleUndo to refetch instead of restoring in
       // place — see the PendingDismiss comment above.
       items: [],
-      message: `Dismissed ${totalBefore} item${totalBefore === 1 ? "" : "s"}`,
+      message: `Dismissed ${dismissCount} item${dismissCount === 1 ? "" : "s"}`,
     });
-  }, [activeCategory, counts, invalidateCache]);
+
+    // Refetch to reveal any new items that arrived while the user was
+    // browsing. This runs after the pending toast is set so the user sees
+    // the undo option immediately.
+    void fetchItems(activeCategory);
+  }, [activeCategory, items, invalidateCache, fetchItems]);
 
   const handleUndo = useCallback(async () => {
     if (!pending) return;
