@@ -21,9 +21,9 @@ const GIT_COMMIT = (() => {
 })();
 const GIT_LAST_MERGE_TS = (() => {
   try {
-    return execSync("git log -1 --merges --format=%cI").toString().trim() || "";
+    return execSync("git log -1 --format=%cI").toString().trim() || "";
   } catch {
-    return "";
+    return new Date().toISOString();
   }
 })();
 
