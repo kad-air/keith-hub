@@ -12,21 +12,18 @@ sources:
     type: rss
     category: reading
     url: https://www.theverge.com/rss/partner/subscriber-only-full-feed/rss.xml
-    poll_interval_minutes: 3
 
   - id: verge-quickposts
     name: Verge Quickposts
     type: rss
     category: reading
     url: https://www.theverge.com/rss/quickposts
-    poll_interval_minutes: 3
 
   - id: verge-reviews
     name: Verge Reviews
     type: rss
     category: tech_review
     url: https://www.theverge.com/rss/partner/subscriber-only-reviews/rss.xml
-    poll_interval_minutes: 3
 
   # --- Books ---
   - id: nyt-books
