@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useState } from "react";
 import type { TrackerConfig, TrackerItem } from "@/lib/craft-types";
 
 interface TrackerCardProps {
@@ -23,27 +23,14 @@ export default memo(function TrackerCard({
   onFocus,
   onUpdate,
 }: TrackerCardProps) {
-  const cardRef = useRef<HTMLDivElement>(null);
-  const [visible, setVisible] = useState(false);
+  const [imageFailed, setImageFailed] = useState(false);
   const [rankingDraft, setRankingDraft] = useState(
     item.ranking?.toString() ?? "",
   );
 
   useEffect(() => {
-    const el = cardRef.current;
-    if (!el) return;
-    const io = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setVisible(true);
-          io.disconnect();
-        }
-      },
-      { rootMargin: "200px" },
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, []);
+    setImageFailed(false);
+  }, [item.imageUrl]);
 
   const handleStatusChange = useCallback(
     (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -103,7 +90,6 @@ export default memo(function TrackerCard({
 
   return (
     <div
-      ref={cardRef}
       onClick={handleClick}
       onMouseEnter={() => onFocus(index)}
       className={[
@@ -120,15 +106,15 @@ export default memo(function TrackerCard({
           "relative w-full overflow-hidden bg-ink",
         ].join(" ")}
       >
-        {item.imageUrl && visible ? (
+        {item.imageUrl && !imageFailed ? (
           <img
             src={item.imageUrl}
             alt={item.name}
+            loading="lazy"
+            decoding="async"
+            onError={() => setImageFailed(true)}
             className="h-full w-full object-cover"
           />
-        ) : item.imageUrl ? (
-          /* Placeholder while waiting for intersection */
-          <div className="h-full w-full bg-ink" />
         ) : (
           <div
             className={[
