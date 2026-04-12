@@ -45,6 +45,12 @@ interface PendingDismiss {
   message: string;
 }
 
+interface NewItemsAvailable {
+  items: Item[];
+  counts: CategoryCounts;
+  newCount: number;
+}
+
 export default function FeedClient({
   initialItems,
   initialCounts,
@@ -59,6 +65,8 @@ export default function FeedClient({
   const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
   const [focusedIndex, setFocusedIndex] = useState(0);
   const [pending, setPending] = useState<PendingDismiss | null>(null);
+  const [newItemsAvailable, setNewItemsAvailable] =
+    useState<NewItemsAvailable | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
   const [renderedCount, setRenderedCount] = useState(INITIAL_CHUNK);
   const cardRefs = useRef<Array<HTMLElement | null>>([]);
@@ -79,6 +87,9 @@ export default function FeedClient({
   // ─── Data fetching ────────────────────────────────────────
   const fetchItems = useCallback(
     async (category: keyof CategoryCounts) => {
+      // Any user-driven refresh supersedes a pending "new items" toast.
+      setNewItemsAvailable(null);
+
       // Use cached data if fresh (< 30s old)
       const cached = categoryCache.current.get(category);
       if (cached && Date.now() - cached.ts < 30_000) {
@@ -150,8 +161,13 @@ export default function FeedClient({
   // When the user switches back to the app, trigger a server-side fetch so
   // new content is ready, and update the tab badge counts — but do NOT
   // replace the visible item list or reset focusedIndex, which would yank
-  // the user's scroll position to the top of the feed.
+  // the user's scroll position to the top of the feed. If new items are
+  // available, surface a toast offering to load them on demand.
   const lastRefreshRef = useRef(0);
+  const itemsRef = useRef(items);
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
   useEffect(() => {
     function onVisibilityChange() {
       if (document.visibilityState !== "visible") return;
@@ -160,7 +176,9 @@ export default function FeedClient({
       invalidateCache();
       fetch("/api/refresh", { method: "POST" })
         .then(() => {
-          // Fetch fresh data for counts only — don't touch items/scroll
+          // Fetch fresh data for counts and new-items detection — don't
+          // touch the visible items or scroll position unless the user
+          // explicitly opts in via the "Load now" toast action.
           const params = new URLSearchParams({
             limit: String(FEED_LIMIT),
             offset: "0",
@@ -171,6 +189,18 @@ export default function FeedClient({
         .then((res) => (res.ok ? res.json() : Promise.reject()))
         .then((data: ItemsResponse) => {
           setCounts(data.counts);
+          const currentIds = new Set(itemsRef.current.map((it) => it.id));
+          const newCount = data.items.reduce(
+            (n, it) => (currentIds.has(it.id) ? n : n + 1),
+            0
+          );
+          if (newCount > 0) {
+            setNewItemsAvailable({
+              items: data.items,
+              counts: data.counts,
+              newCount,
+            });
+          }
         })
         .catch(() => {});
     }
@@ -178,6 +208,18 @@ export default function FeedClient({
     return () =>
       document.removeEventListener("visibilitychange", onVisibilityChange);
   }, [activeCategory, invalidateCache]);
+
+  // Apply the pending new-items payload — the user has opted in, so replacing
+  // the list and snapping focus to the top is the expected behavior.
+  const handleLoadNewItems = useCallback(() => {
+    setNewItemsAvailable((pending) => {
+      if (!pending) return null;
+      setItems(pending.items);
+      setCounts(pending.counts);
+      setFocusedIndex(0);
+      return null;
+    });
+  }, []);
 
   // Also stamp the ref on manual refresh so the 60s guard works both ways
   useEffect(() => {
@@ -659,14 +701,24 @@ export default function FeedClient({
       )}
 
       {/* ── Toast ── */}
-      {pending && (
+      {pending ? (
         <Toast
           message={pending.message}
           actionLabel="Undo"
           onAction={handleUndo}
           onDismiss={() => setPending(null)}
         />
-      )}
+      ) : newItemsAvailable ? (
+        <Toast
+          message={`${newItemsAvailable.newCount} new item${
+            newItemsAvailable.newCount === 1 ? "" : "s"
+          }`}
+          actionLabel="Load now"
+          onAction={handleLoadNewItems}
+          onDismiss={() => setNewItemsAvailable(null)}
+          durationMs={15000}
+        />
+      ) : null}
 
       {/* ── Help overlay ── */}
       <KeyboardHelp open={helpOpen} onClose={() => setHelpOpen(false)} />
