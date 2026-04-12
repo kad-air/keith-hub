@@ -27,7 +27,7 @@ export default function HeaderNav() {
             key={link.href}
             href={link.href}
             className={[
-              "hidden font-mono text-[0.68rem] uppercase tracking-kicker transition-colors sm:inline",
+              "hidden font-mono text-[0.72rem] uppercase tracking-kicker transition-colors sm:inline",
               isActive
                 ? "text-cream"
                 : "text-cream-dim hover:text-cream",
@@ -48,7 +48,7 @@ export default function HeaderNav() {
             key={t.slug}
             href={`/trackers/${t.slug}`}
             className={[
-              "hidden font-mono text-[0.68rem] uppercase tracking-kicker transition-colors sm:inline",
+              "hidden font-mono text-[0.72rem] uppercase tracking-kicker transition-colors sm:inline",
               isActive
                 ? t.colorClass
                 : "text-cream-dim hover:text-cream",

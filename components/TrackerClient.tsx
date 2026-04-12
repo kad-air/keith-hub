@@ -241,10 +241,10 @@ export default function TrackerClient({
                 type="button"
                 onClick={() => handleStatusChange(tab.id)}
                 className={[
-                  "whitespace-nowrap border-b-2 pb-2.5 font-mono text-[0.65rem] uppercase tracking-kicker transition-colors",
+                  "whitespace-nowrap border-b-2 pb-2.5 font-mono text-[0.72rem] uppercase tracking-kicker transition-colors",
                   activeStatus === tab.id
                     ? `border-current ${config.colorClass}`
-                    : "border-transparent text-cream-dimmer hover:text-cream-dim",
+                    : "border-transparent text-cream-dim hover:text-cream",
                 ].join(" ")}
               >
                 {tab.label}
@@ -259,7 +259,7 @@ export default function TrackerClient({
           <select
             value={activeSort}
             onChange={(e) => handleSortChange(e.target.value as SortKey)}
-            className="mb-1.5 shrink-0 appearance-none border border-rule/60 bg-ink px-2 py-0.5 font-mono text-[0.6rem] uppercase tracking-kicker text-cream-dim transition-colors hover:border-rule-strong focus:border-accent focus:text-cream focus:outline-none"
+            className="mb-1.5 shrink-0 appearance-none border border-rule/60 bg-ink px-2 py-1 font-mono text-[0.68rem] uppercase tracking-kicker text-cream-dim transition-colors hover:border-rule-strong focus:border-accent focus:text-cream focus:outline-none"
           >
             {SORT_OPTIONS.map((opt) => (
               <option key={opt.key} value={opt.key}>
@@ -294,7 +294,7 @@ export default function TrackerClient({
       )}
 
       {filteredItems.length === 0 && (
-        <p className="py-16 text-center font-mono text-[0.7rem] uppercase tracking-kicker text-cream-dimmer">
+        <p className="py-16 text-center font-mono text-[0.75rem] uppercase tracking-kicker text-cream-dim">
           Nothing here yet
         </p>
       )}

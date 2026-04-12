@@ -612,7 +612,7 @@ export default function FeedClient({
                 type="button"
                 onClick={() => handleCategoryChange(cat.id)}
                 className={[
-                  "group flex items-baseline gap-1.5 font-mono text-[0.7rem] uppercase tracking-kicker transition-colors",
+                  "group flex items-baseline gap-1.5 font-mono text-[0.75rem] uppercase tracking-kicker transition-colors",
                   // Vertical hit zone bump on touch devices, no visual change
                   "[@media(hover:none)]:py-2 [@media(hover:none)]:-my-1",
                   isActive
@@ -631,8 +631,8 @@ export default function FeedClient({
                 {cat.id !== "bluesky" && (
                   <span
                     className={[
-                      "tabular-nums text-[0.65rem]",
-                      isActive ? "text-accent" : "text-cream-dimmer",
+                      "tabular-nums text-[0.7rem]",
+                      isActive ? "text-accent" : "text-cream-dim",
                     ].join(" ")}
                   >
                     {count}
@@ -645,7 +645,7 @@ export default function FeedClient({
 
         <div className="flex items-center gap-3">
           {refreshMessage && (
-            <span className="font-mono text-[0.65rem] uppercase tracking-kicker text-cream-dim animate-fade-in">
+            <span className="font-mono text-[0.7rem] uppercase tracking-kicker text-cream-dim animate-fade-in">
               {refreshMessage}
             </span>
           )}
@@ -757,7 +757,7 @@ export default function FeedClient({
 function DateDivider({ label }: { label: string }) {
   return (
     <div className="mb-1 mt-7 flex items-center gap-3 px-6 first:mt-0">
-      <span className="font-mono text-[0.65rem] uppercase tracking-kicker text-cat-film">
+      <span className="font-mono text-[0.72rem] uppercase tracking-kicker text-cat-film">
         {label}
       </span>
       <span aria-hidden className="h-px flex-1 bg-rule" />
@@ -792,7 +792,7 @@ function FooterActions({ count, onMarkAllRead, onShowHelp }: FooterActionsProps)
     <div className="mt-10 px-6 pb-2 text-center">
       <div className="mb-4 flex items-center justify-center gap-3 text-cream-dimmer">
         <span aria-hidden className="h-px w-12 bg-rule" />
-        <span className="font-mono text-[0.6rem] uppercase tracking-kicker">
+        <span className="font-mono text-[0.68rem] uppercase tracking-kicker">
           end of feed
         </span>
         <span aria-hidden className="h-px w-12 bg-rule" />
@@ -804,14 +804,14 @@ function FooterActions({ count, onMarkAllRead, onShowHelp }: FooterActionsProps)
         <button
           type="button"
           onClick={onMarkAllRead}
-          className="border border-rule-strong px-4 py-2 font-mono text-[0.68rem] uppercase tracking-kicker text-cream transition-colors hover:border-accent hover:text-accent"
+          className="border border-rule-strong px-4 py-2 font-mono text-[0.72rem] uppercase tracking-kicker text-cream transition-colors hover:border-accent hover:text-accent"
         >
           That&rsquo;s enough for now.
         </button>
         <button
           type="button"
           onClick={onShowHelp}
-          className="px-4 py-2 font-mono text-[0.68rem] uppercase tracking-kicker text-cream-dim transition-colors hover:text-cream"
+          className="px-4 py-2 font-mono text-[0.72rem] uppercase tracking-kicker text-cream-dim transition-colors hover:text-cream"
         >
           Keyboard
         </button>

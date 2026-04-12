@@ -152,7 +152,7 @@ export default function ReadClient({ initialItems }: ReadClientProps) {
         <h1 className="font-display text-[1.6rem] font-medium italic text-cream opsz-display">
           Read
         </h1>
-        <span className="font-mono text-[0.65rem] uppercase tracking-kicker text-cream-dim tabular-nums">
+        <span className="font-mono text-[0.72rem] uppercase tracking-kicker text-cream-dim tabular-nums">
           {items.length} {items.length === 1 ? "item" : "items"}
         </span>
       </div>

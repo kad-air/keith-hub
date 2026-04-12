@@ -132,16 +132,16 @@ export default memo(function TrackerCard({
 
       {/* Info */}
       <div className="flex flex-1 flex-col gap-1 px-2.5 pt-2 pb-2">
-        <h3 className="font-display text-[0.95rem] font-medium italic leading-tight text-cream line-clamp-2">
+        <h3 className="font-display text-[1.05rem] font-medium italic leading-tight text-cream line-clamp-2">
           {item.name}
         </h3>
         {item.subtitle && (
-          <p className="font-mono text-[0.6rem] uppercase tracking-kicker text-cream-dim line-clamp-1">
+          <p className="font-mono text-[0.68rem] uppercase tracking-kicker text-cream-dim line-clamp-1">
             {item.subtitle}
           </p>
         )}
         {formattedDate && (
-          <p className="font-mono text-[0.55rem] uppercase tracking-kicker text-cream-dimmer">
+          <p className="font-mono text-[0.66rem] uppercase tracking-kicker text-cream-dim">
             {formattedDate}
           </p>
         )}
@@ -155,7 +155,7 @@ export default memo(function TrackerCard({
           <select
             value={item.status}
             onChange={handleStatusChange}
-            className="min-w-0 flex-1 appearance-none truncate border border-rule bg-ink px-1.5 py-1 font-mono text-[0.6rem] uppercase tracking-kicker text-cream-dim transition-colors hover:border-rule-strong focus:border-accent focus:text-cream focus:outline-none"
+            className="min-w-0 flex-1 appearance-none truncate border border-rule bg-ink px-1.5 py-1 font-mono text-[0.68rem] uppercase tracking-kicker text-cream-dim transition-colors hover:border-rule-strong focus:border-accent focus:text-cream focus:outline-none"
           >
             <option value="">—</option>
             {config.statusOptions.map((opt) => (
@@ -169,7 +169,7 @@ export default memo(function TrackerCard({
           <select
             value={item.rating}
             onChange={handleRatingChange}
-            className="w-10 appearance-none border border-rule bg-ink px-1 py-1 text-center text-[0.75rem] transition-colors hover:border-rule-strong focus:border-accent focus:outline-none"
+            className="w-10 appearance-none border border-rule bg-ink px-1 py-1 text-center text-[0.85rem] transition-colors hover:border-rule-strong focus:border-accent focus:outline-none"
           >
             <option value="">—</option>
             {config.ratingOptions.map((opt) => (
@@ -189,7 +189,7 @@ export default memo(function TrackerCard({
             onBlur={handleRankingCommit}
             onKeyDown={handleRankingKeyDown}
             placeholder="#"
-            className="w-9 appearance-none border border-rule bg-ink px-1 py-1 text-center font-mono text-[0.65rem] tabular-nums text-cream-dim transition-colors hover:border-rule-strong focus:border-accent focus:text-cream focus:outline-none"
+            className="w-10 appearance-none border border-rule bg-ink px-1 py-1 text-center font-mono text-[0.72rem] tabular-nums text-cream-dim transition-colors hover:border-rule-strong focus:border-accent focus:text-cream focus:outline-none"
           />
         </div>
       </div>

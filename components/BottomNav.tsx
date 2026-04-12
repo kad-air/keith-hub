@@ -55,7 +55,7 @@ export default function BottomNav() {
               key={tab.href}
               href={tab.href}
               className={[
-                "relative flex flex-1 items-center justify-center py-3 font-mono text-[0.62rem] uppercase tracking-kicker transition-colors",
+                "relative flex flex-1 items-center justify-center py-3 font-mono text-[0.7rem] uppercase tracking-kicker transition-colors",
                 isActive ? "text-cream" : "text-cream-dimmer",
               ].join(" ")}
             >
@@ -79,7 +79,7 @@ export default function BottomNav() {
             type="button"
             onClick={() => setTrackersOpen((v) => !v)}
             className={[
-              "flex flex-1 items-center justify-center gap-1 py-3 font-mono text-[0.62rem] uppercase tracking-kicker transition-colors",
+              "flex flex-1 items-center justify-center gap-1 py-3 font-mono text-[0.7rem] uppercase tracking-kicker transition-colors",
               isOnTracker ? "text-cream" : "text-cream-dimmer",
             ].join(" ")}
           >
@@ -115,7 +115,7 @@ export default function BottomNav() {
                     key={t.slug}
                     href={`/trackers/${t.slug}`}
                     className={[
-                      "flex items-center gap-2.5 px-4 py-2.5 font-mono text-[0.62rem] uppercase tracking-kicker transition-colors",
+                      "flex items-center gap-2.5 px-4 py-2.5 font-mono text-[0.7rem] uppercase tracking-kicker transition-colors",
                       isActiveTracker
                         ? `${t.colorClass}`
                         : "text-cream-dim hover:text-cream",

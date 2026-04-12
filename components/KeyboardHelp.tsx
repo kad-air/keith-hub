@@ -43,7 +43,7 @@ const SHORTCUTS: Array<{
 
 function Kbd({ children }: { children: React.ReactNode }) {
   return (
-    <kbd className="inline-flex h-6 min-w-[1.5rem] items-center justify-center rounded-sm border border-rule-strong bg-ink px-1.5 font-mono text-[0.7rem] uppercase text-cream">
+    <kbd className="inline-flex h-6 min-w-[1.5rem] items-center justify-center rounded-sm border border-rule-strong bg-ink px-1.5 font-mono text-[0.75rem] uppercase text-cream">
       {children}
     </kbd>
   );
@@ -80,14 +80,14 @@ export default function KeyboardHelp({ open, onClose }: KeyboardHelpProps) {
           <h2 className="font-display text-[1.5rem] font-medium italic text-cream">
             Keyboard
           </h2>
-          <span className="font-mono text-[0.65rem] uppercase tracking-kicker text-cream-dimmer">
+          <span className="font-mono text-[0.7rem] uppercase tracking-kicker text-cream-dim">
             press ? to toggle
           </span>
         </div>
         <div className="space-y-5">
           {SHORTCUTS.map((section) => (
             <div key={section.section}>
-              <h3 className="mb-2 font-mono text-[0.65rem] uppercase tracking-kicker text-cat-film">
+              <h3 className="mb-2 font-mono text-[0.72rem] uppercase tracking-kicker text-cat-film">
                 {section.section}
               </h3>
               <ul className="space-y-1.5">
@@ -96,7 +96,7 @@ export default function KeyboardHelp({ open, onClose }: KeyboardHelpProps) {
                     key={row.label + row.keys.join("-")}
                     className="flex items-center justify-between gap-4"
                   >
-                    <span className="font-display text-[0.92rem] text-cream">
+                    <span className="font-display text-[1rem] text-cream">
                       {row.label}
                     </span>
                     <span className="flex items-center gap-1">

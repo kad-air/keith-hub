@@ -283,7 +283,7 @@ const FeedCard = memo(forwardRef<HTMLDivElement, FeedCardProps>(function FeedCar
       >
       {/* Repost banner — when this post appears in the feed via someone reposting it */}
       {isBluesky && bsky?.reposted_by && (
-        <div className="mb-1.5 flex items-center gap-1.5 font-mono text-[0.6rem] uppercase tracking-kicker text-cream-dimmer">
+        <div className="mb-1.5 flex items-center gap-1.5 font-mono text-[0.68rem] uppercase tracking-kicker text-cream-dim">
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="17 1 21 5 17 9" />
             <path d="M3 11V9a4 4 0 0 1 4-4h14" />
@@ -298,7 +298,7 @@ const FeedCard = memo(forwardRef<HTMLDivElement, FeedCardProps>(function FeedCar
       )}
 
       {/* Kicker line: source · category · time */}
-      <div className="mb-2.5 flex items-center gap-2 font-mono text-[0.65rem] uppercase tracking-kicker text-cream-dim">
+      <div className="mb-2.5 flex items-center gap-2 font-mono text-[0.72rem] uppercase tracking-kicker text-cream-dim">
         {isBluesky && bsky?.avatar_url && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -361,7 +361,7 @@ const FeedCard = memo(forwardRef<HTMLDivElement, FeedCardProps>(function FeedCar
             <h2 className="font-display text-[1.05rem] font-medium leading-snug text-cream opsz-body">
               {item.title}
             </h2>
-            <p className="mt-1.5 font-mono text-[0.68rem] uppercase tracking-kicker text-cream-dim">
+            <p className="mt-1.5 font-mono text-[0.72rem] uppercase tracking-kicker text-cream-dim">
               {podcast?.show_name}
               {podcast?.duration && (
                 <>
@@ -389,7 +389,7 @@ const FeedCard = memo(forwardRef<HTMLDivElement, FeedCardProps>(function FeedCar
 
       {/* Bluesky engagement counts */}
       {isBluesky && bsky && (!!bsky.reply_count || !!bsky.like_count) && (
-        <div className="mt-2.5 flex items-center gap-4 font-mono text-[0.65rem] uppercase tracking-kicker text-cream-dimmer">
+        <div className="mt-2.5 flex items-center gap-4 font-mono text-[0.7rem] uppercase tracking-kicker text-cream-dim">
           {!!bsky.reply_count && <span>{bsky.reply_count} replies</span>}
           {!!bsky.like_count && <span>{bsky.like_count} likes</span>}
         </div>
@@ -517,10 +517,10 @@ function ReplyContext({ reply }: { reply: { handle: string; display_name?: strin
   return (
     <div className="mb-2 flex gap-2 border-l-2 border-rule pl-3 text-cream-dim">
       <div className="min-w-0 flex-1">
-        <div className="font-mono text-[0.6rem] uppercase tracking-kicker text-cream-dimmer">
+        <div className="font-mono text-[0.68rem] uppercase tracking-kicker text-cream-dim">
           ↳ replying to {reply.display_name || `@${reply.handle}`}
         </div>
-        <div className="mt-0.5 line-clamp-2 font-display text-[0.85rem] italic leading-snug text-cream-dim opsz-body">
+        <div className="mt-0.5 line-clamp-2 font-display text-[0.9rem] italic leading-snug text-cream-dim opsz-body">
           {reply.text}
         </div>
       </div>
@@ -626,14 +626,14 @@ function ExternalCard({ external }: { external: BlueskyExternalCard }) {
         />
       )}
       <div className="min-w-0 flex-1 px-3.5 py-2.5">
-        <div className="font-mono text-[0.6rem] uppercase tracking-kicker text-cream-dimmer">
+        <div className="font-mono text-[0.68rem] uppercase tracking-kicker text-cream-dim">
           {external.domain}
         </div>
-        <div className="mt-0.5 line-clamp-2 font-display text-[0.92rem] font-medium leading-snug text-cream opsz-body">
+        <div className="mt-1 line-clamp-2 font-display text-[0.95rem] font-medium leading-snug text-cream opsz-body">
           {external.title}
         </div>
         {external.description && (
-          <div className="mt-0.5 line-clamp-2 font-display text-[0.78rem] italic leading-snug text-cream-dim opsz-body">
+          <div className="mt-1 line-clamp-2 font-display text-[0.85rem] italic leading-snug text-cream-dim opsz-body">
             {external.description}
           </div>
         )}
@@ -651,7 +651,7 @@ function QuotedPost({ post }: { post: BlueskyQuotedPost }) {
       onClick={(e) => e.stopPropagation()}
       className="block rounded-sm border border-rule bg-ink/60 px-3.5 py-3 transition-colors hover:border-rule-strong"
     >
-      <div className="mb-1.5 flex items-center gap-1.5 font-mono text-[0.6rem] uppercase tracking-kicker text-cream-dim">
+      <div className="mb-1.5 flex items-center gap-1.5 font-mono text-[0.68rem] uppercase tracking-kicker text-cream-dim">
         {post.avatar_url && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -669,7 +669,7 @@ function QuotedPost({ post }: { post: BlueskyQuotedPost }) {
         </span>
       </div>
       {post.text && (
-        <p className="whitespace-pre-wrap break-words font-display text-[0.92rem] leading-snug text-cream opsz-body line-clamp-6">
+        <p className="whitespace-pre-wrap break-words font-display text-[0.95rem] leading-snug text-cream opsz-body line-clamp-6">
           {post.text}
         </p>
       )}
@@ -684,7 +684,7 @@ function QuotedPost({ post }: { post: BlueskyQuotedPost }) {
             <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
             <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
           </svg>
-          <span className="truncate font-mono text-[0.6rem] uppercase tracking-kicker">
+          <span className="truncate font-mono text-[0.68rem] uppercase tracking-kicker">
             {post.external.domain}
           </span>
         </div>

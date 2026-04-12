@@ -124,7 +124,7 @@ export default function AppMenu() {
         <div className="absolute right-0 top-full mt-2 z-50 w-56 border border-rule-strong bg-ink-raised shadow-2xl shadow-black/40 animate-fade-in">
           {/* Theme section */}
           <div className="px-4 pt-4 pb-3">
-            <h3 className="mb-2.5 font-mono text-[0.6rem] uppercase tracking-kicker text-cream-dimmer">
+            <h3 className="mb-2.5 font-mono text-[0.68rem] uppercase tracking-kicker text-cream-dim">
               Appearance
             </h3>
             <div className="flex gap-1">
@@ -134,7 +134,7 @@ export default function AppMenu() {
                   type="button"
                   onClick={() => setMode(opt.value)}
                   className={[
-                    "flex-1 rounded-sm px-2 py-1.5 font-mono text-[0.65rem] uppercase tracking-kicker transition-colors",
+                    "flex-1 rounded-sm px-2 py-1.5 font-mono text-[0.7rem] uppercase tracking-kicker transition-colors",
                     mode === opt.value
                       ? "bg-accent-soft text-accent border border-accent/30"
                       : "text-cream-dim border border-rule hover:border-rule-strong hover:text-cream",
@@ -153,11 +153,11 @@ export default function AppMenu() {
           {pushState !== "unsupported" && (
             <>
               <div className="px-4 py-3">
-                <h3 className="mb-2.5 font-mono text-[0.6rem] uppercase tracking-kicker text-cream-dimmer">
+                <h3 className="mb-2.5 font-mono text-[0.68rem] uppercase tracking-kicker text-cream-dim">
                   Notifications
                 </h3>
                 {pushState === "denied" ? (
-                  <p className="font-mono text-[0.6rem] text-cream-dimmer">
+                  <p className="font-mono text-[0.7rem] text-cream-dim">
                     Blocked in system settings
                   </p>
                 ) : (
@@ -166,7 +166,7 @@ export default function AppMenu() {
                     onClick={togglePush}
                     disabled={pushState === "loading"}
                     className={[
-                      "w-full rounded-sm px-2 py-1.5 font-mono text-[0.65rem] uppercase tracking-kicker transition-colors border",
+                      "w-full rounded-sm px-2 py-1.5 font-mono text-[0.7rem] uppercase tracking-kicker transition-colors border",
                       pushState === "on"
                         ? "bg-accent-soft text-accent border-accent/30"
                         : "text-cream-dim border-rule hover:border-rule-strong hover:text-cream",
@@ -186,23 +186,23 @@ export default function AppMenu() {
 
           {/* Version section */}
           <div className="px-4 py-3">
-            <h3 className="mb-2 font-mono text-[0.6rem] uppercase tracking-kicker text-cream-dimmer">
+            <h3 className="mb-2 font-mono text-[0.68rem] uppercase tracking-kicker text-cream-dim">
               Version
             </h3>
             <div className="space-y-1">
               <div className="flex items-center justify-between">
-                <span className="font-mono text-[0.6rem] uppercase tracking-kicker text-cream-dim">
+                <span className="font-mono text-[0.68rem] uppercase tracking-kicker text-cream-dim">
                   Commit
                 </span>
-                <span className="font-mono text-[0.65rem] text-cream tabular-nums">
+                <span className="font-mono text-[0.72rem] text-cream tabular-nums">
                   {commit}
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="font-mono text-[0.6rem] uppercase tracking-kicker text-cream-dim">
+                <span className="font-mono text-[0.68rem] uppercase tracking-kicker text-cream-dim">
                   Updated
                 </span>
-                <span className="font-mono text-[0.6rem] text-cream-dim tabular-nums">
+                <span className="font-mono text-[0.68rem] text-cream-dim tabular-nums">
                   {formatMergeDate(mergeTs)}
                 </span>
               </div>
@@ -217,7 +217,7 @@ export default function AppMenu() {
             <form action="/api/auth/logout" method="POST">
               <button
                 type="submit"
-                className="w-full rounded-sm px-2 py-1.5 font-mono text-[0.65rem] uppercase tracking-kicker text-cream-dim border border-rule transition-colors hover:border-rule-strong hover:text-cream"
+                className="w-full rounded-sm px-2 py-1.5 font-mono text-[0.7rem] uppercase tracking-kicker text-cream-dim border border-rule transition-colors hover:border-rule-strong hover:text-cream"
               >
                 Log out
               </button>
