@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import type { Item, CategoryCounts, ItemsResponse } from "@/lib/types";
 import { groupByDate } from "@/lib/groupByDate";
 import { useKeyboard } from "@/lib/useKeyboard";
@@ -51,15 +51,25 @@ interface NewItemsAvailable {
   newCount: number;
 }
 
+const VALID_CATEGORIES = new Set<string>(CATEGORIES.map((c) => c.id));
+
 export default function FeedClient({
   initialItems,
   initialCounts,
 }: FeedClientProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  // URL is the source of truth for which tab is active so refreshes,
+  // shared links, and PWA cold-starts all restore the same view.
+  const urlCategory = searchParams.get("category");
+  const initialCategory: keyof CategoryCounts =
+    urlCategory && VALID_CATEGORIES.has(urlCategory)
+      ? (urlCategory as keyof CategoryCounts)
+      : "all";
   const [items, setItems] = useState<Item[]>(initialItems);
   const [counts, setCounts] = useState<CategoryCounts>(initialCounts);
   const [activeCategory, setActiveCategory] =
-    useState<keyof CategoryCounts>("all");
+    useState<keyof CategoryCounts>(initialCategory);
   const [swapping, setSwapping] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
@@ -131,8 +141,12 @@ export default function FeedClient({
       if (cat === activeCategory) return;
       setActiveCategory(cat);
       void fetchItems(cat);
+      // Mirror the active tab into the URL. replace() (not push) so each
+      // tap doesn't pile up in browser history — back should leave the page.
+      const url = cat === "all" ? "/" : `/?category=${cat}`;
+      router.replace(url, { scroll: false });
     },
-    [activeCategory, fetchItems]
+    [activeCategory, fetchItems, router]
   );
 
   const handleRefresh = useCallback(async () => {
@@ -156,6 +170,18 @@ export default function FeedClient({
       setTimeout(() => setRefreshMessage(null), 3500);
     }
   }, [activeCategory, fetchItems, refreshing, invalidateCache]);
+
+  // ─── Sync URL → data on mount ────────────────────────────
+  // Server SSR's the All view. If the URL says otherwise (deep link,
+  // refresh on a filtered tab, PWA cold-start), fetch the right slice.
+  useEffect(() => {
+    if (initialCategory !== "all") {
+      void fetchItems(initialCategory);
+    }
+    // Mount-only: subsequent URL changes come from handleCategoryChange,
+    // which already updates state and fetches.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ─── Silent auto-refresh on PWA resume ────────────────────
   // When the user switches back to the app, trigger a server-side fetch so
