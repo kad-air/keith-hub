@@ -19,7 +19,8 @@ export default function BottomNav() {
   const activeTracker = TRACKER_CONFIGS.find(
     (t) => pathname === `/trackers/${t.slug}`,
   );
-  const isOnTracker = !!activeTracker;
+  const isOnComics = pathname.startsWith("/comics");
+  const isOnTracker = !!activeTracker || isOnComics;
 
   // Close popover on outside tap or navigation
   useEffect(() => {
@@ -83,7 +84,7 @@ export default function BottomNav() {
               isOnTracker ? "text-cream" : "text-cream-dimmer",
             ].join(" ")}
           >
-            <span>{activeTracker?.label ?? "Trackers"}</span>
+            <span>{activeTracker?.label ?? (isOnComics ? "Comics" : "Trackers")}</span>
             <svg
               width="8"
               height="8"
@@ -132,6 +133,24 @@ export default function BottomNav() {
                   </Link>
                 );
               })}
+              <Link
+                href="/comics"
+                className={[
+                  "flex items-center gap-2.5 border-t border-rule/40 px-4 py-2.5 font-mono text-[0.7rem] uppercase tracking-kicker transition-colors",
+                  isOnComics
+                    ? "text-accent"
+                    : "text-cream-dim hover:text-cream",
+                ].join(" ")}
+              >
+                <span
+                  aria-hidden
+                  className={[
+                    "h-1.5 w-1.5 rounded-full",
+                    isOnComics ? "bg-current" : "bg-rule-strong",
+                  ].join(" ")}
+                />
+                Comics
+              </Link>
             </div>
           )}
         </div>
