@@ -1,26 +1,22 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import type { Storyline } from "@/lib/comics-data";
+import type { ComicIssue, Storyline } from "@/lib/comics-data";
 
 interface Props {
   storyline: Storyline;
   initialReadIds: string[];
 }
 
-// TEMP: House of X #1 points at the share.marvel.com universal-link URL
-// to test whether iOS hands off to Marvel Unlimited from inside the PWA.
-// Revert this branch if it doesn't work better than read.marvel.com.
-const TEST_SHARE_URL: Record<string, string> = {
-  "51975":
-    "https://marvel.smart.link/fiir7ec77?type=issue&drn=drn:src:marvel:unison::prod:6e60b594-548f-4e50-92ab-cbfea2866b72&sourceId=72984",
-};
-
-function readerUrl(digitalBookId: string): string {
-  return (
-    TEST_SHARE_URL[digitalBookId] ??
-    `https://read.marvel.com/#/book/${digitalBookId}`
-  );
+// marvel.smart.link is Marvel's Branch deep-link host. It hands off to
+// Marvel Unlimited even from inside the PWA's in-app browser, where
+// read.marvel.com universal links silently fail. See
+// scripts/comics-data-pipeline.md for how drn/sourceId are sourced.
+function readerUrl(issue: ComicIssue): string {
+  if (issue.drn && issue.sourceId) {
+    return `https://marvel.smart.link/fiir7ec77?type=issue&drn=${issue.drn}&sourceId=${issue.sourceId}`;
+  }
+  return `https://read.marvel.com/#/book/${issue.digitalBookId}`;
 }
 
 export default function ComicsClient({ storyline, initialReadIds }: Props) {
@@ -79,7 +75,7 @@ export default function ComicsClient({ storyline, initialReadIds }: Props) {
     () =>
       storyline.issues.map((issue, idx) => {
         const isRead = readIds.has(issue.id);
-        const url = readerUrl(issue.digitalBookId);
+        const url = readerUrl(issue);
         return (
           <li
             key={issue.id}
