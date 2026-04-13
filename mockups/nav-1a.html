@@ -1,0 +1,576 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Hub — nav 1a (contents switcher)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --ink:        #0e0d0b;
+    --ink-raised: #15140f;
+    --ink-deep:   #08070a;
+    --cream:      #f3ead6;
+    --cream-dim:  #b6ad99;
+    --cream-dimmer: #6e6857;
+    --rule:       #2a261d;
+    --rule-strong:#3a352a;
+    --accent:     #c89a3c;     /* burnished brass */
+    --cat-music:  #d36d4f;
+    --cat-books:  #b7c47b;
+    --cat-film:   #7aa6c4;
+    --cat-pods:   #c89a3c;
+    --cat-reading:#a98ec4;
+    --cat-bsky:   #6dbac9;
+    --cat-comics: #d3525a;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--ink);
+    color: var(--cream);
+    font-family: "Newsreader", Georgia, serif;
+    font-feature-settings: "ss01", "ss02";
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+    background-image:
+      radial-gradient(1200px 600px at 80% -10%, rgba(200,154,60,0.06), transparent 60%),
+      radial-gradient(900px 500px at -10% 110%, rgba(109,186,201,0.04), transparent 60%);
+  }
+  .mono { font-family: "JetBrains Mono", ui-monospace, monospace; }
+  .kicker {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--cream-dim);
+  }
+
+  /* ─────────── header ─────────── */
+  header.masthead {
+    position: sticky; top: 0; z-index: 30;
+    backdrop-filter: blur(14px);
+    background: color-mix(in oklab, var(--ink) 88%, transparent);
+    border-bottom: 1px solid var(--rule);
+  }
+  .masthead-row {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 14px max(20px, env(safe-area-inset-left)) 14px max(20px, env(safe-area-inset-right));
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: baseline;
+    gap: 24px;
+  }
+  .wordmark {
+    font-family: "Newsreader", serif;
+    font-weight: 500;
+    font-size: 1.05rem;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    color: var(--cream);
+  }
+  .wordmark .dot { color: var(--accent); }
+
+  .section-switch {
+    appearance: none; background: none; border: 0; padding: 6px 14px;
+    color: var(--cream);
+    font-family: "Newsreader", serif;
+    font-style: italic;
+    font-weight: 400;
+    font-size: 1.35rem;
+    letter-spacing: 0.005em;
+    cursor: pointer;
+    display: inline-flex; align-items: baseline; gap: 10px;
+    border-top: 1px solid transparent;
+    border-bottom: 1px solid var(--rule);
+    transition: border-color 180ms ease, color 180ms ease;
+  }
+  .section-switch:hover { border-bottom-color: var(--accent); }
+  .section-switch .num {
+    font-family: "JetBrains Mono", monospace;
+    font-style: normal;
+    font-size: 0.65rem;
+    letter-spacing: 0.18em;
+    color: var(--cream-dimmer);
+    transform: translateY(-2px);
+  }
+  .section-switch .glyph {
+    color: var(--cream-dim);
+    font-size: 0.8rem;
+    transform: translateY(-2px);
+  }
+
+  .gear {
+    justify-self: end;
+    display: inline-flex; align-items: center; gap: 14px;
+  }
+  .gear .now {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.62rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--cream-dimmer);
+  }
+  .icon-btn {
+    background: none; border: 1px solid var(--rule); color: var(--cream-dim);
+    width: 32px; height: 32px; display: inline-grid; place-items: center;
+    cursor: pointer; transition: color 150ms, border-color 150ms;
+  }
+  .icon-btn:hover { color: var(--cream); border-color: var(--rule-strong); }
+
+  /* ─────────── sub-bar (in-section nav) ─────────── */
+  .subbar {
+    border-bottom: 1px solid var(--rule);
+    background: var(--ink);
+  }
+  .subbar-row {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 max(20px, env(safe-area-inset-left));
+    display: flex; align-items: stretch; gap: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .subbar-row::-webkit-scrollbar { display: none; }
+  .subbar a {
+    position: relative;
+    padding: 12px 16px;
+    color: var(--cream-dim);
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    text-decoration: none;
+    transition: color 150ms;
+    white-space: nowrap;
+  }
+  .subbar a:hover { color: var(--cream); }
+  .subbar a.active { color: var(--cream); }
+  .subbar a.active::after {
+    content: ""; position: absolute; left: 16px; right: 16px; bottom: -1px;
+    height: 1px; background: var(--accent);
+  }
+  .subbar .count {
+    margin-left: 8px; color: var(--cream-dimmer); font-size: 0.6rem;
+  }
+  .subbar a.active .count { color: var(--accent); }
+
+  /* ─────────── content (placeholder feed) ─────────── */
+  main {
+    max-width: 720px; margin: 0 auto;
+    padding: 36px max(20px, env(safe-area-inset-left)) 120px;
+  }
+  .day-bucket {
+    display: flex; align-items: baseline; gap: 16px; margin: 32px 0 16px;
+  }
+  .day-bucket h2 {
+    font-family: "Newsreader", serif; font-weight: 400; font-style: italic;
+    font-size: 1.15rem; margin: 0; color: var(--cream);
+  }
+  .day-bucket .rule { flex: 1; height: 1px; background: var(--rule); }
+  .day-bucket .count { color: var(--cream-dimmer); }
+
+  article.card {
+    padding: 22px 0; border-bottom: 1px solid var(--rule);
+    display: grid; grid-template-columns: 1fr; gap: 8px;
+  }
+  article.card .meta { display: flex; align-items: baseline; gap: 12px; }
+  article.card .cat {
+    font-family: "JetBrains Mono", monospace; font-size: 0.62rem;
+    letter-spacing: 0.22em; text-transform: uppercase;
+  }
+  article.card h3 {
+    font-family: "Newsreader", serif; font-weight: 500;
+    font-size: 1.55rem; line-height: 1.18; margin: 4px 0 0;
+    letter-spacing: -0.005em;
+  }
+  article.card p {
+    color: var(--cream-dim); font-size: 1rem; line-height: 1.55; margin: 6px 0 0;
+  }
+  .cat-music { color: var(--cat-music); }
+  .cat-books { color: var(--cat-books); }
+  .cat-film  { color: var(--cat-film); }
+  .cat-pods  { color: var(--cat-pods); }
+  .cat-reading { color: var(--cat-reading); }
+  .cat-bsky  { color: var(--cat-bsky); }
+  .cat-comics{ color: var(--cat-comics); }
+
+  /* ─────────── contents overlay ─────────── */
+  .contents {
+    position: fixed; inset: 0; z-index: 60;
+    background: color-mix(in oklab, var(--ink-deep) 92%, transparent);
+    backdrop-filter: blur(20px) saturate(110%);
+    display: none;
+    overflow-y: auto;
+  }
+  .contents.open { display: block; animation: fade 240ms ease both; }
+  @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+
+  .contents-inner {
+    max-width: 980px; margin: 0 auto;
+    padding: 48px max(28px, env(safe-area-inset-left)) 80px;
+  }
+  .contents-head {
+    display: grid; grid-template-columns: 1fr auto; align-items: baseline;
+    border-bottom: 1px solid var(--rule);
+    padding-bottom: 18px;
+  }
+  .contents-head .label {
+    font-family: "JetBrains Mono", monospace; font-size: 0.7rem;
+    letter-spacing: 0.32em; text-transform: uppercase; color: var(--cream-dim);
+  }
+  .contents-head .label .ornament {
+    color: var(--accent); margin-right: 10px;
+  }
+  .contents-close {
+    background: none; border: 1px solid var(--rule); color: var(--cream-dim);
+    padding: 6px 12px; font-family: "JetBrains Mono", monospace;
+    font-size: 0.6rem; letter-spacing: 0.22em; text-transform: uppercase; cursor: pointer;
+  }
+  .contents-close:hover { color: var(--cream); border-color: var(--accent); }
+
+  /* search */
+  .contents-search {
+    margin-top: 28px;
+    display: flex; align-items: center; gap: 14px;
+    border-bottom: 1px solid var(--rule);
+    padding: 8px 0 10px;
+  }
+  .contents-search .prompt {
+    font-family: "Newsreader", serif; font-style: italic;
+    font-size: 1.6rem; color: var(--cream-dimmer);
+  }
+  .contents-search input {
+    flex: 1; background: transparent; border: 0; outline: 0;
+    color: var(--cream); font-family: "Newsreader", serif;
+    font-size: 1.6rem; letter-spacing: 0.005em; padding: 0;
+  }
+  .contents-search input::placeholder { color: var(--cream-dimmer); font-style: italic; }
+  .contents-search .hint {
+    font-family: "JetBrains Mono", monospace; font-size: 0.6rem;
+    letter-spacing: 0.22em; text-transform: uppercase; color: var(--cream-dimmer);
+    border: 1px solid var(--rule); padding: 4px 8px;
+  }
+
+  /* index list */
+  .contents-list { margin: 24px 0 0; padding: 0; list-style: none; }
+  .contents-group {
+    margin-top: 36px;
+  }
+  .contents-group .group-label {
+    font-family: "JetBrains Mono", monospace; font-size: 0.6rem;
+    letter-spacing: 0.32em; text-transform: uppercase;
+    color: var(--cream-dimmer); margin-bottom: 6px;
+  }
+  .contents-row {
+    display: grid;
+    grid-template-columns: 56px 1fr auto;
+    align-items: baseline;
+    gap: 24px;
+    padding: 18px 0;
+    border-bottom: 1px solid var(--rule);
+    cursor: pointer;
+    text-decoration: none; color: inherit;
+    position: relative;
+  }
+  .contents-row::before {
+    content: ""; position: absolute; left: -16px; top: 0; bottom: 0;
+    width: 2px; background: transparent; transition: background 180ms;
+  }
+  .contents-row:hover::before { background: var(--accent); }
+  .contents-row:hover .name { color: var(--cream); letter-spacing: 0.01em; }
+  .contents-row .num {
+    font-family: "JetBrains Mono", monospace; font-size: 0.72rem;
+    letter-spacing: 0.18em; color: var(--cream-dimmer);
+  }
+  .contents-row .name {
+    font-family: "Newsreader", serif; font-weight: 500;
+    font-size: 2.2rem; line-height: 1; color: var(--cream);
+    letter-spacing: -0.012em;
+    transition: color 180ms, letter-spacing 220ms;
+  }
+  .contents-row .name .em { font-style: italic; font-weight: 400; color: var(--cream-dim); }
+  .contents-row .desc {
+    font-family: "JetBrains Mono", monospace; font-size: 0.66rem;
+    letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--cream-dimmer); text-align: right;
+    max-width: 260px;
+  }
+  .contents-row.current .name { color: var(--accent); }
+  .contents-row.current::before { background: var(--accent); }
+
+  /* footer chord legend */
+  .contents-foot {
+    margin-top: 56px; padding-top: 22px; border-top: 1px solid var(--rule);
+    display: flex; flex-wrap: wrap; gap: 14px 28px;
+    font-family: "JetBrains Mono", monospace; font-size: 0.62rem;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--cream-dimmer);
+  }
+  .contents-foot kbd {
+    font-family: "JetBrains Mono", monospace; font-size: 0.6rem;
+    border: 1px solid var(--rule-strong); padding: 2px 6px;
+    background: var(--ink-raised); color: var(--cream-dim); margin-right: 6px;
+  }
+
+  /* ─────────── responsive ─────────── */
+  @media (max-width: 640px) {
+    .masthead-row { grid-template-columns: auto 1fr auto; gap: 12px; padding: 12px 16px; }
+    .wordmark { font-size: 0.85rem; letter-spacing: 0.24em; }
+    .section-switch { font-size: 1.05rem; padding: 4px 8px; justify-self: center; }
+    .section-switch .num { display: none; }
+    .gear .now { display: none; }
+    .contents-inner { padding: 28px 18px 60px; }
+    .contents-row { grid-template-columns: 36px 1fr; gap: 14px; padding: 14px 0; }
+    .contents-row .name { font-size: 1.55rem; }
+    .contents-row .desc { display: none; }
+    .contents-search .prompt, .contents-search input { font-size: 1.15rem; }
+  }
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="masthead-row">
+    <a class="wordmark" href="#">HUB<span class="dot">.</span></a>
+
+    <button class="section-switch" id="open-contents" aria-haspopup="dialog" aria-controls="contents">
+      <span class="num">01</span>
+      <span class="title"><em>Feed</em></span>
+      <span class="glyph">⌄</span>
+    </button>
+
+    <div class="gear">
+      <span class="now">Sun · Apr 12 · 4:12 pm</span>
+      <button class="icon-btn" aria-label="Settings" title="Settings">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.9 2.9l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.9-2.9l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.9-2.9l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.9 2.9l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="subbar">
+    <div class="subbar-row" id="subbar">
+      <!-- populated by JS based on current section -->
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="day-bucket">
+    <h2>Today</h2>
+    <span class="rule"></span>
+    <span class="kicker count">12</span>
+  </div>
+
+  <article class="card">
+    <div class="meta">
+      <span class="cat cat-music">Music · Pitchfork</span>
+      <span class="kicker" style="color:var(--cream-dimmer)">2h ago</span>
+    </div>
+    <h3>Mount Eerie — <em>Night Palace</em></h3>
+    <p>Phil Elverum's first record under the Mount Eerie name in five years feels like a return to the wide-open formal restlessness of <em>A Crow Looked at Me</em>, only this time the grief is ambient rather than acute.</p>
+  </article>
+
+  <article class="card">
+    <div class="meta">
+      <span class="cat cat-bsky">Bluesky · @robinrendle.com</span>
+      <span class="kicker" style="color:var(--cream-dimmer)">3h ago</span>
+    </div>
+    <h3>"the contents page is the most under-rated piece of UI in print design"</h3>
+    <p>quote-thread of three, the second one mentions the Pentagram redesign of the New York Times Magazine</p>
+  </article>
+
+  <article class="card">
+    <div class="meta">
+      <span class="cat cat-film">Film · The Ringer</span>
+      <span class="kicker" style="color:var(--cream-dimmer)">5h ago</span>
+    </div>
+    <h3>The Brutalist isn't really about brutalism</h3>
+    <p>Adam Nayman on what Brady Corbet's three-and-a-half-hour epic is actually after, and why the form is the argument.</p>
+  </article>
+
+  <div class="day-bucket">
+    <h2>Yesterday</h2>
+    <span class="rule"></span>
+    <span class="kicker count">8</span>
+  </div>
+
+  <article class="card">
+    <div class="meta">
+      <span class="cat cat-pods">Podcast · Decoder</span>
+      <span class="kicker" style="color:var(--cream-dimmer)">yesterday</span>
+    </div>
+    <h3>Anil Dash on what comes after the platforms</h3>
+    <p>52 min · the conversation gets interesting around the 28-minute mark when Patel pushes on whether ActivityPub's federation model can survive its own moderation problem.</p>
+  </article>
+</main>
+
+<!-- ─────────── contents overlay ─────────── -->
+<aside class="contents" id="contents" role="dialog" aria-label="Contents">
+  <div class="contents-inner">
+    <div class="contents-head">
+      <div class="label"><span class="ornament">§</span>Contents</div>
+      <button class="contents-close" id="close-contents" aria-label="Close contents">Esc · Close</button>
+    </div>
+
+    <div class="contents-search">
+      <span class="prompt">⌕</span>
+      <input type="text" placeholder="Jump to anything…" autocomplete="off" />
+      <span class="hint">⌘ K</span>
+    </div>
+
+    <ul class="contents-list">
+      <li class="contents-group">
+        <div class="group-label">— Reading</div>
+        <a class="contents-row current" href="#" data-section="feed" data-name="Feed">
+          <span class="num">01</span>
+          <span class="name">Feed <span class="em">— today</span></span>
+          <span class="desc">Today · Saved · Read</span>
+        </a>
+      </li>
+
+      <li class="contents-group">
+        <div class="group-label">— Tracking</div>
+        <a class="contents-row" href="#" data-section="music" data-name="Music">
+          <span class="num">02</span>
+          <span class="name">Music</span>
+          <span class="desc">Albums · 142 logged</span>
+        </a>
+        <a class="contents-row" href="#" data-section="books" data-name="Books">
+          <span class="num">03</span>
+          <span class="name">Books</span>
+          <span class="desc">Reading · 8 in flight</span>
+        </a>
+        <a class="contents-row" href="#" data-section="film" data-name="Film">
+          <span class="num">04</span>
+          <span class="name">Film</span>
+          <span class="desc">Watchlist · 31</span>
+        </a>
+        <a class="contents-row" href="#" data-section="tv" data-name="TV">
+          <span class="num">05</span>
+          <span class="name">TV</span>
+          <span class="desc">Currently airing · 6</span>
+        </a>
+        <a class="contents-row" href="#" data-section="games" data-name="Games">
+          <span class="num">06</span>
+          <span class="name">Games</span>
+          <span class="desc">Backlog · 24</span>
+        </a>
+      </li>
+
+      <li class="contents-group">
+        <div class="group-label">— Library</div>
+        <a class="contents-row" href="#" data-section="comics" data-name="Comics">
+          <span class="num">07</span>
+          <span class="name">Comics</span>
+          <span class="desc">Hickman X-Men · 219 issues</span>
+        </a>
+      </li>
+
+      <li class="contents-group">
+        <div class="group-label">— Future</div>
+        <a class="contents-row" href="#" data-section="notes" data-name="Notes">
+          <span class="num">08</span>
+          <span class="name">Notes <span class="em">— quotes &amp; clippings</span></span>
+          <span class="desc">Not yet built</span>
+        </a>
+        <a class="contents-row" href="#" data-section="inbox" data-name="Inbox">
+          <span class="num">09</span>
+          <span class="name">Inbox</span>
+          <span class="desc">Not yet built</span>
+        </a>
+        <a class="contents-row" href="#" data-section="archive" data-name="Archive">
+          <span class="num">10</span>
+          <span class="name">Archive</span>
+          <span class="desc">Not yet built</span>
+        </a>
+      </li>
+    </ul>
+
+    <div class="contents-foot">
+      <span><kbd>g</kbd><kbd>f</kbd> Feed</span>
+      <span><kbd>g</kbd><kbd>m</kbd> Music</span>
+      <span><kbd>g</kbd><kbd>b</kbd> Books</span>
+      <span><kbd>g</kbd><kbd>c</kbd> Comics</span>
+      <span><kbd>?</kbd> Shortcuts</span>
+      <span><kbd>⌘</kbd><kbd>K</kbd> Jump</span>
+    </div>
+  </div>
+</aside>
+
+<script>
+  // sub-bar definitions per section (in-section nav)
+  const SUBNAVS = {
+    feed:   [["Today",  12, true], ["Saved", 47], ["Read", 1893]],
+    music:  [["All", 142, true], ["Listening", 4], ["Loved", 38], ["Backlog", 100]],
+    books:  [["All", 86, true], ["Reading", 8], ["Finished", 64], ["Backlog", 14]],
+    film:   [["All", 220, true], ["Watchlist", 31], ["Seen", 189]],
+    tv:     [["All", 42, true], ["Airing", 6], ["Watching", 4], ["Done", 32]],
+    games:  [["All", 71, true], ["Playing", 3], ["Backlog", 24], ["Finished", 44]],
+    comics: [["Series", 4, true], ["X-Men", 219], ["Avengers", 96], ["Secret Wars", 81]],
+    notes:  [["Coming soon", 0, true]],
+    inbox:  [["Coming soon", 0, true]],
+    archive:[["Coming soon", 0, true]],
+  };
+
+  const subbar = document.getElementById("subbar");
+  const sectionLabel = document.querySelector(".section-switch .title");
+  const sectionNum   = document.querySelector(".section-switch .num");
+
+  function renderSubbar(sectionKey) {
+    const items = SUBNAVS[sectionKey] || [];
+    subbar.innerHTML = items.map(([label, count, active]) =>
+      `<a href="#" class="${active ? 'active' : ''}">${label}<span class="count">${count}</span></a>`
+    ).join("");
+  }
+
+  function setSection(key, name, num) {
+    sectionLabel.innerHTML = `<em>${name}</em>`;
+    sectionNum.textContent = num;
+    renderSubbar(key);
+    document.querySelectorAll(".contents-row").forEach(r => r.classList.remove("current"));
+    const row = document.querySelector(`.contents-row[data-section="${key}"]`);
+    if (row) row.classList.add("current");
+  }
+
+  // initial
+  renderSubbar("feed");
+
+  // overlay open/close
+  const contents = document.getElementById("contents");
+  document.getElementById("open-contents").addEventListener("click", () => {
+    contents.classList.add("open");
+    setTimeout(() => contents.querySelector("input")?.focus(), 60);
+  });
+  document.getElementById("close-contents").addEventListener("click", () => {
+    contents.classList.remove("open");
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") contents.classList.remove("open");
+    if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+      e.preventDefault();
+      contents.classList.add("open");
+      setTimeout(() => contents.querySelector("input")?.focus(), 60);
+    }
+  });
+
+  // section selection from contents
+  document.querySelectorAll(".contents-row").forEach((row, i) => {
+    row.addEventListener("click", (e) => {
+      e.preventDefault();
+      const key = row.dataset.section;
+      const name = row.dataset.name;
+      const num = String(i + 1).padStart(2, "0");
+      setSection(key, name, num);
+      contents.classList.remove("open");
+    });
+  });
+</script>
+</body>
+</html>

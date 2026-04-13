@@ -1,11 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import { Newsreader, JetBrains_Mono } from "next/font/google";
-import Link from "next/link";
 import "./globals.css";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 import ThemeProvider from "@/components/ThemeProvider";
-import HeaderNav from "@/components/HeaderNav";
-import BottomNav from "@/components/BottomNav";
+import Masthead from "@/components/Masthead";
 
 const displayFont = Newsreader({
   subsets: ["latin"],
@@ -83,19 +81,9 @@ export default function RootLayout({
       </head>
       <body className="font-display text-cream bg-ink min-h-screen">
         <ThemeProvider>
-        <header className="sticky top-0 z-40 border-b border-rule/60 bg-ink/95 pt-[env(safe-area-inset-top)]">
-          <div className="mx-auto flex min-h-14 max-w-[720px] items-center justify-between pl-[max(1.5rem,env(safe-area-inset-left))] pr-[max(1.5rem,env(safe-area-inset-right))]">
-            <Link href="/" className="group inline-flex items-baseline">
-              <span className="font-display text-[1.4rem] font-medium italic leading-none tracking-tight text-cream transition-colors group-hover:text-accent">
-                hub
-              </span>
-            </Link>
-            <HeaderNav />
-          </div>
-        </header>
-        <main className="relative z-10 pb-14 sm:pb-0">{children}</main>
-        <BottomNav />
-        <ServiceWorkerRegister />
+          <Masthead />
+          <main className="relative z-10">{children}</main>
+          <ServiceWorkerRegister />
         </ThemeProvider>
       </body>
     </html>
