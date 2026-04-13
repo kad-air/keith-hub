@@ -13,7 +13,7 @@ interface Props {
 // Revert this branch if it doesn't work better than read.marvel.com.
 const TEST_SHARE_URL: Record<string, string> = {
   "51975":
-    "https://share.marvel.com/sharing/issue/drn:src:marvel:unison::prod:5763f5f5-313b-4849-8b17-8c71e77cbc2a",
+    "https://marvel.smart.link/fiir7ec77?type=issue&drn=drn:src:marvel:unison::prod:5763f5f5-313b-4849-8b17-8c71e77cbc2a&sourceId=112987",
 };
 
 function readerUrl(digitalBookId: string): string {
