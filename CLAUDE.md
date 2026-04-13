@@ -178,6 +178,17 @@ Web Push via VAPID, powered by the `web-push` npm package. Single-user, so the s
 
 **Testing:** `curl -X POST http://localhost:3000/api/push/test` (requires an active subscription; in production, use the auth cookie or `inspect.mjs`).
 
+### Comics — Marvel Unlimited reading orders
+A static catalog of Hickman-era reading orders (X-Men, Avengers/Secret Wars), each issue tappable to hand off to the Marvel Unlimited iOS app. Two pages: `/comics` (storyline index) and `/comics/[slug]` (the checklist).
+
+**Catalog is static, generated offline.** `lib/comics-data.ts` is auto-generated and committed; the app does not fetch from Marvel at runtime. Source data and the scraping/generation pipeline live in the sibling repo `~/Code/mu-reading-lists` — see `scripts/comics-data-pipeline.md` for how the per-issue `digitalBookId`, `drn`, and `sourceId` are sourced from the marvel.com sitemap, page HTML, and `bifrost.marvel.com/unison/legacy`. To regenerate after adding a storyline or refreshing data: `node scripts/generate-comics-data.mjs`. The script skips storylines whose applinks/drns aren't fully populated yet (resumable scrapes) so partial regenerations can't ship broken data.
+
+**Read state lives in SQLite.** Table `comic_state` has one row per read issue (`issue_id` PK = `digitalBookId`, `read_at`). Routes: `POST /api/comics/[id]/read` and `POST /api/comics/[id]/unread`. The `/comics` index calls `getReadComicIds()` from `lib/queries.ts` to compute `read / total` per storyline.
+
+**The Marvel Unlimited handoff is the load-bearing UX trick.** `read.marvel.com/#/book/{digitalBookId}` is the obvious URL but it's useless from inside the PWA — iOS routes `target="_blank"` clicks through SFSafariViewController, which doesn't honor universal links. The fix in `components/ComicsClient.tsx` is to link to `marvel.smart.link/fiir7ec77?type=issue&drn={drn}&sourceId={sourceId}` (Marvel's Branch.io deep-link host) **as a plain `<a>` with no `target` and no `preventDefault`**. iOS treats that as a top-level navigation and hands off to the app via the smart.link's app-claim. The PWA gets backgrounded; swiping back returns to the same scroll position.
+
+**Important: do NOT replicate the FeedClient `target="_blank"` anchor pattern here.** The whole PWA-handoff section #2 below explicitly opens in the in-app browser — that's the wrong outcome for comics.
+
 ## PWA setup (read this before touching app/layout.tsx)
 
 The Feed is installable as an iOS PWA. There are TWO non-obvious gotchas baked into the code that are easy to undo by accident:
@@ -217,6 +228,8 @@ iOS standalone PWAs have a long-standing quirk: `window.open(url, "_blank")` ope
 
 ### Auth
 Password-protected via Next.js middleware (`middleware.ts`). A `hub-auth` httpOnly cookie (30-day expiry) gates all routes except the login page, static assets, manifest, and service worker. `FEED_PASSWORD` env var. Log out via gear menu.
+
+The login/logout `POST` handlers (`app/api/auth/{login,logout}/route.ts`) must return **303** redirects, not the default 307. iOS Safari preserves the POST method on 307 and tries to POST to `/`, which fails with "Safari can't open the page because the address is invalid" until manual refresh.
 
 ### Local dev
 The Mac Mini is still the dev environment. `npm run dev` on port 3000. The `.env` file holds the same env vars as Railway. If `FEED_PASSWORD` is unset, auth is bypassed (so local dev works without logging in).
