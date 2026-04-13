@@ -12,14 +12,6 @@ function readerUrl(digitalBookId: string): string {
   return `https://read.marvel.com/#/book/${digitalBookId}`;
 }
 
-// Top-level navigation (not target=_blank) so iOS checks universal-link
-// associations and hands read.marvel.com URLs off to Marvel Unlimited.
-// SFSafariViewController (what target=_blank opens in a PWA) does not
-// trigger universal links. The PWA gets backgrounded and resumes on return.
-function openExternal(url: string) {
-  window.location.href = url;
-}
-
 export default function ComicsClient({ storyline, initialReadIds }: Props) {
   const [readIds, setReadIds] = useState<Set<string>>(
     () => new Set(initialReadIds),
@@ -49,10 +41,12 @@ export default function ComicsClient({ storyline, initialReadIds }: Props) {
   }, [readIds]);
 
   const handleLink = useCallback(
-    (id: string, url: string) => {
+    (id: string) => {
       // Auto-mark read on tap. Fire-and-forget; UI updates optimistically.
+      // Anchor's default navigation is allowed to proceed (no preventDefault)
+      // so iOS sees a real top-level click and can hand off to Marvel
+      // Unlimited via universal links.
       if (!readIds.has(id)) void setRead(id, true);
-      openExternal(url);
     },
     [readIds, setRead],
   );
@@ -94,12 +88,8 @@ export default function ComicsClient({ storyline, initialReadIds }: Props) {
             />
             <a
               href={url}
-              target="_blank"
               rel="noopener noreferrer"
-              onClick={(e) => {
-                e.preventDefault();
-                handleLink(issue.id, url);
-              }}
+              onClick={() => handleLink(issue.id)}
               className={[
                 "flex-1 truncate text-[0.95rem] transition-colors",
                 isRead
