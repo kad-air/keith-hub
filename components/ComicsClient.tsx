@@ -8,8 +8,19 @@ interface Props {
   initialReadIds: string[];
 }
 
+// TEMP: House of X #1 points at the share.marvel.com universal-link URL
+// to test whether iOS hands off to Marvel Unlimited from inside the PWA.
+// Revert this branch if it doesn't work better than read.marvel.com.
+const TEST_SHARE_URL: Record<string, string> = {
+  "51975":
+    "https://share.marvel.com/sharing/issue/drn:src:marvel:unison::prod:5763f5f5-313b-4849-8b17-8c71e77cbc2a",
+};
+
 function readerUrl(digitalBookId: string): string {
-  return `https://read.marvel.com/#/book/${digitalBookId}`;
+  return (
+    TEST_SHARE_URL[digitalBookId] ??
+    `https://read.marvel.com/#/book/${digitalBookId}`
+  );
 }
 
 export default function ComicsClient({ storyline, initialReadIds }: Props) {
