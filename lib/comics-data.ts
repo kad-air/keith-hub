@@ -1367,6 +1367,1984 @@ export const STORYLINES: Storyline[] = [
         "sourceId": "77326"
       }
     ]
+  },
+  {
+    "slug": "hickman-secret-wars",
+    "title": "Jonathan Hickman's Avengers / Secret Wars",
+    "description": "Full Hickman runway: Secret Warriors, S.H.I.E.L.D., Fantastic Four / FF, the Ultimate Comics line, Avengers / New Avengers, Infinity, and Secret Wars.",
+    "issues": [
+      {
+        "id": "13394",
+        "title": "Secret Warriors (2009) #1",
+        "digitalBookId": "13394",
+        "marvelIssueId": "23648",
+        "slug": "secret_warriors_2009_1",
+        "drn": "drn:src:marvel:unison::prod:1a89f74e-7009-4a2c-88fe-ca8038dadb3e",
+        "sourceId": "23648"
+      },
+      {
+        "id": "13561",
+        "title": "Secret Warriors (2009) #2",
+        "digitalBookId": "13561",
+        "marvelIssueId": "23812",
+        "slug": "secret_warriors_2009_2",
+        "drn": "drn:src:marvel:unison::prod:e50b2b41-f381-4fa5-8ac7-5713bcd90702",
+        "sourceId": "23812"
+      },
+      {
+        "id": "15542",
+        "title": "Secret Warriors (2009) #3",
+        "digitalBookId": "15542",
+        "marvelIssueId": "24002",
+        "slug": "secret_warriors_2009_3",
+        "drn": "drn:src:marvel:unison::prod:2abf821c-a670-405b-9328-4a0ef833de05",
+        "sourceId": "24002"
+      },
+      {
+        "id": "15616",
+        "title": "Secret Warriors (2009) #4",
+        "digitalBookId": "15616",
+        "marvelIssueId": "24208",
+        "slug": "secret_warriors_2009_4",
+        "drn": "drn:src:marvel:unison::prod:41604f38-8396-40a5-beb1-1fc45b446d69",
+        "sourceId": "24208"
+      },
+      {
+        "id": "12720",
+        "title": "Secret Warriors (2009) #5",
+        "digitalBookId": "12720",
+        "marvelIssueId": "26287",
+        "slug": "secret_warriors_2009_5",
+        "drn": "drn:src:marvel:unison::prod:02d7cb16-464a-4955-9155-aa49fe47d532",
+        "sourceId": "26287"
+      },
+      {
+        "id": "14874",
+        "title": "Secret Warriors (2009) #6",
+        "digitalBookId": "14874",
+        "marvelIssueId": "26288",
+        "slug": "secret_warriors_2009_6",
+        "drn": "drn:src:marvel:unison::prod:6b16ec84-de2d-4b76-bac2-9f0a43ae6ad2",
+        "sourceId": "26288"
+      },
+      {
+        "id": "13781",
+        "title": "Secret Warriors (2009) #7",
+        "digitalBookId": "13781",
+        "marvelIssueId": "26289",
+        "slug": "secret_warriors_2009_7",
+        "drn": "drn:src:marvel:unison::prod:13fffee4-19f0-4180-929d-7b3be990e904",
+        "sourceId": "26289"
+      },
+      {
+        "id": "13474",
+        "title": "Secret Warriors (2009) #8",
+        "digitalBookId": "13474",
+        "marvelIssueId": "26290",
+        "slug": "secret_warriors_2009_8",
+        "drn": "drn:src:marvel:unison::prod:cbad1023-4fee-4dbf-af07-884afb6a2eb8",
+        "sourceId": "26290"
+      },
+      {
+        "id": "17225",
+        "title": "Secret Warriors (2009) #9",
+        "digitalBookId": "17225",
+        "marvelIssueId": "26291",
+        "slug": "secret_warriors_2009_9",
+        "drn": "drn:src:marvel:unison::prod:52ea826f-25e7-40dd-807f-e7b1d942a1dd",
+        "sourceId": "26291"
+      },
+      {
+        "id": "16856",
+        "title": "Dark Reign: The List - Secret Warriors (2009) #1",
+        "digitalBookId": "16856",
+        "marvelIssueId": "27422",
+        "slug": "dark_reign_the_list_-_secret_warriors_2009_1",
+        "drn": "drn:src:marvel:unison::prod:122e6cf5-60a9-4118-8893-9f252fbc5165",
+        "sourceId": "27422"
+      },
+      {
+        "id": "13629",
+        "title": "Secret Warriors (2009) #10",
+        "digitalBookId": "13629",
+        "marvelIssueId": "26283",
+        "slug": "secret_warriors_2009_10",
+        "drn": "drn:src:marvel:unison::prod:b6ee23ec-9221-45c8-9301-c021bbd412f2",
+        "sourceId": "26283"
+      },
+      {
+        "id": "14873",
+        "title": "Secret Warriors (2009) #11",
+        "digitalBookId": "14873",
+        "marvelIssueId": "26284",
+        "slug": "secret_warriors_2009_11",
+        "drn": "drn:src:marvel:unison::prod:b0ba43a5-9e30-4c79-a280-2df3f4ad28e7",
+        "sourceId": "26284"
+      },
+      {
+        "id": "14867",
+        "title": "Secret Warriors (2009) #12",
+        "digitalBookId": "14867",
+        "marvelIssueId": "26285",
+        "slug": "secret_warriors_2009_12",
+        "drn": "drn:src:marvel:unison::prod:1448f50b-a94a-4e80-8160-1fc36343c2a5",
+        "sourceId": "26285"
+      },
+      {
+        "id": "13924",
+        "title": "Secret Warriors (2009) #13",
+        "digitalBookId": "13924",
+        "marvelIssueId": "30174",
+        "slug": "secret_warriors_2009_13",
+        "drn": "drn:src:marvel:unison::prod:22bcf081-af69-4676-b8c2-0e88cf65cc05",
+        "sourceId": "30174"
+      },
+      {
+        "id": "14167",
+        "title": "Secret Warriors (2009) #14",
+        "digitalBookId": "14167",
+        "marvelIssueId": "30175",
+        "slug": "secret_warriors_2009_14",
+        "drn": "drn:src:marvel:unison::prod:8c0cabd5-0548-4cfe-bafa-021101758743",
+        "sourceId": "30175"
+      },
+      {
+        "id": "14421",
+        "title": "Secret Warriors (2009) #15",
+        "digitalBookId": "14421",
+        "marvelIssueId": "32559",
+        "slug": "secret_warriors_2009_15",
+        "drn": "drn:src:marvel:unison::prod:ccd795f9-3e47-47cf-b2f8-fee2e425b4c5",
+        "sourceId": "32559"
+      },
+      {
+        "id": "14749",
+        "title": "Secret Warriors (2009) #16",
+        "digitalBookId": "14749",
+        "marvelIssueId": "30177",
+        "slug": "secret_warriors_2009_16",
+        "drn": "drn:src:marvel:unison::prod:62f5ae76-fe35-44ca-84aa-1d7abe273f3a",
+        "sourceId": "30177"
+      },
+      {
+        "id": "14418",
+        "title": "Siege: Secret Warriors (2010) #1",
+        "digitalBookId": "14418",
+        "marvelIssueId": "32930",
+        "slug": "siege_secret_warriors_2010_1",
+        "drn": "drn:src:marvel:unison::prod:6d8c73c9-33b7-4799-a3d3-e38b743caa31",
+        "sourceId": "32930"
+      },
+      {
+        "id": "15001",
+        "title": "Secret Warriors (2009) #17",
+        "digitalBookId": "15001",
+        "marvelIssueId": "30714",
+        "slug": "secret_warriors_2009_17",
+        "drn": "drn:src:marvel:unison::prod:49a8cef8-5283-490c-9327-fdff714f53fa",
+        "sourceId": "30714"
+      },
+      {
+        "id": "15530",
+        "title": "Secret Warriors (2009) #18",
+        "digitalBookId": "15530",
+        "marvelIssueId": "30178",
+        "slug": "secret_warriors_2009_18",
+        "drn": "drn:src:marvel:unison::prod:fe164cbc-da50-4ac0-bdd6-fe8a8c71e541",
+        "sourceId": "30178"
+      },
+      {
+        "id": "15801",
+        "title": "Secret Warriors (2009) #19",
+        "digitalBookId": "15801",
+        "marvelIssueId": "30179",
+        "slug": "secret_warriors_2009_19",
+        "drn": "drn:src:marvel:unison::prod:b5c910e8-29c7-4a60-b46d-985d897cd61e",
+        "sourceId": "30179"
+      },
+      {
+        "id": "16291",
+        "title": "Secret Warriors (2009) #20",
+        "digitalBookId": "16291",
+        "marvelIssueId": "30180",
+        "slug": "secret_warriors_2009_20",
+        "drn": "drn:src:marvel:unison::prod:2eec8e8d-82cd-475c-bcdd-da41c7428c58",
+        "sourceId": "30180"
+      },
+      {
+        "id": "16996",
+        "title": "Secret Warriors (2009) #21",
+        "digitalBookId": "16996",
+        "marvelIssueId": "30181",
+        "slug": "secret_warriors_2009_21",
+        "drn": "drn:src:marvel:unison::prod:7c65b141-9bce-4e09-b393-3536b99778b0",
+        "sourceId": "30181"
+      },
+      {
+        "id": "17922",
+        "title": "Secret Warriors (2009) #22",
+        "digitalBookId": "17922",
+        "marvelIssueId": "30182",
+        "slug": "secret_warriors_2009_22",
+        "drn": "drn:src:marvel:unison::prod:3fdc17f4-7533-4e9f-9806-d27b3dfca54b",
+        "sourceId": "30182"
+      },
+      {
+        "id": "18696",
+        "title": "Secret Warriors (2009) #23",
+        "digitalBookId": "18696",
+        "marvelIssueId": "30183",
+        "slug": "secret_warriors_2009_23",
+        "drn": "drn:src:marvel:unison::prod:4d334e5e-1c9a-4867-8fb4-d81a3e92a674",
+        "sourceId": "30183"
+      },
+      {
+        "id": "19857",
+        "title": "Secret Warriors (2009) #25",
+        "digitalBookId": "19857",
+        "marvelIssueId": "36492",
+        "slug": "secret_warriors_2009_25",
+        "drn": "drn:src:marvel:unison::prod:1e845400-0a1d-4d56-a58f-246b7d3ed8c1",
+        "sourceId": "36492"
+      },
+      {
+        "id": "20475",
+        "title": "Secret Warriors (2009) #26",
+        "digitalBookId": "20475",
+        "marvelIssueId": "36491",
+        "slug": "secret_warriors_2009_26",
+        "drn": "drn:src:marvel:unison::prod:fdf4baa3-1aeb-4ef3-92fb-34ffc56273c5",
+        "sourceId": "36491"
+      },
+      {
+        "id": "21245",
+        "title": "Secret Warriors (2009) #27",
+        "digitalBookId": "21245",
+        "marvelIssueId": "36493",
+        "slug": "secret_warriors_2009_27",
+        "drn": "drn:src:marvel:unison::prod:32704fa6-445a-48e0-ba6d-48f7596236c0",
+        "sourceId": "36493"
+      },
+      {
+        "id": "22892",
+        "title": "Secret Warriors (2009) #28",
+        "digitalBookId": "22892",
+        "marvelIssueId": "36494",
+        "slug": "secret_warriors_2009_28",
+        "drn": "drn:src:marvel:unison::prod:2d7bf585-aae9-4736-bb9f-0037e6c79a78",
+        "sourceId": "36494"
+      },
+      {
+        "id": "14250",
+        "title": "S.H.I.E.L.D. (2010) #1",
+        "digitalBookId": "14250",
+        "marvelIssueId": "31599",
+        "slug": "shield_2010_1",
+        "drn": "drn:src:marvel:unison::prod:4c6793c8-a5f4-428d-8e23-c14fb0d83a1d",
+        "sourceId": "31599"
+      },
+      {
+        "id": "14887",
+        "title": "S.H.I.E.L.D. (2010) #2",
+        "digitalBookId": "14887",
+        "marvelIssueId": "30509",
+        "slug": "shield_2010_2",
+        "drn": "drn:src:marvel:unison::prod:c97f016d-08f9-4280-aae5-d811f62c9cad",
+        "sourceId": "30509"
+      },
+      {
+        "id": "15508",
+        "title": "S.H.I.E.L.D. (2010) #3",
+        "digitalBookId": "15508",
+        "marvelIssueId": "30510",
+        "slug": "shield_2010_3",
+        "drn": "drn:src:marvel:unison::prod:e465ac04-b44d-4c9c-a44b-4e13c6ba0a92",
+        "sourceId": "30510"
+      },
+      {
+        "id": "16517",
+        "title": "S.H.I.E.L.D. (2010) #4",
+        "digitalBookId": "16517",
+        "marvelIssueId": "30511",
+        "slug": "shield_2010_4",
+        "drn": "drn:src:marvel:unison::prod:22f9850f-5840-4253-99f2-9e77579be1ef",
+        "sourceId": "30511"
+      },
+      {
+        "id": "18683",
+        "title": "S.H.I.E.L.D. (2010) #5",
+        "digitalBookId": "18683",
+        "marvelIssueId": "30512",
+        "slug": "shield_2010_5",
+        "drn": "drn:src:marvel:unison::prod:8653a542-3c0a-4362-871f-6ad8a4f5f54e",
+        "sourceId": "30512"
+      },
+      {
+        "id": "19298",
+        "title": "S.H.I.E.L.D. (2010) #6",
+        "digitalBookId": "19298",
+        "marvelIssueId": "30774",
+        "slug": "shield_2010_6",
+        "drn": "drn:src:marvel:unison::prod:5991370b-89c6-4838-a993-2027a7dd7108",
+        "sourceId": "30774"
+      },
+      {
+        "id": "21293",
+        "title": "S.H.I.E.L.D. (2011) #1",
+        "digitalBookId": "21293",
+        "marvelIssueId": "38177",
+        "slug": "shield_2011_1",
+        "drn": "drn:src:marvel:unison::prod:0fed7d45-3010-4792-951e-9e1e844f4f0b",
+        "sourceId": "38177"
+      },
+      {
+        "id": "23165",
+        "title": "S.H.I.E.L.D. (2011) #2",
+        "digitalBookId": "23165",
+        "marvelIssueId": "38179",
+        "slug": "shield_2011_2",
+        "drn": "drn:src:marvel:unison::prod:f6f813f7-6a58-432c-bc3f-ade1cca1322f",
+        "sourceId": "38179"
+      },
+      {
+        "id": "24264",
+        "title": "S.H.I.E.L.D. (2011) #3",
+        "digitalBookId": "24264",
+        "marvelIssueId": "38180",
+        "slug": "shield_2011_3",
+        "drn": "drn:src:marvel:unison::prod:ea91d665-1ac7-404f-8ab6-7464b8b9d8cb",
+        "sourceId": "38180"
+      },
+      {
+        "id": "25051",
+        "title": "S.H.I.E.L.D. (2011) #4",
+        "digitalBookId": "25051",
+        "marvelIssueId": "38178",
+        "slug": "shield_2011_4",
+        "drn": "drn:src:marvel:unison::prod:631854b6-abe1-46de-ba37-f9c3031ad0c9",
+        "sourceId": "38178"
+      },
+      {
+        "id": "12993",
+        "title": "Dark Reign: Fantastic Four (2009) #1",
+        "digitalBookId": "12993",
+        "marvelIssueId": "23843",
+        "slug": "dark_reign_fantastic_four_2009_1",
+        "drn": "drn:src:marvel:unison::prod:d58319cf-d573-4c2b-9252-74e0413d171b",
+        "sourceId": "23843"
+      },
+      {
+        "id": "15552",
+        "title": "Dark Reign: Fantastic Four (2009) #2",
+        "digitalBookId": "15552",
+        "marvelIssueId": "24043",
+        "slug": "dark_reign_fantastic_four_2009_2",
+        "drn": "drn:src:marvel:unison::prod:3fae2bb0-5f89-4860-bdad-3b2e5f441455",
+        "sourceId": "24043"
+      },
+      {
+        "id": "15301",
+        "title": "Dark Reign: Fantastic Four (2009) #3",
+        "digitalBookId": "15301",
+        "marvelIssueId": "24245",
+        "slug": "dark_reign_fantastic_four_2009_3",
+        "drn": "drn:src:marvel:unison::prod:aa0f6e9d-e417-4b02-9f4d-11e48ee719d5",
+        "sourceId": "24245"
+      },
+      {
+        "id": "15118",
+        "title": "Dark Reign: Fantastic Four (2009) #4",
+        "digitalBookId": "15118",
+        "marvelIssueId": "24834",
+        "slug": "dark_reign_fantastic_four_2009_4",
+        "drn": "drn:src:marvel:unison::prod:2edce067-9120-4a96-abc3-b27431fbc2ff",
+        "sourceId": "24834"
+      },
+      {
+        "id": "15838",
+        "title": "Dark Reign: Fantastic Four (2009) #5",
+        "digitalBookId": "15838",
+        "marvelIssueId": "24835",
+        "slug": "dark_reign_fantastic_four_2009_5",
+        "drn": "drn:src:marvel:unison::prod:95174a8f-9c14-4882-8073-04a2223e0135",
+        "sourceId": "24835"
+      },
+      {
+        "id": "13541",
+        "title": "Fantastic Four (1998) #570",
+        "digitalBookId": "13541",
+        "marvelIssueId": "25182",
+        "slug": "fantastic_four_1998_570",
+        "drn": "drn:src:marvel:unison::prod:8e2ef34f-d690-405a-888a-9723c25c4ef0",
+        "sourceId": "25182"
+      },
+      {
+        "id": "13542",
+        "title": "Fantastic Four (1998) #571",
+        "digitalBookId": "13542",
+        "marvelIssueId": "25183",
+        "slug": "fantastic_four_1998_571",
+        "drn": "drn:src:marvel:unison::prod:a65175d5-5c55-4add-b196-ed0d0ce324f8",
+        "sourceId": "25183"
+      },
+      {
+        "id": "14456",
+        "title": "Fantastic Four (1998) #572",
+        "digitalBookId": "14456",
+        "marvelIssueId": "25184",
+        "slug": "fantastic_four_1998_572",
+        "drn": "drn:src:marvel:unison::prod:663c5899-4160-48d2-9c99-e39a681c4212",
+        "sourceId": "25184"
+      },
+      {
+        "id": "14457",
+        "title": "Fantastic Four (1998) #573",
+        "digitalBookId": "14457",
+        "marvelIssueId": "25185",
+        "slug": "fantastic_four_1998_573",
+        "drn": "drn:src:marvel:unison::prod:4e4f4593-2d91-408f-8fb8-81855727c0b4",
+        "sourceId": "25185"
+      },
+      {
+        "id": "14458",
+        "title": "Fantastic Four (1998) #574",
+        "digitalBookId": "14458",
+        "marvelIssueId": "25186",
+        "slug": "fantastic_four_1998_574",
+        "drn": "drn:src:marvel:unison::prod:0102d34b-5fbf-40b7-8f8a-6474342e8cb0",
+        "sourceId": "25186"
+      },
+      {
+        "id": "13716",
+        "title": "Fantastic Four (1998) #575",
+        "digitalBookId": "13716",
+        "marvelIssueId": "25187",
+        "slug": "fantastic_four_1998_575",
+        "drn": "drn:src:marvel:unison::prod:bda84cad-9774-4e38-b25c-a4ec87addee2",
+        "sourceId": "25187"
+      },
+      {
+        "id": "13923",
+        "title": "Fantastic Four (1998) #576",
+        "digitalBookId": "13923",
+        "marvelIssueId": "25188",
+        "slug": "fantastic_four_1998_576",
+        "drn": "drn:src:marvel:unison::prod:a9b795cc-917e-4669-8019-8439b8df6fc0",
+        "sourceId": "25188"
+      },
+      {
+        "id": "14229",
+        "title": "Fantastic Four (1998) #577",
+        "digitalBookId": "14229",
+        "marvelIssueId": "29597",
+        "slug": "fantastic_four_1998_577",
+        "drn": "drn:src:marvel:unison::prod:2198f966-d3da-4fa1-bdd5-bf886d3f04d9",
+        "sourceId": "29597"
+      },
+      {
+        "id": "14425",
+        "title": "Fantastic Four (1998) #578",
+        "digitalBookId": "14425",
+        "marvelIssueId": "32548",
+        "slug": "fantastic_four_1998_578",
+        "drn": "drn:src:marvel:unison::prod:45b4ca39-9f31-48a4-b7b9-47f42d9f7b55",
+        "sourceId": "32548"
+      },
+      {
+        "id": "14752",
+        "title": "Fantastic Four (1998) #579",
+        "digitalBookId": "14752",
+        "marvelIssueId": "29599",
+        "slug": "fantastic_four_1998_579",
+        "drn": "drn:src:marvel:unison::prod:0d1979be-323b-4535-aa61-ccca78ee446c",
+        "sourceId": "29599"
+      },
+      {
+        "id": "14998",
+        "title": "Fantastic Four (1998) #580",
+        "digitalBookId": "14998",
+        "marvelIssueId": "29600",
+        "slug": "fantastic_four_1998_580",
+        "drn": "drn:src:marvel:unison::prod:03d8b599-a146-441b-a469-380d899f2c60",
+        "sourceId": "29600"
+      },
+      {
+        "id": "15381",
+        "title": "Fantastic Four (1998) #581",
+        "digitalBookId": "15381",
+        "marvelIssueId": "29601",
+        "slug": "fantastic_four_1998_581",
+        "drn": "drn:src:marvel:unison::prod:2b5e8433-66f8-4faf-9524-679106e0f4a8",
+        "sourceId": "29601"
+      },
+      {
+        "id": "15797",
+        "title": "Fantastic Four (1998) #582",
+        "digitalBookId": "15797",
+        "marvelIssueId": "29602",
+        "slug": "fantastic_four_1998_582",
+        "drn": "drn:src:marvel:unison::prod:1df8c06d-d039-4a9d-b99f-8a1a73b95898",
+        "sourceId": "29602"
+      },
+      {
+        "id": "16163",
+        "title": "Fantastic Four (1998) #583",
+        "digitalBookId": "16163",
+        "marvelIssueId": "29603",
+        "slug": "fantastic_four_1998_583",
+        "drn": "drn:src:marvel:unison::prod:cf40db6f-1fe4-4d30-9742-63f660efba4f",
+        "sourceId": "29603"
+      },
+      {
+        "id": "16982",
+        "title": "Fantastic Four (1998) #584",
+        "digitalBookId": "16982",
+        "marvelIssueId": "29604",
+        "slug": "fantastic_four_1998_584",
+        "drn": "drn:src:marvel:unison::prod:2f523f6e-09dd-4d7c-9f63-165b6e7b0136",
+        "sourceId": "29604"
+      },
+      {
+        "id": "17913",
+        "title": "Fantastic Four (1998) #585",
+        "digitalBookId": "17913",
+        "marvelIssueId": "29605",
+        "slug": "fantastic_four_1998_585",
+        "drn": "drn:src:marvel:unison::prod:01d62266-7294-49df-9264-b5f94157c689",
+        "sourceId": "29605"
+      },
+      {
+        "id": "18553",
+        "title": "Fantastic Four (1998) #586",
+        "digitalBookId": "18553",
+        "marvelIssueId": "29606",
+        "slug": "fantastic_four_1998_586",
+        "drn": "drn:src:marvel:unison::prod:fc8ca12e-e858-4975-8b46-e20875360949",
+        "sourceId": "29606"
+      },
+      {
+        "id": "24451",
+        "title": "Fantastic Four (1998) #587",
+        "digitalBookId": "24451",
+        "marvelIssueId": "36060",
+        "slug": "fantastic_four_1998_587",
+        "drn": "drn:src:marvel:unison::prod:5f28bb2c-4927-47ff-84f0-fae6781366f4",
+        "sourceId": "36060"
+      },
+      {
+        "id": "19700",
+        "title": "Fantastic Four (1998) #588",
+        "digitalBookId": "19700",
+        "marvelIssueId": "36059",
+        "slug": "fantastic_four_1998_588",
+        "drn": "drn:src:marvel:unison::prod:f28c6580-d17a-4fde-b4e7-56dea4597723",
+        "sourceId": "36059"
+      },
+      {
+        "id": "20186",
+        "title": "FF (2011) #1",
+        "digitalBookId": "20186",
+        "marvelIssueId": "37398",
+        "slug": "ff_2011_1",
+        "drn": "drn:src:marvel:unison::prod:f8bbdd10-3804-4466-81e4-5a3e8e25737f",
+        "sourceId": "37398"
+      },
+      {
+        "id": "20708",
+        "title": "FF (2011) #2",
+        "digitalBookId": "20708",
+        "marvelIssueId": "37400",
+        "slug": "ff_2011_2",
+        "drn": "drn:src:marvel:unison::prod:9a9eee1b-2d77-4513-ac93-a4150a3fae69",
+        "sourceId": "37400"
+      },
+      {
+        "id": "20939",
+        "title": "FF (2011) #3",
+        "digitalBookId": "20939",
+        "marvelIssueId": "37404",
+        "slug": "ff_2011_3",
+        "drn": "drn:src:marvel:unison::prod:9f742a5d-68e8-47f6-b8ea-a353abd04c0c",
+        "sourceId": "37404"
+      },
+      {
+        "id": "21213",
+        "title": "FF (2011) #4",
+        "digitalBookId": "21213",
+        "marvelIssueId": "37403",
+        "slug": "ff_2011_4",
+        "drn": "drn:src:marvel:unison::prod:997656a7-dcc8-4eaf-bdb9-fbda86df4b73",
+        "sourceId": "37403"
+      },
+      {
+        "id": "22106",
+        "title": "FF (2011) #5",
+        "digitalBookId": "22106",
+        "marvelIssueId": "37402",
+        "slug": "ff_2011_5",
+        "drn": "drn:src:marvel:unison::prod:ded79890-f05c-41ff-9b47-9b5c44084898",
+        "sourceId": "37402"
+      },
+      {
+        "id": "22582",
+        "title": "FF (2011) #6",
+        "digitalBookId": "22582",
+        "marvelIssueId": "37395",
+        "slug": "ff_2011_6",
+        "drn": "drn:src:marvel:unison::prod:3ae64147-61ff-4cb0-94a2-5365bcbe4bd8",
+        "sourceId": "37395"
+      },
+      {
+        "id": "22861",
+        "title": "FF (2011) #7",
+        "digitalBookId": "22861",
+        "marvelIssueId": "37401",
+        "slug": "ff_2011_7",
+        "drn": "drn:src:marvel:unison::prod:473b1392-dbf4-4238-890a-6a6f3c68b3c6",
+        "sourceId": "37401"
+      },
+      {
+        "id": "23564",
+        "title": "FF (2011) #8",
+        "digitalBookId": "23564",
+        "marvelIssueId": "37397",
+        "slug": "ff_2011_8",
+        "drn": "drn:src:marvel:unison::prod:7a04740d-4da9-4adb-8ae8-c2678f4f139e",
+        "sourceId": "37397"
+      },
+      {
+        "id": "24027",
+        "title": "FF (2011) #9",
+        "digitalBookId": "24027",
+        "marvelIssueId": "38609",
+        "slug": "ff_2011_9",
+        "drn": "drn:src:marvel:unison::prod:6571106e-5d6c-49ef-92d5-e9778c1b8ef4",
+        "sourceId": "38609"
+      },
+      {
+        "id": "24274",
+        "title": "FF (2011) #10",
+        "digitalBookId": "24274",
+        "marvelIssueId": "38608",
+        "slug": "ff_2011_10",
+        "drn": "drn:src:marvel:unison::prod:a79dd2d1-2879-4ed3-afe8-fb62fbfe9f0c",
+        "sourceId": "38608"
+      },
+      {
+        "id": "24480",
+        "title": "FF (2011) #11",
+        "digitalBookId": "24480",
+        "marvelIssueId": "38607",
+        "slug": "ff_2011_11",
+        "drn": "drn:src:marvel:unison::prod:fb66318a-6745-4d9f-9228-6a30bf688c40",
+        "sourceId": "38607"
+      },
+      {
+        "id": "24795",
+        "title": "Fantastic Four (1998) #600",
+        "digitalBookId": "24795",
+        "marvelIssueId": "37399",
+        "slug": "fantastic_four_1998_600",
+        "drn": "drn:src:marvel:unison::prod:69de81ba-c31a-48c3-849b-dd2fdbb98ddd",
+        "sourceId": "37399"
+      },
+      {
+        "id": "24893",
+        "title": "FF (2011) #12",
+        "digitalBookId": "24893",
+        "marvelIssueId": "41197",
+        "slug": "ff_2011_12",
+        "drn": "drn:src:marvel:unison::prod:7c3a84fa-6e11-43ba-a7b4-44a9a5780b0a",
+        "sourceId": "41197"
+      },
+      {
+        "id": "25060",
+        "title": "Fantastic Four (1998) #601",
+        "digitalBookId": "25060",
+        "marvelIssueId": "38796",
+        "slug": "fantastic_four_1998_601",
+        "drn": "drn:src:marvel:unison::prod:ceb93aff-142a-4a3f-ba2a-0ddf8db92810",
+        "sourceId": "38796"
+      },
+      {
+        "id": "25149",
+        "title": "FF (2011) #13",
+        "digitalBookId": "25149",
+        "marvelIssueId": "41207",
+        "slug": "ff_2011_13",
+        "drn": "drn:src:marvel:unison::prod:06439187-536c-4d36-aa17-a28ae8aa1885",
+        "sourceId": "41207"
+      },
+      {
+        "id": "25337",
+        "title": "Fantastic Four (1998) #602",
+        "digitalBookId": "25337",
+        "marvelIssueId": "38795",
+        "slug": "fantastic_four_1998_602",
+        "drn": "drn:src:marvel:unison::prod:abd01db7-7804-45fb-b1c1-ab59480eb149",
+        "sourceId": "38795"
+      },
+      {
+        "id": "25332",
+        "title": "FF (2011) #14",
+        "digitalBookId": "25332",
+        "marvelIssueId": "41206",
+        "slug": "ff_2011_14",
+        "drn": "drn:src:marvel:unison::prod:35b88f14-d523-4457-94cc-6d7e4b667903",
+        "sourceId": "41206"
+      },
+      {
+        "id": "25582",
+        "title": "Fantastic Four (1998) #603",
+        "digitalBookId": "25582",
+        "marvelIssueId": "38797",
+        "slug": "fantastic_four_1998_603",
+        "drn": "drn:src:marvel:unison::prod:e59129e7-1ef4-40de-a8fa-37a6149a9906",
+        "sourceId": "38797"
+      },
+      {
+        "id": "25655",
+        "title": "FF (2011) #15",
+        "digitalBookId": "25655",
+        "marvelIssueId": "41204",
+        "slug": "ff_2011_15",
+        "drn": "drn:src:marvel:unison::prod:738a0c43-c7d5-404a-929b-9e9f14c9a1e4",
+        "sourceId": "41204"
+      },
+      {
+        "id": "25787",
+        "title": "Fantastic Four (1998) #604",
+        "digitalBookId": "25787",
+        "marvelIssueId": "40471",
+        "slug": "fantastic_four_1998_604",
+        "drn": "drn:src:marvel:unison::prod:6a5a2762-215c-4741-a82e-395ee1acca22",
+        "sourceId": "40471"
+      },
+      {
+        "id": "25877",
+        "title": "FF (2011) #16",
+        "digitalBookId": "25877",
+        "marvelIssueId": "41201",
+        "slug": "ff_2011_16",
+        "drn": "drn:src:marvel:unison::prod:709cd8b8-7eee-4cc5-9760-1935859f90cd",
+        "sourceId": "41201"
+      },
+      {
+        "id": "26076",
+        "title": "Fantastic Four (1998) #605",
+        "digitalBookId": "26076",
+        "marvelIssueId": "40476",
+        "slug": "fantastic_four_1998_605",
+        "drn": "drn:src:marvel:unison::prod:5daa2401-9fba-4289-92bc-ff2711eb66ea",
+        "sourceId": "40476"
+      },
+      {
+        "id": "26214",
+        "title": "FF (2011) #17",
+        "digitalBookId": "26214",
+        "marvelIssueId": "41200",
+        "slug": "ff_2011_17",
+        "drn": "drn:src:marvel:unison::prod:cd33e15f-d05c-4683-ab43-e8e247824ea8",
+        "sourceId": "41200"
+      },
+      {
+        "id": "26515",
+        "title": "Fantastic Four (1998) #606",
+        "digitalBookId": "26515",
+        "marvelIssueId": "40464",
+        "slug": "fantastic_four_1998_606",
+        "drn": "drn:src:marvel:unison::prod:b18954ff-5ee7-47e7-be3d-35b7335511f7",
+        "sourceId": "40464"
+      },
+      {
+        "id": "26551",
+        "title": "FF (2011) #18",
+        "digitalBookId": "26551",
+        "marvelIssueId": "41203",
+        "slug": "ff_2011_18",
+        "drn": "drn:src:marvel:unison::prod:2653caa4-67d5-4db7-aa96-22052a6b6e76",
+        "sourceId": "41203"
+      },
+      {
+        "id": "26736",
+        "title": "Fantastic Four (1998) #607",
+        "digitalBookId": "26736",
+        "marvelIssueId": "40467",
+        "slug": "fantastic_four_1998_607",
+        "drn": "drn:src:marvel:unison::prod:5d82f32c-0241-46da-a256-66e6d685f567",
+        "sourceId": "40467"
+      },
+      {
+        "id": "26956",
+        "title": "FF (2011) #19",
+        "digitalBookId": "26956",
+        "marvelIssueId": "41199",
+        "slug": "ff_2011_19",
+        "drn": "drn:src:marvel:unison::prod:5e21dfca-c7bb-4a66-b299-0265d072626d",
+        "sourceId": "41199"
+      },
+      {
+        "id": "27199",
+        "title": "Fantastic Four (1998) #608",
+        "digitalBookId": "27199",
+        "marvelIssueId": "40474",
+        "slug": "fantastic_four_1998_608",
+        "drn": "drn:src:marvel:unison::prod:6b8cd2dc-2f4e-4956-8c13-0b0bb5cbfbc0",
+        "sourceId": "40474"
+      },
+      {
+        "id": "27291",
+        "title": "FF (2011) #20",
+        "digitalBookId": "27291",
+        "marvelIssueId": "41202",
+        "slug": "ff_2011_20",
+        "drn": "drn:src:marvel:unison::prod:4d856cdd-b52a-44f1-9e2f-c27ee90c3e58",
+        "sourceId": "41202"
+      },
+      {
+        "id": "27409",
+        "title": "Fantastic Four (1998) #609",
+        "digitalBookId": "27409",
+        "marvelIssueId": "40479",
+        "slug": "fantastic_four_1998_609",
+        "drn": "drn:src:marvel:unison::prod:e9abaece-cdcd-4bec-8438-609f31ded83e",
+        "sourceId": "40479"
+      },
+      {
+        "id": "27523",
+        "title": "FF (2011) #21",
+        "digitalBookId": "27523",
+        "marvelIssueId": "41198",
+        "slug": "ff_2011_21",
+        "drn": "drn:src:marvel:unison::prod:a89de357-5d0e-46ff-af28-d143b8fec317",
+        "sourceId": "41198"
+      },
+      {
+        "id": "27663",
+        "title": "Fantastic Four (1998) #610",
+        "digitalBookId": "27663",
+        "marvelIssueId": "40478",
+        "slug": "fantastic_four_1998_610",
+        "drn": "drn:src:marvel:unison::prod:467cf33f-1508-4fd0-a174-c5bbc069a178",
+        "sourceId": "40478"
+      },
+      {
+        "id": "27722",
+        "title": "FF (2011) #22",
+        "digitalBookId": "27722",
+        "marvelIssueId": "41208",
+        "slug": "ff_2011_22",
+        "drn": "drn:src:marvel:unison::prod:10782c7c-6e4a-4341-b1f2-ad0c2fe14c33",
+        "sourceId": "41208"
+      },
+      {
+        "id": "27791",
+        "title": "Fantastic Four (1998) #611",
+        "digitalBookId": "27791",
+        "marvelIssueId": "40465",
+        "slug": "fantastic_four_1998_611",
+        "drn": "drn:src:marvel:unison::prod:e8652f72-5c5e-446f-8ea2-afd522a5258a",
+        "sourceId": "40465"
+      },
+      {
+        "id": "27877",
+        "title": "FF (2011) #23",
+        "digitalBookId": "27877",
+        "marvelIssueId": "41205",
+        "slug": "ff_2011_23",
+        "drn": "drn:src:marvel:unison::prod:4c352585-06e9-4c07-83a1-49bf470e4119",
+        "sourceId": "41205"
+      },
+      {
+        "id": "16044",
+        "title": "Ultimate Comics Thor (2010) #1",
+        "digitalBookId": "16044",
+        "marvelIssueId": "33579",
+        "slug": "ultimate_comics_thor_2010_1",
+        "drn": "drn:src:marvel:unison::prod:13fd3364-eefd-41f8-aba8-7fab0113e711",
+        "sourceId": "33579"
+      },
+      {
+        "id": "17582",
+        "title": "Ultimate Comics Thor (2010) #2",
+        "digitalBookId": "17582",
+        "marvelIssueId": "33576",
+        "slug": "ultimate_comics_thor_2010_2",
+        "drn": "drn:src:marvel:unison::prod:98571efc-2b28-474d-ae95-373a4585267f",
+        "sourceId": "33576"
+      },
+      {
+        "id": "18567",
+        "title": "Ultimate Comics Thor (2010) #3",
+        "digitalBookId": "18567",
+        "marvelIssueId": "33577",
+        "slug": "ultimate_comics_thor_2010_3",
+        "drn": "drn:src:marvel:unison::prod:1c464004-f532-45b1-bf49-cb48c777de05",
+        "sourceId": "33577"
+      },
+      {
+        "id": "19059",
+        "title": "Ultimate Comics Thor (2010) #4",
+        "digitalBookId": "19059",
+        "marvelIssueId": "33578",
+        "slug": "ultimate_comics_thor_2010_4",
+        "drn": "drn:src:marvel:unison::prod:286194ca-a78d-4832-ae68-384834825024",
+        "sourceId": "33578"
+      },
+      {
+        "id": "22152",
+        "title": "Ultimate Fallout (2011) #1",
+        "digitalBookId": "22152",
+        "marvelIssueId": "39967",
+        "slug": "ultimate_fallout_2011_1",
+        "drn": "drn:src:marvel:unison::prod:647f8012-226b-4a4d-8bbc-fdeaf6814b6a",
+        "sourceId": "39967"
+      },
+      {
+        "id": "22415",
+        "title": "Ultimate Fallout (2011) #2",
+        "digitalBookId": "22415",
+        "marvelIssueId": "39966",
+        "slug": "ultimate_fallout_2011_2",
+        "drn": "drn:src:marvel:unison::prod:90b06701-b0e5-40bd-83f5-473c6530670a",
+        "sourceId": "39966"
+      },
+      {
+        "id": "22638",
+        "title": "Ultimate Fallout (2011) #3",
+        "digitalBookId": "22638",
+        "marvelIssueId": "39965",
+        "slug": "ultimate_fallout_2011_3",
+        "drn": "drn:src:marvel:unison::prod:548565a8-4528-4c84-82de-b0b7aa3d7d92",
+        "sourceId": "39965"
+      },
+      {
+        "id": "22733",
+        "title": "Ultimate Fallout (2011) #4",
+        "digitalBookId": "22733",
+        "marvelIssueId": "39962",
+        "slug": "ultimate_fallout_2011_4",
+        "drn": "drn:src:marvel:unison::prod:2f6f3fdc-ad55-42ec-99af-270a32f5d7e2",
+        "sourceId": "39962"
+      },
+      {
+        "id": "22824",
+        "title": "Ultimate Fallout (2011) #5",
+        "digitalBookId": "22824",
+        "marvelIssueId": "39963",
+        "slug": "ultimate_fallout_2011_5",
+        "drn": "drn:src:marvel:unison::prod:911fd122-362f-487d-822e-3096b67203e7",
+        "sourceId": "39963"
+      },
+      {
+        "id": "23132",
+        "title": "Ultimate Fallout (2011) #6",
+        "digitalBookId": "23132",
+        "marvelIssueId": "39964",
+        "slug": "ultimate_fallout_2011_6",
+        "drn": "drn:src:marvel:unison::prod:1cb30b68-5802-46da-943b-f8000dd6bcac",
+        "sourceId": "39964"
+      },
+      {
+        "id": "22825",
+        "title": "Ultimate Comics Ultimates (2011) #1",
+        "digitalBookId": "22825",
+        "marvelIssueId": "38693",
+        "slug": "ultimate_comics_ultimates_2011_1",
+        "drn": "drn:src:marvel:unison::prod:5e7999c8-1c0b-4745-a645-10f5b41f25fb",
+        "sourceId": "38693"
+      },
+      {
+        "id": "23841",
+        "title": "Ultimate Comics Ultimates (2011) #2",
+        "digitalBookId": "23841",
+        "marvelIssueId": "38690",
+        "slug": "ultimate_comics_ultimates_2011_2",
+        "drn": "drn:src:marvel:unison::prod:45d68693-7ea4-46bb-a8eb-e3d4045d6431",
+        "sourceId": "38690"
+      },
+      {
+        "id": "24078",
+        "title": "Ultimate Comics Ultimates (2011) #3",
+        "digitalBookId": "24078",
+        "marvelIssueId": "38687",
+        "slug": "ultimate_comics_ultimates_2011_3",
+        "drn": "drn:src:marvel:unison::prod:6bd354ef-3a41-4180-a2af-50ce572317d3",
+        "sourceId": "38687"
+      },
+      {
+        "id": "24301",
+        "title": "Ultimate Comics Ultimates (2011) #4",
+        "digitalBookId": "24301",
+        "marvelIssueId": "38689",
+        "slug": "ultimate_comics_ultimates_2011_4",
+        "drn": "drn:src:marvel:unison::prod:19feff0b-62f2-4019-9781-9dca3d8e3916",
+        "sourceId": "38689"
+      },
+      {
+        "id": "25144",
+        "title": "Ultimate Comics Ultimates (2011) #5",
+        "digitalBookId": "25144",
+        "marvelIssueId": "38691",
+        "slug": "ultimate_comics_ultimates_2011_5",
+        "drn": "drn:src:marvel:unison::prod:2204750f-2fbc-4437-aac1-580d7377175f",
+        "sourceId": "38691"
+      },
+      {
+        "id": "25333",
+        "title": "Ultimate Comics Ultimates (2011) #6",
+        "digitalBookId": "25333",
+        "marvelIssueId": "38695",
+        "slug": "ultimate_comics_ultimates_2011_6",
+        "drn": "drn:src:marvel:unison::prod:6844e7ed-4840-445d-ad21-bddfb0d137db",
+        "sourceId": "38695"
+      },
+      {
+        "id": "25656",
+        "title": "Ultimate Comics Ultimates (2011) #7",
+        "digitalBookId": "25656",
+        "marvelIssueId": "38686",
+        "slug": "ultimate_comics_ultimates_2011_7",
+        "drn": "drn:src:marvel:unison::prod:0e8d1861-c1f7-4259-8fe8-1d20e1b1fad2",
+        "sourceId": "38686"
+      },
+      {
+        "id": "25747",
+        "title": "Ultimate Comics Ultimates (2011) #8",
+        "digitalBookId": "25747",
+        "marvelIssueId": "38685",
+        "slug": "ultimate_comics_ultimates_2011_8",
+        "drn": "drn:src:marvel:unison::prod:bffc07b9-8668-4aa5-b0a7-0df612d0c385",
+        "sourceId": "38685"
+      },
+      {
+        "id": "25748",
+        "title": "Ultimate Comics Ultimates (2011) #9",
+        "digitalBookId": "25748",
+        "marvelIssueId": "38696",
+        "slug": "ultimate_comics_ultimates_2011_9",
+        "drn": "drn:src:marvel:unison::prod:e94684aa-7e72-4879-9c2d-0424fb3d522a",
+        "sourceId": "38696"
+      },
+      {
+        "id": "25749",
+        "title": "Ultimate Comics Ultimates (2011) #10",
+        "digitalBookId": "25749",
+        "marvelIssueId": "38688",
+        "slug": "ultimate_comics_ultimates_2011_10",
+        "drn": "drn:src:marvel:unison::prod:fecc77ad-8ae2-4907-8190-2d5c53ae58c8",
+        "sourceId": "38688"
+      },
+      {
+        "id": "25750",
+        "title": "Ultimate Comics Ultimates (2011) #11",
+        "digitalBookId": "25750",
+        "marvelIssueId": "38692",
+        "slug": "ultimate_comics_ultimates_2011_11",
+        "drn": "drn:src:marvel:unison::prod:380b0d67-3cc9-405e-96b4-5556e475420a",
+        "sourceId": "38692"
+      },
+      {
+        "id": "25751",
+        "title": "Ultimate Comics Ultimates (2011) #12",
+        "digitalBookId": "25751",
+        "marvelIssueId": "38694",
+        "slug": "ultimate_comics_ultimates_2011_12",
+        "drn": "drn:src:marvel:unison::prod:16489a48-b9a0-4712-b1a5-f0790a3734c5",
+        "sourceId": "38694"
+      },
+      {
+        "id": "22735",
+        "title": "Ultimate Comics Hawkeye (2011) #1",
+        "digitalBookId": "22735",
+        "marvelIssueId": "38950",
+        "slug": "ultimate_comics_hawkeye_2011_1",
+        "drn": "drn:src:marvel:unison::prod:d10d8b7a-d5c5-4546-9105-6669d27b06a0",
+        "sourceId": "38950"
+      },
+      {
+        "id": "23768",
+        "title": "Ultimate Comics Hawkeye (2011) #2",
+        "digitalBookId": "23768",
+        "marvelIssueId": "38951",
+        "slug": "ultimate_comics_hawkeye_2011_2",
+        "drn": "drn:src:marvel:unison::prod:4fd6fefe-2298-4229-863e-a60a9942b92b",
+        "sourceId": "38951"
+      },
+      {
+        "id": "23932",
+        "title": "Ultimate Comics Hawkeye (2011) #3",
+        "digitalBookId": "23932",
+        "marvelIssueId": "38944",
+        "slug": "ultimate_comics_hawkeye_2011_3",
+        "drn": "drn:src:marvel:unison::prod:4fd5f169-c427-4c02-a784-891f66f5db99",
+        "sourceId": "38944"
+      },
+      {
+        "id": "24794",
+        "title": "Ultimate Comics Hawkeye (2011) #4",
+        "digitalBookId": "24794",
+        "marvelIssueId": "38943",
+        "slug": "ultimate_comics_hawkeye_2011_4",
+        "drn": "drn:src:marvel:unison::prod:de113886-dd4c-4a53-9c5e-9eb657b91b1b",
+        "sourceId": "38943"
+      },
+      {
+        "id": "28113",
+        "title": "Avengers (2012) #1",
+        "digitalBookId": "28113",
+        "marvelIssueId": "43528",
+        "slug": "avengers_2012_1",
+        "drn": "drn:src:marvel:unison::prod:b0fb90ad-1239-4a84-b5da-08d850beeb96",
+        "sourceId": "43528"
+      },
+      {
+        "id": "28114",
+        "title": "Avengers (2012) #2",
+        "digitalBookId": "28114",
+        "marvelIssueId": "43532",
+        "slug": "avengers_2012_2",
+        "drn": "drn:src:marvel:unison::prod:af2cd44a-1fed-4bf9-80bf-cd341be61d24",
+        "sourceId": "43532"
+      },
+      {
+        "id": "28115",
+        "title": "Avengers (2012) #3",
+        "digitalBookId": "28115",
+        "marvelIssueId": "43533",
+        "slug": "avengers_2012_3",
+        "drn": "drn:src:marvel:unison::prod:89321120-437d-4c0c-89fc-89a62865cf92",
+        "sourceId": "43533"
+      },
+      {
+        "id": "28116",
+        "title": "Avengers (2012) #4",
+        "digitalBookId": "28116",
+        "marvelIssueId": "43534",
+        "slug": "avengers_2012_4",
+        "drn": "drn:src:marvel:unison::prod:0756cc2f-0f63-4697-b4ab-8ada50021973",
+        "sourceId": "43534"
+      },
+      {
+        "id": "28434",
+        "title": "Avengers (2012) #5",
+        "digitalBookId": "28434",
+        "marvelIssueId": "43535",
+        "slug": "avengers_2012_5",
+        "drn": "drn:src:marvel:unison::prod:c61fad78-02db-494f-92cc-b6bc2ea3dc53",
+        "sourceId": "43535"
+      },
+      {
+        "id": "28435",
+        "title": "Avengers (2012) #6",
+        "digitalBookId": "28435",
+        "marvelIssueId": "43536",
+        "slug": "avengers_2012_6",
+        "drn": "drn:src:marvel:unison::prod:f5d733db-2f84-4b5c-b993-23408ea84e5a",
+        "sourceId": "43536"
+      },
+      {
+        "id": "28750",
+        "title": "Avengers (2012) #7",
+        "digitalBookId": "28750",
+        "marvelIssueId": "43537",
+        "slug": "avengers_2012_7",
+        "drn": "drn:src:marvel:unison::prod:0bf489fd-608d-4a6b-a1e3-85dea69a1cd1",
+        "sourceId": "43537"
+      },
+      {
+        "id": "28785",
+        "title": "Avengers (2012) #8",
+        "digitalBookId": "28785",
+        "marvelIssueId": "43538",
+        "slug": "avengers_2012_8",
+        "drn": "drn:src:marvel:unison::prod:b3203539-c2b3-486c-a37a-03ac857cc7f6",
+        "sourceId": "43538"
+      },
+      {
+        "id": "29225",
+        "title": "Avengers (2012) #9",
+        "digitalBookId": "29225",
+        "marvelIssueId": "43539",
+        "slug": "avengers_2012_9",
+        "drn": "drn:src:marvel:unison::prod:377453de-069e-413f-a65f-8055c88ef908",
+        "sourceId": "43539"
+      },
+      {
+        "id": "29488",
+        "title": "Avengers (2012) #10",
+        "digitalBookId": "29488",
+        "marvelIssueId": "43540",
+        "slug": "avengers_2012_10",
+        "drn": "drn:src:marvel:unison::prod:6639c125-5737-4efc-908c-341af04fc82a",
+        "sourceId": "43540"
+      },
+      {
+        "id": "29489",
+        "title": "Avengers (2012) #11",
+        "digitalBookId": "29489",
+        "marvelIssueId": "43541",
+        "slug": "avengers_2012_11",
+        "drn": "drn:src:marvel:unison::prod:786e6569-90b0-42f7-9bcb-4c230d4c46ea",
+        "sourceId": "43541"
+      },
+      {
+        "id": "29490",
+        "title": "Avengers (2012) #12",
+        "digitalBookId": "29490",
+        "marvelIssueId": "43542",
+        "slug": "avengers_2012_12",
+        "drn": "drn:src:marvel:unison::prod:7043ad4f-b83f-4104-97d1-7ba7a4b95234",
+        "sourceId": "43542"
+      },
+      {
+        "id": "29491",
+        "title": "Avengers (2012) #13",
+        "digitalBookId": "29491",
+        "marvelIssueId": "43543",
+        "slug": "avengers_2012_13",
+        "drn": "drn:src:marvel:unison::prod:efad877c-bd0c-417b-b79a-537d45ece7f4",
+        "sourceId": "43543"
+      },
+      {
+        "id": "29492",
+        "title": "Avengers (2012) #14",
+        "digitalBookId": "29492",
+        "marvelIssueId": "43544",
+        "slug": "avengers_2012_14",
+        "drn": "drn:src:marvel:unison::prod:aace91bc-ac53-46bc-bd9a-4dbd4a6cf19c",
+        "sourceId": "43544"
+      },
+      {
+        "id": "30376",
+        "title": "Avengers (2012) #15",
+        "digitalBookId": "30376",
+        "marvelIssueId": "43545",
+        "slug": "avengers_2012_15",
+        "drn": "drn:src:marvel:unison::prod:47d78a9f-db39-4ed3-8525-0619af382255",
+        "sourceId": "43545"
+      },
+      {
+        "id": "30502",
+        "title": "Avengers (2012) #16",
+        "digitalBookId": "30502",
+        "marvelIssueId": "43546",
+        "slug": "avengers_2012_16",
+        "drn": "drn:src:marvel:unison::prod:c83e716a-d69f-4929-b382-e70d8efaa0f4",
+        "sourceId": "43546"
+      },
+      {
+        "id": "30991",
+        "title": "Avengers (2012) #17",
+        "digitalBookId": "30991",
+        "marvelIssueId": "43547",
+        "slug": "avengers_2012_17",
+        "drn": "drn:src:marvel:unison::prod:e8c3bcc3-0e7a-4a48-8edf-e14fc8428547",
+        "sourceId": "43547"
+      },
+      {
+        "id": "31056",
+        "title": "Avengers (2012) #18",
+        "digitalBookId": "31056",
+        "marvelIssueId": "43548",
+        "slug": "avengers_2012_18",
+        "drn": "drn:src:marvel:unison::prod:53929e21-d1bd-473e-963b-22a4d0a70a3c",
+        "sourceId": "43548"
+      },
+      {
+        "id": "31493",
+        "title": "Avengers (2012) #19",
+        "digitalBookId": "31493",
+        "marvelIssueId": "43549",
+        "slug": "avengers_2012_19",
+        "drn": "drn:src:marvel:unison::prod:60659047-33da-4f8e-90a0-acc9b8ab9a4c",
+        "sourceId": "43549"
+      },
+      {
+        "id": "31582",
+        "title": "Avengers (2012) #20",
+        "digitalBookId": "31582",
+        "marvelIssueId": "43550",
+        "slug": "avengers_2012_20",
+        "drn": "drn:src:marvel:unison::prod:3c9b3f4d-e1eb-4cb2-9535-9a8d06ff65aa",
+        "sourceId": "43550"
+      },
+      {
+        "id": "31721",
+        "title": "Avengers (2012) #21",
+        "digitalBookId": "31721",
+        "marvelIssueId": "46927",
+        "slug": "avengers_2012_21",
+        "drn": "drn:src:marvel:unison::prod:08588170-3f82-4612-97b7-46f1566c1f52",
+        "sourceId": "46927"
+      },
+      {
+        "id": "31798",
+        "title": "Avengers (2012) #22",
+        "digitalBookId": "31798",
+        "marvelIssueId": "46928",
+        "slug": "avengers_2012_22",
+        "drn": "drn:src:marvel:unison::prod:022f3380-f464-4d5a-9104-139849860c65",
+        "sourceId": "46928"
+      },
+      {
+        "id": "31967",
+        "title": "Avengers (2012) #23",
+        "digitalBookId": "31967",
+        "marvelIssueId": "46930",
+        "slug": "avengers_2012_23",
+        "drn": "drn:src:marvel:unison::prod:89d1a505-12dc-430c-87cf-ef1856469e8a",
+        "sourceId": "46930"
+      },
+      {
+        "id": "32476",
+        "title": "Avengers (2012) #24",
+        "digitalBookId": "32476",
+        "marvelIssueId": "46931",
+        "slug": "avengers_2012_24",
+        "drn": "drn:src:marvel:unison::prod:7f7d0f7e-d2b5-4bd2-bd5f-7f7bb47e6792",
+        "sourceId": "46931"
+      },
+      {
+        "id": "32797",
+        "title": "Avengers (2012) #25",
+        "digitalBookId": "32797",
+        "marvelIssueId": "46933",
+        "slug": "avengers_2012_25",
+        "drn": "drn:src:marvel:unison::prod:af47f46b-f644-423e-a477-8f5c50cbd9ba",
+        "sourceId": "46933"
+      },
+      {
+        "id": "32963",
+        "title": "Avengers (2012) #26",
+        "digitalBookId": "32963",
+        "marvelIssueId": "46934",
+        "slug": "avengers_2012_26",
+        "drn": "drn:src:marvel:unison::prod:7f92510f-fe27-4bf9-82e8-d8a15b7f98fd",
+        "sourceId": "46934"
+      },
+      {
+        "id": "33344",
+        "title": "Avengers (2012) #27",
+        "digitalBookId": "33344",
+        "marvelIssueId": "48381",
+        "slug": "avengers_2012_27",
+        "drn": "drn:src:marvel:unison::prod:05da1f0b-0fcf-4537-8852-c1ef875ff88d",
+        "sourceId": "48381"
+      },
+      {
+        "id": "33587",
+        "title": "Avengers (2012) #28",
+        "digitalBookId": "33587",
+        "marvelIssueId": "48382",
+        "slug": "avengers_2012_28",
+        "drn": "drn:src:marvel:unison::prod:86c5e3ce-8e6e-4262-8f45-df1768d03f2b",
+        "sourceId": "48382"
+      },
+      {
+        "id": "33848",
+        "title": "Avengers (2012) #29",
+        "digitalBookId": "33848",
+        "marvelIssueId": "48383",
+        "slug": "avengers_2012_29",
+        "drn": "drn:src:marvel:unison::prod:bccfdf6b-9696-4a05-88fe-a343caef8951",
+        "sourceId": "48383"
+      },
+      {
+        "id": "33965",
+        "title": "Avengers (2012) #30",
+        "digitalBookId": "33965",
+        "marvelIssueId": "48384",
+        "slug": "avengers_2012_30",
+        "drn": "drn:src:marvel:unison::prod:c54b2b59-8776-478a-a032-d1037e996192",
+        "sourceId": "48384"
+      },
+      {
+        "id": "33858",
+        "title": "Avengers (2012) #31",
+        "digitalBookId": "33858",
+        "marvelIssueId": "48385",
+        "slug": "avengers_2012_31",
+        "drn": "drn:src:marvel:unison::prod:deeeaeea-2999-4b44-b7f6-17cfe0a33f9e",
+        "sourceId": "48385"
+      },
+      {
+        "id": "34100",
+        "title": "Avengers (2012) #32",
+        "digitalBookId": "34100",
+        "marvelIssueId": "48386",
+        "slug": "avengers_2012_32",
+        "drn": "drn:src:marvel:unison::prod:003cbff3-8b75-40c5-91fd-74e7aadc290c",
+        "sourceId": "48386"
+      },
+      {
+        "id": "34136",
+        "title": "Avengers (2012) #33",
+        "digitalBookId": "34136",
+        "marvelIssueId": "48387",
+        "slug": "avengers_2012_33",
+        "drn": "drn:src:marvel:unison::prod:4574a4c3-9d3a-481f-b75f-34246ee7c17b",
+        "sourceId": "48387"
+      },
+      {
+        "id": "34607",
+        "title": "Avengers (2012) #34",
+        "digitalBookId": "34607",
+        "marvelIssueId": "48388",
+        "slug": "avengers_2012_34",
+        "drn": "drn:src:marvel:unison::prod:266a36a0-41ac-4e2c-a5b8-2d186af196bd",
+        "sourceId": "48388"
+      },
+      {
+        "id": "34774",
+        "title": "Avengers (2012) #35",
+        "digitalBookId": "34774",
+        "marvelIssueId": "48389",
+        "slug": "avengers_2012_35",
+        "drn": "drn:src:marvel:unison::prod:4a300886-b58e-483d-b5e0-eff3955e0e53",
+        "sourceId": "48389"
+      },
+      {
+        "id": "34882",
+        "title": "Avengers (2012) #36",
+        "digitalBookId": "34882",
+        "marvelIssueId": "48390",
+        "slug": "avengers_2012_36",
+        "drn": "drn:src:marvel:unison::prod:270db0ed-ba97-41d4-85db-71e1308fb023",
+        "sourceId": "48390"
+      },
+      {
+        "id": "34894",
+        "title": "Avengers (2012) #37",
+        "digitalBookId": "34894",
+        "marvelIssueId": "48391",
+        "slug": "avengers_2012_37",
+        "drn": "drn:src:marvel:unison::prod:36437bc2-4a73-4807-93c2-84f262bb2fcc",
+        "sourceId": "48391"
+      },
+      {
+        "id": "35385",
+        "title": "Avengers (2012) #38",
+        "digitalBookId": "35385",
+        "marvelIssueId": "48392",
+        "slug": "avengers_2012_38",
+        "drn": "drn:src:marvel:unison::prod:3f65cc5f-257d-4fb5-b5e4-b21edb0bac34",
+        "sourceId": "48392"
+      },
+      {
+        "id": "35747",
+        "title": "Avengers (2012) #39",
+        "digitalBookId": "35747",
+        "marvelIssueId": "48393",
+        "slug": "avengers_2012_39",
+        "drn": "drn:src:marvel:unison::prod:208ef028-49dc-4e67-bc08-cc9a036ca603",
+        "sourceId": "48393"
+      },
+      {
+        "id": "35749",
+        "title": "Avengers (2012) #40",
+        "digitalBookId": "35749",
+        "marvelIssueId": "48394",
+        "slug": "avengers_2012_40",
+        "drn": "drn:src:marvel:unison::prod:c4a42496-e8a4-43f8-9fa1-45747c9fa9fc",
+        "sourceId": "48394"
+      },
+      {
+        "id": "35750",
+        "title": "Avengers (2012) #41",
+        "digitalBookId": "35750",
+        "marvelIssueId": "48395",
+        "slug": "avengers_2012_41",
+        "drn": "drn:src:marvel:unison::prod:9c6bccfb-f64c-4b6f-af46-ea4cdfc7e914",
+        "sourceId": "48395"
+      },
+      {
+        "id": "36844",
+        "title": "Avengers (2012) #42",
+        "digitalBookId": "36844",
+        "marvelIssueId": "48396",
+        "slug": "avengers_2012_42",
+        "drn": "drn:src:marvel:unison::prod:6d07f177-3664-419f-a5bc-748d72373d9f",
+        "sourceId": "48396"
+      },
+      {
+        "id": "36942",
+        "title": "Avengers (2012) #43",
+        "digitalBookId": "36942",
+        "marvelIssueId": "48397",
+        "slug": "avengers_2012_43",
+        "drn": "drn:src:marvel:unison::prod:0598ac56-3aba-407e-a80d-5b603e35a0d9",
+        "sourceId": "48397"
+      },
+      {
+        "id": "37778",
+        "title": "Avengers (2012) #44",
+        "digitalBookId": "37778",
+        "marvelIssueId": "48398",
+        "slug": "avengers_2012_44",
+        "drn": "drn:src:marvel:unison::prod:316704fe-3ee1-4422-bf1f-23834c5f2844",
+        "sourceId": "48398"
+      },
+      {
+        "id": "34832",
+        "title": "Avengers (2012) #34.1",
+        "digitalBookId": "34832",
+        "marvelIssueId": "50951",
+        "slug": "avengers_2012_34.1",
+        "drn": "drn:src:marvel:unison::prod:b5481122-237e-4b95-8a9c-e3cbaafe3cf3",
+        "sourceId": "50951"
+      },
+      {
+        "id": "36297",
+        "title": "Avengers (2012) #34.2",
+        "digitalBookId": "36297",
+        "marvelIssueId": "51410",
+        "slug": "avengers_2012_34.2",
+        "drn": "drn:src:marvel:unison::prod:1a897a29-a8bc-40e5-acbb-0abd0b8ab3fe",
+        "sourceId": "51410"
+      },
+      {
+        "id": "28087",
+        "title": "New Avengers (2013) #1",
+        "digitalBookId": "28087",
+        "marvelIssueId": "43512",
+        "slug": "new_avengers_2013_1",
+        "drn": "drn:src:marvel:unison::prod:be24844d-e5d3-4ba4-a582-90ebb31f9940",
+        "sourceId": "43512"
+      },
+      {
+        "id": "28088",
+        "title": "New Avengers (2013) #2",
+        "digitalBookId": "28088",
+        "marvelIssueId": "43516",
+        "slug": "new_avengers_2013_2",
+        "drn": "drn:src:marvel:unison::prod:ed4a9f8e-8ec6-40cc-bb4f-cc9dc25dff5b",
+        "sourceId": "43516"
+      },
+      {
+        "id": "28423",
+        "title": "New Avengers (2013) #3",
+        "digitalBookId": "28423",
+        "marvelIssueId": "43517",
+        "slug": "new_avengers_2013_3",
+        "drn": "drn:src:marvel:unison::prod:d3b9aa17-5381-4277-bffa-4f8d09ef1b77",
+        "sourceId": "43517"
+      },
+      {
+        "id": "28779",
+        "title": "New Avengers (2013) #4",
+        "digitalBookId": "28779",
+        "marvelIssueId": "43518",
+        "slug": "new_avengers_2013_4",
+        "drn": "drn:src:marvel:unison::prod:39dbedf6-35d4-447d-bf4e-3e4a9a616aed",
+        "sourceId": "43518"
+      },
+      {
+        "id": "29449",
+        "title": "New Avengers (2013) #5",
+        "digitalBookId": "29449",
+        "marvelIssueId": "43519",
+        "slug": "new_avengers_2013_5",
+        "drn": "drn:src:marvel:unison::prod:e06a2e67-08bf-431c-9b4e-dd3dd56d79cf",
+        "sourceId": "43519"
+      },
+      {
+        "id": "29450",
+        "title": "New Avengers (2013) #6",
+        "digitalBookId": "29450",
+        "marvelIssueId": "43520",
+        "slug": "new_avengers_2013_6",
+        "drn": "drn:src:marvel:unison::prod:5787c42a-624a-4e78-896c-69de8c1e5478",
+        "sourceId": "43520"
+      },
+      {
+        "id": "29451",
+        "title": "New Avengers (2013) #7",
+        "digitalBookId": "29451",
+        "marvelIssueId": "43521",
+        "slug": "new_avengers_2013_7",
+        "drn": "drn:src:marvel:unison::prod:e2599510-2d91-4294-baa4-1d43baf66af6",
+        "sourceId": "43521"
+      },
+      {
+        "id": "30649",
+        "title": "New Avengers (2013) #8",
+        "digitalBookId": "30649",
+        "marvelIssueId": "43522",
+        "slug": "new_avengers_2013_8",
+        "drn": "drn:src:marvel:unison::prod:aa3926f4-9ccd-4b00-a4ca-d5357b3237ee",
+        "sourceId": "43522"
+      },
+      {
+        "id": "31066",
+        "title": "New Avengers (2013) #9",
+        "digitalBookId": "31066",
+        "marvelIssueId": "43523",
+        "slug": "new_avengers_2013_9",
+        "drn": "drn:src:marvel:unison::prod:1ac0138f-a2c4-451c-be09-ef0ce08bb1bf",
+        "sourceId": "43523"
+      },
+      {
+        "id": "31514",
+        "title": "New Avengers (2013) #10",
+        "digitalBookId": "31514",
+        "marvelIssueId": "43524",
+        "slug": "new_avengers_2013_10",
+        "drn": "drn:src:marvel:unison::prod:14c567f7-2818-4564-ae65-66911d53fc7a",
+        "sourceId": "43524"
+      },
+      {
+        "id": "31729",
+        "title": "New Avengers (2013) #11",
+        "digitalBookId": "31729",
+        "marvelIssueId": "43525",
+        "slug": "new_avengers_2013_11",
+        "drn": "drn:src:marvel:unison::prod:94ed9ac3-0881-4664-a241-77c291efd3e5",
+        "sourceId": "43525"
+      },
+      {
+        "id": "32345",
+        "title": "New Avengers (2013) #12",
+        "digitalBookId": "32345",
+        "marvelIssueId": "43526",
+        "slug": "new_avengers_2013_12",
+        "drn": "drn:src:marvel:unison::prod:ed897d35-46bc-4453-b655-b86bc11cec03",
+        "sourceId": "43526"
+      },
+      {
+        "id": "32471",
+        "title": "New Avengers (2013) #13",
+        "digitalBookId": "32471",
+        "marvelIssueId": "43527",
+        "slug": "new_avengers_2013_13",
+        "drn": "drn:src:marvel:unison::prod:1935be0d-ea98-4bd3-8ce8-e091a301d5df",
+        "sourceId": "43527"
+      },
+      {
+        "id": "32824",
+        "title": "New Avengers (2013) #14",
+        "digitalBookId": "32824",
+        "marvelIssueId": "48784",
+        "slug": "new_avengers_2013_14",
+        "drn": "drn:src:marvel:unison::prod:33f422d2-2625-41bd-ae2a-08c605c97772",
+        "sourceId": "48784"
+      },
+      {
+        "id": "33028",
+        "title": "New Avengers (2013) #15",
+        "digitalBookId": "33028",
+        "marvelIssueId": "48785",
+        "slug": "new_avengers_2013_15",
+        "drn": "drn:src:marvel:unison::prod:e6c615b4-0bd4-458e-ac83-8bc10e51ef00",
+        "sourceId": "48785"
+      },
+      {
+        "id": "33490",
+        "title": "New Avengers (2013) #16",
+        "digitalBookId": "33490",
+        "marvelIssueId": "48786",
+        "slug": "new_avengers_2013_16",
+        "drn": "drn:src:marvel:unison::prod:e0e7f155-1052-4190-b1c0-6242118369f7",
+        "sourceId": "48786"
+      },
+      {
+        "id": "33575",
+        "title": "New Avengers (2013) #17",
+        "digitalBookId": "33575",
+        "marvelIssueId": "48787",
+        "slug": "new_avengers_2013_17",
+        "drn": "drn:src:marvel:unison::prod:4dd696e7-290a-4847-b1d8-3c3a55436d8d",
+        "sourceId": "48787"
+      },
+      {
+        "id": "33875",
+        "title": "New Avengers (2013) #18",
+        "digitalBookId": "33875",
+        "marvelIssueId": "48788",
+        "slug": "new_avengers_2013_18",
+        "drn": "drn:src:marvel:unison::prod:48cd9bc5-27c0-4760-aa77-1bf280ed8fd7",
+        "sourceId": "48788"
+      },
+      {
+        "id": "33845",
+        "title": "New Avengers (2013) #19",
+        "digitalBookId": "33845",
+        "marvelIssueId": "48789",
+        "slug": "new_avengers_2013_19",
+        "drn": "drn:src:marvel:unison::prod:b7ffa00b-d0b7-4588-bba5-845830a1b51f",
+        "sourceId": "48789"
+      },
+      {
+        "id": "33882",
+        "title": "New Avengers (2013) #20",
+        "digitalBookId": "33882",
+        "marvelIssueId": "48790",
+        "slug": "new_avengers_2013_20",
+        "drn": "drn:src:marvel:unison::prod:a92de145-825b-4807-babe-3966884da194",
+        "sourceId": "48790"
+      },
+      {
+        "id": "34147",
+        "title": "New Avengers (2013) #21",
+        "digitalBookId": "34147",
+        "marvelIssueId": "48791",
+        "slug": "new_avengers_2013_21",
+        "drn": "drn:src:marvel:unison::prod:19a0ccf8-93e4-4620-b909-64b9e023b106",
+        "sourceId": "48791"
+      },
+      {
+        "id": "34548",
+        "title": "New Avengers (2013) #22",
+        "digitalBookId": "34548",
+        "marvelIssueId": "48792",
+        "slug": "new_avengers_2013_22",
+        "drn": "drn:src:marvel:unison::prod:7ed1258a-022d-477e-9cd2-7f9ecb0bbefe",
+        "sourceId": "48792"
+      },
+      {
+        "id": "34624",
+        "title": "New Avengers (2013) #23",
+        "digitalBookId": "34624",
+        "marvelIssueId": "50095",
+        "slug": "new_avengers_2013_23",
+        "drn": "drn:src:marvel:unison::prod:21526ecf-d049-4b47-8833-d90650185f9d",
+        "sourceId": "50095"
+      },
+      {
+        "id": "34842",
+        "title": "New Avengers (2013) #24",
+        "digitalBookId": "34842",
+        "marvelIssueId": "50096",
+        "slug": "new_avengers_2013_24",
+        "drn": "drn:src:marvel:unison::prod:a94f9b67-4208-4d4e-b51b-99e8695d2957",
+        "sourceId": "50096"
+      },
+      {
+        "id": "34977",
+        "title": "New Avengers (2013) #25",
+        "digitalBookId": "34977",
+        "marvelIssueId": "50973",
+        "slug": "new_avengers_2013_25",
+        "drn": "drn:src:marvel:unison::prod:0db06213-9c6e-480e-9d98-4097992bacbe",
+        "sourceId": "50973"
+      },
+      {
+        "id": "35410",
+        "title": "New Avengers (2013) #26",
+        "digitalBookId": "35410",
+        "marvelIssueId": "52257",
+        "slug": "new_avengers_2013_26",
+        "drn": "drn:src:marvel:unison::prod:6fdd459a-cd60-4f55-b13f-0c7ab13c9bd6",
+        "sourceId": "52257"
+      },
+      {
+        "id": "35455",
+        "title": "New Avengers (2013) #27",
+        "digitalBookId": "35455",
+        "marvelIssueId": "52259",
+        "slug": "new_avengers_2013_27",
+        "drn": "drn:src:marvel:unison::prod:499c0f9e-dbe8-48ec-bbd1-c0dcd49aa561",
+        "sourceId": "52259"
+      },
+      {
+        "id": "35866",
+        "title": "New Avengers (2013) #28",
+        "digitalBookId": "35866",
+        "marvelIssueId": "51172",
+        "slug": "new_avengers_2013_28",
+        "drn": "drn:src:marvel:unison::prod:b4b46de8-50fa-4c8a-bc10-7949c449cfed",
+        "sourceId": "51172"
+      },
+      {
+        "id": "36387",
+        "title": "New Avengers (2013) #29",
+        "digitalBookId": "36387",
+        "marvelIssueId": "52261",
+        "slug": "new_avengers_2013_29",
+        "drn": "drn:src:marvel:unison::prod:5d2f5aab-ecf3-4d5c-bfa6-3769b71a8c0c",
+        "sourceId": "52261"
+      },
+      {
+        "id": "36685",
+        "title": "New Avengers (2013) #30",
+        "digitalBookId": "36685",
+        "marvelIssueId": "52263",
+        "slug": "new_avengers_2013_30",
+        "drn": "drn:src:marvel:unison::prod:545a39b9-add1-4502-bc63-3f16b3871880",
+        "sourceId": "52263"
+      },
+      {
+        "id": "36916",
+        "title": "New Avengers (2013) #31",
+        "digitalBookId": "36916",
+        "marvelIssueId": "52265",
+        "slug": "new_avengers_2013_31",
+        "drn": "drn:src:marvel:unison::prod:ca21429c-ef74-44f6-91f9-8141c5bb153c",
+        "sourceId": "52265"
+      },
+      {
+        "id": "36988",
+        "title": "New Avengers (2013) #32",
+        "digitalBookId": "36988",
+        "marvelIssueId": "52266",
+        "slug": "new_avengers_2013_32",
+        "drn": "drn:src:marvel:unison::prod:696b950e-2f36-4647-a24e-10182eb119ed",
+        "sourceId": "52266"
+      },
+      {
+        "id": "37706",
+        "title": "New Avengers (2013) #33",
+        "digitalBookId": "37706",
+        "marvelIssueId": "52267",
+        "slug": "new_avengers_2013_33",
+        "drn": "drn:src:marvel:unison::prod:e286874d-569d-4848-addc-368c41d7859f",
+        "sourceId": "52267"
+      },
+      {
+        "id": "30683",
+        "title": "Infinity (2013) #1",
+        "digitalBookId": "30683",
+        "marvelIssueId": "47120",
+        "slug": "infinity_2013_1",
+        "drn": "drn:src:marvel:unison::prod:2ca79d3d-4a02-4030-8c34-1d816b6e4233",
+        "sourceId": "47120"
+      },
+      {
+        "id": "31380",
+        "title": "Infinity (2013) #2",
+        "digitalBookId": "31380",
+        "marvelIssueId": "47123",
+        "slug": "infinity_2013_2",
+        "drn": "drn:src:marvel:unison::prod:9074dd28-27f3-49bb-a4c3-4da65c76a308",
+        "sourceId": "47123"
+      },
+      {
+        "id": "31501",
+        "title": "Infinity (2013) #3",
+        "digitalBookId": "31501",
+        "marvelIssueId": "47124",
+        "slug": "infinity_2013_3",
+        "drn": "drn:src:marvel:unison::prod:a3eb6a19-9314-42bd-a747-49959e9c064d",
+        "sourceId": "47124"
+      },
+      {
+        "id": "31528",
+        "title": "Infinity (2013) #4",
+        "digitalBookId": "31528",
+        "marvelIssueId": "47125",
+        "slug": "infinity_2013_4",
+        "drn": "drn:src:marvel:unison::prod:2fc77517-38de-4cca-80b2-7f257f8eefb8",
+        "sourceId": "47125"
+      },
+      {
+        "id": "31741",
+        "title": "Infinity (2013) #5",
+        "digitalBookId": "31741",
+        "marvelIssueId": "47126",
+        "slug": "infinity_2013_5",
+        "drn": "drn:src:marvel:unison::prod:5f0d7488-bf8d-4b21-b526-c324b789378a",
+        "sourceId": "47126"
+      },
+      {
+        "id": "32315",
+        "title": "Infinity (2013) #6",
+        "digitalBookId": "32315",
+        "marvelIssueId": "47127",
+        "slug": "infinity_2013_6",
+        "drn": "drn:src:marvel:unison::prod:2e568c90-bbd7-4a66-ba52-05eb36af3ac3",
+        "sourceId": "47127"
+      },
+      {
+        "id": "38811",
+        "title": "FREE COMIC BOOK DAY 2015 0 (2015)",
+        "digitalBookId": "38811",
+        "marvelIssueId": "52986",
+        "slug": "free_comic_book_day_2015_0_2015",
+        "drn": "drn:src:marvel:unison::prod:03baf094-d1bf-4eb6-8533-0840ebc0d0b9",
+        "sourceId": "52986"
+      },
+      {
+        "id": "38164",
+        "title": "Secret Wars (2015) #1",
+        "digitalBookId": "38164",
+        "marvelIssueId": "52447",
+        "slug": "secret_wars_2015_1",
+        "drn": "drn:src:marvel:unison::prod:06d2cb74-1cd3-452c-a295-698cd5e6f473",
+        "sourceId": "52447"
+      },
+      {
+        "id": "38263",
+        "title": "Secret Wars (2015) #2",
+        "digitalBookId": "38263",
+        "marvelIssueId": "52450",
+        "slug": "secret_wars_2015_2",
+        "drn": "drn:src:marvel:unison::prod:91f255b3-20da-4a17-a40d-ae1da00e1f3f",
+        "sourceId": "52450"
+      },
+      {
+        "id": "38820",
+        "title": "Secret Wars (2015) #3",
+        "digitalBookId": "38820",
+        "marvelIssueId": "52451",
+        "slug": "secret_wars_2015_3",
+        "drn": "drn:src:marvel:unison::prod:5ae2d0f4-0632-49c8-a3b2-14a87fbe1648",
+        "sourceId": "52451"
+      },
+      {
+        "id": "39004",
+        "title": "Secret Wars (2015) #4",
+        "digitalBookId": "39004",
+        "marvelIssueId": "52452",
+        "slug": "secret_wars_2015_4",
+        "drn": "drn:src:marvel:unison::prod:075bf928-0401-4374-8c29-b9de4fd4ade5",
+        "sourceId": "52452"
+      },
+      {
+        "id": "39684",
+        "title": "Secret Wars (2015) #5",
+        "digitalBookId": "39684",
+        "marvelIssueId": "52453",
+        "slug": "secret_wars_2015_5",
+        "drn": "drn:src:marvel:unison::prod:e59f9f80-4c03-4470-adc9-4acc711b5d17",
+        "sourceId": "52453"
+      },
+      {
+        "id": "39847",
+        "title": "Secret Wars (2015) #6",
+        "digitalBookId": "39847",
+        "marvelIssueId": "52454",
+        "slug": "secret_wars_2015_6",
+        "drn": "drn:src:marvel:unison::prod:e024bea4-515a-480f-b349-b5fee0c1b6e4",
+        "sourceId": "52454"
+      },
+      {
+        "id": "40469",
+        "title": "Secret Wars (2015) #7",
+        "digitalBookId": "40469",
+        "marvelIssueId": "52455",
+        "slug": "secret_wars_2015_7",
+        "drn": "drn:src:marvel:unison::prod:ded3436b-42a0-49a7-bf69-907f0039c75d",
+        "sourceId": "52455"
+      },
+      {
+        "id": "40542",
+        "title": "Secret Wars (2015) #8",
+        "digitalBookId": "40542",
+        "marvelIssueId": "52456",
+        "slug": "secret_wars_2015_8",
+        "drn": "drn:src:marvel:unison::prod:eef0395e-6fe7-4c2b-a852-4fc46169f145",
+        "sourceId": "52456"
+      },
+      {
+        "id": "40728",
+        "title": "Secret Wars (2015) #9",
+        "digitalBookId": "40728",
+        "marvelIssueId": "57620",
+        "slug": "secret_wars_2015_9",
+        "drn": "drn:src:marvel:unison::prod:12395d36-1f52-4294-9d0b-2b825381413a",
+        "sourceId": "57620"
+      }
+    ]
   }
 ];
 
