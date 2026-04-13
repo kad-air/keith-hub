@@ -59,6 +59,19 @@ export default function HeaderNav() {
         );
       })}
 
+      {/* Comics — separate from trackers (static catalog, not Craft-backed) */}
+      <Link
+        href="/comics"
+        className={[
+          "hidden font-mono text-[0.72rem] uppercase tracking-kicker transition-colors sm:inline",
+          pathname.startsWith("/comics")
+            ? "text-cream"
+            : "text-cream-dim hover:text-cream",
+        ].join(" ")}
+      >
+        Comics
+      </Link>
+
       <AppMenu />
     </nav>
   );

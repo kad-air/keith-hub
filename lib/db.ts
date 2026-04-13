@@ -62,6 +62,11 @@ export function getDb(): Database.Database {
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS comic_state (
+      issue_id TEXT PRIMARY KEY,
+      read_at TEXT NOT NULL
+    );
   `);
 
   return dbInstance;

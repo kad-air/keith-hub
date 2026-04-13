@@ -1,4 +1,5 @@
 import type Database from "better-sqlite3";
+import { getDb } from "./db";
 import type { CategoryCounts, Item } from "./types";
 
 // ── Time-based falloff ─────────────────────────────────────────────────────
@@ -315,4 +316,29 @@ export function getCategoryCounts(
   counts.all = totalRss + bskyContribution;
 
   return counts;
+}
+
+// ─── Comics ────────────────────────────────────────────────
+// Backed by the comic_state table. Catalog itself lives in
+// lib/comics-data.ts (static); the DB only stores read state.
+// Marking unread = deleting the row (read_at is NOT NULL).
+
+export function getReadComicIds(): Set<string> {
+  const db = getDb();
+  const rows = db.prepare(`SELECT issue_id FROM comic_state`).all() as { issue_id: string }[];
+  return new Set(rows.map((r) => r.issue_id));
+}
+
+export function markComicRead(issueId: string): void {
+  const db = getDb();
+  db.prepare(`
+    INSERT INTO comic_state (issue_id, read_at)
+    VALUES (?, ?)
+    ON CONFLICT(issue_id) DO NOTHING
+  `).run(issueId, new Date().toISOString());
+}
+
+export function markComicUnread(issueId: string): void {
+  const db = getDb();
+  db.prepare(`DELETE FROM comic_state WHERE issue_id = ?`).run(issueId);
 }
