@@ -12,16 +12,12 @@ function readerUrl(digitalBookId: string): string {
   return `https://read.marvel.com/#/book/${digitalBookId}`;
 }
 
-// iOS standalone PWA quirk: window.open opens BOTH Safari and an in-PWA overlay.
-// Programmatic anchor click is the clean handoff. See FeedClient.tsx:295-301.
+// Top-level navigation (not target=_blank) so iOS checks universal-link
+// associations and hands read.marvel.com URLs off to Marvel Unlimited.
+// SFSafariViewController (what target=_blank opens in a PWA) does not
+// trigger universal links. The PWA gets backgrounded and resumes on return.
 function openExternal(url: string) {
-  const a = document.createElement("a");
-  a.href = url;
-  a.target = "_blank";
-  a.rel = "noopener noreferrer";
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
+  window.location.href = url;
 }
 
 export default function ComicsClient({ storyline, initialReadIds }: Props) {
