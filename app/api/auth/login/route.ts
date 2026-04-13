@@ -8,11 +8,11 @@ export async function POST(request: NextRequest) {
   const expected = process.env.FEED_PASSWORD;
 
   if (!expected || password !== expected) {
-    return NextResponse.redirect(publicUrl("/login?error=1", request));
+    return NextResponse.redirect(publicUrl("/login?error=1", request), 303);
   }
 
   const token = await deriveAuthToken(expected);
-  const response = NextResponse.redirect(publicUrl("/", request));
+  const response = NextResponse.redirect(publicUrl("/", request), 303);
   response.cookies.set("hub-auth", token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
