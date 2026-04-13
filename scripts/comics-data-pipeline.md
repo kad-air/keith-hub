@@ -24,44 +24,55 @@ universal link. To force app handoff we also store a per-issue `drn` and
 
 ## Pipeline
 
-The end-to-end pipeline lives in `~/Code/hickman-xmen/`:
+The end-to-end pipeline lives in `~/Code/mu-reading-lists/`. Each
+storyline gets its own subdir; the top-level scripts take a storyline
+slug as an argument so the same code drives every list.
 
 ```
-reading-order text  ─┐
-                     │
-sitemap-comics-*.xml ├──> build.py ──> lookup.json    (issue page IDs + slugs)
-                     │
-issue HTML pages ────┴──> fetch_applinks.py ──> applinks.json   (digital book IDs)
-                                          │
-                                          └──> generate-comics-data.mjs ──> comics-data.ts
+~/Code/mu-reading-lists/
+  storylines.json                       (master index: slug, title, description)
+  build.py                              (X-Men only — sitemap-driven)
+  parse_markdown.py                     (any list with marvel.com URLs)
+  fetch_applinks.py <slug>              (issue page → digital_book_id)
+  fetch_drns.py <slug>                  (digital_book_id → drn + sourceId)
+  hickman-x-men/
+    lookup.json applinks.json drns.json
+  hickman-secret-wars/
+    source.md  lookup.json  applinks.json  drns.json
 ```
 
 ### Step 1 — Reading order
 
-A hand-curated ordered list of 150 issues, sourced from
-[Comic Book Herald's Hickman X-Men reading order](https://www.comicbookherald.com/the-complete-marvel-reading-order-guide/jonathan-hickman-x-men-reading-order/),
-expanded inline with the X of Swords crossover order from Wikipedia. Lives
-as a Python list in `~/Code/hickman-xmen/build.py`.
+Two ways to source a reading order, depending on what you have:
+
+**Hand-curated list (X-Men).** Edit the `READING_ORDER` Python list in
+`build.py` and run it. It produces `<slug>/lookup.json` by looking up
+each title in Marvel's comic sitemaps (Step 2). Currently used for
+*Jonathan Hickman's X-Men* (House of X / Powers of X through X of
+Swords), based on Comic Book Herald's order plus the X of Swords
+crossover order from Wikipedia.
+
+**Pre-built markdown checklist.** If you already have a markdown file
+where each line is `- [ ] [Title](https://www.marvel.com/comics/issue/{id}/{slug})`,
+drop it at `<slug>/source.md` and run `parse_markdown.py <slug>`. Skips
+Step 2 entirely because the markdown already encodes the marvel.com page
+ID and slug. Used for *Hickman Secret Wars* (sourced from
+[emreparker/marvel-comics](https://github.com/emreparker/marvel-comics/blob/main/data/hickman_full.md)).
 
 ### Step 2 — Resolve issue page IDs (slug → marvel.com ID)
+
+Only needed for `build.py`-driven storylines. `parse_markdown.py` skips
+this entirely.
 
 Marvel publishes its full comic catalog as XML sitemaps:
 - https://www.marvel.com/sitemap-comics-0.xml
 - https://www.marvel.com/sitemap-comics-1.xml
 
-Combined, these contain ~56,000 URLs in the form:
-
-```
-https://www.marvel.com/comics/issue/{ID}/{slug}
-```
-
-`build.py` downloads both sitemaps once, builds a `{slug → ID}` index
-(filtering out variant covers), then for each reading-order entry it
-generates candidate slugs and looks up the issue ID. Output: `lookup.json`.
-
-This gives URLs like
-`https://www.marvel.com/comics/issue/76795/x-force_2019_7` — but those open
-the marvel.com landing page, not the reader. Step 3 fixes that.
+Combined, these contain ~56,000 URLs in the form
+`https://www.marvel.com/comics/issue/{ID}/{slug}`. `build.py` downloads
+both once, builds a `{slug → ID}` index (filtering out variant covers),
+then for each reading-order entry generates candidate slugs and looks up
+the issue ID.
 
 ### Step 3 — Resolve digital book IDs (issue page → reader URL)
 
@@ -115,16 +126,17 @@ Pull `content.id` (the DRN, used verbatim) and the `SourceId` external id
 response than assume the equality). Bifrost is unauthenticated and
 permissive — pace the requests anyway (~1/s) to be polite.
 
-The scraper isn't checked in yet; when you write it, drop it next to
-`fetch_applinks.py` and emit a `{ digital_book_id → { drn, sourceId } }`
-JSON map.
-
 ### Step 5 — Generate `lib/comics-data.ts`
 
-`scripts/generate-comics-data.mjs` (in this repo) zips `lookup.json`,
-`applinks.json`, and the DRN map together and emits the static TS catalog
+`scripts/generate-comics-data.mjs` (in this repo) reads
+`storylines.json` and, for each entry, zips its `lookup.json`,
+`applinks.json`, and `drns.json` together. Emits the static TS catalog
 with `{ id, title, digitalBookId, marvelIssueId, drn, sourceId, slug }`
-for each issue.
+for each issue inside a `STORYLINES` array.
+
+Storylines whose data is incomplete (missing applinks or drns rows) are
+skipped with a warning so a partial regeneration during a long scrape
+doesn't ship broken data.
 
 ## Why three IDs per issue
 
@@ -141,18 +153,22 @@ URL (PWA-friendly).
 
 ## Re-running the pipeline
 
-If the reading order changes (e.g. a new storyline gets added):
-
 ```bash
-# In ~/Code/hickman-xmen/, edit READING_ORDER in build.py, then:
-python3 build.py            # regenerates lookup.json
-python3 fetch_applinks.py   # fetches applink IDs for any new slugs
-                            # (resumable; cached IDs are skipped)
-python3 fetch_drns.py       # fetches DRN + sourceId via bifrost (Step 4)
-                            # also resumable; one request per digital_book_id
+cd ~/Code/mu-reading-lists
 
-# Then in this repo:
-node scripts/generate-comics-data.mjs   # rewrites lib/comics-data.ts
+# (a) Hand-curated storyline: edit READING_ORDER in build.py, then:
+python3 build.py                                # rewrites hickman-x-men/lookup.json
+
+# (b) Markdown-checklist storyline: drop the file at
+#     <slug>/source.md, add the storyline to storylines.json, then:
+python3 parse_markdown.py <slug>                # writes <slug>/lookup.json
+
+# Then for any storyline (including newly added ones):
+python3 fetch_applinks.py <slug>                # ~5s/issue, resumable
+python3 fetch_drns.py <slug>                    # ~1s/issue, resumable
+
+# In this repo:
+node scripts/generate-comics-data.mjs           # rewrites lib/comics-data.ts
 ```
 
 ## Notes
