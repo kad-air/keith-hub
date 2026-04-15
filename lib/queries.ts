@@ -8,10 +8,10 @@ import type { CategoryCounts, Item } from "./types";
 // become "pending": still in items, with item_state.read_at set, invisible
 // to every view.
 //
-// Bluesky has NO TTL — it doesn't need one. The All view only pulls enough
-// bsky posts to interleave between RSS items (see BSKY_INTERLEAVE_RATIO),
-// so stale posts naturally fall off as the selection window slides forward.
-// The bluesky tab still shows all unread posts via pure recency.
+// Bluesky uses a position-based window instead of a TTL (see BSKY_WINDOW
+// below). Anything outside the newest-N unread posts gets auto-marked read,
+// so the well is bounded: clearing the feed does NOT dig deeper into the
+// backlog — the next refresh only surfaces genuinely-new posts.
 export const UNREAD_TTL_HOURS: Record<string, number> = {
   music:       168,   // 7 days
   books:       168,   // 7 days
@@ -38,9 +38,20 @@ export const ALL_VIEW_PRIORITY: Record<keyof CategoryCounts, number> = {
 // ── Bluesky derivation ────────────────────────────────────────────────────
 // Bluesky count is derived from RSS total, not independently capped.
 // When RSS items exist: 1 bsky per BSKY_INTERLEAVE_RATIO RSS items.
-// When RSS is empty: fall back to BSKY_FALLBACK_MAX.
+// When RSS is empty: fall back to BSKY_WINDOW (the whole window).
+//
+// BSKY_WINDOW is also the size of the bounded backlog: each poll cycle,
+// any unread bsky post outside the newest N gets auto-marked read. This
+// means a dismiss-all doesn't surface a fresh 100 on the next refresh —
+// only genuinely-new posts since the window slid forward.
 export const BSKY_INTERLEAVE_RATIO = 4;
-export const BSKY_FALLBACK_MAX = 100;
+export const BSKY_WINDOW = 100;
+
+// ── Universal retention ───────────────────────────────────────────────────
+// Items with read_at set but no saved_at and no consumed_at get hard-deleted
+// this many hours after being marked read. Applies to every category.
+// Saved (saved_at) and opened (consumed_at) items are kept forever.
+export const READ_RETENTION_HOURS = 168; // 7 days
 
 // ── Variety knobs for the All view ─────────────────────────────────────────
 // These control the surprise sampling (for bluesky's capped selection) and
@@ -188,7 +199,7 @@ export function getMainFeedItems(
   const totalRss = byCategory.reduce((sum, { items }) => sum + items.length, 0);
   const bskyTarget = totalRss > 0
     ? Math.max(10, Math.ceil(totalRss / BSKY_INTERLEAVE_RATIO))
-    : BSKY_FALLBACK_MAX;
+    : BSKY_WINDOW;
   const bskyPool = stmtLimited.all(
     "bluesky",
     Math.ceil(bskyTarget * SURPRISE_POOL_MULTIPLIER)
@@ -227,6 +238,79 @@ export function pruneExpiredUnread(db: Database.Database): number {
     const result = stmt.run(now, category, cutoff);
     total += result.changes;
   }
+
+  // Bluesky: position-based window. Anything outside the newest BSKY_WINDOW
+  // unread bsky posts gets HARD DELETED (unless the user saved it or opened
+  // it) — bsky volume is high enough that just marking read would bloat the
+  // items table forever. Saved/consumed posts are preserved so /saved and
+  // /read stay correct. With LEFT JOIN, "unread-and-untouched" means either
+  // no state row at all or a state row with null read/saved/consumed —
+  // `ist.read_at IS NULL` etc. handle both uniformly.
+  const bskyTargetIds = db
+    .prepare(
+      `SELECT i.id FROM items i
+       LEFT JOIN item_state ist ON ist.item_id = i.id
+       JOIN sources s ON s.id = i.source_id
+       WHERE s.category = 'bluesky'
+         AND ist.read_at IS NULL
+         AND ist.saved_at IS NULL
+         AND ist.consumed_at IS NULL
+         AND i.id NOT IN (
+           SELECT i2.id FROM items i2
+           LEFT JOIN item_state ist2 ON ist2.item_id = i2.id
+           JOIN sources s2 ON s2.id = i2.source_id
+           WHERE ist2.read_at IS NULL AND s2.category = 'bluesky'
+           ORDER BY i2.published_at DESC
+           LIMIT ?
+         )`
+    )
+    .all(BSKY_WINDOW) as Array<{ id: string }>;
+  if (bskyTargetIds.length > 0) {
+    // item_state has a FK to items with no ON DELETE CASCADE — delete state
+    // rows first (if any exist), then the items themselves.
+    const deleteState = db.prepare(`DELETE FROM item_state WHERE item_id = ?`);
+    const deleteItem = db.prepare(`DELETE FROM items WHERE id = ?`);
+    const tx = db.transaction((rows: Array<{ id: string }>) => {
+      for (const r of rows) {
+        deleteState.run(r.id);
+        deleteItem.run(r.id);
+      }
+    });
+    tx(bskyTargetIds);
+    total += bskyTargetIds.length;
+  }
+
+  // Universal expiry: after 7 days, silently drop anything the user never
+  // engaged with — i.e., read but not saved and not opened. Dismissed items
+  // and TTL-pruned items both land here. Saved or consumed items survive
+  // forever (so /saved is permanent and /read is a full history).
+  const staleReadCutoff = new Date(
+    Date.now() - READ_RETENTION_HOURS * 3600_000
+  ).toISOString();
+  const staleDeleteState = db.prepare(`
+    DELETE FROM item_state
+    WHERE read_at IS NOT NULL
+      AND read_at < ?
+      AND saved_at IS NULL
+      AND consumed_at IS NULL
+  `);
+  const staleDeleteItems = db.prepare(`
+    DELETE FROM items
+    WHERE id NOT IN (SELECT item_id FROM item_state)
+      AND id IN (
+        SELECT i.id FROM items i
+        WHERE i.published_at < ?
+      )
+  `);
+  const staleTx = db.transaction(() => {
+    staleDeleteState.run(staleReadCutoff);
+    // Items orphaned by the state delete above AND old enough to not be
+    // in-flight (still loading, waiting for first interaction) get dropped.
+    const r = staleDeleteItems.run(staleReadCutoff);
+    total += r.changes;
+  });
+  staleTx();
+
   return total;
 }
 
@@ -312,7 +396,7 @@ export function getCategoryCounts(
   const totalRss = counts.music + counts.books + counts.film + counts.tech_review + counts.podcasts + counts.reading;
   const bskyContribution = totalRss > 0
     ? Math.min(counts.bluesky, Math.max(10, Math.ceil(totalRss / BSKY_INTERLEAVE_RATIO)))
-    : Math.min(counts.bluesky, BSKY_FALLBACK_MAX);
+    : Math.min(counts.bluesky, BSKY_WINDOW);
   counts.all = totalRss + bskyContribution;
 
   return counts;

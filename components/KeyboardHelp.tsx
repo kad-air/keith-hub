@@ -29,6 +29,7 @@ const SHORTCUTS: Array<{
       { keys: ["s"], label: "Save / unsave" },
       { keys: ["x"], label: "Dismiss" },
       { keys: ["e"], label: "Dismiss" },
+      { keys: ["c"], label: "Clear this item and all above" },
     ],
   },
   {

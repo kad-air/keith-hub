@@ -19,6 +19,9 @@ import type {
 const SWIPE_DETECT_THRESHOLD = 6;
 const SWIPE_COMMIT_THRESHOLD = 80;
 const COMMIT_ANIM_MS = 200;
+// Long-press (touch-only) fires Clear-Above. Held this long without
+// enough motion to lock the swipe gesture = treat as long-press.
+const LONG_PRESS_MS = 500;
 
 interface FeedCardProps {
   item: Item;
@@ -28,6 +31,9 @@ interface FeedCardProps {
   onOpen: (item: Item) => void;
   onSave: (item: Item) => void;
   onDismiss?: (item: Item) => void;
+  // "Clear above" — dismiss this item plus every card above it in one go.
+  // Desktop: third hover button. Mobile: long-press the card.
+  onClearAbove?: (item: Item) => void;
 }
 
 const CATEGORY_LABEL: Record<string, { label: string; klass: string }> = {
@@ -92,7 +98,7 @@ function parseMeta<T>(raw: string | null): T | null {
 }
 
 const FeedCard = memo(forwardRef<HTMLDivElement, FeedCardProps>(function FeedCard(
-  { item, index, focused, onFocus, onOpen, onSave, onDismiss },
+  { item, index, focused, onFocus, onOpen, onSave, onDismiss, onClearAbove },
   ref
 ) {
   const category = item.source_category || "reading";
@@ -117,12 +123,35 @@ const FeedCard = memo(forwardRef<HTMLDivElement, FeedCardProps>(function FeedCar
   const [animating, setAnimating] = useState(false);
   const startRef = useRef<{ x: number; y: number; locked: boolean } | null>(null);
   const wasSwipedRef = useRef(false);
+  const longPressTimerRef = useRef<number | null>(null);
+  const longPressFiredRef = useRef(false);
+
+  function cancelLongPress() {
+    if (longPressTimerRef.current !== null) {
+      window.clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  }
 
   function handleTouchStart(e: ReactTouchEvent) {
     if (animating) return;
     onFocus(index);
     const t = e.touches[0];
     startRef.current = { x: t.clientX, y: t.clientY, locked: false };
+    longPressFiredRef.current = false;
+    if (onClearAbove) {
+      cancelLongPress();
+      longPressTimerRef.current = window.setTimeout(() => {
+        longPressTimerRef.current = null;
+        // Only fire if the user never started swiping and never released.
+        const s = startRef.current;
+        if (!s || s.locked) return;
+        longPressFiredRef.current = true;
+        // Swallow the upcoming click from release.
+        wasSwipedRef.current = true;
+        onClearAbove(item);
+      }, LONG_PRESS_MS);
+    }
   }
 
   function handleTouchMove(e: ReactTouchEvent) {
@@ -136,6 +165,8 @@ const FeedCard = memo(forwardRef<HTMLDivElement, FeedCardProps>(function FeedCar
       const absX = Math.abs(moveX);
       const absY = Math.abs(moveY);
       if (absX < SWIPE_DETECT_THRESHOLD && absY < SWIPE_DETECT_THRESHOLD) return;
+      // Any meaningful motion cancels the pending long-press.
+      cancelLongPress();
       if (absY > absX) {
         // The user is scrolling vertically — bow out so the page can scroll.
         startRef.current = null;
@@ -148,9 +179,14 @@ const FeedCard = memo(forwardRef<HTMLDivElement, FeedCardProps>(function FeedCar
   }
 
   function handleTouchEnd() {
+    cancelLongPress();
     const start = startRef.current;
     if (!start) return;
     startRef.current = null;
+    if (longPressFiredRef.current) {
+      // Long-press already fired — do nothing on release.
+      return;
+    }
     if (!start.locked) {
       // Tap, not swipe — let the upcoming click event open the card.
       return;
@@ -274,6 +310,11 @@ const FeedCard = memo(forwardRef<HTMLDivElement, FeedCardProps>(function FeedCar
           transform: `translateX(${dx}px)`,
           transition: animating ? `transform ${COMMIT_ANIM_MS}ms ease-out` : "none",
           touchAction: "pan-y",
+          // Suppress iOS's long-press callout (copy/share) and text selection,
+          // both of which would fight the Clear-Above long-press gesture.
+          WebkitTouchCallout: "none",
+          WebkitUserSelect: "none",
+          userSelect: "none",
         }}
         className={[
           "relative cursor-pointer px-6 py-5 transition-colors duration-200",
@@ -425,6 +466,26 @@ const FeedCard = memo(forwardRef<HTMLDivElement, FeedCardProps>(function FeedCar
             <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
           </svg>
         </ActionButton>
+        {onClearAbove && (
+          <ActionButton
+            label="Clear above (c)"
+            onClick={() => onClearAbove(item)}
+          >
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <polyline points="17 11 12 6 7 11" />
+              <polyline points="17 18 12 13 7 18" />
+            </svg>
+          </ActionButton>
+        )}
         {onDismiss && (
           <ActionButton label="Dismiss (x)" onClick={() => onDismiss(item)}>
             <svg
