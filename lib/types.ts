@@ -39,6 +39,16 @@ export interface BlueskyRepostContext {
   display_name?: string;
 }
 
+export interface BlueskyViewerState {
+  // at-URIs of the viewer's own like/repost records, when present. Used both
+  // as "has the user already done this?" and as the target for delete calls.
+  like_uri?: string;
+  repost_uri?: string;
+  // at-URI of the viewer's follow record for the post's AUTHOR. Present = the
+  // viewer already follows them. We never unfollow from this UI.
+  following_uri?: string;
+}
+
 export interface BlueskyMetadata {
   handle: string;
   display_name?: string;
@@ -46,6 +56,15 @@ export interface BlueskyMetadata {
   like_count: number;
   reply_count: number;
   repost_count: number;
+  // Post identity — needed to write likes/reposts back via the AT Protocol.
+  // Optional on read so old rows written before this field existed still parse.
+  uri?: string;
+  cid?: string;
+  // Author DID — needed for follow calls.
+  did?: string;
+  // Viewer-specific state from the feed response. Rewritten every poll cycle,
+  // and mutated in-place by our write endpoints when the user interacts.
+  viewer?: BlueskyViewerState;
   // Rich content
   images?: BlueskyImage[];
   external?: BlueskyExternalCard;

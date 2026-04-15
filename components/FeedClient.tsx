@@ -77,6 +77,7 @@ export default function FeedClient({
   const [pending, setPending] = useState<PendingDismiss | null>(null);
   const [newItemsAvailable, setNewItemsAvailable] =
     useState<NewItemsAvailable | null>(null);
+  const [bskyError, setBskyError] = useState<string | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
   const [renderedCount, setRenderedCount] = useState(INITIAL_CHUNK);
   const cardRefs = useRef<Array<HTMLElement | null>>([]);
@@ -335,6 +336,39 @@ export default function FeedClient({
       }
     },
     [removeFromList, decrementCount, invalidateCache]
+  );
+
+  // Bluesky write actions. FeedCard owns the optimistic UI flip; these
+  // functions just fire the request and surface a toast on failure. Return
+  // true on success so the card keeps its optimistic state, false on failure
+  // so it reverts.
+  const postBskyAction = useCallback(
+    async (item: Item, path: string, errorMessage: string): Promise<boolean> => {
+      try {
+        const res = await fetch(`/api/items/${item.id}/${path}`, {
+          method: "POST",
+        });
+        if (!res.ok) throw new Error(`${path} ${res.status}`);
+        return true;
+      } catch (err) {
+        console.error(`[FeedClient] bsky ${path} error:`, err);
+        setBskyError(errorMessage);
+        return false;
+      }
+    },
+    []
+  );
+  const handleBskyLike = useCallback(
+    (item: Item) => postBskyAction(item, "bsky-like", "Couldn’t like that post"),
+    [postBskyAction]
+  );
+  const handleBskyRepost = useCallback(
+    (item: Item) => postBskyAction(item, "bsky-repost", "Couldn’t repost that"),
+    [postBskyAction]
+  );
+  const handleBskyFollow = useCallback(
+    (item: Item) => postBskyAction(item, "bsky-follow", "Couldn’t follow that account"),
+    [postBskyAction]
   );
 
   const handleDismiss = useCallback(
@@ -766,6 +800,9 @@ export default function FeedClient({
                     onSave={handleSave}
                     onDismiss={handleDismiss}
                     onClearAbove={handleClearAbove}
+                    onBskyLike={handleBskyLike}
+                    onBskyRepost={handleBskyRepost}
+                    onBskyFollow={handleBskyFollow}
                   />
                 );
               })}
@@ -794,6 +831,12 @@ export default function FeedClient({
           actionLabel="Undo"
           onAction={handleUndo}
           onDismiss={() => setPending(null)}
+        />
+      ) : bskyError ? (
+        <Toast
+          message={bskyError}
+          onDismiss={() => setBskyError(null)}
+          durationMs={4000}
         />
       ) : newItemsAvailable ? (
         <Toast

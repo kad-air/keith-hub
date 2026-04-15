@@ -1,6 +1,6 @@
 "use client";
 
-import { forwardRef, memo, useRef, useState } from "react";
+import { forwardRef, memo, useEffect, useRef, useState } from "react";
 import type { TouchEvent as ReactTouchEvent } from "react";
 import type {
   Item,
@@ -34,6 +34,14 @@ interface FeedCardProps {
   // "Clear above" — dismiss this item plus every card above it in one go.
   // Desktop: third hover button. Mobile: long-press the card.
   onClearAbove?: (item: Item) => void;
+  // Bluesky write actions. Each returns a promise that resolves true on
+  // success and false if the server call failed — FeedCard owns the
+  // optimistic UI update and reverts when these return false. Omitting the
+  // handler hides the control entirely (used on /read etc. where we
+  // deliberately don't surface interactive affordances).
+  onBskyLike?: (item: Item) => Promise<boolean>;
+  onBskyRepost?: (item: Item) => Promise<boolean>;
+  onBskyFollow?: (item: Item) => Promise<boolean>;
 }
 
 const CATEGORY_LABEL: Record<string, { label: string; klass: string }> = {
@@ -98,7 +106,19 @@ function parseMeta<T>(raw: string | null): T | null {
 }
 
 const FeedCard = memo(forwardRef<HTMLDivElement, FeedCardProps>(function FeedCard(
-  { item, index, focused, onFocus, onOpen, onSave, onDismiss, onClearAbove },
+  {
+    item,
+    index,
+    focused,
+    onFocus,
+    onOpen,
+    onSave,
+    onDismiss,
+    onClearAbove,
+    onBskyLike,
+    onBskyRepost,
+    onBskyFollow,
+  },
   ref
 ) {
   const category = item.source_category || "reading";
@@ -109,6 +129,93 @@ const FeedCard = memo(forwardRef<HTMLDivElement, FeedCardProps>(function FeedCar
 
   const bsky = isBluesky ? parseMeta<BlueskyMetadata>(item.metadata) : null;
   const podcast = isPodcast ? parseMeta<PodcastMeta>(item.metadata) : null;
+
+  // ── Bluesky interaction state ────────────────────────────────
+  // We hold optimistic overrides in local state so taps feel instant. When
+  // `item.metadata` changes underneath us (feed refresh, parent mutation),
+  // the effect below resyncs us to the new server truth.
+  const [bskyLiked, setBskyLiked] = useState<boolean>(
+    !!bsky?.viewer?.like_uri
+  );
+  const [bskyLikeCount, setBskyLikeCount] = useState<number>(
+    bsky?.like_count ?? 0
+  );
+  const [bskyReposted, setBskyReposted] = useState<boolean>(
+    !!bsky?.viewer?.repost_uri
+  );
+  const [bskyRepostCount, setBskyRepostCount] = useState<number>(
+    bsky?.repost_count ?? 0
+  );
+  // Follow is one-way. Once true we never flip it back, even if the
+  // underlying row changes (so a rapid double-tap can't re-show the chip).
+  const [bskyFollowing, setBskyFollowing] = useState<boolean>(
+    !!bsky?.viewer?.following_uri
+  );
+  const bskyBusyRef = useRef<{ like: boolean; repost: boolean; follow: boolean }>(
+    { like: false, repost: false, follow: false }
+  );
+  useEffect(() => {
+    if (!isBluesky) return;
+    // Re-derive from item.metadata directly: the outer-scope `bsky` is a
+    // fresh object every render, so putting it in the deps list (or reading
+    // it here without the metadata string as dep) would trip this effect
+    // after every click and stomp the optimistic state we just set.
+    const fresh = parseMeta<BlueskyMetadata>(item.metadata);
+    setBskyLiked(!!fresh?.viewer?.like_uri);
+    setBskyLikeCount(fresh?.like_count ?? 0);
+    setBskyReposted(!!fresh?.viewer?.repost_uri);
+    setBskyRepostCount(fresh?.repost_count ?? 0);
+    // Only flip to true from server truth — don't let an older cached row
+    // revert a successful optimistic follow.
+    if (fresh?.viewer?.following_uri) setBskyFollowing(true);
+  }, [item.metadata, isBluesky]);
+
+  async function handleBskyLike() {
+    if (!onBskyLike || !bsky) return;
+    if (bskyBusyRef.current.like) return;
+    bskyBusyRef.current.like = true;
+    const prevLiked = bskyLiked;
+    const prevCount = bskyLikeCount;
+    const nextLiked = !prevLiked;
+    setBskyLiked(nextLiked);
+    setBskyLikeCount(Math.max(0, prevCount + (nextLiked ? 1 : -1)));
+    const ok = await onBskyLike(item);
+    if (!ok) {
+      setBskyLiked(prevLiked);
+      setBskyLikeCount(prevCount);
+    }
+    bskyBusyRef.current.like = false;
+  }
+
+  async function handleBskyRepost() {
+    if (!onBskyRepost || !bsky) return;
+    if (bskyBusyRef.current.repost) return;
+    bskyBusyRef.current.repost = true;
+    const prevReposted = bskyReposted;
+    const prevCount = bskyRepostCount;
+    const nextReposted = !prevReposted;
+    setBskyReposted(nextReposted);
+    setBskyRepostCount(Math.max(0, prevCount + (nextReposted ? 1 : -1)));
+    const ok = await onBskyRepost(item);
+    if (!ok) {
+      setBskyReposted(prevReposted);
+      setBskyRepostCount(prevCount);
+    }
+    bskyBusyRef.current.repost = false;
+  }
+
+  async function handleBskyFollow() {
+    if (!onBskyFollow || !bsky) return;
+    if (bskyBusyRef.current.follow) return;
+    bskyBusyRef.current.follow = true;
+    setBskyFollowing(true);
+    const ok = await onBskyFollow(item);
+    if (!ok) setBskyFollowing(false);
+    bskyBusyRef.current.follow = false;
+  }
+
+  const canBskyInteract = isBluesky && bsky && !!bsky.uri && !!bsky.cid;
+  const canBskyFollow = isBluesky && bsky && !!bsky.did && !bskyFollowing;
 
   // Limit stagger to first 8 cards so the page never feels slow
   const animDelay =
@@ -361,6 +468,19 @@ const FeedCard = memo(forwardRef<HTMLDivElement, FeedCardProps>(function FeedCar
             item.source_name
           )}
         </span>
+        {canBskyFollow && onBskyFollow && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              void handleBskyFollow();
+            }}
+            title={`Follow @${bsky?.handle}`}
+            className="ml-0.5 flex-shrink-0 rounded-full border border-accent/50 px-2 py-0.5 font-mono text-[0.62rem] uppercase tracking-kicker text-accent transition-colors hover:border-accent hover:bg-accent-soft"
+          >
+            + Follow
+          </button>
+        )}
         <span className="text-cream-dimmer">·</span>
         <span className={cat.klass}>{cat.label}</span>
         <span className="text-cream-dimmer">·</span>
@@ -428,11 +548,79 @@ const FeedCard = memo(forwardRef<HTMLDivElement, FeedCardProps>(function FeedCar
         </>
       )}
 
-      {/* Bluesky engagement counts */}
-      {isBluesky && bsky && (!!bsky.reply_count || !!bsky.like_count) && (
-        <div className="mt-2.5 flex items-center gap-4 font-mono text-[0.7rem] uppercase tracking-kicker text-cream-dim">
+      {/* Bluesky engagement row. Like and Repost are interactive when the
+          handlers are provided and we have the post identity. Reply count
+          stays a read-only label — we don't post replies from here. */}
+      {isBluesky && bsky && (
+        <div className="mt-2.5 flex items-center gap-3 font-mono text-[0.7rem] uppercase tracking-kicker text-cream-dim">
+          {onBskyLike && canBskyInteract ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                void handleBskyLike();
+              }}
+              title={bskyLiked ? "Unlike" : "Like"}
+              className={[
+                "flex items-center gap-1.5 rounded-sm px-2 py-1 transition-colors",
+                bskyLiked
+                  ? "text-accent hover:text-accent"
+                  : "hover:text-cream",
+              ].join(" ")}
+            >
+              <svg
+                width="13"
+                height="13"
+                viewBox="0 0 24 24"
+                fill={bskyLiked ? "currentColor" : "none"}
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+              </svg>
+              <span className="tabular-nums">{bskyLikeCount}</span>
+            </button>
+          ) : !!bsky.like_count ? (
+            <span>{bsky.like_count} likes</span>
+          ) : null}
+          {onBskyRepost && canBskyInteract ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                void handleBskyRepost();
+              }}
+              title={bskyReposted ? "Undo repost" : "Repost"}
+              className={[
+                "flex items-center gap-1.5 rounded-sm px-2 py-1 transition-colors",
+                bskyReposted
+                  ? "text-accent hover:text-accent"
+                  : "hover:text-cream",
+              ].join(" ")}
+            >
+              <svg
+                width="13"
+                height="13"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <polyline points="17 1 21 5 17 9" />
+                <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+                <polyline points="7 23 3 19 7 15" />
+                <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+              </svg>
+              <span className="tabular-nums">{bskyRepostCount}</span>
+            </button>
+          ) : !!bsky.repost_count ? (
+            <span>{bsky.repost_count} reposts</span>
+          ) : null}
           {!!bsky.reply_count && <span>{bsky.reply_count} replies</span>}
-          {!!bsky.like_count && <span>{bsky.like_count} likes</span>}
         </div>
       )}
 
