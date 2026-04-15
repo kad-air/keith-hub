@@ -356,6 +356,62 @@ export default function FeedClient({
     [removeFromList, decrementCount, invalidateCache]
   );
 
+  // Clear above: dismiss the targeted item plus every card rendered above it.
+  // Semantically identical to bulk-dismissing those items — only read_at gets
+  // set, never consumed_at, so they don't pollute /read. Snapshot the items
+  // so undo can restore them in place instead of refetching.
+  const handleClearAbove = useCallback(
+    async (item: Item) => {
+      invalidateCache();
+      const cutoff = items.findIndex((it) => it.id === item.id);
+      if (cutoff < 0) return;
+      const toClear = items.slice(0, cutoff + 1);
+      const clearIds = toClear.map((it) => it.id);
+      const clearIdSet = new Set(clearIds);
+      const clearCount = clearIds.length;
+      if (clearCount === 0) return;
+
+      setItems((prev) => prev.filter((it) => !clearIdSet.has(it.id)));
+      setCounts((prev) => {
+        const next = { ...prev };
+        next.all = Math.max(0, next.all - clearCount);
+        for (const it of toClear) {
+          const cat = it.source_category as keyof CategoryCounts | undefined;
+          if (cat && cat in next && cat !== "all") {
+            next[cat] = Math.max(0, next[cat] - 1);
+          }
+        }
+        return next;
+      });
+
+      setPending({
+        ids: clearIds,
+        items: toClear,
+        message: `Cleared ${clearCount} item${clearCount === 1 ? "" : "s"}`,
+      });
+      setFocusedIndex(0);
+
+      // The cleared cards vanished synchronously; without this the user
+      // ends up scrolled deep into what's now empty/shifted content. Wait
+      // for the removal to commit, then glide to the top so "clear above"
+      // always lands at the top of the feed.
+      window.requestAnimationFrame(() => {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      });
+
+      try {
+        await fetch("/api/items/read-bulk", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ ids: clearIds }),
+        });
+      } catch {
+        // best effort
+      }
+    },
+    [items, invalidateCache]
+  );
+
   // Bulk dismiss: marks the currently-visible items as read using their
   // specific IDs. Only items the user has actually seen get dismissed — any
   // new items that arrived on the server in the interim survive and will
@@ -507,6 +563,10 @@ export default function FeedClient({
       e: () => {
         const it = items[focusedIndex];
         if (it) void handleDismiss(it);
+      },
+      c: () => {
+        const it = items[focusedIndex];
+        if (it) void handleClearAbove(it);
       },
       r: () => void handleRefresh(),
       "g h": () => router.push("/"),
@@ -705,6 +765,7 @@ export default function FeedClient({
                     onOpen={handleOpen}
                     onSave={handleSave}
                     onDismiss={handleDismiss}
+                    onClearAbove={handleClearAbove}
                   />
                 );
               })}
