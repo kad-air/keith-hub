@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { Item } from "@/lib/types";
 import FeedCard from "@/components/FeedCard";
 import KeyboardHelp from "@/components/KeyboardHelp";
+import Toast from "@/components/Toast";
 import { useKeyboard } from "@/lib/useKeyboard";
 
 interface ReadClientProps {
@@ -22,6 +23,7 @@ export default function ReadClient({ initialItems }: ReadClientProps) {
   const [items, setItems] = useState<Item[]>(initialItems);
   const [focusedIndex, setFocusedIndex] = useState(0);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [bskyError, setBskyError] = useState<string | null>(null);
   const READ_CHUNK = 40;
   const [renderedCount, setRenderedCount] = useState(READ_CHUNK);
   const cardRefs = useRef<Array<HTMLElement | null>>([]);
@@ -75,6 +77,35 @@ export default function ReadClient({ initialItems }: ReadClientProps) {
 
   // No dismiss action on /read — this is the history view, not a triage queue.
   // FeedCard hides the dismiss button when onDismiss is omitted.
+
+  const postBskyAction = useCallback(
+    async (item: Item, path: string, errorMessage: string): Promise<boolean> => {
+      try {
+        const res = await fetch(`/api/items/${item.id}/${path}`, {
+          method: "POST",
+        });
+        if (!res.ok) throw new Error(`${path} ${res.status}`);
+        return true;
+      } catch (err) {
+        console.error(`[ReadClient] bsky ${path} error:`, err);
+        setBskyError(errorMessage);
+        return false;
+      }
+    },
+    []
+  );
+  const handleBskyLike = useCallback(
+    (item: Item) => postBskyAction(item, "bsky-like", "Couldn’t like that post"),
+    [postBskyAction]
+  );
+  const handleBskyRepost = useCallback(
+    (item: Item) => postBskyAction(item, "bsky-repost", "Couldn’t repost that"),
+    [postBskyAction]
+  );
+  const handleBskyFollow = useCallback(
+    (item: Item) => postBskyAction(item, "bsky-follow", "Couldn’t follow that account"),
+    [postBskyAction]
+  );
 
   // Keep focusedIndex in bounds
   useEffect(() => {
@@ -181,12 +212,23 @@ export default function ReadClient({ initialItems }: ReadClientProps) {
               onFocus={setFocusedIndex}
               onOpen={handleOpen}
               onSave={handleSave}
+              onBskyLike={handleBskyLike}
+              onBskyRepost={handleBskyRepost}
+              onBskyFollow={handleBskyFollow}
             />
           ))}
           {renderedCount < items.length && (
             <div ref={sentinelRef} className="h-px" />
           )}
         </div>
+      )}
+
+      {bskyError && (
+        <Toast
+          message={bskyError}
+          onDismiss={() => setBskyError(null)}
+          durationMs={4000}
+        />
       )}
 
       <KeyboardHelp open={helpOpen} onClose={() => setHelpOpen(false)} />

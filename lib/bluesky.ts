@@ -8,9 +8,21 @@ import type {
   BlueskyQuotedPost,
   BlueskyReplyContext,
   BlueskyRepostContext,
+  BlueskyViewerState,
 } from "@/lib/types";
 
 let agent: AtpAgent | null = null;
+
+// Reset the module-scoped agent so the next getAgent() re-logs in. Used by
+// write endpoints when they hit a 401/session-expired so the next call
+// refreshes the session.
+export function resetBlueskyAgent(): void {
+  agent = null;
+}
+
+export async function getBlueskyAgent(): Promise<AtpAgent> {
+  return getAgent();
+}
 
 async function getAgent(): Promise<AtpAgent> {
   if (agent) return agent;
@@ -159,6 +171,21 @@ function extractRepostContext(reason: AnyObj | undefined): BlueskyRepostContext 
   };
 }
 
+function extractViewer(
+  postViewer: AnyObj | undefined,
+  authorViewer: AnyObj | undefined
+): BlueskyViewerState | undefined {
+  const likeUri = postViewer?.like as string | undefined;
+  const repostUri = postViewer?.repost as string | undefined;
+  const followingUri = authorViewer?.following as string | undefined;
+  if (!likeUri && !repostUri && !followingUri) return undefined;
+  return {
+    like_uri: likeUri || undefined,
+    repost_uri: repostUri || undefined,
+    following_uri: followingUri || undefined,
+  };
+}
+
 function buildBlueskyMetadata(feedViewPost: AnyObj): BlueskyMetadata {
   const post = feedViewPost.post as AnyObj;
   const author = post.author as AnyObj;
@@ -175,6 +202,13 @@ function buildBlueskyMetadata(feedViewPost: AnyObj): BlueskyMetadata {
     like_count: (post.likeCount as number) || 0,
     reply_count: (post.replyCount as number) || 0,
     repost_count: (post.repostCount as number) || 0,
+    uri: (post.uri as string) || undefined,
+    cid: (post.cid as string) || undefined,
+    did: (author?.did as string) || undefined,
+    viewer: extractViewer(
+      post.viewer as AnyObj | undefined,
+      author?.viewer as AnyObj | undefined
+    ),
     images: rwmMedia.images ?? extractImages(embed),
     external: rwmMedia.external ?? extractExternal(embed),
     quoted: extractQuoted(embed),
