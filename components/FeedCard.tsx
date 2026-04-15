@@ -228,6 +228,11 @@ const FeedCard = memo(forwardRef<HTMLDivElement, FeedCardProps>(function FeedCar
   // wasSwipedRef guards onClick so a swipe doesn't also count as a tap.
   const [dx, setDx] = useState(0);
   const [animating, setAnimating] = useState(false);
+  // `longPressing` drives the hold progress bar at the top of the card.
+  // When true, the bar's CSS transition scales from 0→1 over LONG_PRESS_MS.
+  // When false, it snaps back to 0 with a quick fade — either because the
+  // user released early, started swiping, or the long-press fired.
+  const [longPressing, setLongPressing] = useState(false);
   const startRef = useRef<{ x: number; y: number; locked: boolean } | null>(null);
   const wasSwipedRef = useRef(false);
   const longPressTimerRef = useRef<number | null>(null);
@@ -238,6 +243,7 @@ const FeedCard = memo(forwardRef<HTMLDivElement, FeedCardProps>(function FeedCar
       window.clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = null;
     }
+    setLongPressing(false);
   }
 
   function handleTouchStart(e: ReactTouchEvent) {
@@ -248,8 +254,10 @@ const FeedCard = memo(forwardRef<HTMLDivElement, FeedCardProps>(function FeedCar
     longPressFiredRef.current = false;
     if (onClearAbove) {
       cancelLongPress();
+      setLongPressing(true);
       longPressTimerRef.current = window.setTimeout(() => {
         longPressTimerRef.current = null;
+        setLongPressing(false);
         // Only fire if the user never started swiping and never released.
         const s = startRef.current;
         if (!s || s.locked) return;
@@ -429,6 +437,24 @@ const FeedCard = memo(forwardRef<HTMLDivElement, FeedCardProps>(function FeedCar
           focused ? "bg-ink-hover" : "bg-ink hover:bg-ink-raised/60",
         ].join(" ")}
       >
+      {/* Long-press progress bar. Only appears during a touch hold; fills
+          from left to right over LONG_PRESS_MS, then Clear-Above fires.
+          scaleX + transform-origin is noticeably smoother on mobile than
+          animating width. Fast 120ms snap-back when the gesture is
+          cancelled (release, scroll, or swipe). */}
+      {onClearAbove && (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute left-0 right-0 top-0 z-20 h-[2px] origin-left bg-accent"
+          style={{
+            transform: longPressing ? "scaleX(1)" : "scaleX(0)",
+            opacity: longPressing ? 1 : 0,
+            transition: longPressing
+              ? `transform ${LONG_PRESS_MS}ms linear, opacity 80ms ease-out`
+              : "transform 120ms ease-out, opacity 120ms ease-out",
+          }}
+        />
+      )}
       {/* Repost banner — when this post appears in the feed via someone reposting it */}
       {isBluesky && bsky?.reposted_by && (
         <div className="mb-1.5 flex items-center gap-1.5 font-mono text-[0.68rem] uppercase tracking-kicker text-cream-dim">
