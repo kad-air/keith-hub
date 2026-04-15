@@ -21,7 +21,7 @@ const SWIPE_COMMIT_THRESHOLD = 80;
 const COMMIT_ANIM_MS = 200;
 // Long-press (touch-only) fires Clear-Above. Held this long without
 // enough motion to lock the swipe gesture = treat as long-press.
-const LONG_PRESS_MS = 500;
+const LONG_PRESS_MS = 1000;
 
 interface FeedCardProps {
   item: Item;
