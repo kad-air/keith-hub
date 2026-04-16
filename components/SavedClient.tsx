@@ -223,6 +223,7 @@ export default function SavedClient({ initialItems }: SavedClientProps) {
               onOpen={handleOpen}
               onSave={handleUnsave}
               onDismiss={handleDismiss}
+              disableSwipeSave
               onBskyLike={handleBskyLike}
               onBskyRepost={handleBskyRepost}
               onBskyFollow={handleBskyFollow}
