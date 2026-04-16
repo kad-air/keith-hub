@@ -31,6 +31,10 @@ interface FeedCardProps {
   onOpen: (item: Item) => void;
   onSave: (item: Item) => void;
   onDismiss?: (item: Item) => void;
+  // Suppress the right-swipe-to-save gesture (button + keyboard shortcut still
+  // work). Used on /saved, where the gesture would symbolically mean "save"
+  // but actually unsaves — confusing enough that we'd rather it do nothing.
+  disableSwipeSave?: boolean;
   // "Clear above" — dismiss this item plus every card above it in one go.
   // Desktop: third hover button. Mobile: long-press the card.
   onClearAbove?: (item: Item) => void;
@@ -114,6 +118,7 @@ const FeedCard = memo(forwardRef<HTMLDivElement, FeedCardProps>(function FeedCar
     onOpen,
     onSave,
     onDismiss,
+    disableSwipeSave,
     onClearAbove,
     onBskyLike,
     onBskyRepost,
@@ -310,7 +315,7 @@ const FeedCard = memo(forwardRef<HTMLDivElement, FeedCardProps>(function FeedCar
     const finalDx = dx;
     setAnimating(true);
 
-    const commitSave = finalDx > SWIPE_COMMIT_THRESHOLD;
+    const commitSave = finalDx > SWIPE_COMMIT_THRESHOLD && !disableSwipeSave;
     // Only treat a left swipe as a commit if there's actually a dismiss
     // action to fire — on /read the dismiss button is hidden, so a left
     // swipe just snaps back instead of doing nothing visible.
@@ -360,11 +365,11 @@ const FeedCard = memo(forwardRef<HTMLDivElement, FeedCardProps>(function FeedCar
 
   // Reveal background icons only after the gesture has clearly started so
   // that incidental movement doesn't flash them.
-  const showSaveBg = dx > SWIPE_DETECT_THRESHOLD;
+  const showSaveBg = dx > SWIPE_DETECT_THRESHOLD && !disableSwipeSave;
   const showDismissBg = dx < -SWIPE_DETECT_THRESHOLD && !!onDismiss;
   // Past the commit threshold, intensify the icon to confirm the action
   // will fire on release.
-  const saveCommitted = dx > SWIPE_COMMIT_THRESHOLD;
+  const saveCommitted = dx > SWIPE_COMMIT_THRESHOLD && !disableSwipeSave;
   const dismissCommitted = dx < -SWIPE_COMMIT_THRESHOLD && !!onDismiss;
 
   return (
