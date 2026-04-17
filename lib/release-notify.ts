@@ -3,10 +3,27 @@ import { TRACKER_CONFIGS } from "@/lib/tracker-config";
 import { fetchCollectionItems, normalizeItems } from "@/lib/craft";
 import { sendPush } from "@/lib/push";
 
-function todayStr(): string {
-  // Local date string YYYY-MM-DD
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+// Morning delivery in the user's timezone — don't fire at UTC midnight.
+const NOTIFY_TIMEZONE = "America/Denver";
+const NOTIFY_HOUR = 8;
+
+function getLocalDate(): string {
+  // en-CA formats as YYYY-MM-DD
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: NOTIFY_TIMEZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
+function getLocalHour(): number {
+  const h = new Intl.DateTimeFormat("en-US", {
+    timeZone: NOTIFY_TIMEZONE,
+    hour: "numeric",
+    hour12: false,
+  }).format(new Date());
+  return parseInt(h, 10);
 }
 
 function getLastCheckedDate(): string | null {
@@ -30,18 +47,26 @@ function setLastCheckedDate(date: string): void {
 
 /**
  * Checks all tracker collections for items releasing today and sends
- * a push notification for each. Runs at most once per calendar day.
+ * one push notification per releasing item. Runs at most once per
+ * calendar day in NOTIFY_TIMEZONE, and only after NOTIFY_HOUR local.
  */
 export async function checkReleaseNotifications(): Promise<void> {
-  const today = todayStr();
+  const today = getLocalDate();
 
-  // Only run once per day
+  // Only run once per local day
   if (getLastCheckedDate() === today) return;
+  // Hold off until the local morning threshold
+  if (getLocalHour() < NOTIFY_HOUR) return;
   setLastCheckedDate(today);
 
   console.log(`[release-notify] Checking release dates for ${today}`);
 
-  const releasing: Array<{ name: string; tracker: string; subtitle: string }> = [];
+  const releasing: Array<{
+    name: string;
+    tracker: string;
+    slug: string;
+    subtitle: string;
+  }> = [];
 
   for (const config of TRACKER_CONFIGS) {
     try {
@@ -56,6 +81,7 @@ export async function checkReleaseNotifications(): Promise<void> {
           releasing.push({
             name: item.name,
             tracker: config.label,
+            slug: config.slug,
             subtitle: item.subtitle,
           });
         }
@@ -70,29 +96,16 @@ export async function checkReleaseNotifications(): Promise<void> {
     return;
   }
 
-  // Build notification — batch into one if multiple
-  if (releasing.length === 1) {
-    const r = releasing[0];
-    const body = r.subtitle
-      ? `${r.subtitle} — ${r.name}`
-      : r.name;
+  for (const r of releasing) {
+    const body = r.subtitle ? `${r.subtitle} — ${r.name}` : r.name;
     await sendPush({
       title: `${r.tracker} out today`,
       body,
-      url: `/trackers/${TRACKER_CONFIGS.find((c) => c.label === r.tracker)?.slug ?? ""}`,
-    });
-  } else {
-    const lines = releasing.map((r) => {
-      return r.subtitle ? `${r.subtitle} — ${r.name}` : r.name;
-    });
-    await sendPush({
-      title: `${releasing.length} releases today`,
-      body: lines.join("\n"),
-      url: "/",
+      url: `/trackers/${r.slug}`,
     });
   }
 
   console.log(
-    `[release-notify] Sent notification for ${releasing.length} release(s): ${releasing.map((r) => r.name).join(", ")}`,
+    `[release-notify] Sent ${releasing.length} notification(s): ${releasing.map((r) => r.name).join(", ")}`,
   );
 }
