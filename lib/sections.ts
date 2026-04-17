@@ -42,7 +42,8 @@ export const SECTIONS: Section[] = (() => {
     href: `/trackers/${t.slug}`,
     group: "Tracking",
     desc: t.statusOptions.slice(0, 3).join(" · "),
-    match: (p) => p === `/trackers/${t.slug}`,
+    match: (p) =>
+      p === `/trackers/${t.slug}` || p.startsWith(`/trackers/${t.slug}/`),
   }));
 
   const all = [FEED_SECTION, ...trackerSections, COMICS_SECTION];

@@ -49,14 +49,20 @@ self.addEventListener("notificationclick", (event) => {
   event.waitUntil(
     self.clients
       .matchAll({ type: "window", includeUncontrolled: true })
-      .then((clients) => {
-        // Focus existing window if one is open
+      .then(async (clients) => {
+        // Reuse an existing window if one is open — but navigate it to the
+        // notification's URL so we land on the right page, not wherever the
+        // user left the app.
         for (const client of clients) {
-          if (client.url.includes(self.location.origin) && "focus" in client) {
+          if (client.url.startsWith(self.location.origin)) {
+            try {
+              await client.navigate(url);
+            } catch {
+              // navigate() can reject on cross-origin or detached clients; fall through to focus
+            }
             return client.focus();
           }
         }
-        // Otherwise open a new one
         return self.clients.openWindow(url);
       }),
   );

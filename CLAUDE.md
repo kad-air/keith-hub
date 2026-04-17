@@ -93,7 +93,9 @@ Standard "the user reports a bug" workflow:
 - `components/FeedClient.tsx` — main feed page-level state, keyboard shortcuts, refresh, dismiss/save/undo/swipe flow, pull-to-refresh
 - `components/SavedClient.tsx` / `components/ReadClient.tsx` — analogous clients for `/saved` and `/read`. ReadClient has no dismiss action (history is read-only) and FeedCard hides the dismiss button when `onDismiss` is omitted.
 - `components/TrackerClient.tsx` — tracker grid state, status-tab filtering, optimistic updates, keyboard navigation
-- `components/TrackerCard.tsx` — individual tracker item card with cover image, title/subtitle, release date, and inline edit controls (status, rating, ranking)
+- `components/TrackerCard.tsx` — individual tracker item card with cover image, title/subtitle, release date, and inline edit controls (status, rating, ranking). Tapping the card navigates to the item detail page (NOT the external link — that moved to the detail page's CTA)
+- `components/TrackerItemClient.tsx` — detail page for a single tracker item. Cover, title, subtitle, release date, external CTA (Apple Music / IMDb / etc.), inline status/rating/ranking controls, and any schema properties not already surfaced (genre, synopsis, runtime, etc.)
+- `lib/tracker-detail.ts` — helpers for the detail page: `getExternalLinkLabel` picks a friendly CTA label based on domain; `buildExtraProps` filters the Craft schema to the properties worth rendering (skips ones already shown as primary UI, hides empty values and `false` booleans)
 - `components/Toast.tsx` — undo toast with countdown progress bar; bottom anchor respects iOS safe-area-inset and clears the BottomNav on mobile
 - `components/KeyboardHelp.tsx` — `?` overlay listing shortcuts. **Source of truth for the user-facing keyboard list.**
 - `components/AppMenu.tsx` — gear icon dropdown with theme toggle (Auto/Light/Dark) and version info. Accessible from both mobile and desktop header.
@@ -160,9 +162,9 @@ Web Push via VAPID, powered by the `web-push` npm package. Single-user, so the s
 
 **Flow:**
 1. User taps "Enable release alerts" in AppMenu (gear icon). iOS prompts for notification permission (user gesture required). The browser creates a push subscription and POSTs it to `/api/push/subscribe`.
-2. Every poll cycle (~15 min), `fetchAllSources` calls `checkReleaseNotifications()` from `lib/release-notify.ts`. A date guard (`data/release-notify-last.txt`) ensures it only runs once per calendar day.
-3. The checker fetches all 5 Craft tracker collections, compares each item's `release_date` against today (YYYY-MM-DD), and sends a web push for any matches.
-4. The service worker (`app/sw.ts`) handles `push` events (shows the notification) and `notificationclick` events (focuses or opens the app).
+2. Every poll cycle (~15 min), `fetchAllSources` calls `checkReleaseNotifications()` from `lib/release-notify.ts`. A date guard (keyed `release_notify_last` in the `kv` table) ensures it only runs once per calendar day in `NOTIFY_TIMEZONE` (America/Denver), and the run is deferred until the local hour is at or past `NOTIFY_HOUR` (8 AM) — otherwise server-time UTC would fire at Mountain-time midnight.
+3. The checker fetches all 5 Craft tracker collections, compares each item's `release_date` against today (YYYY-MM-DD in the local tz), and sends **one push per releasing item** deep-linking to that item's detail page (`/trackers/{slug}/{itemId}`).
+4. The service worker (`app/sw.ts`) handles `push` events (shows the notification) and `notificationclick` events. The click handler reuses an existing window if the PWA is open, but always calls `client.navigate(url)` first so the tap lands on the notification's destination — not wherever the user had left the app.
 
 **Key files:**
 - `lib/push.ts` — `getSubscription`, `saveSubscription`, `removeSubscription`, `sendPush` (backed by SQLite `kv` table)
