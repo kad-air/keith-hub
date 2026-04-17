@@ -26,10 +26,14 @@ export interface CraftItem {
   contentPreviewMd?: string;
 }
 
+// The /collections/{id}/items endpoint only returns `items` (the rest of
+// these fields exist in Craft's documented response shape but never come
+// through in practice). The schema lives on the separate /schema endpoint;
+// see fetchCollectionSchema in lib/craft.ts.
 export interface CraftCollectionResponse {
   items: CraftItem[];
-  schema: CraftSchema;
-  collectionName: string;
+  schema?: CraftSchema;
+  collectionName?: string;
 }
 
 export interface CraftSchemaProperty {

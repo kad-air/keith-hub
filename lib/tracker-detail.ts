@@ -1,6 +1,5 @@
 import type {
   CraftItemProperties,
-  CraftSchema,
   CraftSchemaProperty,
   TrackerConfig,
 } from "./craft-types";
@@ -48,14 +47,10 @@ export interface ExtraProp {
 // primary UI (title/subtitle/status/rating/ranking/release date). Returns
 // empty-value fields filtered out so the page never renders bare labels.
 export function buildExtraProps(
-  schema: CraftSchema | undefined,
+  schemaProperties: CraftSchemaProperty[],
   properties: CraftItemProperties,
   config: TrackerConfig,
 ): ExtraProp[] {
-  // Craft's collection-items response sometimes omits the schema block; if
-  // it does, we just skip the extra-props section rather than crash the page.
-  if (!schema || !Array.isArray(schema.properties)) return [];
-
   const skip = new Set<string>([
     config.titleKey,
     config.subtitleKey,
@@ -68,7 +63,7 @@ export function buildExtraProps(
   if (config.slug === "books") skip.add("publication_year");
 
   const out: ExtraProp[] = [];
-  for (const p of schema.properties) {
+  for (const p of schemaProperties) {
     if (skip.has(p.key)) continue;
     const raw = properties[p.key];
     if (raw === undefined || raw === null) continue;

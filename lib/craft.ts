@@ -1,6 +1,7 @@
 import type {
   CraftItem,
   CraftCollectionResponse,
+  CraftSchemaProperty,
   TrackerConfig,
   TrackerItem,
 } from "./craft-types";
@@ -28,6 +29,62 @@ export async function fetchCollectionItems(
     );
   }
   return res.json();
+}
+
+// ─── Fetch the property schema for a collection ────────────────
+// The /items endpoint never includes a schema block, so the detail page
+// pulls it from /schema separately to drive the read-only "extras" list.
+// Type is sniffed from the description text rather than the JSON Schema
+// `type`, because Craft's "single select" and "date" both serialize as
+// `type: "string"` and the description is the only differentiator.
+export async function fetchCollectionSchema(
+  collectionId: string,
+): Promise<CraftSchemaProperty[]> {
+  const res = await fetch(
+    `${CRAFT_BASE}/collections/${collectionId}/schema`,
+    { headers: headers(), cache: "no-store" },
+  );
+  if (!res.ok) {
+    throw new Error(
+      `Craft schema error ${res.status}: ${await res.text()}`,
+    );
+  }
+  const json = (await res.json()) as {
+    properties?: {
+      items?: {
+        items?: {
+          properties?: {
+            properties?: {
+              properties?: Record<
+                string,
+                { title?: string; description?: string; type?: string }
+              >;
+            };
+          };
+        };
+      };
+    };
+  };
+  const raw =
+    json.properties?.items?.items?.properties?.properties?.properties ?? {};
+  return Object.entries(raw).map(([key, def]) =>
+    normalizeSchemaProperty(key, def),
+  );
+}
+
+function normalizeSchemaProperty(
+  key: string,
+  def: { title?: string; description?: string; type?: string },
+): CraftSchemaProperty {
+  const desc = def.description ?? "";
+  let type: CraftSchemaProperty["type"];
+  if (def.type === "boolean") type = "boolean";
+  else if (def.type === "number") type = "number";
+  else if (def.type === "array") type = "multiSelect";
+  else if (/^A single select/i.test(desc)) type = "singleSelect";
+  else if (/^A date/i.test(desc)) type = "date";
+  else type = "text";
+  return { key, name: def.title ?? key, type };
 }
 
 // ─── Update a single item's properties ──────────────────────────

@@ -1,8 +1,15 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getTrackerConfig } from "@/lib/tracker-config";
-import { fetchCollectionItems, normalizeItems } from "@/lib/craft";
-import type { CraftCollectionResponse } from "@/lib/craft-types";
+import {
+  fetchCollectionItems,
+  fetchCollectionSchema,
+  normalizeItems,
+} from "@/lib/craft";
+import type {
+  CraftCollectionResponse,
+  CraftSchemaProperty,
+} from "@/lib/craft-types";
 import { buildExtraProps } from "@/lib/tracker-detail";
 import TrackerItemClient from "@/components/TrackerItemClient";
 
@@ -31,12 +38,29 @@ export default async function TrackerItemPage({ params }: Props) {
   const config = getTrackerConfig(params.slug);
   if (!config) return notFound();
 
-  // Fetch in a narrow try/catch so a 404 (notFound below) isn't swallowed by
-  // the network-error fallback — Next.js's notFound() throws an internal
-  // error that must propagate to the framework.
+  // Items fetch is the only failure mode worth a global error fallback;
+  // the schema fetch falls back to no extras and lets the page still render.
+  // Both calls live outside the try/catch only for the narrowing — a 404
+  // (notFound below) must propagate to the framework, which the broad catch
+  // would otherwise swallow.
   let data: CraftCollectionResponse;
+  let schemaProperties: CraftSchemaProperty[];
   try {
-    data = await fetchCollectionItems(config.collectionId);
+    const [itemsResult, schemaResult] = await Promise.allSettled([
+      fetchCollectionItems(config.collectionId),
+      fetchCollectionSchema(config.collectionId),
+    ]);
+    if (itemsResult.status === "rejected") throw itemsResult.reason;
+    data = itemsResult.value;
+    if (schemaResult.status === "rejected") {
+      console.warn(
+        `[trackers/${params.slug}/${params.itemId}] schema fetch failed (extras hidden):`,
+        schemaResult.reason,
+      );
+      schemaProperties = [];
+    } else {
+      schemaProperties = schemaResult.value;
+    }
   } catch (err) {
     console.error(
       `[trackers/${params.slug}/${params.itemId}] page fetch error:`,
@@ -55,7 +79,7 @@ export default async function TrackerItemPage({ params }: Props) {
   const item = items.find((i) => i.id === params.itemId);
   if (!item) return notFound();
 
-  const extraProps = buildExtraProps(data.schema, item.properties, config);
+  const extraProps = buildExtraProps(schemaProperties, item.properties, config);
 
   return (
     <TrackerItemClient item={item} config={config} extraProps={extraProps} />
