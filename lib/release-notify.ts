@@ -62,6 +62,7 @@ export async function checkReleaseNotifications(): Promise<void> {
   console.log(`[release-notify] Checking release dates for ${today}`);
 
   const releasing: Array<{
+    id: string;
     name: string;
     tracker: string;
     slug: string;
@@ -79,6 +80,7 @@ export async function checkReleaseNotifications(): Promise<void> {
         const itemDate = item.releaseDate.slice(0, 10);
         if (itemDate === today) {
           releasing.push({
+            id: item.id,
             name: item.name,
             tracker: config.label,
             slug: config.slug,
@@ -101,7 +103,7 @@ export async function checkReleaseNotifications(): Promise<void> {
     await sendPush({
       title: `${r.tracker} out today`,
       body,
-      url: `/trackers/${r.slug}`,
+      url: `/trackers/${r.slug}/${r.id}`,
     });
   }
 

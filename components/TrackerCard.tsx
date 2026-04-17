@@ -1,6 +1,7 @@
 "use client";
 
 import { memo, useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { TrackerConfig, TrackerItem } from "@/lib/craft-types";
 
 interface TrackerCardProps {
@@ -23,6 +24,7 @@ export default memo(function TrackerCard({
   onFocus,
   onUpdate,
 }: TrackerCardProps) {
+  const router = useRouter();
   const [imageFailed, setImageFailed] = useState(false);
   const [rankingDraft, setRankingDraft] = useState(
     item.ranking?.toString() ?? "",
@@ -66,7 +68,6 @@ export default memo(function TrackerCard({
     [],
   );
 
-  // Open external link if available
   // Format release date for display
   const formattedDate = (() => {
     if (!item.releaseDate) return null;
@@ -83,19 +84,16 @@ export default memo(function TrackerCard({
   })();
 
   const handleClick = useCallback(() => {
-    if (item.linkUrl) {
-      window.open(item.linkUrl, "_blank", "noopener");
-    }
-  }, [item.linkUrl]);
+    router.push(`/trackers/${config.slug}/${item.id}`);
+  }, [router, config.slug, item.id]);
 
   return (
     <div
       onClick={handleClick}
       onMouseEnter={() => onFocus(index)}
       className={[
-        "group relative flex flex-col overflow-hidden border border-rule/40 bg-ink-raised transition-colors",
+        "group relative flex flex-col overflow-hidden border border-rule/40 bg-ink-raised transition-colors cursor-pointer",
         "hover:border-rule-strong",
-        item.linkUrl ? "cursor-pointer" : "",
         focused ? "ring-1 ring-accent" : "",
       ].join(" ")}
     >
