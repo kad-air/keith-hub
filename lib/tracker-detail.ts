@@ -48,10 +48,14 @@ export interface ExtraProp {
 // primary UI (title/subtitle/status/rating/ranking/release date). Returns
 // empty-value fields filtered out so the page never renders bare labels.
 export function buildExtraProps(
-  schema: CraftSchema,
+  schema: CraftSchema | undefined,
   properties: CraftItemProperties,
   config: TrackerConfig,
 ): ExtraProp[] {
+  // Craft's collection-items response sometimes omits the schema block; if
+  // it does, we just skip the extra-props section rather than crash the page.
+  if (!schema || !Array.isArray(schema.properties)) return [];
+
   const skip = new Set<string>([
     config.titleKey,
     config.subtitleKey,

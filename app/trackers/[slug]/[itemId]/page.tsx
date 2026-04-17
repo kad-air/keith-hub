@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getTrackerConfig } from "@/lib/tracker-config";
 import { fetchCollectionItems, normalizeItems } from "@/lib/craft";
+import type { CraftCollectionResponse } from "@/lib/craft-types";
 import { buildExtraProps } from "@/lib/tracker-detail";
 import TrackerItemClient from "@/components/TrackerItemClient";
 
@@ -30,17 +31,12 @@ export default async function TrackerItemPage({ params }: Props) {
   const config = getTrackerConfig(params.slug);
   if (!config) return notFound();
 
+  // Fetch in a narrow try/catch so a 404 (notFound below) isn't swallowed by
+  // the network-error fallback — Next.js's notFound() throws an internal
+  // error that must propagate to the framework.
+  let data: CraftCollectionResponse;
   try {
-    const data = await fetchCollectionItems(config.collectionId);
-    const items = normalizeItems(data.items, config);
-    const item = items.find((i) => i.id === params.itemId);
-    if (!item) return notFound();
-
-    const extraProps = buildExtraProps(data.schema, item.properties, config);
-
-    return (
-      <TrackerItemClient item={item} config={config} extraProps={extraProps} />
-    );
+    data = await fetchCollectionItems(config.collectionId);
   } catch (err) {
     console.error(
       `[trackers/${params.slug}/${params.itemId}] page fetch error:`,
@@ -54,4 +50,14 @@ export default async function TrackerItemPage({ params }: Props) {
       </article>
     );
   }
+
+  const items = normalizeItems(data.items, config);
+  const item = items.find((i) => i.id === params.itemId);
+  if (!item) return notFound();
+
+  const extraProps = buildExtraProps(data.schema, item.properties, config);
+
+  return (
+    <TrackerItemClient item={item} config={config} extraProps={extraProps} />
+  );
 }
