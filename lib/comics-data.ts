@@ -3345,6 +3345,229 @@ export const STORYLINES: Storyline[] = [
         "sourceId": "57620"
       }
     ]
+  },
+  {
+    "slug": "fraction-hawkeye",
+    "title": "Matt Fraction's Hawkeye",
+    "description": "The full 2012–2015 David Aja / Matt Fraction run, plus the Annual, in publication order. Opens with Fraction's 2008 Kate Bishop one-shot as a prelude.",
+    "issues": [
+      {
+        "id": "11898",
+        "title": "Young Avengers Presents (2008) #6",
+        "digitalBookId": "11898",
+        "marvelIssueId": "21401",
+        "slug": "young_avengers_presents_2008_6",
+        "drn": "drn:src:marvel:unison::prod:e6e83a04-2b22-4c22-95eb-1073e2750dd6",
+        "sourceId": "21401"
+      },
+      {
+        "id": "27349",
+        "title": "Hawkeye (2012) #1",
+        "digitalBookId": "27349",
+        "marvelIssueId": "42768",
+        "slug": "hawkeye_2012_1",
+        "drn": "drn:src:marvel:unison::prod:23ac1b70-055b-4714-8597-4972c9a5f6d3",
+        "sourceId": "42768"
+      },
+      {
+        "id": "27600",
+        "title": "Hawkeye (2012) #2",
+        "digitalBookId": "27600",
+        "marvelIssueId": "42785",
+        "slug": "hawkeye_2012_2",
+        "drn": "drn:src:marvel:unison::prod:442b354c-726c-4434-a4b9-23f05f4185b8",
+        "sourceId": "42785"
+      },
+      {
+        "id": "27836",
+        "title": "Hawkeye (2012) #3",
+        "digitalBookId": "27836",
+        "marvelIssueId": "42786",
+        "slug": "hawkeye_2012_3",
+        "drn": "drn:src:marvel:unison::prod:cdb626fd-59cb-451a-902e-8ca60b328cf4",
+        "sourceId": "42786"
+      },
+      {
+        "id": "28030",
+        "title": "Hawkeye (2012) #4",
+        "digitalBookId": "28030",
+        "marvelIssueId": "42764",
+        "slug": "hawkeye_2012_4",
+        "drn": "drn:src:marvel:unison::prod:e0904ae5-8ad0-4980-8b2a-39a9de97b522",
+        "sourceId": "42764"
+      },
+      {
+        "id": "28165",
+        "title": "Hawkeye (2012) #5",
+        "digitalBookId": "28165",
+        "marvelIssueId": "42770",
+        "slug": "hawkeye_2012_5",
+        "drn": "drn:src:marvel:unison::prod:a2255e5a-d270-40ea-8af3-c764ff59dbcd",
+        "sourceId": "42770"
+      },
+      {
+        "id": "28280",
+        "title": "Hawkeye (2012) #6",
+        "digitalBookId": "28280",
+        "marvelIssueId": "42782",
+        "slug": "hawkeye_2012_6",
+        "drn": "drn:src:marvel:unison::prod:ac33f599-57a8-45d9-b0dc-12316e6449d9",
+        "sourceId": "42782"
+      },
+      {
+        "id": "28403",
+        "title": "Hawkeye (2012) #7",
+        "digitalBookId": "28403",
+        "marvelIssueId": "42755",
+        "slug": "hawkeye_2012_7",
+        "drn": "drn:src:marvel:unison::prod:7df6eeb2-8aa8-4ea3-9836-700113c80903",
+        "sourceId": "42755"
+      },
+      {
+        "id": "28709",
+        "title": "Hawkeye (2012) #8",
+        "digitalBookId": "28709",
+        "marvelIssueId": "42771",
+        "slug": "hawkeye_2012_8",
+        "drn": "drn:src:marvel:unison::prod:3c3fe7b3-43ef-4a08-bf7e-a911e2f3f946",
+        "sourceId": "42771"
+      },
+      {
+        "id": "29052",
+        "title": "Hawkeye (2012) #9",
+        "digitalBookId": "29052",
+        "marvelIssueId": "42784",
+        "slug": "hawkeye_2012_9",
+        "drn": "drn:src:marvel:unison::prod:481c2cd0-29d4-43c5-9adb-3fa08306131e",
+        "sourceId": "42784"
+      },
+      {
+        "id": "29568",
+        "title": "Hawkeye (2012) #10",
+        "digitalBookId": "29568",
+        "marvelIssueId": "42765",
+        "slug": "hawkeye_2012_10",
+        "drn": "drn:src:marvel:unison::prod:d5060d05-18e3-46d6-8635-3fb78c21854c",
+        "sourceId": "42765"
+      },
+      {
+        "id": "29856",
+        "title": "Hawkeye (2012) #11",
+        "digitalBookId": "29856",
+        "marvelIssueId": "42772",
+        "slug": "hawkeye_2012_11",
+        "drn": "drn:src:marvel:unison::prod:143fb89c-9c0b-4da5-b2f8-9023a960ea87",
+        "sourceId": "42772"
+      },
+      {
+        "id": "30508",
+        "title": "Hawkeye (2012) #12",
+        "digitalBookId": "30508",
+        "marvelIssueId": "42769",
+        "slug": "hawkeye_2012_12",
+        "drn": "drn:src:marvel:unison::prod:ff048885-b807-42a8-84f1-cea77ae42ba9",
+        "sourceId": "42769"
+      },
+      {
+        "id": "30671",
+        "title": "Hawkeye Annual (2013) #1",
+        "digitalBookId": "30671",
+        "marvelIssueId": "47398",
+        "slug": "hawkeye_annual_2013_1",
+        "drn": "drn:src:marvel:unison::prod:70eb309b-6b42-4e80-a3cc-d6f3391a63f5",
+        "sourceId": "47398"
+      },
+      {
+        "id": "31512",
+        "title": "Hawkeye (2012) #13",
+        "digitalBookId": "31512",
+        "marvelIssueId": "46867",
+        "slug": "hawkeye_2012_13",
+        "drn": "drn:src:marvel:unison::prod:dbd171f0-2744-478c-bc1c-0f7f0cc45079",
+        "sourceId": "46867"
+      },
+      {
+        "id": "31740",
+        "title": "Hawkeye (2012) #14",
+        "digitalBookId": "31740",
+        "marvelIssueId": "46868",
+        "slug": "hawkeye_2012_14",
+        "drn": "drn:src:marvel:unison::prod:fb37d780-c0ae-469c-8413-5412b4f364f3",
+        "sourceId": "46868"
+      },
+      {
+        "id": "33233",
+        "title": "Hawkeye (2012) #15",
+        "digitalBookId": "33233",
+        "marvelIssueId": "46869",
+        "slug": "hawkeye_2012_15",
+        "drn": "drn:src:marvel:unison::prod:f8b45043-365a-4264-9479-8b1b45eb1ad9",
+        "sourceId": "46869"
+      },
+      {
+        "id": "32910",
+        "title": "Hawkeye (2012) #16",
+        "digitalBookId": "32910",
+        "marvelIssueId": "46870",
+        "slug": "hawkeye_2012_16",
+        "drn": "drn:src:marvel:unison::prod:b634e59c-75ec-4ed1-a141-feafed3ab4f4",
+        "sourceId": "46870"
+      },
+      {
+        "id": "33354",
+        "title": "Hawkeye (2012) #17",
+        "digitalBookId": "33354",
+        "marvelIssueId": "46871",
+        "slug": "hawkeye_2012_17",
+        "drn": "drn:src:marvel:unison::prod:1f906a66-facc-44ef-92ce-effd57ba97cc",
+        "sourceId": "46871"
+      },
+      {
+        "id": "33465",
+        "title": "Hawkeye (2012) #18",
+        "digitalBookId": "33465",
+        "marvelIssueId": "46872",
+        "slug": "hawkeye_2012_18",
+        "drn": "drn:src:marvel:unison::prod:4ad6ecea-a172-4940-b0e6-74c5631a3e0e",
+        "sourceId": "46872"
+      },
+      {
+        "id": "33577",
+        "title": "Hawkeye (2012) #19",
+        "digitalBookId": "33577",
+        "marvelIssueId": "48639",
+        "slug": "hawkeye_2012_19",
+        "drn": "drn:src:marvel:unison::prod:182a234c-8a1c-428d-ae5e-14ada205d0b5",
+        "sourceId": "48639"
+      },
+      {
+        "id": "33927",
+        "title": "Hawkeye (2012) #20",
+        "digitalBookId": "33927",
+        "marvelIssueId": "48640",
+        "slug": "hawkeye_2012_20",
+        "drn": "drn:src:marvel:unison::prod:f813b5dc-475f-491b-b660-049ca67ca8c0",
+        "sourceId": "48640"
+      },
+      {
+        "id": "34156",
+        "title": "Hawkeye (2012) #21",
+        "digitalBookId": "34156",
+        "marvelIssueId": "48641",
+        "slug": "hawkeye_2012_21",
+        "drn": "drn:src:marvel:unison::prod:cb7bd5ec-b899-48fb-abf8-24d813a84560",
+        "sourceId": "48641"
+      },
+      {
+        "id": "34968",
+        "title": "Hawkeye (2012) #22",
+        "digitalBookId": "34968",
+        "marvelIssueId": "48642",
+        "slug": "hawkeye_2012_22",
+        "drn": "drn:src:marvel:unison::prod:549308a8-5d76-4f3c-b647-71bc5d61c70a",
+        "sourceId": "48642"
+      }
+    ]
   }
 ];
 
