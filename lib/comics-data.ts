@@ -3349,8 +3349,17 @@ export const STORYLINES: Storyline[] = [
   {
     "slug": "fraction-hawkeye",
     "title": "Matt Fraction's Hawkeye",
-    "description": "The full 2012–2015 David Aja / Matt Fraction run, plus the Annual, in publication order.",
+    "description": "The full 2012–2015 David Aja / Matt Fraction run, plus the Annual, in publication order. Opens with Fraction's 2008 Kate Bishop one-shot as a prelude.",
     "issues": [
+      {
+        "id": "11898",
+        "title": "Young Avengers Presents (2008) #6",
+        "digitalBookId": "11898",
+        "marvelIssueId": "21401",
+        "slug": "young_avengers_presents_2008_6",
+        "drn": "drn:src:marvel:unison::prod:e6e83a04-2b22-4c22-95eb-1073e2750dd6",
+        "sourceId": "21401"
+      },
       {
         "id": "27349",
         "title": "Hawkeye (2012) #1",
