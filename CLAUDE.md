@@ -270,7 +270,7 @@ Password-protected via Next.js middleware (`middleware.ts`). A `hub-auth` httpOn
 The login/logout `POST` handlers (`app/api/auth/{login,logout}/route.ts`) must return **303** redirects, not the default 307. iOS Safari preserves the POST method on 307 and tries to POST to `/`, which fails with "Safari can't open the page because the address is invalid" until manual refresh. Redirects also go through `publicUrl()` in `lib/auth.ts` so Railway's forwarded `host`/`proto` headers win over the localhost `request.url` on the internal network.
 
 ### Local dev
-The Mac Mini is still the dev environment. `npm run dev` on port 3000. The `.env` file holds the same env vars as Railway. If `FEED_PASSWORD` is unset, auth is bypassed (so local dev works without logging in).
+`npm run dev` on port 3000. Copy `.env.example` to `.env` and fill in the same vars Railway has set. If `FEED_PASSWORD` is unset, auth is bypassed (so local dev works without logging in).
 
 ### Files never committed
 `.env`, `data/the-feed.db`
@@ -285,4 +285,4 @@ The Mac Mini is still the dev environment. `npm run dev` on port 3000. The `.env
 - `VAPID_SUBJECT` — `mailto:` URI for VAPID identification
 
 ## Git auth
-The repo pushes via HTTPS with a PAT stored in `~/.git-credentials`. SSH doesn't work in this session because the SSH agent routes through 1Password which isn't accessible from Claude Code's shell. The `git push` command will print a benign `failed to store: -25308` warning from `git-credential-osxkeychain` — that's a Keychain access denial, NOT a push failure. Check the `<old>..<new>  main -> main` line to confirm the push actually happened.
+The repo pushes via HTTPS with a PAT stored in `~/.git-credentials`. Check the `<old>..<new>  main -> main` line to confirm the push actually happened — macOS Keychain helpers may print a benign `failed to store: -25308` warning that is NOT a push failure.
