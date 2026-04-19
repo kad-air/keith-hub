@@ -34,16 +34,6 @@ const COMICS_SECTION: Section = {
   match: (p) => p.startsWith("/comics"),
 };
 
-const NBA_SECTION: Section = {
-  key: "nba",
-  num: "",
-  name: "r/nba",
-  href: "/nba",
-  group: "Library",
-  desc: "Hot posts & threads",
-  match: (p) => p.startsWith("/nba"),
-};
-
 export const SECTIONS: Section[] = (() => {
   const trackerSections: Section[] = TRACKER_CONFIGS.map((t) => ({
     key: t.slug,
@@ -56,7 +46,7 @@ export const SECTIONS: Section[] = (() => {
       p === `/trackers/${t.slug}` || p.startsWith(`/trackers/${t.slug}/`),
   }));
 
-  const all = [FEED_SECTION, ...trackerSections, NBA_SECTION, COMICS_SECTION];
+  const all = [FEED_SECTION, ...trackerSections, COMICS_SECTION];
   return all.map((s, i) => ({ ...s, num: String(i + 1).padStart(2, "0") }));
 })();
 

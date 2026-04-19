@@ -180,26 +180,6 @@ Web Push via VAPID, powered by the `web-push` npm package. Single-user, so the s
 
 **Testing:** `curl -X POST http://localhost:3000/api/push/test` (requires an active subscription; in production, use the auth cookie or `inspect.mjs`).
 
-### Reddit — r/nba reader
-A read-only browser for /r/nba. Separate from the main Feed: these posts do NOT land in the `items` table and the user never triages them. Two pages: `/nba` (hot list with Hot/New/Top-day sort pills) and `/nba/[postId]` (post + threaded comments).
-
-**No Reddit account, no OAuth, no env vars.** Uses public unauthenticated endpoints at `www.reddit.com/r/nba/{hot,new,top}.json` and `www.reddit.com/comments/{id}.json`. Reddit requires a descriptive `User-Agent`; module constant in `lib/reddit.ts`. If Reddit ever tightens unauthenticated access, the upgrade path is application-only OAuth (client_credentials with an "installed app" client ID — still no user account) — swap the base URL to `oauth.reddit.com` and add an `Authorization: bearer` header; everything else stays.
-
-**Data is not persisted.** Each page SSRs fresh from Reddit. A module-level in-memory cache in `lib/reddit.ts` (45s TTL for lists, 20s TTL for post detail) smooths rapid back-nav and keeps us well under the unauthenticated rate budget.
-
-**Key files:**
-- `lib/reddit.ts` — `fetchSubreddit`, `fetchPostWithComments`, module cache, `sanitizeRedditHtml` (DOMPurify with forced `target=_blank` + safe rel on all anchors).
-- `lib/reddit-types.ts` — `RedditPost`, `RedditComment`, `PostMedia` discriminated union (image / gallery / reddit_video / gif_video / youtube / external / none).
-- `app/nba/page.tsx` + `app/nba/[postId]/page.tsx` — server components, `force-dynamic`.
-- `components/NbaPostClient.tsx` — detail shell.
-- `components/NbaPostMedia.tsx` — media dispatcher. v.redd.it uses native HLS (`<video src={hls_url} playsInline controls>`) which iOS Safari plays natively; desktop Chrome/Firefox fall back to the silent MP4. YouTube embeds use `youtube-nocookie.com`. Galleries are CSS-only scroll-snap carousels.
-- `components/NbaCommentTree.tsx` — recursive renderer. Hard cap at depth 8 (deeper → "Continue thread on old.reddit"), auto-collapse at depth 4, `{kind: "more"}` stubs render as "+ N more replies" links to old.reddit.
-- `.nba-prose` in `app/globals.css` — re-adds the sensible prose defaults (paragraph spacing, blockquote rules, list bullets) stripped by Tailwind's reset, for sanitized Reddit HTML.
-
-**Rendering invariant: all Reddit HTML is sanitized server-side** in `app/nba/[postId]/page.tsx` before being handed to the client, so the client never touches untrusted markup. The client only sees the pre-sanitized strings as `body_html_sanitized` / `selftextSanitized`.
-
-**No app handoff.** The user explicitly doesn't want the Reddit app; the "View on reddit.com" link on the detail page points to `old.reddit.com{permalink}` which doesn't trigger the Reddit app's universal-link claim.
-
 ### Comics — Marvel Unlimited reading orders
 A static catalog of Hickman-era reading orders (X-Men, Avengers/Secret Wars), each issue tappable to hand off to the Marvel Unlimited iOS app. Two pages: `/comics` (storyline index) and `/comics/[slug]` (the checklist).
 
