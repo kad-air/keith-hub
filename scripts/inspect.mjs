@@ -409,6 +409,11 @@ async function html() {
     "reply contexts":          (text.match(/border-l-2 border-rule pl-3/g) || []).length,
     "reposted-by banners":     (text.match(/Reposted by/g) || []).length,
     "manifest links":          (text.match(/<link rel="manifest"/g) || []).length,
+    // Fretboard atom — data-role only appears on note markers inside the SVG.
+    "fretboard notes (root)":  (text.match(/data-role="root"/g) || []).length,
+    "fretboard notes (chord)": (text.match(/data-role="chord"/g) || []).length,
+    "fretboard notes (scale)": (text.match(/data-role="scale"/g) || []).length,
+    "fretboard notes (ghost)": (text.match(/data-role="ghost"/g) || []).length,
   };
   header("Structural counts");
   for (const [k, v] of Object.entries(counts)) {

@@ -26,6 +26,10 @@
     --cat-bluesky: 146 188 220;
     --cat-games: 140 200 118;
     --cat-tv: 122 184 224;
+    --cat-practice: 222 176 104;
+    --cat-practice-root: 236 162 72;
+    --cat-practice-chord: 214 136 108;
+    --cat-practice-scale: 132 184 176;
     --selection-bg: #d44a3f;
     --selection-fg: #f5efe1;
     --grain-opacity: 0.05;
@@ -54,6 +58,10 @@
     --cat-bluesky: 74 130 170;
     --cat-games: 80 140 60;
     --cat-tv: 60 120 170;
+    --cat-practice: 172 122 58;
+    --cat-practice-root: 188 116 44;
+    --cat-practice-chord: 164 92 68;
+    --cat-practice-scale: 70 130 122;
     --selection-bg: #c43832;
     --selection-fg: #f6f3ee;
     --grain-opacity: 0.03;
@@ -83,6 +91,10 @@
       --cat-bluesky: 74 130 170;
       --cat-games: 80 140 60;
       --cat-tv: 60 120 170;
+      --cat-practice: 172 122 58;
+      --cat-practice-root: 188 116 44;
+      --cat-practice-chord: 164 92 68;
+      --cat-practice-scale: 70 130 122;
       --selection-bg: #c43832;
       --selection-fg: #f6f3ee;
       --grain-opacity: 0.03;

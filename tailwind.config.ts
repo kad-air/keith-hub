@@ -37,6 +37,10 @@ const config: Config = {
           bluesky: "rgb(var(--cat-bluesky) / <alpha-value>)",
           games: "rgb(var(--cat-games) / <alpha-value>)",
           tv: "rgb(var(--cat-tv) / <alpha-value>)",
+          practice: "rgb(var(--cat-practice) / <alpha-value>)",
+          "practice-root": "rgb(var(--cat-practice-root) / <alpha-value>)",
+          "practice-chord": "rgb(var(--cat-practice-chord) / <alpha-value>)",
+          "practice-scale": "rgb(var(--cat-practice-scale) / <alpha-value>)",
         },
       },
       fontFamily: {
