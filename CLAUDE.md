@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **The Feed** — a personal content hub. Next.js 14 App Router + SQLite + Tailwind, installable as an iOS PWA. Hosted on Railway at `hub.keithadair.com`. Single user, password-protected via middleware.
 
-See `PRODUCT_PLAN.md` for product vision and design principles. The most load-bearing ones: **finite, not infinite** (no infinite scroll — you reach the end and stop), **triage, not consumption** (scan/save/dismiss here, consume in native apps), and **config over UI** (sources are managed by editing `config/feeds.yml` — there's no admin screen).
+Load-bearing design principles: **finite, not infinite** (no infinite scroll — you reach the end and stop), **triage, not consumption** (scan/save/dismiss here, consume in native apps), and **config over UI** (sources are managed by editing `config/feeds.yml` — there's no admin screen). See `README.md` for the user-facing description.
 
 ## Commands
 
