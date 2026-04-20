@@ -45,12 +45,6 @@ export function AlphaTabViewer({ tex, className }: AlphaTabViewerProps) {
           core: {
             fontDirectory: "/alphatab/font/",
             engine: "svg",
-            // Next's webpack build doesn't emit alphatab's worker chunk
-            // (would need @coderline/alphatab/webpack), so the worker URL
-            // resolves to nothing and renderFinished never fires — the UI
-            // sits on "Rendering tab…" forever. Licks are tiny; sync
-            // main-thread layout is imperceptible.
-            useWorkers: false,
           },
           display: {
             resources: {
