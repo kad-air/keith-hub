@@ -26,7 +26,7 @@ const TILES: Tile[] = [
     title: "Fretboard",
     desc: "Chords, scales, and CAGED shapes across the neck.",
     href: "/practice/fretboard",
-    available: false,
+    available: true,
   },
   {
     key: "licks",
