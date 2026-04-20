@@ -1,6 +1,6 @@
 import { TRACKER_CONFIGS } from "@/lib/tracker-config";
 
-export type SectionGroup = "Reading" | "Tracking" | "Library" | "Practice";
+export type SectionGroup = "Reading" | "Tracking" | "Library" | "Guitar";
 
 export type Section = {
   key: string;
@@ -37,9 +37,9 @@ const COMICS_SECTION: Section = {
 const PRACTICE_SECTION: Section = {
   key: "practice",
   num: "",
-  name: "Practice",
+  name: "Guitar",
   href: "/practice",
-  group: "Practice",
+  group: "Guitar",
   desc: "Today · Fretboard · Licks",
   match: (p) => p.startsWith("/practice"),
 };
