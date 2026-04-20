@@ -37,7 +37,7 @@ const COMICS_SECTION: Section = {
 const PRACTICE_SECTION: Section = {
   key: "practice",
   num: "",
-  name: "Guitar",
+  name: "Practice",
   href: "/practice",
   group: "Guitar",
   desc: "Today · Fretboard · Licks",
