@@ -19,6 +19,22 @@ export type AlphaTabViewerProps = {
   className?: string;
 };
 
+function readThemeResources(): Record<string, string> {
+  const styles = getComputedStyle(document.documentElement);
+  const rgb = (name: string) => {
+    const value = styles.getPropertyValue(name).trim();
+    return `rgb(${value})`;
+  };
+  return {
+    staffLineColor: rgb("--rule-strong"),
+    barSeparatorColor: rgb("--rule-strong"),
+    mainGlyphColor: rgb("--cream"),
+    secondaryGlyphColor: rgb("--cream-dim"),
+    scoreInfoColor: rgb("--cream"),
+    barNumberColor: rgb("--cream-dim"),
+  };
+}
+
 export function AlphaTabViewer({ tex, className }: AlphaTabViewerProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mountRef = useRef<HTMLDivElement | null>(null);
@@ -31,6 +47,22 @@ export function AlphaTabViewer({ tex, className }: AlphaTabViewerProps) {
   const [speed, setSpeed] = useState(1);
   const [looping, setLooping] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [themeVersion, setThemeVersion] = useState(0);
+
+  useEffect(() => {
+    const bump = () => setThemeVersion((v) => v + 1);
+    const observer = new MutationObserver(bump);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-theme"],
+    });
+    const mql = window.matchMedia("(prefers-color-scheme: light)");
+    mql.addEventListener("change", bump);
+    return () => {
+      observer.disconnect();
+      mql.removeEventListener("change", bump);
+    };
+  }, []);
 
   useEffect(() => {
     let disposed = false;
@@ -47,14 +79,7 @@ export function AlphaTabViewer({ tex, className }: AlphaTabViewerProps) {
             engine: "svg",
           },
           display: {
-            resources: {
-              staffLineColor: "rgb(82, 79, 73)",
-              barSeparatorColor: "rgb(170, 162, 144)",
-              mainGlyphColor: "rgb(217, 209, 190)",
-              secondaryGlyphColor: "rgb(170, 162, 144)",
-              scoreInfoColor: "rgb(217, 209, 190)",
-              barNumberColor: "rgb(170, 162, 144)",
-            },
+            resources: readThemeResources(),
           },
           player: {
             enablePlayer: true,
@@ -102,7 +127,7 @@ export function AlphaTabViewer({ tex, className }: AlphaTabViewerProps) {
       }
       apiRef.current = null;
     };
-  }, [tex]);
+  }, [tex, themeVersion]);
 
   useEffect(() => {
     if (!apiRef.current) return;
