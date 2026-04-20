@@ -1,0 +1,199 @@
+# 14-day A-minor-pentatonic box-1 curriculum.
+#
+# Content transcribed from the research brief at
+# ~/Downloads/compass_artifact_wf-037aa23d-5b73-4ee3-8946-8905eddc8078_text_markdown.md.
+# Sources: Sandercoe (JustinGuitar BL-402), Govan Creative Guitar 1, Grady on
+# picking mechanics, Cepeda 2006 (spacing), Kornell-Bjork 2008 (interleaving),
+# Walker 2002 (motor consolidation). Interleaving days at 8 / 11 / 14.
+#
+# Editing: change any day, re-render — no DB migration, no build step beyond
+# next dev reload. Adding days past 14 requires also extending the curriculum
+# length in lib/practice/config.ts if you want the "complete" state to trigger
+# at a different count.
+
+pre_check:
+  title: Picking-hand prereq
+  prompt: >
+    80 bpm, straight eighth notes on the open A string. Strict down-up-down-up,
+    no hybrid, no all-downstrokes. 60 continuous seconds. Pass criterion:
+    fewer than 3 mis-picks across the minute, and the picking hand stays
+    visibly relaxed.
+  why: >
+    Isolates the rhythm-to-lead bottleneck (picking-hand consistency) with
+    the fretting hand removed as a confounder. Troy Grady: mechanically wrong
+    picking at slow tempos does NOT build to usable speed — it reinforces
+    bad motion. If you fail this, do picking mechanics work before Day 1.
+
+days:
+  - day: 1
+    title: Map the box, land the roots
+    focus: >
+      Learn every note in box 1; find both A roots by sight and sound.
+    lick_ids: [am-pent-ascending-box1-run]
+    prompt: >
+      Metronome off for 2 min: play every note in the box low-to-high, say
+      "A" out loud when you hit the E-string 5th fret and D-string 7th fret.
+      Then metronome at 60 bpm quarter notes for 3 min: one note per click,
+      ascending and descending. Finish on the A root at fret 5 string 6.
+    why: Root awareness — you can't phrase to a target you can't see.
+
+  - day: 2
+    title: Ascending run, clean picking
+    focus: >
+      Strict alternate picking, 2 notes per string, no string-skip resets.
+    lick_ids: [am-pent-ascending-box1-run]
+    prompt: >
+      80 bpm quarter notes for 2 min (down-up-down-up, ascending). Then
+      70 bpm eighth notes for 3 min (ascending + descending, no stopping
+      at the top). Stop if picking hand tenses up.
+    why: Picking-hand sync is the bottleneck for every lick that follows.
+
+  - day: 3
+    title: Pull-offs, descending
+    focus: >
+      Fretting-hand articulation; both notes of a pair equal volume.
+    lick_ids: [am-pent-descending-pulloffs]
+    prompt: >
+      60 bpm eighth notes for 3 min: pick only the first note of each string
+      pair, pull-off the second. Then 75 bpm for 2 min. Listen for the
+      pull-off note being as loud as the picked note.
+    why: Legato foundation — pull-offs are 50% of a blues vocabulary.
+
+  - day: 4
+    title: The signature bend
+    focus: >
+      Whole-step bend from G (♭7) to A (root) on the B string, fret 8 to
+      pitch of fret 10.
+    lick_ids: [am-pent-bb-style-box1-opener]
+    prompt: >
+      No metronome: bend B-string fret 8 up a whole step, match pitch to
+      B-string fret 10 played un-bent. Do this 20 times. Then play the full
+      lick at your own pace, adding vibrato AFTER the bend reaches pitch,
+      for 4 min.
+    why: Pitch-accurate bending is the single biggest lead-guitar "tell."
+
+  - day: 5
+    title: Hammer-on / pull-off flurry
+    focus: String-crossing legato; same dynamic across strings.
+    lick_ids: [am-pent-hendrix-voodoo-child-transposed]
+    prompt: >
+      60 bpm eighth notes for 3 min — play the phrase once per bar, loop.
+      Then 70 bpm for 2 min. The G-string 5h7p5h7p5 must sound even; no dip
+      in volume on the pull-off.
+    why: Hendrix-grade left-hand independence.
+
+  - day: 6
+    title: Double-stop slides
+    focus: Two-string attack, staccato, Chuck Berry groove.
+    lick_ids: [am-pent-chuck-berry-double-stop]
+    prompt: >
+      90 bpm quarter notes for 3 min, playing the double-stop on every click.
+      Then 75 bpm straight eighths for 2 min. Pick G+B strings together;
+      let the G-string slide 5→6 be the movement.
+    why: Double-stops are half of blues/rock rhythm-lead hybrid language.
+
+  - day: 7
+    title: The ♭5 blues note
+    focus: >
+      E♭ passing tone at A-string fret 6; move through, don't land.
+    lick_ids: [am-pent-b5-chromatic]
+    prompt: >
+      70 bpm eighth notes for 3 min. Play A→E→E♭→D (A-string 5-7-6-5) as
+      a chromatic slide, then out through box 1. Repeat 10×. Then freely
+      noodle for 2 min using the ♭5 only as passing tone.
+    why: The blues scale sound — the one note that converts pentatonic to blues.
+
+  - day: 8
+    title: Interleaving day 1 — call & response
+    focus: Ask a question, answer it.
+    lick_ids:
+      - am-pent-call-response
+      - am-pent-bb-style-box1-opener
+      - am-pent-descending-pulloffs
+    prompt: >
+      2 min: play the BB-style opener twice. 2 min: play the descending
+      pull-off run twice. 4 min: play the 2-bar call & response lick with
+      a metronome tapping only beat 1 of each bar at 80 bpm — feel the
+      space between call and response.
+    why: >
+      Interleaving boosts retention (Kornell-Bjork); space is the lead-
+      guitar skill rhythm players most lack.
+
+  - day: 9
+    title: Slow blues, one note holds forever
+    focus: Sustained bend, wide vibrato, patience.
+    lick_ids: [am-pent-slow-blues-phrasing]
+    prompt: >
+      50 bpm with a 6/8 click (or 50 bpm quarter note, count 1-2-3-4-5-6).
+      Play the lick once per 4 bars for 5 min. The held bend must last at
+      least 2 full beats before vibrato starts. If you feel rushed, slow
+      the metronome.
+    why: Rhythm players rush; slow blues is the antidote.
+
+  - day: 10
+    title: Rhythmic displacement
+    focus: Anticipating the downbeat; phrases that start on "and of 4."
+    lick_ids: [am-pent-rhythmic-displacement]
+    prompt: >
+      80 bpm quarter notes for 5 min, foot tapping downbeats. Play the
+      2-bar phrase so the answer's resolution lands on the "and of 3" of
+      bar 2, not on beat 1. Record on your phone and listen back — is the
+      anticipation there?
+    why: Syncopation is how lead guitar breathes against a rhythm section.
+
+  - day: 11
+    title: Interleaving day 2 — turnarounds
+    focus: Land the final A root exactly on the downbeat of the next chorus.
+    lick_ids:
+      - am-pent-traditional-turnaround
+      - am-pent-ascending-box1-run
+      - am-pent-zigzag-connection
+    prompt: >
+      2 min: ascending run at 80 bpm eighths. 2 min: zigzag sequence (the
+      "fours" pattern) at 70 bpm eighths. 4 min: turnaround lick repeated,
+      resolving to A on beat 1 of the next bar, at 80 bpm.
+    why: >
+      Turnaround = the musical punctuation that makes you sound like you
+      know the form.
+
+  - day: 12
+    title: First improv — over a backing track
+    focus: 70% of the time play the licks you know; 30% experiment.
+    lick_ids: [am-pent-page-heartbreaker]
+    backing_track_search: A minor blues backing track slow 80 bpm
+    prompt: >
+      YouTube: "A minor blues backing track slow 80 bpm" (Elevated Jam
+      Tracks and QuistJam both have reliable 80 bpm A minor slow-blues
+      tracks). Play the Heartbreaker phrase over the I chord, then play
+      any box-1 lick over the IV and V. 8 min, no stopping.
+    why: First real context — a lick only means something inside a groove.
+
+  - day: 13
+    title: Taste night — Crossroads + Cortez feel
+    focus: Fast vs. slow phrasing in the same box.
+    lick_ids:
+      - am-pent-clapton-crossroads-box1
+      - am-pent-young-cortez-style
+    backing_track_search: A minor rock backing track 90 bpm
+    prompt: >
+      YouTube: "A minor rock backing track 90 bpm". 4 min: Crossroads-style
+      phrase, dense 16ths, Clapton's C→C♯ grace-note color. 4 min:
+      Cortez-style phrase, ONE bend per 4 bars, long vibrato. Same box,
+      opposite vocabulary.
+    why: >
+      Hearing the same 5 notes say two opposite things = the moment rhythm
+      players "get" lead.
+
+  - day: 14
+    title: Interleaving day 3 — free improv
+    focus: >
+      Combine 5+ licks from memory over a backing track; add the legato
+      stretch lick as a flourish.
+    lick_ids: [am-pent-legato-3nps]
+    backing_track_search: A minor pentatonic jam track backing 100 bpm
+    prompt: >
+      YouTube: "A minor pentatonic jam track backing 100 bpm" (Quist,
+      Elevated Jam Tracks). 10 min continuous: every 8 bars, play a
+      different lick from the library. Once during the jam, throw in the
+      3nps legato run as a "comment." Record it. Next day, listen.
+    why: Synthesis — proving the 14 days actually built a vocabulary.
