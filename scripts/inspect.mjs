@@ -414,6 +414,9 @@ async function html() {
     "fretboard notes (chord)": (text.match(/data-role="chord"/g) || []).length,
     "fretboard notes (scale)": (text.match(/data-role="scale"/g) || []).length,
     "fretboard notes (ghost)": (text.match(/data-role="ghost"/g) || []).length,
+    // Practice · licks — each lick tile links to /practice/licks/<id>.
+    "lick cards":              (text.match(/href="\/practice\/licks\/am-pent-/g) || []).length,
+    "mark-learned buttons":    (text.match(/Mark as learned|Learned · tap to unmark/g) || []).length,
   };
   header("Structural counts");
   for (const [k, v] of Object.entries(counts)) {

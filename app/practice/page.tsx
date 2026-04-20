@@ -33,7 +33,7 @@ const TILES: Tile[] = [
     title: "Licks",
     desc: "A-minor pentatonic vocabulary — browse and mark learned.",
     href: "/practice/licks",
-    available: false,
+    available: true,
   },
 ];
 
