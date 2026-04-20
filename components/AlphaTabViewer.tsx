@@ -45,7 +45,6 @@ export function AlphaTabViewer({ tex, className }: AlphaTabViewerProps) {
           core: {
             fontDirectory: "/alphatab/font/",
             engine: "svg",
-            tex: false,
           },
           display: {
             resources: {

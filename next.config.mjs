@@ -1,5 +1,6 @@
 import { execSync } from "child_process";
 import withSerwistInit from "@serwist/next";
+import { AlphaTabWebPackPlugin } from "@coderline/alphatab-webpack";
 
 const withSerwist = withSerwistInit({
   swSrc: "app/sw.ts",
@@ -46,6 +47,15 @@ const nextConfig = {
         path: false,
         crypto: false,
       };
+      // Wire up alphatab's web worker + audio worklet so the layout worker
+      // and the player actually spawn in the Next.js bundle. Without this,
+      // `new URL('./alphaTab.worker.mjs', import.meta.url)` inside alphatab
+      // never resolves to an emitted chunk, renderFinished never fires, and
+      // the viewer hangs on "Rendering tab…". Fonts + soundfont are already
+      // committed in public/alphatab/, so skip the plugin's asset copy.
+      config.plugins.push(
+        new AlphaTabWebPackPlugin({ assetOutputDir: false }),
+      );
     }
     return config;
   },
