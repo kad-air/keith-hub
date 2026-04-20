@@ -22,8 +22,13 @@ export type AlphaTabViewerProps = {
 function readThemeResources(): Record<string, string> {
   const styles = getComputedStyle(document.documentElement);
   const rgb = (name: string) => {
-    const value = styles.getPropertyValue(name).trim();
-    return `rgb(${value})`;
+    // globals.css stores RGB channels space-separated so Tailwind's /opacity
+    // modifier works. AlphaTab's Color.fromJson only understands the legacy
+    // comma-separated rgb(r,g,b) form — a space-separated value parses to
+    // null, which leaves mainGlyphColor unset and the viewer stuck on
+    // "Rendering tab…". Normalize to commas here.
+    const channels = styles.getPropertyValue(name).trim().split(/\s+/).join(",");
+    return `rgb(${channels})`;
   };
   return {
     staffLineColor: rgb("--rule-strong"),
