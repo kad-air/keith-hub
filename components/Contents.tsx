@@ -9,7 +9,7 @@ const GROUP_ORDER: SectionGroup[] = [
   "Reading",
   "Tracking",
   "Library",
-  "Practice",
+  "Guitar",
 ];
 
 const SHORTCUT_HINTS = [
