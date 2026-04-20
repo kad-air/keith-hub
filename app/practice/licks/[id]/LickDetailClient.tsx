@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
+import { AlphaTabViewer } from "@/components/AlphaTabViewer";
 import type { Lick, LickDifficulty, LickTag } from "@/lib/practice/licks";
 
 function difficultyLabel(d: LickDifficulty): string {
@@ -10,6 +11,18 @@ function difficultyLabel(d: LickDifficulty): string {
 
 function tagLabel(t: LickTag): string {
   return t.replace(/-/g, " ");
+}
+
+// Prepend AlphaTex metadata (title + tempo) to the lick body. If the lick
+// already begins with its own metadata (e.g. `\ts 6 8 . …`), merge by sharing
+// the `.` marker rather than emitting it twice.
+function buildTex(lick: Lick): string {
+  const tempo = lick.tempo ?? 80;
+  const safeTitle = lick.name.replace(/"/g, "'");
+  const header = `\\title "${safeTitle}" \\tempo ${tempo}`;
+  const body = lick.alphaTex.trim();
+  if (body.startsWith("\\")) return `${header} ${body}`;
+  return `${header} . ${body}`;
 }
 
 export function LickDetailClient({
@@ -93,9 +106,12 @@ export function LickDetailClient({
         <h2 className="mb-2 font-mono text-[0.7rem] uppercase tracking-kicker text-cream-dimmer">
           Tab
         </h2>
-        <pre className="overflow-x-auto rounded-lg border border-rule/60 bg-ink-raised/40 p-4 font-mono text-[0.8rem] leading-tight text-cream">
-          {lick.tab}
-        </pre>
+        <AlphaTabViewer tex={buildTex(lick)} />
+        {lick.tabNote && (
+          <p className="mt-2 font-mono text-[0.65rem] text-cream-dimmer">
+            {lick.tabNote}
+          </p>
+        )}
       </section>
 
       <section className="mb-6">
