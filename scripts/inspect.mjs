@@ -441,6 +441,90 @@ function logs(args) {
   console.log(cmd.stdout);
 }
 
+function practice(args) {
+  const sub = args[0] || "counts";
+
+  if (!["counts", "days", "licks"].includes(sub)) {
+    console.error(c.red(`Unknown subcommand: practice ${sub}`));
+    console.error(c.dim("Usage: practice [counts|days|licks]"));
+    process.exit(1);
+  }
+
+  const conn = db();
+
+  // The practice_progress table might not exist yet if the server hasn't
+  // booted with the new schema — handle that gracefully.
+  const tableExists = conn
+    .prepare(
+      `SELECT name FROM sqlite_master WHERE type='table' AND name='practice_progress'`,
+    )
+    .get();
+  if (!tableExists) {
+    console.log(
+      c.yellow(
+        "practice_progress table doesn't exist yet — restart the dev server so lib/db.ts runs.",
+      ),
+    );
+    return;
+  }
+
+  if (sub === "counts") {
+    header("Practice progress");
+    const row = conn
+      .prepare(
+        `SELECT
+           COUNT(*) as total,
+           SUM(CASE WHEN item_id LIKE 'day:%' THEN 1 ELSE 0 END) as days_done,
+           SUM(CASE WHEN item_id LIKE 'lick:%' THEN 1 ELSE 0 END) as licks_learned
+         FROM practice_progress`,
+      )
+      .get();
+    table([row], [
+      { label: "rows", get: (r) => r.total ?? 0 },
+      { label: "days done", get: (r) => r.days_done ?? 0 },
+      { label: "licks learned", get: (r) => r.licks_learned ?? 0 },
+    ]);
+
+    // Derive a streak from day:* rows — count consecutive days ending today.
+    const days = conn
+      .prepare(
+        `SELECT DISTINCT date(done_at, 'localtime') as d
+         FROM practice_progress
+         WHERE item_id LIKE 'day:%'
+         ORDER BY d DESC`,
+      )
+      .all()
+      .map((r) => r.d);
+    let streak = 0;
+    const today = new Date();
+    for (let i = 0; i < days.length; i++) {
+      const expected = new Date(today);
+      expected.setDate(today.getDate() - i);
+      const expectedStr = expected.toISOString().slice(0, 10);
+      if (days[i] === expectedStr) streak++;
+      else break;
+    }
+    console.log(`\n  ${c.dim("streak")}  ${streak} day${streak === 1 ? "" : "s"}`);
+  }
+
+  if (sub === "days" || sub === "licks") {
+    const prefix = sub === "days" ? "day:" : "lick:";
+    const rows = conn
+      .prepare(
+        `SELECT item_id, done_at FROM practice_progress
+         WHERE item_id LIKE ? || '%'
+         ORDER BY done_at DESC`,
+      )
+      .all(prefix);
+    header(`${rows.length} ${sub === "days" ? "days done" : "licks learned"}`);
+    table(rows, [
+      { label: "item_id", get: (r) => r.item_id },
+      { label: "done", get: (r) => relativeTime(r.done_at) },
+      { label: "at", get: (r) => r.done_at },
+    ]);
+  }
+}
+
 async function refresh() {
   header(`POST ${FEED_BASE}/api/refresh`);
   const cookie = await getAuthCookie();
@@ -469,6 +553,7 @@ ${c.bold("Commands:")}
                                 ${c.dim("kinds: images external quoted reply repost")}
   ${c.cyan("html [path]")}                 Fetch live page, count rendered structures
   ${c.cyan("logs [n]")}                    Last N log lines (pm2 locally; use Railway dashboard in prod)
+  ${c.cyan("practice [sub]")}              Practice progress: subs are counts (default), days, licks
   ${c.cyan("refresh")}                     POST /api/refresh and report
   ${c.cyan("help")}                        This help
 `);
@@ -482,6 +567,7 @@ const COMMANDS = {
   "bsky-rich": bskyRich,
   html,
   logs,
+  practice,
   refresh,
   help,
 };

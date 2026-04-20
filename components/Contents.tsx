@@ -5,7 +5,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { SECTIONS, type Section, type SectionGroup } from "@/lib/sections";
 
-const GROUP_ORDER: SectionGroup[] = ["Reading", "Tracking", "Library"];
+const GROUP_ORDER: SectionGroup[] = [
+  "Reading",
+  "Tracking",
+  "Library",
+  "Practice",
+];
 
 const SHORTCUT_HINTS = [
   ["g f", "Feed"],

@@ -67,6 +67,16 @@ export function getDb(): Database.Database {
       issue_id TEXT PRIMARY KEY,
       read_at TEXT NOT NULL
     );
+
+    -- Practice section: one row per "thing you've completed". item_id is a
+    -- composite key like "day:01" or "lick:am-pent-bb-style-box1-opener".
+    -- Streak is derived by scanning day:* rows; learned-lick count is a
+    -- SELECT over lick:* rows. No separate sessions table in v1.
+    CREATE TABLE IF NOT EXISTS practice_progress (
+      item_id TEXT PRIMARY KEY,
+      done_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_practice_progress_done_at ON practice_progress(done_at);
   `);
 
   return dbInstance;

@@ -1,6 +1,6 @@
 import { TRACKER_CONFIGS } from "@/lib/tracker-config";
 
-export type SectionGroup = "Reading" | "Tracking" | "Library";
+export type SectionGroup = "Reading" | "Tracking" | "Library" | "Practice";
 
 export type Section = {
   key: string;
@@ -34,6 +34,16 @@ const COMICS_SECTION: Section = {
   match: (p) => p.startsWith("/comics"),
 };
 
+const PRACTICE_SECTION: Section = {
+  key: "practice",
+  num: "",
+  name: "Practice",
+  href: "/practice",
+  group: "Practice",
+  desc: "Today · Fretboard · Licks",
+  match: (p) => p.startsWith("/practice"),
+};
+
 export const SECTIONS: Section[] = (() => {
   const trackerSections: Section[] = TRACKER_CONFIGS.map((t) => ({
     key: t.slug,
@@ -46,7 +56,12 @@ export const SECTIONS: Section[] = (() => {
       p === `/trackers/${t.slug}` || p.startsWith(`/trackers/${t.slug}/`),
   }));
 
-  const all = [FEED_SECTION, ...trackerSections, COMICS_SECTION];
+  const all = [
+    FEED_SECTION,
+    ...trackerSections,
+    COMICS_SECTION,
+    PRACTICE_SECTION,
+  ];
   return all.map((s, i) => ({ ...s, num: String(i + 1).padStart(2, "0") }));
 })();
 
