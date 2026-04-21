@@ -82,6 +82,11 @@ export default function FeedClient({
   const [renderedCount, setRenderedCount] = useState(INITIAL_CHUNK);
   const cardRefs = useRef<Array<HTMLElement | null>>([]);
   const sentinelRef = useRef<HTMLDivElement>(null);
+  // Gate scrollIntoView to keyboard-driven focus changes only. Touch and
+  // hover also call onFocus to set focusedIndex — without this gate, tapping
+  // a card (onTouchStart fires before the tap commits) or drifting the mouse
+  // across cards would trigger smooth-scrolling mid-gesture.
+  const keyboardFocusRef = useRef(false);
 
   // ─── Category cache ──────────────────────────────────────
   // Avoids redundant network round-trips when switching between tabs.
@@ -107,6 +112,7 @@ export default function FeedClient({
         setItems(cached.items);
         setCounts(cached.counts);
         setFocusedIndex(0);
+        setRenderedCount(INITIAL_CHUNK);
         return;
       }
 
@@ -123,6 +129,7 @@ export default function FeedClient({
         setItems(data.items);
         setCounts(data.counts);
         setFocusedIndex(0);
+        setRenderedCount(INITIAL_CHUNK);
         categoryCache.current.set(category, {
           items: data.items,
           counts: data.counts,
@@ -191,10 +198,11 @@ export default function FeedClient({
   // the user's scroll position to the top of the feed. If new items are
   // available, surface a toast offering to load them on demand.
   const lastRefreshRef = useRef(0);
+  // Latest-items ref consumed by event handlers so their identity can stay
+  // stable across `items` changes. Assigned during render (not in an effect)
+  // so handlers firing between render and effect don't see stale items.
   const itemsRef = useRef(items);
-  useEffect(() => {
-    itemsRef.current = items;
-  }, [items]);
+  itemsRef.current = items;
   useEffect(() => {
     function onVisibilityChange() {
       if (document.visibilityState !== "visible") return;
@@ -244,6 +252,7 @@ export default function FeedClient({
       setItems(pending.items);
       setCounts(pending.counts);
       setFocusedIndex(0);
+      setRenderedCount(INITIAL_CHUNK);
       return null;
     });
   }, []);
@@ -394,12 +403,18 @@ export default function FeedClient({
   // Semantically identical to bulk-dismissing those items — only read_at gets
   // set, never consumed_at, so they don't pollute /read. Snapshot the items
   // so undo can restore them in place instead of refetching.
+  //
+  // Reads the current items via itemsRef so this callback's identity stays
+  // stable across items changes — if items were in the dep list, every
+  // dismiss would rebuild the callback and defeat FeedCard's memo, forcing
+  // every rendered card to re-render.
   const handleClearAbove = useCallback(
     async (item: Item) => {
       invalidateCache();
-      const cutoff = items.findIndex((it) => it.id === item.id);
+      const current = itemsRef.current;
+      const cutoff = current.findIndex((it) => it.id === item.id);
       if (cutoff < 0) return;
-      const toClear = items.slice(0, cutoff + 1);
+      const toClear = current.slice(0, cutoff + 1);
       const clearIds = toClear.map((it) => it.id);
       const clearIdSet = new Set(clearIds);
       const clearCount = clearIds.length;
@@ -443,7 +458,7 @@ export default function FeedClient({
         // best effort
       }
     },
-    [items, invalidateCache]
+    [invalidateCache]
   );
 
   // Bulk dismiss: marks the currently-visible items as read using their
@@ -457,7 +472,9 @@ export default function FeedClient({
   // semantic as the per-card dismiss button.
   const handleMarkAllRead = useCallback(async () => {
     invalidateCache();
-    const dismissIds = items.map((it) => it.id);
+    // Read current items via ref so this callback's identity stays stable —
+    // closing over `items` would rebuild it on every dismiss.
+    const dismissIds = itemsRef.current.map((it) => it.id);
     const dismissCount = dismissIds.length;
     if (dismissCount === 0) return;
 
@@ -492,7 +509,7 @@ export default function FeedClient({
     // browsing. This runs after the pending toast is set so the user sees
     // the undo option immediately.
     void fetchItems(activeCategory);
-  }, [activeCategory, items, invalidateCache, fetchItems]);
+  }, [activeCategory, invalidateCache, fetchItems]);
 
   const handleUndo = useCallback(async () => {
     if (!pending) return;
@@ -558,8 +575,12 @@ export default function FeedClient({
     }
   }, [items.length, focusedIndex]);
 
-  // Scroll focused card into view when keyboard nav changes the index
+  // Scroll focused card into view when keyboard nav changes the index.
+  // Skipped when the focus change came from touch/hover — those set
+  // focusedIndex too but the user hasn't asked to be scrolled.
   useEffect(() => {
+    if (!keyboardFocusRef.current) return;
+    keyboardFocusRef.current = false;
     const el = cardRefs.current[focusedIndex];
     if (!el) return;
     el.scrollIntoView({ block: "nearest", behavior: "smooth" });
@@ -569,6 +590,7 @@ export default function FeedClient({
   useKeyboard(
     {
       j: () => {
+        keyboardFocusRef.current = true;
         setFocusedIndex((i) => {
           const next = Math.min(items.length - 1, i + 1);
           if (next >= renderedCount) {
@@ -577,7 +599,10 @@ export default function FeedClient({
           return next;
         });
       },
-      k: () => setFocusedIndex((i) => Math.max(0, i - 1)),
+      k: () => {
+        keyboardFocusRef.current = true;
+        setFocusedIndex((i) => Math.max(0, i - 1));
+      },
       o: () => {
         const it = items[focusedIndex];
         if (it) void handleOpen(it);
@@ -649,10 +674,14 @@ export default function FeedClient({
   }, [handleRefresh]);
 
   // ─── Chunked rendering ───────────────────────────────────
-  // Reset chunk count when the item list changes (category switch, refresh)
+  // Wholesale list replacements (category switch, refresh, load-new-items)
+  // reset renderedCount explicitly at their call sites. Here we only clamp
+  // so a dismiss that shrinks items below the current renderedCount doesn't
+  // leave the sentinel unreachable — and crucially, a dismiss from a
+  // deep-scrolled position doesn't truncate the rendered window back to 50.
   useEffect(() => {
-    setRenderedCount(INITIAL_CHUNK);
-  }, [items]);
+    setRenderedCount((prev) => Math.min(prev, Math.max(INITIAL_CHUNK, items.length)));
+  }, [items.length]);
 
   // Load more chunks as the user scrolls near the sentinel
   useEffect(() => {

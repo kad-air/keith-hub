@@ -22,6 +22,8 @@ export default function SavedClient({ initialItems }: SavedClientProps) {
   const [renderedCount, setRenderedCount] = useState(SAVED_CHUNK);
   const cardRefs = useRef<Array<HTMLElement | null>>([]);
   const sentinelRef = useRef<HTMLDivElement>(null);
+  // See FeedClient: only scrollIntoView for keyboard-driven focus changes.
+  const keyboardFocusRef = useRef(false);
 
   const removeFromList = useCallback((id: string) => {
     setItems((prev) => prev.filter((it) => it.id !== id));
@@ -117,15 +119,20 @@ export default function SavedClient({ initialItems }: SavedClientProps) {
   }, [items.length, focusedIndex]);
 
   useEffect(() => {
+    if (!keyboardFocusRef.current) return;
+    keyboardFocusRef.current = false;
     const el = cardRefs.current[focusedIndex];
     if (!el) return;
     el.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }, [focusedIndex]);
 
   // ── Chunked rendering ─────────────────────────────────────
+  // Clamp only — don't reset the rendered window when a single item is
+  // unsaved/dismissed. Initial mount already renders SAVED_CHUNK, and
+  // there's no refresh path here that wholesale-replaces items.
   useEffect(() => {
-    setRenderedCount(SAVED_CHUNK);
-  }, [items]);
+    setRenderedCount((prev) => Math.min(prev, Math.max(SAVED_CHUNK, items.length)));
+  }, [items.length]);
 
   useEffect(() => {
     const el = sentinelRef.current;
@@ -150,6 +157,7 @@ export default function SavedClient({ initialItems }: SavedClientProps) {
   useKeyboard(
     {
       j: () => {
+        keyboardFocusRef.current = true;
         setFocusedIndex((i) => {
           const next = Math.min(items.length - 1, i + 1);
           if (next >= renderedCount) {
@@ -158,7 +166,10 @@ export default function SavedClient({ initialItems }: SavedClientProps) {
           return next;
         });
       },
-      k: () => setFocusedIndex((i) => Math.max(0, i - 1)),
+      k: () => {
+        keyboardFocusRef.current = true;
+        setFocusedIndex((i) => Math.max(0, i - 1));
+      },
       o: () => {
         const it = items[focusedIndex];
         if (it) void handleOpen(it);
