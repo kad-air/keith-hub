@@ -17,20 +17,27 @@ export default function Toast({
   onDismiss,
   durationMs = 5000,
 }: ToastProps) {
-  const [progress, setProgress] = useState(100);
-
+  // Progress is driven by a single CSS width transition: we render in
+  // `reset` phase (width=100, transition=none), flip to `ticking` next
+  // frame (width=0, transition=durationMs), and let the GPU tween between.
+  // Beats a 20Hz setInterval that was re-rendering a fixed-position
+  // element on top of the feed every 50ms — visibly pressuring the main
+  // thread during swipes. The phase flag also means a parent re-render
+  // (new onDismiss identity, new pending item) visibly restarts the bar
+  // instead of freezing it at 0%.
+  const [phase, setPhase] = useState<"reset" | "ticking">("reset");
   useEffect(() => {
-    const start = Date.now();
-    const timer = setInterval(() => {
-      const elapsed = Date.now() - start;
-      const remaining = Math.max(0, 100 - (elapsed / durationMs) * 100);
-      setProgress(remaining);
-      if (remaining <= 0) {
-        clearInterval(timer);
-        onDismiss();
-      }
-    }, 50);
-    return () => clearInterval(timer);
+    setPhase("reset");
+    let raf2 = 0;
+    const raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => setPhase("ticking"));
+    });
+    const timer = window.setTimeout(onDismiss, durationMs);
+    return () => {
+      cancelAnimationFrame(raf1);
+      if (raf2) cancelAnimationFrame(raf2);
+      window.clearTimeout(timer);
+    };
   }, [durationMs, onDismiss]);
 
   return (
@@ -76,11 +83,16 @@ export default function Toast({
             </svg>
           </button>
         </div>
-        {/* Countdown progress bar */}
+        {/* Countdown progress bar — single CSS transition over the full
+            duration, no JS tick. */}
         <div
           aria-hidden
-          className="absolute bottom-0 left-0 h-[1px] bg-accent/70 transition-[width] duration-75 ease-linear"
-          style={{ width: `${progress}%` }}
+          className="absolute bottom-0 left-0 h-[1px] bg-accent/70 ease-linear"
+          style={{
+            width: phase === "reset" ? "100%" : "0%",
+            transition:
+              phase === "reset" ? "none" : `width ${durationMs}ms linear`,
+          }}
         />
       </div>
     </div>

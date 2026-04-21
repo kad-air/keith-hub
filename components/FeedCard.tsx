@@ -1,6 +1,6 @@
 "use client";
 
-import { forwardRef, memo, useEffect, useRef, useState } from "react";
+import { forwardRef, memo, useEffect, useMemo, useRef, useState } from "react";
 import type { TouchEvent as ReactTouchEvent } from "react";
 import type {
   Item,
@@ -132,8 +132,17 @@ const FeedCard = memo(forwardRef<HTMLDivElement, FeedCardProps>(function FeedCar
   const isPodcast = category === "podcasts";
   const saved = !!item.saved_at;
 
-  const bsky = isBluesky ? parseMeta<BlueskyMetadata>(item.metadata) : null;
-  const podcast = isPodcast ? parseMeta<PodcastMeta>(item.metadata) : null;
+  // Metadata is a JSON string in the row. Memoize the parse so re-renders
+  // driven by parent state (focus change, dismiss siblings, etc.) don't
+  // re-run JSON.parse on every visible card.
+  const bsky = useMemo(
+    () => (isBluesky ? parseMeta<BlueskyMetadata>(item.metadata) : null),
+    [isBluesky, item.metadata],
+  );
+  const podcast = useMemo(
+    () => (isPodcast ? parseMeta<PodcastMeta>(item.metadata) : null),
+    [isPodcast, item.metadata],
+  );
 
   // ── Bluesky interaction state ────────────────────────────────
   // We hold optimistic overrides in local state so taps feel instant. When

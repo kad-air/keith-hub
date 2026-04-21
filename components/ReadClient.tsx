@@ -28,6 +28,8 @@ export default function ReadClient({ initialItems }: ReadClientProps) {
   const [renderedCount, setRenderedCount] = useState(READ_CHUNK);
   const cardRefs = useRef<Array<HTMLElement | null>>([]);
   const sentinelRef = useRef<HTMLDivElement>(null);
+  // See FeedClient: only scrollIntoView for keyboard-driven focus changes.
+  const keyboardFocusRef = useRef(false);
 
   const handleOpen = useCallback(async (item: Item) => {
     const podcastMeta =
@@ -115,15 +117,19 @@ export default function ReadClient({ initialItems }: ReadClientProps) {
   }, [items.length, focusedIndex]);
 
   useEffect(() => {
+    if (!keyboardFocusRef.current) return;
+    keyboardFocusRef.current = false;
     const el = cardRefs.current[focusedIndex];
     if (!el) return;
     el.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }, [focusedIndex]);
 
   // ── Chunked rendering ─────────────────────────────────────
+  // Clamp only — a save-toggle shouldn't reset the rendered window, which
+  // would flash the viewport back to the top chunk.
   useEffect(() => {
-    setRenderedCount(READ_CHUNK);
-  }, [items]);
+    setRenderedCount((prev) => Math.min(prev, Math.max(READ_CHUNK, items.length)));
+  }, [items.length]);
 
   useEffect(() => {
     const el = sentinelRef.current;
@@ -148,6 +154,7 @@ export default function ReadClient({ initialItems }: ReadClientProps) {
   useKeyboard(
     {
       j: () => {
+        keyboardFocusRef.current = true;
         setFocusedIndex((i) => {
           const next = Math.min(items.length - 1, i + 1);
           if (next >= renderedCount) {
@@ -156,7 +163,10 @@ export default function ReadClient({ initialItems }: ReadClientProps) {
           return next;
         });
       },
-      k: () => setFocusedIndex((i) => Math.max(0, i - 1)),
+      k: () => {
+        keyboardFocusRef.current = true;
+        setFocusedIndex((i) => Math.max(0, i - 1));
+      },
       o: () => {
         const it = items[focusedIndex];
         if (it) void handleOpen(it);
