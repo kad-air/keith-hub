@@ -38,12 +38,14 @@ export const ALL_VIEW_PRIORITY: Record<keyof CategoryCounts, number> = {
 // ── Bluesky derivation ────────────────────────────────────────────────────
 // Bluesky count is derived from RSS total, not independently capped.
 // When RSS items exist: 1 bsky per BSKY_INTERLEAVE_RATIO RSS items.
-// When RSS is empty: fall back to BSKY_WINDOW (the whole window).
+// When RSS is empty: no bsky in the All view — the feed goes empty and
+// honors "enough for now". The Bluesky tab (category filter, pure recency)
+// still surfaces every unread post, so the backlog is never stranded.
 //
-// BSKY_WINDOW is also the size of the bounded backlog: each poll cycle,
-// any unread bsky post outside the newest N gets auto-marked read. This
-// means a dismiss-all doesn't surface a fresh 100 on the next refresh —
-// only genuinely-new posts since the window slid forward.
+// BSKY_WINDOW sizes the bounded unread backlog: each poll cycle, any unread
+// bsky post outside the newest N gets hard-deleted. Combined with the
+// RSS-empty = zero-bsky rule above, a dismiss-all settles to empty until
+// a genuinely-new post (or RSS item) arrives on the next poll.
 export const BSKY_INTERLEAVE_RATIO = 4;
 export const BSKY_WINDOW = 100;
 
@@ -163,7 +165,10 @@ function interleaveByPriority(
  * Returns items for the main feed. Every unread RSS item makes it in
  * (bounded only by the TTL prune — effectively up to 7 days of content).
  * Bluesky is sprinkled in for flavor: 1 post per BSKY_INTERLEAVE_RATIO
- * RSS items, selected via surprise sampling for variety.
+ * RSS items, selected via surprise sampling for variety. When there is
+ * no unread RSS, the All view returns empty — no bsky fallback — so
+ * "dismiss all" settles to empty instead of dumping the bsky backlog.
+ * The Bluesky tab continues to surface every unread post on its own.
  *
  * Priority-weighted interleave ensures reviews appear earlier/denser
  * than articles, with bluesky filling gaps.
@@ -195,17 +200,20 @@ export function getMainFeedItems(
     if (items.length > 0) byCategory.push({ cat, items });
   }
 
-  // Bluesky: sprinkle in proportional to RSS volume
+  // Bluesky: sprinkle in proportional to RSS volume. No fallback when RSS
+  // is empty — the All view goes empty in that case so "dismiss all"
+  // genuinely clears. Unread bsky is still fully available via the
+  // Bluesky tab (category filter, pure recency).
   const totalRss = byCategory.reduce((sum, { items }) => sum + items.length, 0);
-  const bskyTarget = totalRss > 0
-    ? Math.max(10, Math.ceil(totalRss / BSKY_INTERLEAVE_RATIO))
-    : BSKY_WINDOW;
-  const bskyPool = stmtLimited.all(
-    "bluesky",
-    Math.ceil(bskyTarget * SURPRISE_POOL_MULTIPLIER)
-  ) as Item[];
-  const bskyItems = selectWithSurprise(bskyPool, bskyTarget);
-  if (bskyItems.length > 0) byCategory.push({ cat: "bluesky", items: bskyItems });
+  if (totalRss > 0) {
+    const bskyTarget = Math.max(10, Math.ceil(totalRss / BSKY_INTERLEAVE_RATIO));
+    const bskyPool = stmtLimited.all(
+      "bluesky",
+      Math.ceil(bskyTarget * SURPRISE_POOL_MULTIPLIER)
+    ) as Item[];
+    const bskyItems = selectWithSurprise(bskyPool, bskyTarget);
+    if (bskyItems.length > 0) byCategory.push({ cat: "bluesky", items: bskyItems });
+  }
 
   return interleaveByPriority(byCategory);
 }
@@ -392,11 +400,13 @@ export function getCategoryCounts(
     }
   }
 
-  // All count = RSS totals + derived bsky contribution (mirrors getMainFeedItems)
+  // All count = RSS totals + derived bsky contribution (mirrors getMainFeedItems).
+  // No RSS = no bsky in the All view, so the badge reads zero — matches
+  // what the user actually sees when the feed is drained.
   const totalRss = counts.music + counts.books + counts.film + counts.tech_review + counts.podcasts + counts.reading;
   const bskyContribution = totalRss > 0
     ? Math.min(counts.bluesky, Math.max(10, Math.ceil(totalRss / BSKY_INTERLEAVE_RATIO)))
-    : Math.min(counts.bluesky, BSKY_WINDOW);
+    : 0;
   counts.all = totalRss + bskyContribution;
 
   return counts;

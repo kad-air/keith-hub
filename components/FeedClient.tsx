@@ -203,6 +203,11 @@ export default function FeedClient({
   // so handlers firing between render and effect don't see stale items.
   const itemsRef = useRef(items);
   itemsRef.current = items;
+  // Same trick for focusedIndex — read by the visibility-change handler
+  // without adding it to the effect deps (which would re-register on every
+  // j/k press).
+  const focusedIndexRef = useRef(focusedIndex);
+  focusedIndexRef.current = focusedIndex;
   useEffect(() => {
     function onVisibilityChange() {
       if (document.visibilityState !== "visible") return;
@@ -229,13 +234,25 @@ export default function FeedClient({
             (n, it) => (currentIds.has(it.id) ? n : n + 1),
             0
           );
-          if (newCount > 0) {
-            setNewItemsAvailable({
-              items: data.items,
-              counts: data.counts,
-              newCount,
-            });
+          if (newCount === 0) return;
+          // If the user is already at the top of the feed with nothing
+          // keyboard-focused deep in the list, there's no scroll position
+          // to preserve — just apply the update silently. Otherwise surface
+          // the "Load now" toast so their read position isn't yanked.
+          const atTop =
+            typeof window !== "undefined" &&
+            window.scrollY < 100 &&
+            focusedIndexRef.current === 0;
+          if (atTop) {
+            setItems(data.items);
+            setRenderedCount(INITIAL_CHUNK);
+            return;
           }
+          setNewItemsAvailable({
+            items: data.items,
+            counts: data.counts,
+            newCount,
+          });
         })
         .catch(() => {});
     }
