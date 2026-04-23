@@ -397,7 +397,22 @@ export async function fetchRssSource(
   return insertedCount;
 }
 
-export async function fetchAllSources(db: Database.Database): Promise<number> {
+// Shared in-flight guard. The poller, visibility-change silent refresh, and
+// manual refresh all ultimately call fetchAllSources; without this, they
+// stack up as parallel crawls whose responses can land out of order and
+// overwrite each other in the client. Instead, every caller now awaits
+// the same in-flight promise — one real crawl at a time.
+let fetchAllSourcesInFlight: Promise<number> | null = null;
+
+export function fetchAllSources(db: Database.Database): Promise<number> {
+  if (fetchAllSourcesInFlight) return fetchAllSourcesInFlight;
+  fetchAllSourcesInFlight = fetchAllSourcesImpl(db).finally(() => {
+    fetchAllSourcesInFlight = null;
+  });
+  return fetchAllSourcesInFlight;
+}
+
+async function fetchAllSourcesImpl(db: Database.Database): Promise<number> {
   invalidateConfig(); // Re-read feeds.yml on every poll cycle
   const config = getConfig();
 
