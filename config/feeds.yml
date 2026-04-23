@@ -47,10 +47,10 @@ sources:
     poll_interval_minutes: 3
 
   - id: allmusic
-    name: AllMusic Reviews
+    name: AllMusic New Releases
     type: rss
     category: music
-    url: https://www.allmusic.com/rss/all
+    url: https://www.allmusic.com/rss/newreleases
     poll_interval_minutes: 3
 
   # --- Podcasts ---

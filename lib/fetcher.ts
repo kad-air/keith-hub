@@ -4,20 +4,9 @@ import { getConfig, invalidateConfig, type SourceConfig } from "@/lib/config";
 import { fetchBlueskySource } from "@/lib/bluesky";
 import { pruneExpiredUnread } from "@/lib/queries";
 
-// Custom fields expose media:* elements that AllMusic uses to carry the
-// artist and album cleanly. media:credit appears multiple times per item
-// (one with role="musician" for the artist, one for the publisher), so we
-// keep it as an array and filter by role at use site.
 const RSS_FETCH_TIMEOUT_MS = 10_000;
 
-const parser = new Parser({
-  customFields: {
-    item: [
-      ["media:credit", "mediaCredit", { keepArray: true }],
-      ["media:title", "mediaTitle"],
-    ],
-  },
-});
+const parser = new Parser();
 
 // Sanitize bare & characters in XML that aren't part of valid entities.
 // Some feeds (e.g. AllMusic) contain unescaped ampersands that cause strict
@@ -28,10 +17,9 @@ function sanitizeXml(xml: string): string {
 
 // ── Source-specific title rewriters ────────────────────────────────────────
 //
-// AllMusic and Pitchfork both publish album reviews where the user-facing
-// title is the album name only (or worse). We rewrite those titles to
-// "Artist - Album" so the music feed reads cleanly. The rewriters return
-// null if they can't extract — leaves the original title in place.
+// Pitchfork publishes album reviews whose <title> is the album name only.
+// We rewrite to "Artist - Album" so the music feed reads cleanly. The
+// rewriter returns null if it can't extract — leaves the original in place.
 
 function slugify(s: string): string {
   return s
@@ -103,25 +91,6 @@ function rewritePitchforkAlbumTitle(rawTitle: string, url: string): string | nul
   return null;
 }
 
-// AllMusic album review items carry the artist as <media:credit role="musician">
-// and the album as <media:title>. The <title> element wraps the artist in an
-// <a> tag, which rss-parser strips, leaving us with just " - {album}" — useless.
-// rss-parser exposes media:credit with attributes under .$ when keepArray:true
-// and the element has children. Defensively handle string|object shapes.
-type RawCredit = string | { _?: string; $?: { role?: string } };
-
-function rewriteAllMusicAlbumTitle(rawCredits: RawCredit[] | undefined, mediaTitle: string | undefined): string | null {
-  if (!rawCredits || !mediaTitle) return null;
-  const musicianCredit = rawCredits.find((c) => {
-    if (typeof c === "string") return false;
-    return c.$?.role === "musician";
-  });
-  if (!musicianCredit || typeof musicianCredit === "string") return null;
-  const artist = musicianCredit._?.trim();
-  if (!artist) return null;
-  return `${artist} - ${mediaTitle.trim()}`;
-}
-
 interface ItemRow {
   id: string;
   source_id: string;
@@ -171,36 +140,6 @@ function decodeEntities(text: string): string {
   );
 }
 
-// ── Per-source item filters ─────────────────────────────────────────────────
-//
-// Some feeds publish a mix of content types and we only want one kind. This
-// is a per-source allow-list keyed by source.id, parallel to the title
-// rewriters above. Sources without an entry pass everything through.
-//
-// We apply the filter in two places:
-//   1. At ingest (the .filter() in the map step) so new fetches drop items.
-//   2. As a SQL cleanup right after the upsert so existing rows that pre-date
-//      the filter get pruned. The cleanup is self-healing on every poll.
-
-function shouldKeepRssItem(sourceId: string, url: string): boolean {
-  if (sourceId === "allmusic") {
-    // AllMusic publishes album reviews, blog posts, interviews, and a weekly
-    // newsletter all in the same feed. Album review URLs contain /album/.
-    return url.includes("/album/");
-  }
-  return true;
-}
-
-// Returns the SQL WHERE clause (without "WHERE") that matches items to
-// REMOVE for this source, or null if no cleanup is needed. Must stay in
-// sync with shouldKeepRssItem.
-function rssCleanupWhereClause(sourceId: string): string | null {
-  if (sourceId === "allmusic") {
-    return "url NOT LIKE '%/album/%'";
-  }
-  return null;
-}
-
 function toIsoString(date: string | Date | undefined): string {
   if (!date) return new Date().toISOString();
   try {
@@ -208,6 +147,73 @@ function toIsoString(date: string | Date | undefined): string {
   } catch {
     return new Date().toISOString();
   }
+}
+
+// AllMusic's /rss/newreleases ships ONE item per week — a newsletter whose
+// <description> is an HTML <ul> of editor's-pick album rows. We expand each
+// <li> into its own ItemRow so the user gets one card per album. The
+// per-<li> shape is reliably:
+//
+//   <li>
+//     <a href=".../artist/...">Artist</a> - <a href=".../album/...">Album</a>
+//     <br>
+//     Editor's note about the album.
+//   </li>
+//
+// A trailing meta <li> ("Here are our editors' picks for this week...") has
+// no /album/ link and is skipped.
+//
+// external_id is namespaced as `newsletter#<albumUrl>#<weekDate>` for two
+// reasons: (1) it can never collide with rows left over from the legacy
+// /rss/all "Album of the Day" ingest, whose external_ids were the bare
+// album URL; (2) if the same album appears in two consecutive newsletters,
+// each becomes its own row so a previous dismiss doesn't suppress it.
+function parseAllMusicNewsletter(
+  newsletterItem: { content?: string; description?: string; pubDate?: string; isoDate?: string },
+  fetchedAt: string,
+): ItemRow[] {
+  const html = newsletterItem.content || newsletterItem.description || "";
+  if (!html) return [];
+
+  const publishedAt = toIsoString(newsletterItem.pubDate || newsletterItem.isoDate);
+  const weekDate = publishedAt.slice(0, 10);
+
+  const rows: ItemRow[] = [];
+  const liRegex = /<li[^>]*>([\s\S]*?)<\/li>/gi;
+  for (const match of Array.from(html.matchAll(liRegex))) {
+    const li = match[1];
+    const [heading, ...descParts] = li.split(/<br\s*\/?>/i);
+
+    const artistMatch = heading.match(
+      /<a[^>]+href="[^"]*\/artist\/[^"]+"[^>]*>([^<]+)<\/a>/i,
+    );
+    const albumMatch = heading.match(
+      /<a[^>]+href="([^"]*\/album\/[^"]+)"[^>]*>([^<]+)<\/a>/i,
+    );
+    if (!artistMatch || !albumMatch) continue;
+
+    const artist = decodeEntities(artistMatch[1].trim());
+    const albumUrl = albumMatch[1];
+    const album = decodeEntities(albumMatch[2].trim());
+    const description = descParts.length
+      ? decodeEntities(stripHtml(descParts.join(" "))).trim()
+      : "";
+
+    rows.push({
+      id: crypto.randomUUID(),
+      source_id: "allmusic",
+      external_id: `newsletter#${albumUrl}#${weekDate}`,
+      title: `${artist} - ${album}`,
+      body_excerpt: description || null,
+      author: null,
+      url: albumUrl,
+      image_url: null,
+      published_at: publishedAt,
+      fetched_at: fetchedAt,
+      metadata: null,
+    });
+  }
+  return rows;
 }
 
 export async function fetchRssSource(
@@ -290,13 +296,21 @@ export async function fetchRssSource(
   const feedItunes = (feed as Record<string, unknown>).itunes as Record<string, unknown> | undefined;
   const feedArtworkUrl = (feedItunes?.image as string) || null;
 
-  const itemsToInsert: ItemRow[] = (feed.items || []).map((rawItem) => {
-    // rss-parser's Item type fights us once customFields are added — every
+  const itemsToInsert: ItemRow[] = (feed.items || []).flatMap((rawItem) => {
+    // rss-parser's Item type fights us once we touch fields by name — every
     // standard field becomes typed too narrowly. Cast to any for ergonomic
     // access to both standard and custom fields, defended by the explicit
     // string|null on the row shape itself.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const item = rawItem as any;
+
+    // AllMusic ships a single weekly newsletter item; expand it into one
+    // row per editor's-pick album. See parseAllMusicNewsletter for the
+    // shape and the external_id namespacing rationale.
+    if (source.id === "allmusic") {
+      return parseAllMusicNewsletter(item, now);
+    }
+
     const ext = item;
     const itunes = (ext.itunes as Record<string, unknown>) || {};
 
@@ -326,25 +340,17 @@ export async function fetchRssSource(
         })
       : null;
 
-    // Source-specific title rewrites for music album reviews. Both Pitchfork
-    // and AllMusic publish review titles that are missing or mangled — see
-    // the helpers above. We only rewrite when the URL matches the album
-    // review pattern so blog posts / interviews / newsletters keep their
-    // normal titles.
+    // Source-specific title rewrites for music album reviews. Pitchfork's
+    // album review <title> is the album name only; we rewrite to "Artist -
+    // Album" when the URL matches the album review pattern.
     const url: string = (item.link as string) || source.url || "";
     let title: string | null = (item.title as string) || null;
     if (title) title = decodeEntities(title);
     if (source.id === "pitchfork-reviews" && url.includes("/reviews/albums/") && title) {
       title = rewritePitchforkAlbumTitle(title, url) ?? title;
-    } else if (source.id === "allmusic" && url.includes("/album/")) {
-      const rewritten = rewriteAllMusicAlbumTitle(
-        ext.mediaCredit as RawCredit[] | undefined,
-        ext.mediaTitle as string | undefined,
-      );
-      if (rewritten) title = rewritten;
     }
 
-    return {
+    return [{
       id: crypto.randomUUID(),
       source_id: source.id,
       external_id: externalId,
@@ -356,38 +362,10 @@ export async function fetchRssSource(
       published_at: toIsoString(item.pubDate || item.isoDate),
       fetched_at: now,
       metadata,
-    };
-  })
-  // Drop items that don't pass the per-source allow-list (e.g. AllMusic
-  // blog posts / newsletters in the album-reviews-only feed).
-  .filter((row) => shouldKeepRssItem(source.id, row.url));
+    }];
+  });
 
   insertMany(itemsToInsert);
-
-  // Self-healing cleanup: prune existing rows that pre-date the per-source
-  // filter. Runs every poll cycle. Cheap (indexed scan + small N), idempotent.
-  // Must delete from item_state first because of the FK with no CASCADE.
-  const cleanupWhere = rssCleanupWhereClause(source.id);
-  if (cleanupWhere) {
-    const purgeState = db.prepare(
-      `DELETE FROM item_state WHERE item_id IN (
-         SELECT id FROM items WHERE source_id = ? AND ${cleanupWhere}
-       )`
-    );
-    const purgeItems = db.prepare(
-      `DELETE FROM items WHERE source_id = ? AND ${cleanupWhere}`
-    );
-    const purge = db.transaction(() => {
-      purgeState.run(source.id);
-      const result = purgeItems.run(source.id);
-      if (result.changes > 0) {
-        console.log(
-          `[fetcher] ${source.name}: pruned ${result.changes} item(s) outside the source filter`
-        );
-      }
-    });
-    purge();
-  }
 
   updateSource.run({ last_fetched_at: now, id: source.id });
 
