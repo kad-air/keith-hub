@@ -20,11 +20,20 @@ const DOUBLE_INLAYS = new Set([12, 24]);
 const CELL = 60;
 const STRING_H = 30;
 const NUT_W = 12;
-const PAD_LEFT = 44;
+// Left of the nut sits two separate columns: the string-name labels at the far
+// left, then the open-string note markers. They get dedicated x positions so an
+// open-string note never overlaps its label (NOTE_R = 12, so the marker spans
+// OPEN_NOTE_X ± 12 — kept clear of both the label and the nut at PAD_LEFT).
+const PAD_LEFT = 56;
+const STRING_LABEL_X = 12;
+const OPEN_NOTE_X = 36;
 const PAD_RIGHT = 16;
 const PAD_TOP = 18;
-const PAD_BOTTOM = 28;
+const PAD_BOTTOM = 34;
 const NOTE_R = 12;
+// Fret numbers sit below the neck; offset clears the string-6 note markers
+// (which extend NOTE_R below the bottom string) before the labels start.
+const FRET_LABEL_OFFSET = 24;
 
 type InternalNote = FretboardNote;
 
@@ -59,8 +68,8 @@ function fretX(fret: number): number {
 function noteCenter(note: InternalNote): { x: number; y: number } {
   const y = stringY(note.string);
   if (note.fret === 0) {
-    // Open-string marker sits left of the nut.
-    return { x: PAD_LEFT - NUT_W - 4, y };
+    // Open-string marker sits in its own column left of the nut.
+    return { x: OPEN_NOTE_X, y };
   }
   const x = PAD_LEFT + NUT_W + (note.fret - 0.5) * CELL;
   return { x, y };
@@ -267,12 +276,12 @@ export function Fretboard({
             const s = idx + 1;
             const y = stringY(s);
             const transform = rotateGroup
-              ? `rotate(-90 ${PAD_LEFT - NUT_W - 16} ${y})`
+              ? `rotate(-90 ${STRING_LABEL_X} ${y})`
               : undefined;
             return (
               <text
                 key={`sn-${s}`}
-                x={PAD_LEFT - NUT_W - 16}
+                x={STRING_LABEL_X}
                 y={y + 4}
                 textAnchor="middle"
                 transform={transform}
@@ -287,7 +296,7 @@ export function Fretboard({
         {showFretNumbers &&
           fretNumbersToShow.map((f) => {
             const x = PAD_LEFT + NUT_W + (f - 0.5) * CELL;
-            const y = PAD_TOP + layout.neckHeight + 18;
+            const y = PAD_TOP + layout.neckHeight + FRET_LABEL_OFFSET;
             const transform = rotateGroup
               ? `rotate(-90 ${x} ${y})`
               : undefined;
@@ -350,8 +359,9 @@ export function Fretboard({
               let x: number;
               let w: number;
               if (f === 0) {
-                x = PAD_LEFT - NUT_W - 12;
-                w = NUT_W + 12;
+                // Cover the open-note column up to the nut.
+                x = OPEN_NOTE_X - NOTE_R - 2;
+                w = PAD_LEFT - x;
               } else {
                 x = PAD_LEFT + NUT_W + (f - 1) * CELL;
                 w = CELL;

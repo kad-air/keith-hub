@@ -40,7 +40,7 @@ const PRACTICE_SECTION: Section = {
   name: "Practice",
   href: "/practice",
   group: "Guitar",
-  desc: "Today · Fretboard · Licks",
+  desc: "Today · Fretboard · CAGED · Licks",
   match: (p) => p.startsWith("/practice"),
 };
 

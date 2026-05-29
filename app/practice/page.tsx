@@ -35,8 +35,15 @@ const TILES: Tile[] = [
   {
     key: "fretboard",
     title: "Fretboard",
-    desc: "Chords, scales, and CAGED shapes across the neck.",
+    desc: "Scales and keys mapped across the neck.",
     href: "/practice/fretboard",
+    available: true,
+  },
+  {
+    key: "caged",
+    title: "CAGED",
+    desc: "Every way to play a chord up and down the neck.",
+    href: "/practice/caged",
     available: true,
   },
   {
@@ -77,7 +84,7 @@ export default function PracticeLandingPage() {
         totalLicks={LICKS.length}
       />
 
-      <ul className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {TILES.map((t) => {
           const Body = (
             <>
