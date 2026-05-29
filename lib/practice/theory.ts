@@ -97,7 +97,7 @@ export const SCALES: Record<ScaleKind, ScaleDef> = {
 
 // Open-string pitch classes in standard tuning, indexed by string 1–6
 // (1 = high E, 6 = low E).
-const OPEN_STRING_PITCH: Record<number, number> = {
+export const OPEN_STRING_PITCH: Record<number, number> = {
   1: 4,   // E
   2: 11,  // B
   3: 7,   // G
