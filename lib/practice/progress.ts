@@ -64,7 +64,11 @@ export function getStreak(): number {
   for (let i = 0; i < days.length; i++) {
     const expected = new Date(today);
     expected.setDate(today.getDate() - i);
-    if (days[i] === expected.toISOString().slice(0, 10)) streak++;
+    // Format in local tz (YYYY-MM-DD) to match date(done_at, 'localtime')
+    // above — same approach as anyDayDoneToday() in config.ts. Comparing
+    // against a UTC date here would break the streak in the evening for
+    // users west of UTC (the app's tz is America/Denver, UTC-6/-7).
+    if (days[i] === expected.toLocaleDateString("en-CA")) streak++;
     else break;
   }
   return streak;
