@@ -742,7 +742,7 @@ export default function FeedClient({
     <div className="mx-auto max-w-[720px] px-2 pb-32 pt-6">
       {/* ── Controls row ── */}
       <div className="mb-5 flex items-center justify-between gap-4 px-4">
-        <nav className="flex flex-wrap items-baseline gap-x-5 gap-y-2">
+        <nav className="flex min-w-0 flex-1 items-baseline gap-5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {CATEGORIES.map((cat) => {
             const isActive = activeCategory === cat.id;
             const count = counts[cat.id];
@@ -752,9 +752,11 @@ export default function FeedClient({
                 type="button"
                 onClick={() => handleCategoryChange(cat.id)}
                 className={[
-                  "group flex items-baseline gap-1.5 font-mono text-[0.75rem] uppercase tracking-kicker transition-colors",
-                  // Vertical hit zone bump on touch devices, no visual change
-                  "[@media(hover:none)]:py-2 [@media(hover:none)]:-my-1",
+                  "group flex shrink-0 items-baseline gap-1.5 whitespace-nowrap font-mono text-[0.75rem] uppercase tracking-kicker transition-colors",
+                  // Vertical hit zone bump on touch devices. No negative-margin
+                  // compensation — inside the overflow-x scroll container it
+                  // would clip; the row just runs slightly taller on touch.
+                  "[@media(hover:none)]:py-2",
                   isActive
                     ? "text-cream"
                     : "text-cream-dim hover:text-cream",

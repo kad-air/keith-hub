@@ -5,7 +5,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import AppMenu from "@/components/AppMenu";
 import Contents from "@/components/Contents";
-import SubBar from "@/components/SubBar";
 import { getCurrentSection } from "@/lib/sections";
 
 export default function Masthead() {
@@ -78,8 +77,6 @@ export default function Masthead() {
             <AppMenu />
           </div>
         </div>
-
-        <SubBar />
       </header>
 
       <Contents open={open} onClose={close} currentKey={section.key} />

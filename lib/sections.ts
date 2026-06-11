@@ -20,8 +20,28 @@ const FEED_SECTION: Section = {
   flavor: "— today",
   href: "/",
   group: "Reading",
-  desc: "Today · Saved · Read",
-  match: (p) => p === "/" || p.startsWith("/saved") || p.startsWith("/read"),
+  desc: "Today's unread",
+  match: (p) => p === "/",
+};
+
+const SAVED_SECTION: Section = {
+  key: "saved",
+  num: "",
+  name: "Saved",
+  href: "/saved",
+  group: "Reading",
+  desc: "Kept for later",
+  match: (p) => p.startsWith("/saved"),
+};
+
+const READ_SECTION: Section = {
+  key: "read",
+  num: "",
+  name: "Read",
+  href: "/read",
+  group: "Reading",
+  desc: "Open history",
+  match: (p) => p.startsWith("/read"),
 };
 
 const COMICS_SECTION: Section = {
@@ -58,6 +78,8 @@ export const SECTIONS: Section[] = (() => {
 
   const all = [
     FEED_SECTION,
+    SAVED_SECTION,
+    READ_SECTION,
     ...trackerSections,
     COMICS_SECTION,
     PRACTICE_SECTION,

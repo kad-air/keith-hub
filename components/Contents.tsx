@@ -13,7 +13,7 @@ const GROUP_ORDER: SectionGroup[] = [
 ];
 
 const SHORTCUT_HINTS = [
-  ["g f", "Feed"],
+  ["g h", "Feed"],
   ["g s", "Saved"],
   ["g r", "Read"],
   ["?", "Shortcuts"],
