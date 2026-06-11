@@ -24,6 +24,17 @@ const FEED_LIMIT = 2000;
 const INITIAL_CHUNK = 50;
 const CHUNK_SIZE = 50;
 
+// ── Pull to refresh ──────────────────────────────────────────
+// Finger travel is damped before driving the indicator zone's height,
+// giving the drag rubber-band resistance. Crossing PULL_ARM_HEIGHT
+// (damped px) arms the gesture — the arrow flips and the label changes;
+// releasing while armed holds the zone at PULL_HOLD_HEIGHT until the
+// refresh completes.
+const PULL_DAMPING = 0.5;
+const PULL_ARM_HEIGHT = 64;
+const PULL_MAX_HEIGHT = 110;
+const PULL_HOLD_HEIGHT = 52;
+
 const CATEGORIES: Array<{ id: keyof CategoryCounts; label: string }> = [
   { id: "all", label: "All" },
   { id: "podcasts", label: "Podcasts" },
@@ -73,6 +84,11 @@ export default function FeedClient({
   const [swapping, setSwapping] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [refreshResult, setRefreshResult] = useState<string | null>(null);
+  // Discrete pull-to-refresh phase for the indicator label. The continuous
+  // height tracking bypasses React entirely (see the gesture effect).
+  const [pullPhase, setPullPhase] = useState<
+    "idle" | "pull" | "armed" | "refreshing"
+  >("idle");
   const [focusedIndex, setFocusedIndex] = useState(0);
   const [pending, setPending] = useState<PendingDismiss | null>(null);
   const [newItemsAvailable, setNewItemsAvailable] =
@@ -82,6 +98,7 @@ export default function FeedClient({
   const [renderedCount, setRenderedCount] = useState(INITIAL_CHUNK);
   const cardRefs = useRef<Array<HTMLElement | null>>([]);
   const sentinelRef = useRef<HTMLDivElement>(null);
+  const pullZoneRef = useRef<HTMLDivElement>(null);
   // Gate scrollIntoView to keyboard-driven focus changes only. Touch and
   // hover also call onFocus to set focusedIndex — without this gate, tapping
   // a card (onTouchStart fires before the tap commits) or drifting the mouse
@@ -210,6 +227,11 @@ export default function FeedClient({
   // j/k press).
   const focusedIndexRef = useRef(focusedIndex);
   focusedIndexRef.current = focusedIndex;
+  // Same trick for the pull gesture's handlers.
+  const pullPhaseRef = useRef(pullPhase);
+  pullPhaseRef.current = pullPhase;
+  const refreshingRef = useRef(refreshing);
+  refreshingRef.current = refreshing;
   useEffect(() => {
     function onVisibilityChange() {
       if (document.visibilityState !== "visible") return;
@@ -656,41 +678,116 @@ export default function FeedClient({
   );
 
   // ─── Pull to refresh (touch only) ────────────────────────
+  // The indicator zone above the category nav grows 1:damped with the
+  // finger, flips to "Release to refresh" past the arm threshold, and
+  // holds open with a spinner while the crawl runs. Height/opacity are
+  // written straight to the DOM during the drag — a setState per
+  // touchmove would re-render the whole card list at 60Hz. React state
+  // only tracks the discrete phase, which drives the label. The native
+  // overscroll bounce is suppressed via overscroll-behavior on <body>
+  // (globals.css), so this zone is the only thing that moves.
   useEffect(() => {
-    let startY: number | null = null;
-    let pulling = false;
+    const zone = pullZoneRef.current;
+    if (!zone) return;
+
+    let startX = 0;
+    let startY = 0;
+    let tracking = false; // touch began at the top of the page
+    let engaged = false; // vertical pull won the gesture
+
+    function setZone(px: number, animate: boolean) {
+      zone!.style.transition = animate
+        ? "height 220ms ease-out, opacity 220ms ease-out"
+        : "none";
+      zone!.style.height = `${px}px`;
+      zone!.style.opacity =
+        px === 0 ? "0" : String(Math.min(px / PULL_ARM_HEIGHT, 1));
+    }
 
     function onTouchStart(e: TouchEvent) {
-      if (window.scrollY > 0) return;
+      // Only from the very top, and never on top of an in-flight refresh.
+      if (
+        window.scrollY > 0 ||
+        refreshingRef.current ||
+        pullPhaseRef.current === "refreshing"
+      )
+        return;
+      startX = e.touches[0].clientX;
       startY = e.touches[0].clientY;
-      pulling = true;
+      tracking = true;
+      engaged = false;
     }
+
     function onTouchMove(e: TouchEvent) {
-      if (!pulling || startY === null) return;
+      if (!tracking) return;
+      const dx = e.touches[0].clientX - startX;
       const dy = e.touches[0].clientY - startY;
-      if (dy < 0) {
-        pulling = false;
+      if (!engaged) {
+        // Let horizontal gestures (card swipes) win before engaging.
+        if (Math.abs(dx) > 10 && Math.abs(dx) > dy) {
+          tracking = false;
+          return;
+        }
+        if (dy <= 8) return;
+        engaged = true;
+      }
+      if (dy <= 0) {
+        // Reversed direction — abort and hand the page back to scrolling.
+        tracking = false;
+        engaged = false;
+        setZone(0, true);
+        setPullPhase("idle");
+        return;
+      }
+      const height = Math.min(dy * PULL_DAMPING, PULL_MAX_HEIGHT);
+      setZone(height, false);
+      const phase = height >= PULL_ARM_HEIGHT ? "armed" : "pull";
+      if (pullPhaseRef.current !== phase) {
+        setPullPhase(phase);
+        // Haptic tick at the commit point. No-op on iOS (Safari has no
+        // vibration API) — there the arrow flip + label swap carry it.
+        if (phase === "armed") navigator.vibrate?.(10);
       }
     }
-    function onTouchEnd(e: TouchEvent) {
-      if (!pulling || startY === null) return;
-      const dy = e.changedTouches[0].clientY - startY;
-      if (dy > 90) {
+
+    function onTouchEnd() {
+      if (!tracking) return;
+      tracking = false;
+      if (!engaged) return;
+      engaged = false;
+      if (pullPhaseRef.current === "armed") {
+        setPullPhase("refreshing");
+        setZone(PULL_HOLD_HEIGHT, true);
         void handleRefresh();
+      } else {
+        setPullPhase("idle");
+        setZone(0, true);
       }
-      pulling = false;
-      startY = null;
     }
 
     window.addEventListener("touchstart", onTouchStart, { passive: true });
     window.addEventListener("touchmove", onTouchMove, { passive: true });
     window.addEventListener("touchend", onTouchEnd, { passive: true });
+    window.addEventListener("touchcancel", onTouchEnd, { passive: true });
     return () => {
       window.removeEventListener("touchstart", onTouchStart);
       window.removeEventListener("touchmove", onTouchMove);
       window.removeEventListener("touchend", onTouchEnd);
+      window.removeEventListener("touchcancel", onTouchEnd);
     };
   }, [handleRefresh]);
+
+  // Collapse the held pull zone once the refresh settles.
+  useEffect(() => {
+    if (pullPhase !== "refreshing" || refreshing) return;
+    const zone = pullZoneRef.current;
+    if (zone) {
+      zone.style.transition = "height 250ms ease-in-out, opacity 250ms ease-in-out";
+      zone.style.height = "0px";
+      zone.style.opacity = "0";
+    }
+    setPullPhase("idle");
+  }, [pullPhase, refreshing]);
 
   // ─── Chunked rendering ───────────────────────────────────
   // Wholesale list replacements (category switch, refresh, load-new-items)
@@ -742,6 +839,57 @@ export default function FeedClient({
 
   return (
     <div className="mx-auto max-w-[720px] px-2 pb-32 pt-6">
+      {/* ── Pull-to-refresh zone ── */}
+      {/* Height/opacity are driven directly by the gesture effect; only the
+          label re-renders on phase changes. aria-hidden: the outcome is
+          announced by the refresh toast, this is gesture feedback. */}
+      <div
+        ref={pullZoneRef}
+        aria-hidden
+        className="relative overflow-hidden"
+        style={{ height: 0, opacity: 0 }}
+      >
+        <div className="absolute inset-x-0 bottom-2.5 flex items-center justify-center gap-2.5 font-mono text-[0.68rem] uppercase tracking-kicker">
+          {pullPhase === "refreshing" ? (
+            <>
+              <span className="inline-block animate-spin font-display text-[0.95rem] leading-none text-accent">
+                ⁂
+              </span>
+              <span className="text-cream-dim">Refreshing</span>
+            </>
+          ) : (
+            <>
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className={[
+                  "transition-transform duration-150",
+                  pullPhase === "armed"
+                    ? "rotate-180 text-accent"
+                    : "text-cream-dimmer",
+                ].join(" ")}
+              >
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <polyline points="5 12 12 19 19 12" />
+              </svg>
+              <span
+                className={
+                  pullPhase === "armed" ? "text-cream" : "text-cream-dimmer"
+                }
+              >
+                {pullPhase === "armed" ? "Release to refresh" : "Pull to refresh"}
+              </span>
+            </>
+          )}
+        </div>
+      </div>
+
       {/* ── Category nav ── */}
       {/* Refresh has no button: pull-to-refresh on touch, `r` on desktop,
           and the PWA-resume auto-refresh cover it. Feedback rides the toast. */}
@@ -850,7 +998,10 @@ export default function FeedClient({
           onAction={handleUndo}
           onDismiss={() => setPending(null)}
         />
-      ) : refreshing || refreshResult ? (
+      ) : (refreshing && pullPhase !== "refreshing") || refreshResult ? (
+        // In-flight feedback for keyboard/resume-initiated refreshes only —
+        // a pull shows its own "Refreshing" state in the pull zone, so the
+        // toast would double up. The result still lands here for both.
         <Toast
           message={refreshResult ?? "Refreshing…"}
           onDismiss={() => setRefreshResult(null)}
