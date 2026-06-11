@@ -181,10 +181,19 @@ export default function FeedClient({
     try {
       const res = await fetch("/api/refresh", { method: "POST" });
       if (!res.ok) throw new Error("refresh failed");
-      const data = (await res.json()) as { fetched: number };
+      const data = (await res.json()) as {
+        fetched: number;
+        rss: number;
+        bluesky: number;
+      };
+      // Only count items that actually land in the active view. New bsky
+      // posts don't grow the All view (its bsky contribution is derived
+      // from the RSS total), so a bsky-only crawl reads as "Up to date"
+      // everywhere except the Bluesky tab.
+      const relevant = activeCategory === "bluesky" ? data.bluesky : data.rss;
       setRefreshResult(
-        data.fetched > 0
-          ? `${data.fetched} new item${data.fetched === 1 ? "" : "s"}`
+        relevant > 0
+          ? `${relevant} new item${relevant === 1 ? "" : "s"}`
           : "Up to date"
       );
       await fetchItems(activeCategory);
@@ -254,8 +263,16 @@ export default function FeedClient({
         .then((data: ItemsResponse) => {
           setCounts(data.counts);
           const currentIds = new Set(itemsRef.current.map((it) => it.id));
+          // On the All view, ignore bluesky rows when counting what's new:
+          // surprise sampling rotates which bsky posts appear on every
+          // query, so they'd register as "new" even when nothing was
+          // fetched. Only RSS arrivals are worth disturbing the user for.
           const newCount = data.items.reduce(
-            (n, it) => (currentIds.has(it.id) ? n : n + 1),
+            (n, it) =>
+              currentIds.has(it.id) ||
+              (activeCategory === "all" && it.source_category === "bluesky")
+                ? n
+                : n + 1,
             0
           );
           if (newCount === 0) return;

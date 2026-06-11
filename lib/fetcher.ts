@@ -375,14 +375,24 @@ export async function fetchRssSource(
   return insertedCount;
 }
 
+// Per-crawl breakdown of new rows. `rss` covers rss + podcast sources —
+// everything that actually grows the main feed. Bluesky is reported
+// separately because its All-view contribution is derived from the RSS
+// total, so a bsky-only crawl shouldn't read as "new items" to the user.
+export interface FetchSummary {
+  total: number;
+  rss: number;
+  bluesky: number;
+}
+
 // Shared in-flight guard. The poller, visibility-change silent refresh, and
 // manual refresh all ultimately call fetchAllSources; without this, they
 // stack up as parallel crawls whose responses can land out of order and
 // overwrite each other in the client. Instead, every caller now awaits
 // the same in-flight promise — one real crawl at a time.
-let fetchAllSourcesInFlight: Promise<number> | null = null;
+let fetchAllSourcesInFlight: Promise<FetchSummary> | null = null;
 
-export function fetchAllSources(db: Database.Database): Promise<number> {
+export function fetchAllSources(db: Database.Database): Promise<FetchSummary> {
   if (fetchAllSourcesInFlight) return fetchAllSourcesInFlight;
   fetchAllSourcesInFlight = fetchAllSourcesImpl(db).finally(() => {
     fetchAllSourcesInFlight = null;
@@ -390,7 +400,7 @@ export function fetchAllSources(db: Database.Database): Promise<number> {
   return fetchAllSourcesInFlight;
 }
 
-async function fetchAllSourcesImpl(db: Database.Database): Promise<number> {
+async function fetchAllSourcesImpl(db: Database.Database): Promise<FetchSummary> {
   invalidateConfig(); // Re-read feeds.yml on every poll cycle
   const config = getConfig();
 
@@ -425,14 +435,15 @@ async function fetchAllSourcesImpl(db: Database.Database): Promise<number> {
 
   syncSources();
 
-  let totalFetched = 0;
+  let rssFetched = 0;
+  let blueskyFetched = 0;
 
   const rssSources = config.sources.filter(
     (s) => s.type === "rss" || s.type === "podcast"
   );
   for (const source of rssSources) {
     const count = await fetchRssSource(source, db);
-    totalFetched += count;
+    rssFetched += count;
   }
 
   // Verge dedup: articles that appear in both verge-full and verge-reviews
@@ -468,7 +479,7 @@ async function fetchAllSourcesImpl(db: Database.Database): Promise<number> {
   const blueskySources = config.sources.filter((s) => s.type === "bluesky");
   for (const source of blueskySources) {
     const count = await fetchBlueskySource(source, db);
-    totalFetched += count;
+    blueskyFetched += count;
   }
 
   // Enforce per-category unread caps. Runs at the END of every poll cycle
@@ -489,7 +500,11 @@ async function fetchAllSourcesImpl(db: Database.Database): Promise<number> {
     console.error("[fetcher] Release notification check failed:", err);
   }
 
-  return totalFetched;
+  return {
+    total: rssFetched + blueskyFetched,
+    rss: rssFetched,
+    bluesky: blueskyFetched,
+  };
 }
 
 let pollingInterval: ReturnType<typeof setInterval> | null = null;

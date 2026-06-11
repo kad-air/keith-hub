@@ -7,8 +7,12 @@ export const dynamic = "force-dynamic";
 export async function POST(): Promise<NextResponse> {
   try {
     const db = getDb();
-    const fetched = await fetchAllSources(db);
-    return NextResponse.json({ fetched });
+    const result = await fetchAllSources(db);
+    return NextResponse.json({
+      fetched: result.total,
+      rss: result.rss,
+      bluesky: result.bluesky,
+    });
   } catch (err) {
     console.error("[api/refresh] Error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
