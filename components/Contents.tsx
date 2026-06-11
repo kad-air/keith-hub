@@ -113,7 +113,7 @@ export default function Contents({ open, onClose, currentKey }: Props) {
             onClick={onClose}
             className="border border-rule px-3 py-1.5 font-mono text-[0.6rem] uppercase tracking-[0.22em] text-cream-dim transition-colors hover:border-accent hover:text-cream"
           >
-            Esc · Close
+            <span className="max-sm:hidden">Esc · </span>Close
           </button>
         </div>
 
@@ -160,8 +160,9 @@ export default function Contents({ open, onClose, currentKey }: Props) {
           })}
         </div>
 
-        {/* Footer chord legend */}
-        <div className="mt-14 flex flex-wrap gap-x-7 gap-y-3 border-t border-rule pt-5 font-mono text-[0.6rem] uppercase tracking-[0.18em] text-cream-dimmer">
+        {/* Footer chord legend — hidden on phones (no hardware keyboard);
+            kept at sm+ since an iPad may have a keyboard attached. */}
+        <div className="mt-14 flex flex-wrap gap-x-7 gap-y-3 border-t border-rule pt-5 font-mono text-[0.6rem] uppercase tracking-[0.18em] text-cream-dimmer max-sm:hidden">
           {SHORTCUT_HINTS.map(([keys, label]) => (
             <span key={label} className="inline-flex items-center gap-1.5">
               {keys.split(" ").map((k) => (

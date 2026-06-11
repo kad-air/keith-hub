@@ -72,7 +72,7 @@ export default function FeedClient({
     useState<keyof CategoryCounts>(initialCategory);
   const [swapping, setSwapping] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
+  const [refreshResult, setRefreshResult] = useState<string | null>(null);
   const [focusedIndex, setFocusedIndex] = useState(0);
   const [pending, setPending] = useState<PendingDismiss | null>(null);
   const [newItemsAvailable, setNewItemsAvailable] =
@@ -165,17 +165,19 @@ export default function FeedClient({
       const res = await fetch("/api/refresh", { method: "POST" });
       if (!res.ok) throw new Error("refresh failed");
       const data = (await res.json()) as { fetched: number };
-      setRefreshMessage(
+      setRefreshResult(
         data.fetched > 0
           ? `${data.fetched} new item${data.fetched === 1 ? "" : "s"}`
           : "Up to date"
       );
       await fetchItems(activeCategory);
     } catch {
-      setRefreshMessage("Refresh failed");
+      setRefreshResult("Refresh failed");
     } finally {
       setRefreshing(false);
-      setTimeout(() => setRefreshMessage(null), 3500);
+      // Safety clear in case the toast never mounts (a higher-priority
+      // toast like undo can occupy the slot past the toast's own timer).
+      setTimeout(() => setRefreshResult(null), 4000);
     }
   }, [activeCategory, fetchItems, refreshing, invalidateCache]);
 
@@ -740,83 +742,51 @@ export default function FeedClient({
 
   return (
     <div className="mx-auto max-w-[720px] px-2 pb-32 pt-6">
-      {/* ── Controls row ── */}
-      <div className="mb-5 flex items-center justify-between gap-4 px-4">
-        <nav className="flex min-w-0 flex-1 items-baseline gap-5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {CATEGORIES.map((cat) => {
-            const isActive = activeCategory === cat.id;
-            const count = counts[cat.id];
-            return (
-              <button
-                key={cat.id}
-                type="button"
-                onClick={() => handleCategoryChange(cat.id)}
+      {/* ── Category nav ── */}
+      {/* Refresh has no button: pull-to-refresh on touch, `r` on desktop,
+          and the PWA-resume auto-refresh cover it. Feedback rides the toast. */}
+      <nav className="mb-5 flex items-baseline gap-5 overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {CATEGORIES.map((cat) => {
+          const isActive = activeCategory === cat.id;
+          const count = counts[cat.id];
+          return (
+            <button
+              key={cat.id}
+              type="button"
+              onClick={() => handleCategoryChange(cat.id)}
+              className={[
+                "group flex shrink-0 items-baseline gap-1.5 whitespace-nowrap font-mono text-[0.75rem] uppercase tracking-kicker transition-colors",
+                // Vertical hit zone bump on touch devices. No negative-margin
+                // compensation — inside the overflow-x scroll container it
+                // would clip; the row just runs slightly taller on touch.
+                "[@media(hover:none)]:py-2",
+                isActive
+                  ? "text-cream"
+                  : "text-cream-dim hover:text-cream",
+              ].join(" ")}
+            >
+              <span
                 className={[
-                  "group flex shrink-0 items-baseline gap-1.5 whitespace-nowrap font-mono text-[0.75rem] uppercase tracking-kicker transition-colors",
-                  // Vertical hit zone bump on touch devices. No negative-margin
-                  // compensation — inside the overflow-x scroll container it
-                  // would clip; the row just runs slightly taller on touch.
-                  "[@media(hover:none)]:py-2",
-                  isActive
-                    ? "text-cream"
-                    : "text-cream-dim hover:text-cream",
+                  "border-b border-transparent pb-0.5 transition-colors",
+                  isActive ? "border-accent" : "group-hover:border-rule-strong",
                 ].join(" ")}
               >
+                {cat.label}
+              </span>
+              {cat.id !== "bluesky" && (
                 <span
                   className={[
-                    "border-b border-transparent pb-0.5 transition-colors",
-                    isActive ? "border-accent" : "group-hover:border-rule-strong",
+                    "tabular-nums text-[0.7rem]",
+                    isActive ? "text-accent" : "text-cream-dim",
                   ].join(" ")}
                 >
-                  {cat.label}
+                  {count}
                 </span>
-                {cat.id !== "bluesky" && (
-                  <span
-                    className={[
-                      "tabular-nums text-[0.7rem]",
-                      isActive ? "text-accent" : "text-cream-dim",
-                    ].join(" ")}
-                  >
-                    {count}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </nav>
-
-        <div className="flex items-center gap-3">
-          {refreshMessage && (
-            <span className="font-mono text-[0.7rem] uppercase tracking-kicker text-cream-dim animate-fade-in">
-              {refreshMessage}
-            </span>
-          )}
-          <button
-            type="button"
-            onClick={handleRefresh}
-            disabled={refreshing}
-            title="Refresh (r)"
-            aria-label="Refresh feeds"
-            className="flex h-8 w-8 items-center justify-center rounded-sm border border-rule text-cream-dim transition-colors hover:border-rule-strong hover:text-cream disabled:opacity-50 [@media(hover:none)]:h-11 [@media(hover:none)]:w-11"
-          >
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className={refreshing ? "animate-spin" : ""}
-            >
-              <polyline points="23 4 23 10 17 10" />
-              <polyline points="1 20 1 14 7 14" />
-              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-            </svg>
-          </button>
-        </div>
-      </div>
+              )}
+            </button>
+          );
+        })}
+      </nav>
 
       {/* ── Feed list ── */}
       {items.length === 0 && !swapping ? (
@@ -879,6 +849,14 @@ export default function FeedClient({
           actionLabel="Undo"
           onAction={handleUndo}
           onDismiss={() => setPending(null)}
+        />
+      ) : refreshing || refreshResult ? (
+        <Toast
+          message={refreshResult ?? "Refreshing…"}
+          onDismiss={() => setRefreshResult(null)}
+          // In flight: park the auto-dismiss far out; when the result lands
+          // the durationMs change re-arms the timer at the short value.
+          durationMs={refreshing ? 60000 : 3500}
         />
       ) : bskyError ? (
         <Toast
@@ -960,10 +938,12 @@ function FooterActions({ count, onMarkAllRead, onShowHelp }: FooterActionsProps)
         >
           That&rsquo;s enough for now.
         </button>
+        {/* Hidden on phones (no hardware keyboard); kept at sm+ — an iPad
+            may have a keyboard attached. */}
         <button
           type="button"
           onClick={onShowHelp}
-          className="px-4 py-2 font-mono text-[0.72rem] uppercase tracking-kicker text-cream-dim transition-colors hover:text-cream"
+          className="px-4 py-2 font-mono text-[0.72rem] uppercase tracking-kicker text-cream-dim transition-colors hover:text-cream max-sm:hidden"
         >
           Keyboard
         </button>

@@ -214,9 +214,12 @@ export default function SavedClient({ initialItems }: SavedClientProps) {
           <h2 className="font-display text-[1.6rem] font-medium italic text-cream opsz-display">
             Nothing saved yet.
           </h2>
-          <p className="mt-3 font-display text-[0.95rem] italic text-cream-dim">
+          <p className="mt-3 font-display text-[0.95rem] italic text-cream-dim max-sm:hidden">
             Press <kbd className="font-mono text-[0.7rem] uppercase">s</kbd> on
             any item to save it here.
+          </p>
+          <p className="mt-3 font-display text-[0.95rem] italic text-cream-dim sm:hidden">
+            Swipe right on any item to save it here.
           </p>
         </div>
       ) : (
