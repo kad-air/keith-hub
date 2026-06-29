@@ -314,11 +314,15 @@ export default function ChartViewerClient({
         />
       ) : (
         // One element per physical line so long lines wrap instead of scrolling
-        // horizontally. The hanging indent (padding-left + negative text-indent)
-        // pushes wrapped continuations in by 1.5em so they read as a carry-over
-        // of the same line rather than a new chord/lyric line. `break-words`
-        // catches any single token too wide for the viewport. Empty lines get a
-        // non-breaking space to preserve their height.
+        // horizontally. `break-all` forces character-level wrapping at the same
+        // column on every line, so — combined with the monospace font — a chord
+        // line and the lyric line beneath it always break at the same point and
+        // chords stay locked over their syllable across a wrap (word-level
+        // wrapping would drift them off, since the two lines wrap at different
+        // word boundaries). The hanging indent (padding-left + negative
+        // text-indent) shifts wrapped continuations in by 1.5em equally on both
+        // lines, so the wrapped rows still line up while reading as a carry-over
+        // rather than a new line. Empty lines get a space to preserve height.
         <div
           style={{ fontSize: `${fontSize}px`, lineHeight: 1.55 }}
           className="font-mono text-cream"
@@ -326,7 +330,7 @@ export default function ChartViewerClient({
           {chart.content.split("\n").map((line, i) => (
             <div
               key={i}
-              className="whitespace-pre-wrap break-words"
+              className="whitespace-pre-wrap break-all"
               style={{ paddingLeft: "1.5em", textIndent: "-1.5em" }}
             >
               {line || " "}
