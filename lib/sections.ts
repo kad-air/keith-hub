@@ -64,14 +64,14 @@ const PRACTICE_SECTION: Section = {
   match: (p) => p.startsWith("/practice"),
 };
 
-const SETLIST_SECTION: Section = {
-  key: "setlist",
+const CHARTS_SECTION: Section = {
+  key: "charts",
   num: "",
-  name: "Setlist",
-  href: "/setlist",
+  name: "Charts",
+  href: "/charts",
   group: "Guitar",
-  desc: "Chord charts · autoscroll",
-  match: (p) => p.startsWith("/setlist"),
+  desc: "Chord charts · setlists · autoscroll",
+  match: (p) => p.startsWith("/charts"),
 };
 
 export const SECTIONS: Section[] = (() => {
@@ -93,7 +93,7 @@ export const SECTIONS: Section[] = (() => {
     ...trackerSections,
     COMICS_SECTION,
     PRACTICE_SECTION,
-    SETLIST_SECTION,
+    CHARTS_SECTION,
   ];
   return all.map((s, i) => ({ ...s, num: String(i + 1).padStart(2, "0") }));
 })();
