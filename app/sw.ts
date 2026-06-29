@@ -18,22 +18,24 @@ const serwist = new Serwist({
   clientsClaim: true,
   navigationPreload: true,
   runtimeCaching: [
-    // Setlist gets a dedicated NetworkFirst cache so chord charts stay
-    // available offline — the use case is playing a gig with no signal.
+    // The Charts section gets a dedicated NetworkFirst cache so chord charts
+    // stay available offline — the use case is playing a gig with no signal.
     // Online (or within the 4s timeout) the network wins so edits show up
     // immediately; offline it falls back to the last-cached render of each
     // page. The chart text is baked into the SSR'd HTML and the viewer's
     // interactivity (autoscroll, zoom, wake-lock) is entirely client-side,
-    // so a cached page is fully functional offline. The index warms every
-    // chart page on load (see SetlistClient) so the WHOLE setlist is
-    // offline-ready after one online visit — not just the charts you opened.
-    // This must precede defaultCache so it wins the /setlist* routes.
+    // so a cached page is fully functional offline. Caching is opt-in per
+    // setlist now: the library no longer warms every chart — only setlists
+    // flagged "Available offline" warm their member chart pages (see
+    // ChartsClient + SetlistDetailClient). This rule still caches any chart
+    // page fetched online (so a chart you open is cached on demand). It must
+    // precede defaultCache so it wins the /charts* routes.
     {
       matcher: ({ url, sameOrigin }) =>
         sameOrigin &&
-        (url.pathname === "/setlist" || url.pathname.startsWith("/setlist/")),
+        (url.pathname === "/charts" || url.pathname.startsWith("/charts/")),
       handler: new NetworkFirst({
-        cacheName: "setlist-pages",
+        cacheName: "charts-pages",
         networkTimeoutSeconds: 4,
       }),
     },

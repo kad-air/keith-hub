@@ -92,6 +92,29 @@ export function getDb(): Database.Database {
       updated_at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_charts_sort ON charts(sort_order);
+
+    -- Setlists: named, ordered collections that REFERENCE library charts
+    -- (many-to-many via setlist_charts). The flat charts table is the full
+    -- Charts library; a setlist is just a curated subset + performance order.
+    -- offline is the per-setlist opt-in for SW cache warming (see app/sw.ts
+    -- and the Charts client). See lib/setlists.ts.
+    CREATE TABLE IF NOT EXISTS setlists (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      offline INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    -- Membership + per-setlist order. ON DELETE CASCADE (foreign_keys is ON)
+    -- means deleting a library chart drops it from every setlist, and deleting
+    -- a setlist drops its membership rows — no orphan rows either way.
+    CREATE TABLE IF NOT EXISTS setlist_charts (
+      setlist_id TEXT NOT NULL REFERENCES setlists(id) ON DELETE CASCADE,
+      chart_id   TEXT NOT NULL REFERENCES charts(id)   ON DELETE CASCADE,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (setlist_id, chart_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_setlist_charts ON setlist_charts(setlist_id, sort_order);
   `);
 
   return dbInstance;

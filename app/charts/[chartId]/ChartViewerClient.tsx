@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Chart } from "@/lib/charts";
+import { ChartForm, type FormState } from "../ChartForm";
 
 const SPEED_MIN = 8;
 const SPEED_MAX = 160;
@@ -17,11 +18,95 @@ const FONT_DEFAULT = 16;
 const SPEED_KEY = "setlist-speed";
 const FONT_KEY = "setlist-fontsize";
 
-export default function ChartViewerClient({ chart }: { chart: Chart }) {
+export default function ChartViewerClient({
+  chart: initialChart,
+  back,
+}: {
+  chart: Chart;
+  back: { href: string; label: string };
+}) {
+  // Hold the chart locally so an in-page edit updates the view immediately
+  // without a server round-trip / route refresh.
+  const [chart, setChart] = useState<Chart>(initialChart);
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(SPEED_DEFAULT);
   const [fontSize, setFontSize] = useState(FONT_DEFAULT);
   const [progress, setProgress] = useState(0);
+
+  // Editing — moved here from the library page so a chart is edited from its
+  // own page. Saving needs the network, so it's disabled offline.
+  const [online, setOnline] = useState(true);
+  const [form, setForm] = useState<FormState | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const update = () => setOnline(navigator.onLine);
+    update();
+    window.addEventListener("online", update);
+    window.addEventListener("offline", update);
+    return () => {
+      window.removeEventListener("online", update);
+      window.removeEventListener("offline", update);
+    };
+  }, []);
+
+  const openEdit = useCallback(() => {
+    setPlaying(false);
+    setEditError(null);
+    setForm({
+      mode: "edit",
+      id: chart.id,
+      title: chart.title,
+      artist: chart.artist ?? "",
+      content: chart.content,
+    });
+  }, [chart]);
+
+  const closeEdit = useCallback(() => {
+    setForm(null);
+    setEditError(null);
+  }, []);
+
+  const handleEditFile = useCallback(async (file: File | undefined) => {
+    if (!file) return;
+    const text = await file.text();
+    setForm((f) => {
+      if (!f) return f;
+      const title = f.title.trim() || file.name.replace(/\.[^.]+$/, "").trim();
+      return { ...f, content: text, title };
+    });
+  }, []);
+
+  const saveEdit = useCallback(async () => {
+    if (!form) return;
+    if (!form.title.trim() || !form.content.trim()) {
+      setEditError("Title and chart text are required.");
+      return;
+    }
+    setBusy(true);
+    setEditError(null);
+    try {
+      const res = await fetch(`/api/charts/${form.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: form.title,
+          artist: form.artist,
+          content: form.content,
+        }),
+      });
+      if (!res.ok) throw new Error("save failed");
+      const { chart: updated } = (await res.json()) as { chart: Chart };
+      setChart(updated);
+      closeEdit();
+    } catch {
+      setEditError("Couldn't save. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  }, [form, closeEdit]);
 
   const speedRef = useRef(speed);
   const rafRef = useRef<number | null>(null);
@@ -189,12 +274,24 @@ export default function ChartViewerClient({ chart }: { chart: Chart }) {
   return (
     <article className="mx-auto max-w-[820px] px-4 pb-40 pt-6 sm:px-6">
       <header className="mb-5">
-        <Link
-          href="/setlist"
-          className="font-mono text-[0.7rem] uppercase tracking-kicker text-cream-dimmer hover:text-cream"
-        >
-          ← Setlist
-        </Link>
+        <div className="flex items-start justify-between gap-3">
+          <Link
+            href={back.href}
+            className="font-mono text-[0.7rem] uppercase tracking-kicker text-cream-dimmer hover:text-cream"
+          >
+            {back.label}
+          </Link>
+          {!form && (
+            <button
+              onClick={openEdit}
+              disabled={!online}
+              title={!online ? "Connect to edit" : undefined}
+              className="shrink-0 border border-rule/60 px-3 py-1 font-mono text-[0.65rem] uppercase tracking-kicker text-cream-dim transition-colors hover:border-cat-practice/60 hover:text-cream disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Edit
+            </button>
+          )}
+        </div>
         <h1 className="mt-2 font-display text-2xl text-cream">{chart.title}</h1>
         {chart.artist && (
           <p className="mt-0.5 font-mono text-[0.7rem] uppercase tracking-kicker text-cream-dim">
@@ -203,14 +300,29 @@ export default function ChartViewerClient({ chart }: { chart: Chart }) {
         )}
       </header>
 
-      <pre
-        style={{ fontSize: `${fontSize}px`, lineHeight: 1.55 }}
-        className="overflow-x-auto whitespace-pre font-mono text-cream"
-      >
-        {chart.content}
-      </pre>
+      {form ? (
+        <ChartForm
+          form={form}
+          setForm={setForm}
+          busy={busy}
+          error={editError}
+          onSave={saveEdit}
+          onCancel={closeEdit}
+          onPickFile={() => fileRef.current?.click()}
+          fileRef={fileRef}
+          onFile={handleEditFile}
+        />
+      ) : (
+        <pre
+          style={{ fontSize: `${fontSize}px`, lineHeight: 1.55 }}
+          className="overflow-x-auto whitespace-pre font-mono text-cream"
+        >
+          {chart.content}
+        </pre>
+      )}
 
-      {/* Fixed control bar */}
+      {/* Fixed control bar — hidden while editing. */}
+      {!form && (
       <div
         ref={controlsRef}
         className="fixed inset-x-0 bottom-0 z-30 border-t border-rule/60 bg-ink/95 backdrop-blur"
@@ -281,6 +393,7 @@ export default function ChartViewerClient({ chart }: { chart: Chart }) {
           </div>
         </div>
       </div>
+      )}
     </article>
   );
 }

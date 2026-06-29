@@ -1,10 +1,12 @@
 import { randomUUID } from "crypto";
 import { getDb } from "@/lib/db";
 
-// A single uploaded chord chart in the setlist. `content` is the raw chart
+// A single uploaded chord chart in the library. `content` is the raw chart
 // text, stored and rendered verbatim — chord-over-lyric alignment depends on
 // the original whitespace, so nothing reflows or trims it. Transposition and
 // other transforms are deliberately deferred; v1 just stores + displays.
+// Charts are grouped into ordered setlists via lib/setlists.ts; `sortOrder`
+// here is a vestigial library-level order (the library UI sorts client-side).
 export type Chart = {
   id: string;
   title: string;
