@@ -24,6 +24,14 @@ const EMPTY_FORM: FormState = {
   content: "",
 };
 
+// Vertical gap between rows (Tailwind space-y-2 = 0.5rem). Used by the drag
+// math to size the gap the lifted row leaves behind.
+const GAP_PX = 8;
+// Drag auto-scroll: distance from a viewport edge that arms scrolling, and the
+// max px/frame it scrolls at full press into the edge.
+const EDGE_PX = 90;
+const EDGE_MAX_SPEED = 16;
+
 function lineCount(content: string): number {
   return content.split("\n").length;
 }
@@ -238,14 +246,9 @@ export default function SetlistClient({ initialCharts }: Props) {
     }
   }, [charts]);
 
-  const move = useCallback(
-    async (index: number, dir: -1 | 1) => {
-      const target = index + dir;
-      if (target < 0 || target >= charts.length) return;
-      const next = [...charts];
-      [next[index], next[target]] = [next[target], next[index]];
-      const prev = charts;
-      setCharts(next);
+  // Persist a new order to the server, rolling back on failure.
+  const commitOrder = useCallback(
+    async (next: Chart[], prev: Chart[]) => {
       try {
         const res = await fetch("/api/charts/reorder", {
           method: "POST",
@@ -257,8 +260,170 @@ export default function SetlistClient({ initialCharts }: Props) {
         setCharts(prev);
       }
     },
-    [charts],
+    [],
   );
+
+  // ---- Drag-to-reorder ---------------------------------------------------
+  // A dependency-free pointer drag that works for touch (the primary, gigging
+  // use case) and mouse alike. The list array stays untouched during the drag
+  // — we move rows purely with CSS transforms written straight to the DOM and
+  // commit the reordered array once on drop, so the 60Hz move handler never
+  // hits React's render path. Row tops/heights are measured at pickup, so
+  // variable-height rows shift correctly. All drag bookkeeping lives in refs;
+  // `dragIndex` state only flips the lifted row's styling.
+  const rowRefs = useRef<(HTMLLIElement | null)[]>([]);
+  const drag = useRef<{
+    pointerId: number;
+    startPageY: number;
+    startIndex: number;
+    currentIndex: number;
+    tops: number[];
+    heights: number[];
+    handle: HTMLElement;
+  } | null>(null);
+  const lastClientY = useRef(0);
+  const autoScrollRaf = useRef<number | null>(null);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+
+  // Recompute every row's transform from the current pointer + scroll position.
+  // Called from pointermove and from the edge auto-scroll loop, so a stationary
+  // finger near a screen edge keeps re-laying-out as the page scrolls under it.
+  const renderDrag = useCallback(() => {
+    const d = drag.current;
+    if (!d) return;
+    const dy = lastClientY.current + window.scrollY - d.startPageY;
+    const { tops, heights, startIndex } = d;
+    const n = tops.length;
+    const lift = heights[startIndex] + GAP_PX;
+    const draggedCenter = tops[startIndex] + heights[startIndex] / 2 + dy;
+
+    // Walk out from the pickup slot to find where the lifted row now centers.
+    let target = startIndex;
+    while (target > 0 && draggedCenter < tops[target - 1] + heights[target - 1] / 2) target--;
+    while (
+      target < n - 1 &&
+      draggedCenter > tops[target + 1] + heights[target + 1] / 2
+    )
+      target++;
+
+    if (target !== d.currentIndex) {
+      d.currentIndex = target;
+      if ("vibrate" in navigator) navigator.vibrate?.(5);
+    }
+
+    for (let j = 0; j < n; j++) {
+      const el = rowRefs.current[j];
+      if (!el) continue;
+      if (j === startIndex) {
+        el.style.transform = `translateY(${dy}px)`;
+        continue;
+      }
+      let shift = 0;
+      if (startIndex < target && j > startIndex && j <= target) shift = -lift;
+      else if (startIndex > target && j >= target && j < startIndex) shift = lift;
+      el.style.transform = shift ? `translateY(${shift}px)` : "";
+    }
+  }, []);
+
+  const stopAutoScroll = useCallback(() => {
+    if (autoScrollRaf.current != null) {
+      cancelAnimationFrame(autoScrollRaf.current);
+      autoScrollRaf.current = null;
+    }
+  }, []);
+
+  // Edge auto-scroll: while the finger sits near the top/bottom of the viewport
+  // mid-drag, keep scrolling so long setlists are reachable without lifting.
+  const autoScrollTick = useCallback(() => {
+    if (!drag.current) return;
+    const y = lastClientY.current;
+    const h = window.innerHeight;
+    let dv = 0;
+    if (y < EDGE_PX) dv = -Math.ceil(((EDGE_PX - y) / EDGE_PX) * EDGE_MAX_SPEED);
+    else if (y > h - EDGE_PX)
+      dv = Math.ceil(((y - (h - EDGE_PX)) / EDGE_PX) * EDGE_MAX_SPEED);
+    if (dv !== 0) {
+      window.scrollBy(0, dv);
+      renderDrag();
+    }
+    autoScrollRaf.current = requestAnimationFrame(autoScrollTick);
+  }, [renderDrag]);
+
+  const onDragMove = useCallback(
+    (e: React.PointerEvent) => {
+      if (!drag.current || e.pointerId !== drag.current.pointerId) return;
+      e.preventDefault();
+      lastClientY.current = e.clientY;
+      renderDrag();
+    },
+    [renderDrag],
+  );
+
+  const endDrag = useCallback(
+    (e: React.PointerEvent) => {
+      const d = drag.current;
+      if (!d || e.pointerId !== d.pointerId) return;
+      stopAutoScroll();
+      try {
+        d.handle.releasePointerCapture(e.pointerId);
+      } catch {
+        /* capture may already be gone */
+      }
+      // Clear transforms before React re-renders the committed order.
+      for (const el of rowRefs.current) if (el) el.style.transform = "";
+      drag.current = null;
+      setDragIndex(null);
+
+      const { startIndex, currentIndex } = d;
+      if (currentIndex === startIndex) return;
+      setCharts((cur) => {
+        const next = [...cur];
+        const [moved] = next.splice(startIndex, 1);
+        next.splice(currentIndex, 0, moved);
+        commitOrder(next, cur);
+        return next;
+      });
+    },
+    [stopAutoScroll, commitOrder],
+  );
+
+  const startDrag = useCallback(
+    (e: React.PointerEvent, index: number) => {
+      if (drag.current) return;
+      // Mouse: only a primary-button drag. Touch/pen: any contact.
+      if (e.pointerType === "mouse" && e.button !== 0) return;
+      const handle = e.currentTarget as HTMLElement;
+      const els = rowRefs.current;
+      const tops: number[] = [];
+      const heights: number[] = [];
+      for (const el of els) {
+        if (!el) continue;
+        tops.push(el.offsetTop);
+        heights.push(el.offsetHeight);
+      }
+      handle.setPointerCapture(e.pointerId);
+      lastClientY.current = e.clientY;
+      drag.current = {
+        pointerId: e.pointerId,
+        startPageY: e.clientY + window.scrollY,
+        startIndex: index,
+        currentIndex: index,
+        tops,
+        heights,
+        handle,
+      };
+      setDragIndex(index);
+      if ("vibrate" in navigator) navigator.vibrate?.(10);
+      autoScrollRaf.current = requestAnimationFrame(autoScrollTick);
+    },
+    [autoScrollTick],
+  );
+
+  // Keep the ref array sized to the current list so stale slots don't linger.
+  rowRefs.current.length = charts.length;
+
+  // Stop any in-flight auto-scroll loop if we unmount mid-drag.
+  useEffect(() => () => stopAutoScroll(), [stopAutoScroll]);
 
   return (
     <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6">
@@ -341,47 +506,71 @@ export default function SetlistClient({ initialCharts }: Props) {
         </p>
       ) : (
         <ol className="list-none space-y-2">
-          {charts.map((c, i) => (
-            <li
-              key={c.id}
-              className="flex items-center gap-2 border border-rule/60 bg-ink-raised/40 px-3 py-2.5"
-            >
-              <span className="w-6 shrink-0 text-right font-mono text-[0.7rem] text-cream-dimmer">
-                {i + 1}
-              </span>
-              <Link href={`/setlist/${c.id}`} className="min-w-0 flex-1">
-                <span className="block truncate text-[0.95rem] text-cream hover:text-cat-practice">
-                  {c.title}
-                </span>
-                <span className="block truncate font-mono text-[0.65rem] uppercase tracking-kicker text-cream-dimmer">
-                  {c.artist ? `${c.artist} · ` : ""}
-                  {lineCount(c.content)} lines
-                </span>
-              </Link>
-              <div className="flex shrink-0 items-center gap-1">
-                <IconBtn
-                  label="Move up"
-                  disabled={i === 0}
-                  onClick={() => move(i, -1)}
+          {charts.map((c, i) => {
+            const dragging = dragIndex === i;
+            return (
+              <li
+                key={c.id}
+                ref={(el) => {
+                  rowRefs.current[i] = el;
+                }}
+                style={{
+                  // The lifted row sits above its neighbors and animates back
+                  // into the grid; the others slide with a transition. The
+                  // active row gets no transition so it tracks the finger 1:1.
+                  transition: dragging
+                    ? "none"
+                    : "transform 180ms cubic-bezier(0.2, 0, 0, 1)",
+                  zIndex: dragging ? 20 : undefined,
+                  position: "relative",
+                }}
+                className={`flex items-center gap-1.5 border bg-ink-raised/40 px-2 py-2.5 sm:gap-2 sm:px-3 ${
+                  dragging
+                    ? "border-cat-practice/70 bg-ink-raised shadow-lg shadow-black/40"
+                    : "border-rule/60"
+                } ${dragIndex !== null && !dragging ? "opacity-90" : ""}`}
+              >
+                <button
+                  type="button"
+                  aria-label={`Drag to reorder ${c.title}`}
+                  onPointerDown={(e) => startDrag(e, i)}
+                  onPointerMove={onDragMove}
+                  onPointerUp={endDrag}
+                  onPointerCancel={endDrag}
+                  style={{ touchAction: "none" }}
+                  className={`flex h-9 w-7 shrink-0 cursor-grab touch-none select-none items-center justify-center font-mono text-base text-cream-dimmer transition-colors hover:text-cat-practice active:cursor-grabbing ${
+                    dragging ? "text-cat-practice" : ""
+                  }`}
                 >
-                  ↑
-                </IconBtn>
-                <IconBtn
-                  label="Move down"
-                  disabled={i === charts.length - 1}
-                  onClick={() => move(i, 1)}
+                  ⠿
+                </button>
+                <span className="w-5 shrink-0 text-right font-mono text-[0.7rem] text-cream-dimmer">
+                  {i + 1}
+                </span>
+                <Link
+                  href={`/setlist/${c.id}`}
+                  draggable={false}
+                  className="min-w-0 flex-1"
                 >
-                  ↓
-                </IconBtn>
-                <IconBtn label="Edit" onClick={() => openEdit(c)}>
-                  ✎
-                </IconBtn>
-                <IconBtn label="Delete" onClick={() => remove(c)}>
-                  ✕
-                </IconBtn>
-              </div>
-            </li>
-          ))}
+                  <span className="block truncate text-[0.95rem] text-cream hover:text-cat-practice">
+                    {c.title}
+                  </span>
+                  <span className="block truncate font-mono text-[0.65rem] uppercase tracking-kicker text-cream-dimmer">
+                    {c.artist ? `${c.artist} · ` : ""}
+                    {lineCount(c.content)} lines
+                  </span>
+                </Link>
+                <div className="flex shrink-0 items-center gap-1">
+                  <IconBtn label="Edit" onClick={() => openEdit(c)}>
+                    ✎
+                  </IconBtn>
+                  <IconBtn label="Delete" onClick={() => remove(c)}>
+                    ✕
+                  </IconBtn>
+                </div>
+              </li>
+            );
+          })}
         </ol>
       )}
     </article>
