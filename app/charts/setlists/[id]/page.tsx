@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { listCharts } from "@/lib/charts";
-import { getSetlist } from "@/lib/setlists";
+import { getSetlist, getSetlistMeta } from "@/lib/setlists";
 import SetlistDetailClient from "./SetlistDetailClient";
 
 export const dynamic = "force-dynamic";
@@ -11,8 +11,10 @@ export function generateMetadata({
 }: {
   params: { id: string };
 }): Metadata {
-  const result = getSetlist(params.id);
-  return { title: result ? `${result.setlist.name} — hub` : "Setlist — hub" };
+  // Title only needs the name — use the metadata query, not the full
+  // members JOIN that the page component runs.
+  const setlist = getSetlistMeta(params.id);
+  return { title: setlist ? `${setlist.name} — hub` : "Charts — hub" };
 }
 
 export default function SetlistDetailPage({

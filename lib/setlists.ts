@@ -150,11 +150,15 @@ export function addChartToSetlist(setlistId: string, chartId: string): boolean {
     )
     .get(setlistId) as { m: number | null };
   const sortOrder = (maxRow.m ?? -1) + 1;
-  db.prepare(
-    `INSERT OR IGNORE INTO setlist_charts (setlist_id, chart_id, sort_order)
-     VALUES (?, ?, ?)`,
-  ).run(setlistId, chartId, sortOrder);
-  touch(setlistId);
+  const info = db
+    .prepare(
+      `INSERT OR IGNORE INTO setlist_charts (setlist_id, chart_id, sort_order)
+       VALUES (?, ?, ?)`,
+    )
+    .run(setlistId, chartId, sortOrder);
+  // Only bump updated_at on a real insert — a no-op re-add (chart already a
+  // member; INSERT OR IGNORE reports changes=0) shouldn't touch the setlist.
+  if (info.changes > 0) touch(setlistId);
   return true;
 }
 
@@ -184,27 +188,38 @@ export function reorderSetlist(setlistId: string, chartIds: string[]): void {
   touch(setlistId);
 }
 
-// Offline-flagged setlists with their chart ids, used to drive service-worker
-// cache warming on the Charts library page. Only these setlists' charts are
-// proactively cached for offline play.
-export function getOfflineSetlists(): { id: string; chartIds: string[] }[] {
+// Offline-flagged setlists with their member charts (id + updatedAt), used to
+// drive service-worker cache warming on the Charts library page. Only these
+// setlists' charts are proactively cached for offline play. Including
+// updatedAt lets the client key its warm guard on content, so editing a member
+// chart re-warms the cache (otherwise the stale page would be served at a gig).
+export function getOfflineSetlists(): {
+  id: string;
+  charts: { id: string; updatedAt: string }[];
+}[] {
   const db = getDb();
   const setlists = db
     .prepare(`SELECT id FROM setlists WHERE offline = 1 ORDER BY created_at ASC`)
     .all() as { id: string }[];
-  const idsStmt = db.prepare(
-    `SELECT chart_id FROM setlist_charts WHERE setlist_id = ? ORDER BY sort_order ASC`,
+  const chartsStmt = db.prepare(
+    `SELECT c.id, c.updated_at
+     FROM setlist_charts sc
+     JOIN charts c ON c.id = sc.chart_id
+     WHERE sc.setlist_id = ?
+     ORDER BY sc.sort_order ASC`,
   );
   return setlists.map((s) => ({
     id: s.id,
-    chartIds: (idsStmt.all(s.id) as { chart_id: string }[]).map(
-      (r) => r.chart_id,
+    charts: (chartsStmt.all(s.id) as { id: string; updated_at: string }[]).map(
+      (r) => ({ id: r.id, updatedAt: r.updated_at }),
     ),
   }));
 }
 
-// Bump updated_at on membership/order changes so the offline-warm key (which
-// folds setlist updatedAt) re-warms when a setlist's contents change.
+// Bump updated_at on membership/order changes. (The offline-warm key folds
+// each member chart's id+updatedAt, not the setlist's updatedAt, so re-warming
+// is driven by chart content rather than this timestamp — this is just an
+// honest "last modified" for the setlist.)
 function touch(id: string): void {
   const db = getDb();
   db.prepare(`UPDATE setlists SET updated_at = ? WHERE id = ?`).run(

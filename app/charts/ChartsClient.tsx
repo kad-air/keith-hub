@@ -9,8 +9,10 @@ import { ChartForm, EMPTY_FORM, type FormState } from "./ChartForm";
 interface Props {
   initialCharts: Chart[];
   setlistCount: number;
-  // Offline-flagged setlists + their chart ids — drives SW cache warming.
-  offlineSetlists: { id: string; chartIds: string[] }[];
+  // Offline-flagged setlists + their member charts (id + updatedAt) — drives SW
+  // cache warming. updatedAt is folded into the warm key so editing a member
+  // chart re-warms its page rather than serving a stale render offline.
+  offlineSetlists: { id: string; charts: { id: string; updatedAt: string }[] }[];
 }
 
 // Library sort. The full charts list loads at once, so sorting is a cheap
@@ -123,16 +125,21 @@ export default function ChartsClient({
   // navigation); both land in the `charts-pages` cache. Keyed on the offline
   // set so adds/edits/toggles re-warm, and guarded so it runs at most once per
   // unchanged set per session.
+  // Fold each member chart's updatedAt into the key so an edit re-warms the
+  // page (id alone would short-circuit the guard and serve a stale render).
   const offlineKey = useMemo(
     () =>
       offlineSetlists
-        .map((s) => `${s.id}:${s.chartIds.join("+")}`)
+        .map(
+          (s) =>
+            `${s.id}:${s.charts.map((c) => `${c.id}@${c.updatedAt}`).join("+")}`,
+        )
         .join(","),
     [offlineSetlists],
   );
   const offlineChartCount = useMemo(() => {
     const ids = new Set<string>();
-    for (const s of offlineSetlists) for (const id of s.chartIds) ids.add(id);
+    for (const s of offlineSetlists) for (const c of s.charts) ids.add(c.id);
     return ids.size;
   }, [offlineSetlists]);
 
@@ -148,7 +155,7 @@ export default function ChartsClient({
       const pages = new Set<string>();
       for (const s of offlineSetlists) {
         pages.add(`/charts/setlists/${s.id}`);
-        for (const id of s.chartIds) pages.add(`/charts/${id}`);
+        for (const c of s.charts) pages.add(`/charts/${c.id}`);
       }
       for (const href of Array.from(pages)) {
         if (cancelled) return;
@@ -171,13 +178,17 @@ export default function ChartsClient({
     };
   }, [online, offlineSetlists, offlineKey, router]);
 
-  const offlineStatus = !online
-    ? "● Offline · saved setlists available"
-    : offlineSetlists.length === 0
+  // Only speak to offline availability when something was actually warmed —
+  // with zero offline-flagged setlists nothing is cached, so "saved setlists
+  // available" would be a lie when the connection drops.
+  const offlineStatus =
+    offlineSetlists.length === 0
       ? ""
-      : offlineReady
-        ? `✓ ${offlineChartCount} chart${offlineChartCount === 1 ? "" : "s"} saved for offline`
-        : "Saving setlists for offline…";
+      : !online
+        ? "● Offline · saved setlists available"
+        : offlineReady
+          ? `✓ ${offlineChartCount} chart${offlineChartCount === 1 ? "" : "s"} saved for offline`
+          : "Saving setlists for offline…";
 
   const openNew = useCallback(() => {
     setError(null);

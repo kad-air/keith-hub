@@ -37,6 +37,12 @@ const serwist = new Serwist({
       handler: new NetworkFirst({
         cacheName: "charts-pages",
         networkTimeoutSeconds: 4,
+        // Match ignoring the query string: a chart opened from a setlist links
+        // to /charts/<id>?setlist=<id>, but warming caches the query-less
+        // /charts/<id>. Without this, the offline navigation (query-full) would
+        // miss the warmed (query-less) entry — breaking the exact gig-with-no-
+        // signal flow this cache exists for.
+        matchOptions: { ignoreSearch: true },
       }),
     },
     ...defaultCache,
@@ -44,6 +50,13 @@ const serwist = new Serwist({
 });
 
 serwist.addEventListeners();
+
+// The runtime cache was renamed setlist-pages -> charts-pages when the section
+// became "Charts". Serwist only cleans its own precache, so drop the old
+// runtime cache on activate to avoid stranding it (a one-time storage leak).
+self.addEventListener("activate", (event) => {
+  event.waitUntil(caches.delete("setlist-pages"));
+});
 
 // ── Web Push ────────────────────────────────────────────────────
 self.addEventListener("push", (event) => {

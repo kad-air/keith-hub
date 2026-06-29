@@ -60,8 +60,14 @@ export default function SetlistDetailClient({
   // Warm the SW cache for this setlist when it's flagged offline: fetch each
   // member chart's page (and this setlist page) so they're available with no
   // signal. Keyed on the member set so adds/removes re-warm.
+  // Fold each chart's updatedAt into the key so editing a member chart re-warms
+  // its page — keying on id alone would short-circuit the guard and leave the
+  // stale (pre-edit) render cached for offline play.
   const warmKey = useMemo(
-    () => (setlist.offline ? charts.map((c) => c.id).join(",") : ""),
+    () =>
+      setlist.offline
+        ? charts.map((c) => `${c.id}@${c.updatedAt}`).join(",")
+        : "",
     [setlist.offline, charts],
   );
   useEffect(() => {
@@ -158,8 +164,14 @@ export default function SetlistDetailClient({
 
   const addChart = useCallback(
     async (chart: Chart) => {
-      // Optimistic append; reconcile with the server's authoritative order.
-      setCharts((cur) => [...cur, chart]);
+      if (!online) return;
+      // Optimistic append. The server also appends at the end (MAX(sort_order)
+      // + 1), so the optimistic order already matches — we deliberately do NOT
+      // overwrite the list with the server's response, which would clobber a
+      // concurrent add/remove/reorder still settling locally.
+      setCharts((cur) =>
+        cur.some((c) => c.id === chart.id) ? cur : [...cur, chart],
+      );
       try {
         const res = await fetch(`/api/setlists/${setlist.id}/charts`, {
           method: "POST",
@@ -167,18 +179,17 @@ export default function SetlistDetailClient({
           body: JSON.stringify({ chartId: chart.id }),
         });
         if (!res.ok) throw new Error("add failed");
-        const { charts: next } = (await res.json()) as { charts: Chart[] };
-        setCharts(next);
       } catch {
         setCharts((cur) => cur.filter((c) => c.id !== chart.id));
       }
     },
-    [setlist.id],
+    [online, setlist.id],
   );
 
   const removeChart = useCallback(
     async (chart: Chart) => {
-      const prev = charts;
+      if (!online) return;
+      const idx = charts.findIndex((c) => c.id === chart.id);
       setCharts((cur) => cur.filter((c) => c.id !== chart.id));
       try {
         const res = await fetch(
@@ -187,10 +198,18 @@ export default function SetlistDetailClient({
         );
         if (!res.ok) throw new Error("remove failed");
       } catch {
-        setCharts(prev);
+        // Re-insert at the original position functionally, rather than
+        // overwriting with a captured snapshot that a concurrent reconcile may
+        // have made stale.
+        setCharts((cur) => {
+          if (cur.some((c) => c.id === chart.id)) return cur;
+          const next = [...cur];
+          next.splice(idx < 0 ? next.length : Math.min(idx, next.length), 0, chart);
+          return next;
+        });
       }
     },
-    [charts, setlist.id],
+    [online, charts, setlist.id],
   );
 
   // Persist a new order to the server, rolling back on failure.
@@ -314,20 +333,28 @@ export default function SetlistDetailClient({
 
       const { startIndex, currentIndex } = d;
       if (currentIndex === startIndex) return;
-      setCharts((cur) => {
-        const next = [...cur];
-        const [moved] = next.splice(startIndex, 1);
-        next.splice(currentIndex, 0, moved);
-        commitOrder(next, cur);
-        return next;
-      });
+      // Compute the new order from the live array OUTSIDE the state updater: the
+      // updater must stay pure (StrictMode invokes it twice, which would double-
+      // fire the reorder POST). If the list changed length mid-drag (an
+      // add/remove reconciled while held), the captured indices no longer line
+      // up — bail rather than commit a corrupted order.
+      const cur = charts;
+      if (cur.length !== d.tops.length) return;
+      const next = [...cur];
+      const [moved] = next.splice(startIndex, 1);
+      next.splice(currentIndex, 0, moved);
+      setCharts(next);
+      commitOrder(next, cur);
     },
-    [stopAutoScroll, commitOrder],
+    [charts, stopAutoScroll, commitOrder],
   );
 
   const startDrag = useCallback(
     (e: React.PointerEvent, index: number) => {
       if (drag.current) return;
+      // Reorder is a write — don't start a drag offline (the commit POST would
+      // fail and snap the row back with no explanation mid-gig).
+      if (!online) return;
       if (e.pointerType === "mouse" && e.button !== 0) return;
       const handle = e.currentTarget as HTMLElement;
       const els = rowRefs.current;
@@ -353,7 +380,7 @@ export default function SetlistDetailClient({
       if ("vibrate" in navigator) navigator.vibrate?.(10);
       autoScrollRaf.current = requestAnimationFrame(autoScrollTick);
     },
-    [autoScrollTick],
+    [online, autoScrollTick],
   );
 
   // Keep the ref array sized to the current list so stale slots don't linger.
@@ -419,12 +446,18 @@ export default function SetlistDetailClient({
           </div>
         )}
 
-        {/* Offline toggle */}
-        <label className="mt-3 flex cursor-pointer items-center gap-2 text-sm text-cream-dim">
+        {/* Offline toggle — itself a write (PUT), so disabled while offline. */}
+        <label
+          className={`mt-3 flex items-center gap-2 text-sm text-cream-dim ${
+            online ? "cursor-pointer" : "cursor-not-allowed opacity-50"
+          }`}
+          title={!online ? "Connect to change offline availability" : undefined}
+        >
           <input
             type="checkbox"
             checked={setlist.offline}
             onChange={toggleOffline}
+            disabled={!online}
             className="h-4 w-4 accent-cat-practice"
           />
           <span>Available offline</span>
@@ -498,7 +531,9 @@ export default function SetlistDetailClient({
                   <button
                     aria-label={`Add ${c.title}`}
                     onClick={() => addChart(c)}
-                    className="flex h-7 shrink-0 items-center justify-center border border-cat-practice/60 bg-cat-practice/10 px-3 font-mono text-[0.65rem] uppercase tracking-kicker text-cream transition-colors hover:bg-cat-practice/20"
+                    disabled={!online}
+                    title={!online ? "Connect to add charts" : undefined}
+                    className="flex h-7 shrink-0 items-center justify-center border border-cat-practice/60 bg-cat-practice/10 px-3 font-mono text-[0.65rem] uppercase tracking-kicker text-cream transition-colors hover:bg-cat-practice/20 disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     + Add
                   </button>
@@ -545,8 +580,10 @@ export default function SetlistDetailClient({
                   onPointerMove={onDragMove}
                   onPointerUp={endDrag}
                   onPointerCancel={endDrag}
+                  disabled={!online}
+                  title={!online ? "Connect to reorder" : undefined}
                   style={{ touchAction: "none" }}
-                  className={`flex h-9 w-7 shrink-0 cursor-grab touch-none select-none items-center justify-center font-mono text-base text-cream-dimmer transition-colors hover:text-cat-practice active:cursor-grabbing ${
+                  className={`flex h-9 w-7 shrink-0 cursor-grab touch-none select-none items-center justify-center font-mono text-base text-cream-dimmer transition-colors hover:text-cat-practice active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-40 ${
                     dragging ? "text-cat-practice" : ""
                   }`}
                 >
@@ -571,7 +608,9 @@ export default function SetlistDetailClient({
                 <button
                   aria-label={`Remove ${c.title} from setlist`}
                   onClick={() => removeChart(c)}
-                  className="flex h-7 w-7 shrink-0 items-center justify-center border border-rule/50 font-mono text-xs text-cream-dim transition-colors hover:border-cat-music/60 hover:text-cream"
+                  disabled={!online}
+                  title={!online ? "Connect to remove" : undefined}
+                  className="flex h-7 w-7 shrink-0 items-center justify-center border border-rule/50 font-mono text-xs text-cream-dim transition-colors hover:border-cat-music/60 hover:text-cream disabled:cursor-not-allowed disabled:opacity-30"
                 >
                   ✕
                 </button>
