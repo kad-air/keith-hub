@@ -77,6 +77,21 @@ export function getDb(): Database.Database {
       done_at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_practice_progress_done_at ON practice_progress(done_at);
+
+    -- Setlist: uploaded guitar chord charts displayed as clean mono text with
+    -- a configurable-speed autoscroll viewer. content is the raw chart text,
+    -- preserved verbatim (chord-over-lyric alignment matters). sort_order is
+    -- the performance order, rewritten on reorder. See lib/charts.ts.
+    CREATE TABLE IF NOT EXISTS charts (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      artist TEXT,
+      content TEXT NOT NULL,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_charts_sort ON charts(sort_order);
   `);
 
   return dbInstance;

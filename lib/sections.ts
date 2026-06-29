@@ -64,6 +64,16 @@ const PRACTICE_SECTION: Section = {
   match: (p) => p.startsWith("/practice"),
 };
 
+const SETLIST_SECTION: Section = {
+  key: "setlist",
+  num: "",
+  name: "Setlist",
+  href: "/setlist",
+  group: "Guitar",
+  desc: "Chord charts · autoscroll",
+  match: (p) => p.startsWith("/setlist"),
+};
+
 export const SECTIONS: Section[] = (() => {
   const trackerSections: Section[] = TRACKER_CONFIGS.map((t) => ({
     key: t.slug,
@@ -83,6 +93,7 @@ export const SECTIONS: Section[] = (() => {
     ...trackerSections,
     COMICS_SECTION,
     PRACTICE_SECTION,
+    SETLIST_SECTION,
   ];
   return all.map((s, i) => ({ ...s, num: String(i + 1).padStart(2, "0") }));
 })();
