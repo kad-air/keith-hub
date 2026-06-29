@@ -9,7 +9,7 @@ const SPEED_MAX = 160;
 const SPEED_STEP = 2;
 const SPEED_DEFAULT = 30; // px/sec
 
-const FONT_MIN = 12;
+const FONT_MIN = 6;
 const FONT_MAX = 30;
 const FONT_STEP = 1;
 const FONT_DEFAULT = 16;
