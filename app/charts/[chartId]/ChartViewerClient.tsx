@@ -313,12 +313,26 @@ export default function ChartViewerClient({
           onFile={handleEditFile}
         />
       ) : (
-        <pre
+        // One element per physical line so long lines wrap instead of scrolling
+        // horizontally. The hanging indent (padding-left + negative text-indent)
+        // pushes wrapped continuations in by 1.5em so they read as a carry-over
+        // of the same line rather than a new chord/lyric line. `break-words`
+        // catches any single token too wide for the viewport. Empty lines get a
+        // non-breaking space to preserve their height.
+        <div
           style={{ fontSize: `${fontSize}px`, lineHeight: 1.55 }}
-          className="overflow-x-auto whitespace-pre font-mono text-cream"
+          className="font-mono text-cream"
         >
-          {chart.content}
-        </pre>
+          {chart.content.split("\n").map((line, i) => (
+            <div
+              key={i}
+              className="whitespace-pre-wrap break-words"
+              style={{ paddingLeft: "1.5em", textIndent: "-1.5em" }}
+            >
+              {line || " "}
+            </div>
+          ))}
+        </div>
       )}
 
       {/* Fixed control bar — hidden while editing. */}
