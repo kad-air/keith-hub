@@ -85,6 +85,42 @@ export function createChart(input: ChartInput): Chart {
   return getChart(id)!;
 }
 
+// Bulk insert (e.g. dropping a folder of .txt files). Appends every input to
+// the end of the setlist in the order given, in one transaction so a partial
+// failure can't leave the list half-populated. Returns the created charts in
+// the same order.
+export function createCharts(inputs: ChartInput[]): Chart[] {
+  const db = getDb();
+  if (inputs.length === 0) return [];
+  const now = new Date().toISOString();
+  const maxRow = db
+    .prepare(`SELECT MAX(sort_order) as m FROM charts`)
+    .get() as { m: number | null };
+  let sortOrder = (maxRow.m ?? -1) + 1;
+  const insert = db.prepare(
+    `INSERT INTO charts (id, title, artist, content, sort_order, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+  );
+  const ids: string[] = [];
+  const tx = db.transaction((rows: ChartInput[]) => {
+    for (const input of rows) {
+      const id = randomUUID();
+      insert.run(
+        id,
+        input.title.trim(),
+        input.artist?.trim() || null,
+        input.content,
+        sortOrder++,
+        now,
+        now,
+      );
+      ids.push(id);
+    }
+  });
+  tx(inputs);
+  return ids.map((id) => getChart(id)!);
+}
+
 export function updateChart(id: string, input: ChartInput): Chart | null {
   const db = getDb();
   const existing = getChart(id);
