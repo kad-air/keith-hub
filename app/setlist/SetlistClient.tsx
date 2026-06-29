@@ -28,6 +28,22 @@ function lineCount(content: string): number {
   return content.split("\n").length;
 }
 
+// Derive { artist, title } from a filename. Strips the extension, then splits
+// on the first " - " separator following the "Artist - Title" convention
+// (everything before is the artist, everything after is the title). Files with
+// no separator become a title with no artist.
+function parseFilename(name: string): { artist: string | null; title: string } {
+  const base = name.replace(/\.[^.]+$/, "").trim();
+  const sep = base.indexOf(" - ");
+  if (sep === -1) return { artist: null, title: base };
+  const artist = base.slice(0, sep).trim();
+  const title = base.slice(sep + 3).trim();
+  // Guard against leading/trailing separators (" - Title", "Artist - ") that
+  // would yield an empty half — fall back to using the whole name as title.
+  if (!artist || !title) return { artist: null, title: base };
+  return { artist, title };
+}
+
 export default function SetlistClient({ initialCharts }: Props) {
   const router = useRouter();
   const [charts, setCharts] = useState<Chart[]>(initialCharts);
@@ -36,7 +52,9 @@ export default function SetlistClient({ initialCharts }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [online, setOnline] = useState(true);
   const [offlineReady, setOfflineReady] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const bulkRef = useRef<HTMLInputElement>(null);
   const warmedRef = useRef<string>("");
 
   // Track connectivity for the offline-status line. navigator.onLine is a
@@ -136,6 +154,43 @@ export default function SetlistClient({ initialCharts }: Props) {
     [],
   );
 
+  // Bulk upload: one chart per selected .txt file. Title and artist are parsed
+  // from each filename via the "Artist - Title" convention (artist is blank
+  // when there's no separator). Reads happen client-side, then a single POST
+  // creates them all.
+  const handleBulk = useCallback(async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const entries = await Promise.all(
+        Array.from(files).map(async (file) => ({
+          ...parseFilename(file.name),
+          content: await file.text(),
+        })),
+      );
+      const res = await fetch("/api/charts/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ charts: entries }),
+      });
+      if (!res.ok) throw new Error("bulk upload failed");
+      const { charts: created, skipped } = (await res.json()) as {
+        charts: Chart[];
+        skipped: string[];
+      };
+      setCharts((cur) => [...cur, ...created]);
+      const parts = [`Added ${created.length} chart${created.length === 1 ? "" : "s"}`];
+      if (skipped?.length) parts.push(`skipped ${skipped.length} empty`);
+      setNotice(parts.join(", ") + ".");
+    } catch {
+      setError("Bulk upload failed. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  }, []);
+
   const save = useCallback(async () => {
     if (!form) return;
     if (!form.title.trim() || !form.content.trim()) {
@@ -227,14 +282,42 @@ export default function SetlistClient({ initialCharts }: Props) {
           )}
         </div>
         {!form && (
-          <button
-            onClick={openNew}
-            className="shrink-0 border border-cat-practice/60 bg-cat-practice/10 px-3 py-1.5 font-mono text-[0.7rem] uppercase tracking-kicker text-cream transition-colors hover:bg-cat-practice/20"
-          >
-            + Add
-          </button>
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              onClick={() => bulkRef.current?.click()}
+              disabled={busy}
+              className="border border-rule/60 px-3 py-1.5 font-mono text-[0.7rem] uppercase tracking-kicker text-cream-dim transition-colors hover:border-cat-practice/60 hover:text-cream disabled:opacity-50"
+            >
+              {busy ? "Uploading…" : "Bulk .txt"}
+            </button>
+            <button
+              onClick={openNew}
+              className="border border-cat-practice/60 bg-cat-practice/10 px-3 py-1.5 font-mono text-[0.7rem] uppercase tracking-kicker text-cream transition-colors hover:bg-cat-practice/20"
+            >
+              + Add
+            </button>
+          </div>
         )}
       </header>
+
+      <input
+        ref={bulkRef}
+        type="file"
+        multiple
+        accept=".txt,.chordpro,.cho,.crd,.pro,text/plain"
+        className="hidden"
+        onChange={(e) => {
+          handleBulk(e.target.files);
+          e.target.value = "";
+        }}
+      />
+
+      {notice && (
+        <p className="mb-4 border border-cat-practice/40 bg-cat-practice/10 px-3 py-2 text-sm text-cream">
+          {notice}
+        </p>
+      )}
+      {!form && error && <p className="mb-4 text-sm text-cat-music">{error}</p>}
 
       {form && (
         <ChartForm
