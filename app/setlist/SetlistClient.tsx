@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Chart } from "@/lib/charts";
 
 interface Props {
@@ -28,11 +29,76 @@ function lineCount(content: string): number {
 }
 
 export default function SetlistClient({ initialCharts }: Props) {
+  const router = useRouter();
   const [charts, setCharts] = useState<Chart[]>(initialCharts);
   const [form, setForm] = useState<FormState | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [online, setOnline] = useState(true);
+  const [offlineReady, setOfflineReady] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const warmedRef = useRef<string>("");
+
+  // Track connectivity for the offline-status line. navigator.onLine is a
+  // hint (it can read "online" with no real reachability), but it's the right
+  // signal for a "you're offline" reassurance badge.
+  useEffect(() => {
+    const update = () => setOnline(navigator.onLine);
+    update();
+    window.addEventListener("online", update);
+    window.addEventListener("offline", update);
+    return () => {
+      window.removeEventListener("online", update);
+      window.removeEventListener("offline", update);
+    };
+  }, []);
+
+  // Warm the service worker's setlist cache so EVERY chart is available
+  // offline after one online visit to this index — not just the ones the user
+  // happened to open. We fetch each chart's document (covers a cold PWA
+  // relaunch / shared link) and router.prefetch its RSC payload (covers in-app
+  // <Link> navigation); both responses land in the `setlist-pages` cache via
+  // the SW rule. Keyed on id+updatedAt so adds/edits re-warm the changed page,
+  // and guarded so it runs at most once per unchanged setlist per session.
+  useEffect(() => {
+    if (!online || charts.length === 0) return;
+    const key = charts.map((c) => `${c.id}:${c.updatedAt}`).join(",");
+    if (warmedRef.current === key) {
+      setOfflineReady(true);
+      return;
+    }
+    let cancelled = false;
+    setOfflineReady(false);
+    (async () => {
+      for (const c of charts) {
+        if (cancelled) return;
+        const href = `/setlist/${c.id}`;
+        try {
+          await fetch(href);
+          router.prefetch(href);
+        } catch {
+          // Lost the network mid-warm (or a transient failure). Leave the
+          // ref unset so the next visit retries the remaining charts.
+          return;
+        }
+      }
+      if (!cancelled) {
+        warmedRef.current = key;
+        setOfflineReady(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [online, charts, router]);
+
+  const offlineStatus = !online
+    ? "● Offline · charts available"
+    : charts.length === 0
+      ? ""
+      : offlineReady
+        ? "✓ Saved for offline"
+        : "Saving for offline…";
 
   const openNew = useCallback(() => {
     setError(null);
@@ -150,6 +216,15 @@ export default function SetlistClient({ initialCharts }: Props) {
           <p className="mt-1 text-sm text-cream-dim">
             Chord charts with configurable-speed autoscroll. Hands-free.
           </p>
+          {offlineStatus && (
+            <p
+              className={`mt-1.5 font-mono text-[0.6rem] uppercase tracking-kicker ${
+                online ? "text-cream-dimmer" : "text-cat-practice"
+              }`}
+            >
+              {offlineStatus}
+            </p>
+          )}
         </div>
         {!form && (
           <button
