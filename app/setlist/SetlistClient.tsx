@@ -28,6 +28,20 @@ function lineCount(content: string): number {
   return content.split("\n").length;
 }
 
+// Derive artist + title from an upload's filename. The convention is
+// `Artist - Title.ext` (e.g. `Tom Petty - Walls (Circus).txt`): everything
+// before the first " - " is the artist, the rest is the title. A filename
+// with no " - " separator yields an empty artist and the whole stem as title.
+function parseFilename(name: string): { artist: string; title: string } {
+  const stem = name.replace(/\.[^.]+$/, "").trim();
+  const sep = stem.indexOf(" - ");
+  if (sep === -1) return { artist: "", title: stem };
+  return {
+    artist: stem.slice(0, sep).trim(),
+    title: stem.slice(sep + 3).trim(),
+  };
+}
+
 export default function SetlistClient({ initialCharts }: Props) {
   const router = useRouter();
   const [charts, setCharts] = useState<Chart[]>(initialCharts);
@@ -37,7 +51,9 @@ export default function SetlistClient({ initialCharts }: Props) {
   const [online, setOnline] = useState(true);
   const [offlineReady, setOfflineReady] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const bulkRef = useRef<HTMLInputElement>(null);
   const warmedRef = useRef<string>("");
+  const [bulkStatus, setBulkStatus] = useState<string | null>(null);
 
   // Track connectivity for the offline-status line. navigator.onLine is a
   // hint (it can read "online" with no real reachability), but it's the right
@@ -127,14 +143,64 @@ export default function SetlistClient({ initialCharts }: Props) {
       const text = await file.text();
       setForm((f) => {
         if (!f) return f;
-        // Use the filename (sans extension) as a title fallback when empty.
-        const title =
-          f.title.trim() || file.name.replace(/\.[^.]+$/, "").trim();
-        return { ...f, content: text, title };
+        // Derive title + artist from the filename (`Artist - Title.ext`),
+        // filling only fields the user hasn't already typed.
+        const parsed = parseFilename(file.name);
+        return {
+          ...f,
+          content: text,
+          title: f.title.trim() || parsed.title,
+          artist: f.artist.trim() || parsed.artist,
+        };
       });
     },
     [],
   );
+
+  // Bulk upload: create one chart per file, deriving artist + title from each
+  // filename (`Artist - Title.ext`). Files are POSTed sequentially so the
+  // server-side ordering stays deterministic and the charts list grows in the
+  // order they were picked. The picker is sorted by name first for stable order.
+  const handleBulkFiles = useCallback(async (fileList: FileList | null) => {
+    if (!fileList || fileList.length === 0) return;
+    const files = Array.from(fileList).sort((a, b) =>
+      a.name.localeCompare(b.name),
+    );
+    setBusy(true);
+    setError(null);
+    let added = 0;
+    const failures: string[] = [];
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      setBulkStatus(`Uploading ${i + 1} of ${files.length}…`);
+      try {
+        const text = await file.text();
+        const { artist, title } = parseFilename(file.name);
+        if (!title.trim() || !text.trim()) {
+          failures.push(file.name);
+          continue;
+        }
+        const res = await fetch("/api/charts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title, artist, content: text }),
+        });
+        if (!res.ok) throw new Error("save failed");
+        const { chart } = (await res.json()) as { chart: Chart };
+        setCharts((cur) => [...cur, chart]);
+        added += 1;
+      } catch {
+        failures.push(file.name);
+      }
+    }
+    setBusy(false);
+    setBulkStatus(null);
+    if (failures.length > 0) {
+      setError(
+        `Added ${added} chart${added === 1 ? "" : "s"}. Skipped ${failures.length}: ${failures.join(", ")}`,
+      );
+    }
+  }, []);
 
   const save = useCallback(async () => {
     if (!form) return;
@@ -227,14 +293,44 @@ export default function SetlistClient({ initialCharts }: Props) {
           )}
         </div>
         {!form && (
-          <button
-            onClick={openNew}
-            className="shrink-0 border border-cat-practice/60 bg-cat-practice/10 px-3 py-1.5 font-mono text-[0.7rem] uppercase tracking-kicker text-cream transition-colors hover:bg-cat-practice/20"
-          >
-            + Add
-          </button>
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              onClick={() => bulkRef.current?.click()}
+              disabled={busy}
+              className="border border-rule/60 px-3 py-1.5 font-mono text-[0.7rem] uppercase tracking-kicker text-cream-dim transition-colors hover:text-cream disabled:opacity-50"
+            >
+              ⇪ Bulk
+            </button>
+            <button
+              onClick={openNew}
+              className="border border-cat-practice/60 bg-cat-practice/10 px-3 py-1.5 font-mono text-[0.7rem] uppercase tracking-kicker text-cream transition-colors hover:bg-cat-practice/20"
+            >
+              + Add
+            </button>
+          </div>
         )}
+        <input
+          ref={bulkRef}
+          type="file"
+          multiple
+          accept=".txt,.chordpro,.cho,.crd,.pro,text/plain"
+          className="hidden"
+          onChange={(e) => {
+            handleBulkFiles(e.target.files);
+            e.target.value = "";
+          }}
+        />
       </header>
+
+      {!form && (bulkStatus || error) && (
+        <p
+          className={`mb-4 font-mono text-[0.7rem] ${
+            bulkStatus ? "text-cream-dim" : "text-cat-music"
+          }`}
+        >
+          {bulkStatus ?? error}
+        </p>
+      )}
 
       {form && (
         <ChartForm
@@ -254,7 +350,10 @@ export default function SetlistClient({ initialCharts }: Props) {
         <p className="mt-8 text-sm text-cream-dim">
           No charts yet. Tap{" "}
           <span className="font-mono text-cream">+ Add</span> to paste or upload
-          a chord chart.
+          a chord chart, or{" "}
+          <span className="font-mono text-cream">⇪ Bulk</span> to import several
+          named <span className="font-mono text-cream">Artist - Title.txt</span>{" "}
+          files at once.
         </p>
       ) : (
         <ol className="list-none space-y-2">
