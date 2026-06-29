@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 import { defaultCache } from "@serwist/next/worker";
 import type { PrecacheEntry, SerwistGlobalConfig } from "serwist";
-import { Serwist } from "serwist";
+import { NetworkFirst, Serwist } from "serwist";
 
 declare global {
   interface WorkerGlobalScope extends SerwistGlobalConfig {
@@ -17,7 +17,28 @@ const serwist = new Serwist({
   skipWaiting: true,
   clientsClaim: true,
   navigationPreload: true,
-  runtimeCaching: defaultCache,
+  runtimeCaching: [
+    // Setlist gets a dedicated NetworkFirst cache so chord charts stay
+    // available offline — the use case is playing a gig with no signal.
+    // Online (or within the 4s timeout) the network wins so edits show up
+    // immediately; offline it falls back to the last-cached render of each
+    // page. The chart text is baked into the SSR'd HTML and the viewer's
+    // interactivity (autoscroll, zoom, wake-lock) is entirely client-side,
+    // so a cached page is fully functional offline. The index warms every
+    // chart page on load (see SetlistClient) so the WHOLE setlist is
+    // offline-ready after one online visit — not just the charts you opened.
+    // This must precede defaultCache so it wins the /setlist* routes.
+    {
+      matcher: ({ url, sameOrigin }) =>
+        sameOrigin &&
+        (url.pathname === "/setlist" || url.pathname.startsWith("/setlist/")),
+      handler: new NetworkFirst({
+        cacheName: "setlist-pages",
+        networkTimeoutSeconds: 4,
+      }),
+    },
+    ...defaultCache,
+  ],
 });
 
 serwist.addEventListeners();

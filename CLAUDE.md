@@ -262,6 +262,11 @@ iOS standalone PWAs have a long-standing quirk: `window.open(url, "_blank")` ope
 - `components/ServiceWorkerRegister.tsx` registers the SW on the client.
 - `skipWaiting: true` and `clientsClaim: true` mean a fresh build replaces the previous SW on next launch — but iOS PWAs may need a force-quit (not just close) to actually pick up the new bundle.
 
+### Setlist offline support
+The Setlist (chord charts, `/setlist` + `/setlist/[id]`) is the one section explicitly built to work offline — the use case is playing a gig with no signal. Two pieces make it load-bearing:
+- **Dedicated SW cache** (`app/sw.ts`): a `NetworkFirst` rule for `/setlist` and `/setlist/*` writes to the `setlist-pages` cache, ordered **before** `...defaultCache` so it wins those routes. Online (or within the 4s timeout) the network wins, so edits show immediately; offline it serves the last-cached render. The chart text is baked into the SSR'd HTML and all viewer interactivity (autoscroll, font zoom, wake-lock, progress) is client-side, so a cached page is fully functional offline with zero network.
+- **Cache warming** (`components/../setlist/SetlistClient.tsx`): on load, while online, the index `fetch()`s each chart's document (covers cold PWA relaunch / shared link) **and** `router.prefetch()`s its RSC payload (covers in-app `<Link>` nav). Both land in `setlist-pages`. This makes the **whole** setlist offline-ready after one online visit to the index — not just charts the user opened. Warming is keyed on `id:updatedAt` so adds/edits re-warm the changed page, and guarded by a ref so it runs at most once per unchanged setlist per session. The header shows a status line ("Saving for offline…" → "✓ Saved for offline", or "● Offline · charts available" when disconnected). Writes (add/edit/delete/reorder) still require the network — offline is read/play only.
+
 ## Deployment
 
 **Hosted on Railway** at `hub.keithadair.com`. Auto-deploys on push to `main`.
