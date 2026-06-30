@@ -27,11 +27,15 @@ function lineCount(content: string): number {
 export default function SetlistDetailClient({
   initialSetlist,
   initialCharts,
-  library,
+  library: initialLibrary,
 }: Props) {
   const router = useRouter();
   const [setlist, setSetlist] = useState<Setlist>(initialSetlist);
   const [charts, setCharts] = useState<Chart[]>(initialCharts);
+  // The library is seeded from the SSR prop, but that render can be served
+  // stale (the SW `charts-pages` cache / client Router Cache), so a chart just
+  // added on /charts wouldn't appear here. Refetch it when the picker opens.
+  const [library, setLibrary] = useState<Chart[]>(initialLibrary);
   const [online, setOnline] = useState(true);
   const [offlineReady, setOfflineReady] = useState(false);
   const [picking, setPicking] = useState(false);
@@ -162,6 +166,21 @@ export default function SetlistDetailClient({
       setError("Couldn't delete. Try again.");
     }
   }, [setlist.id, setlist.name, router]);
+
+  // Open the "Add from library" picker, pulling a fresh library so a chart
+  // added on /charts since this page rendered is selectable right away.
+  const openPicker = useCallback(async () => {
+    setPicking(true);
+    if (!navigator.onLine) return;
+    try {
+      const res = await fetch("/api/charts");
+      if (!res.ok) return;
+      const data = await res.json();
+      if (Array.isArray(data.charts)) setLibrary(data.charts);
+    } catch {
+      // Keep the SSR-seeded library if the refetch fails.
+    }
+  }, []);
 
   const addChart = useCallback(
     async (chart: Chart) => {
@@ -522,15 +541,9 @@ export default function SetlistDetailClient({
           </button>
           {!picking && (
             <button
-              onClick={() => setPicking(true)}
-              disabled={!online || available.length === 0}
-              title={
-                !online
-                  ? "Connect to add charts"
-                  : available.length === 0
-                    ? "Every library chart is already here"
-                    : undefined
-              }
+              onClick={openPicker}
+              disabled={!online}
+              title={!online ? "Connect to add charts" : undefined}
               className="border border-cat-practice/60 bg-cat-practice/10 px-3 py-1.5 font-mono text-[0.7rem] uppercase tracking-kicker text-cream transition-colors hover:bg-cat-practice/20 disabled:cursor-not-allowed disabled:opacity-50"
             >
               + Add tabs
