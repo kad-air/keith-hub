@@ -6,9 +6,11 @@ import type { Setlist } from "@/lib/setlists";
 
 interface Props {
   initialSetlists: Setlist[];
+  // True for anonymous public visitors — hides every write affordance.
+  readOnly: boolean;
 }
 
-export default function SetlistsClient({ initialSetlists }: Props) {
+export default function SetlistsClient({ initialSetlists, readOnly }: Props) {
   const [setlists, setSetlists] = useState<Setlist[]>(initialSetlists);
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
@@ -88,7 +90,7 @@ export default function SetlistsClient({ initialSetlists }: Props) {
             Curated, ordered collections drawn from your chart library.
           </p>
         </div>
-        {!creating && (
+        {!creating && !readOnly && (
           <button
             onClick={() => {
               setError(null);
@@ -103,7 +105,7 @@ export default function SetlistsClient({ initialSetlists }: Props) {
         )}
       </header>
 
-      {creating && (
+      {!readOnly && creating && (
         <section className="mb-6 border border-cat-practice/40 bg-ink-raised/30 p-4">
           <label className="block">
             <span className="mb-1 block font-mono text-[0.65rem] uppercase tracking-kicker text-cream-dimmer">
@@ -154,9 +156,15 @@ export default function SetlistsClient({ initialSetlists }: Props) {
 
       {setlists.length === 0 && !creating ? (
         <p className="mt-8 text-sm text-cream-dim">
-          No setlists yet. Tap{" "}
-          <span className="font-mono text-cream">+ New</span> to build one from
-          your library.
+          {readOnly ? (
+            "No setlists yet."
+          ) : (
+            <>
+              No setlists yet. Tap{" "}
+              <span className="font-mono text-cream">+ New</span> to build one
+              from your library.
+            </>
+          )}
         </p>
       ) : (
         <ol className="list-none space-y-2">
@@ -174,14 +182,16 @@ export default function SetlistsClient({ initialSetlists }: Props) {
                   {s.offline ? " · offline" : ""}
                 </span>
               </Link>
-              <button
-                aria-label={`Delete ${s.name}`}
-                onClick={() => remove(s)}
-                disabled={!online}
-                className="flex h-7 w-7 shrink-0 items-center justify-center border border-rule/50 font-mono text-xs text-cream-dim transition-colors hover:border-cat-practice/60 hover:text-cream disabled:cursor-not-allowed disabled:opacity-30"
-              >
-                ✕
-              </button>
+              {!readOnly && (
+                <button
+                  aria-label={`Delete ${s.name}`}
+                  onClick={() => remove(s)}
+                  disabled={!online}
+                  className="flex h-7 w-7 shrink-0 items-center justify-center border border-rule/50 font-mono text-xs text-cream-dim transition-colors hover:border-cat-practice/60 hover:text-cream disabled:cursor-not-allowed disabled:opacity-30"
+                >
+                  ✕
+                </button>
+              )}
             </li>
           ))}
         </ol>

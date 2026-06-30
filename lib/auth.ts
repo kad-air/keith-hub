@@ -1,4 +1,7 @@
 import type { NextRequest } from "next/server";
+import { cookies } from "next/headers";
+
+export const AUTH_COOKIE = "hub-auth";
 
 /**
  * Build a redirect URL that respects the reverse proxy's forwarded headers.
@@ -37,4 +40,18 @@ export async function deriveAuthToken(password: string): Promise<string> {
   return Array.from(new Uint8Array(sig))
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
+}
+
+/**
+ * Server-component equivalent of the middleware's cookie check. Used by pages
+ * that render different UI (e.g. hiding write affordances) depending on
+ * whether the visitor is the logged-in owner or an anonymous public reader.
+ */
+export async function isAuthenticated(): Promise<boolean> {
+  const password = process.env.FEED_PASSWORD;
+  if (!password) return true; // no password configured — local dev, fully trusted
+  const cookie = cookies().get(AUTH_COOKIE);
+  if (!cookie) return false;
+  const expected = await deriveAuthToken(password);
+  return cookie.value === expected;
 }

@@ -1,8 +1,20 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { deriveAuthToken, publicUrl } from "@/lib/auth";
+import { AUTH_COOKIE, deriveAuthToken, publicUrl } from "@/lib/auth";
 
-const AUTH_COOKIE = "hub-auth";
+// Charts + setlists are viewable (not editable) without auth — see
+// app/charts/*/page.tsx, which reads the same cookie to decide whether to
+// render write affordances. Only GET requests to these exact page routes are
+// public; every /api/* route (including the charts/setlists write endpoints)
+// stays fully gated.
+function isPublicReadPath(pathname: string): boolean {
+  return (
+    pathname === "/charts" ||
+    pathname === "/charts/setlists" ||
+    /^\/charts\/setlists\/[^/]+$/.test(pathname) ||
+    /^\/charts\/[^/]+$/.test(pathname)
+  );
+}
 
 export async function middleware(request: NextRequest) {
   const password = process.env.FEED_PASSWORD;
@@ -14,6 +26,10 @@ export async function middleware(request: NextRequest) {
   const cookie = request.cookies.get(AUTH_COOKIE);
   const expected = await deriveAuthToken(password);
   if (cookie?.value === expected) {
+    return NextResponse.next();
+  }
+
+  if (request.method === "GET" && isPublicReadPath(request.nextUrl.pathname)) {
     return NextResponse.next();
   }
 

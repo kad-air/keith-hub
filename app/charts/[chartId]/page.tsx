@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { isAuthenticated } from "@/lib/auth";
 import { getChart } from "@/lib/charts";
 import { getSetlist } from "@/lib/setlists";
 import ChartViewerClient from "./ChartViewerClient";
@@ -15,7 +16,7 @@ export function generateMetadata({
   return { title: chart ? `${chart.title} — hub` : "Charts — hub" };
 }
 
-export default function ChartPage({
+export default async function ChartPage({
   params,
   searchParams,
 }: {
@@ -24,6 +25,7 @@ export default function ChartPage({
 }) {
   const chart = getChart(params.chartId);
   if (!chart) notFound();
+  const readOnly = !(await isAuthenticated());
 
   // When opened from a setlist, the back link returns there (and names it);
   // otherwise it returns to the library. Pulling the full setlist (not just its
@@ -65,6 +67,7 @@ export default function ChartPage({
       back={back}
       next={next}
       autoStart={autoStart}
+      readOnly={readOnly}
     />
   );
 }
