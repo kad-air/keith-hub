@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Chart } from "@/lib/charts";
+import { parseChart, wrapBlock } from "@/lib/chord-wrap";
 import { ChartForm, type FormState } from "../ChartForm";
 
 const SPEED_MIN = 8;
@@ -14,6 +15,8 @@ const FONT_MIN = 6;
 const FONT_MAX = 30;
 const FONT_STEP = 1;
 const FONT_DEFAULT = 16;
+
+const MIN_COLS = 12; // never wrap tighter than this many characters per row
 
 const SPEED_KEY = "setlist-speed";
 const FONT_KEY = "setlist-fontsize";
@@ -32,6 +35,14 @@ export default function ChartViewerClient({
   const [speed, setSpeed] = useState(SPEED_DEFAULT);
   const [fontSize, setFontSize] = useState(FONT_DEFAULT);
   const [progress, setProgress] = useState(0);
+
+  // Number of monospace columns that fit the current width at the current font
+  // size — drives the chord-aligned line wrap. Null until measured on the
+  // client; the SSR / pre-measure render falls back to plain char wrapping so
+  // the full chart text is always present (offline cache, no-JS).
+  const [cols, setCols] = useState<number | null>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const measureRef = useRef<HTMLSpanElement>(null);
 
   // Editing — moved here from the library page so a chart is edited from its
   // own page. Saving needs the network, so it's disabled offline.
@@ -133,6 +144,45 @@ export default function ChartViewerClient({
   useEffect(() => {
     localStorage.setItem(FONT_KEY, String(fontSize));
   }, [fontSize]);
+
+  // Measure how many monospace characters fit the content width at the current
+  // font size. The hidden span renders 20 chars in the same font; dividing its
+  // width gives a per-character width that tracks the font automatically.
+  const recomputeCols = useCallback(() => {
+    const content = contentRef.current;
+    const measure = measureRef.current;
+    if (!content || !measure) return;
+    const charW = measure.getBoundingClientRect().width / 20;
+    const avail = content.clientWidth;
+    if (charW <= 0 || avail <= 0) return;
+    // -1 char of slack absorbs sub-pixel rounding so a row can't overflow.
+    const next = Math.max(MIN_COLS, Math.floor(avail / charW) - 1);
+    setCols((prev) => (prev === next ? prev : next));
+  }, []);
+
+  // Re-measure on mount, on resize (rotation / window), and whenever the font
+  // size changes.
+  useEffect(() => {
+    recomputeCols();
+    const el = contentRef.current;
+    const ro = new ResizeObserver(recomputeCols);
+    if (el) ro.observe(el);
+    window.addEventListener("resize", recomputeCols);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", recomputeCols);
+    };
+  }, [recomputeCols]);
+
+  useEffect(() => {
+    recomputeCols();
+  }, [fontSize, recomputeCols]);
+
+  const blocks = useMemo(() => parseChart(chart.content), [chart.content]);
+  const wrapped = useMemo(
+    () => (cols == null ? null : blocks.map((b) => wrapBlock(b, cols))),
+    [blocks, cols],
+  );
 
   const atBottom = useCallback(
     () =>
@@ -313,29 +363,57 @@ export default function ChartViewerClient({
           onFile={handleEditFile}
         />
       ) : (
-        // One element per physical line so long lines wrap instead of scrolling
-        // horizontally. `break-all` forces character-level wrapping at the same
-        // column on every line, so — combined with the monospace font — a chord
-        // line and the lyric line beneath it always break at the same point and
-        // chords stay locked over their syllable across a wrap (word-level
-        // wrapping would drift them off, since the two lines wrap at different
-        // word boundaries). The hanging indent (padding-left + negative
-        // text-indent) shifts wrapped continuations in by 1.5em equally on both
-        // lines, so the wrapped rows still line up while reading as a carry-over
-        // rather than a new line. Empty lines get a space to preserve height.
+        // Chord-aligned line wrapping (see lib/chord-wrap.ts). We measure how
+        // many monospace columns fit the current width/font, wrap each lyric
+        // line on word boundaries, and slice the chord line at the same columns
+        // so chords stay locked over their syllable — never scrolls sideways.
         <div
-          style={{ fontSize: `${fontSize}px`, lineHeight: 1.55 }}
-          className="font-mono text-cream"
+          ref={contentRef}
+          style={{ fontSize: `${fontSize}px`, lineHeight: 1.5 }}
+          className="relative font-mono text-cream"
         >
-          {chart.content.split("\n").map((line, i) => (
-            <div
-              key={i}
-              className="whitespace-pre-wrap break-all"
-              style={{ paddingLeft: "1.5em", textIndent: "-1.5em" }}
-            >
-              {line || " "}
-            </div>
-          ))}
+          {/* Hidden ruler: 20 chars in the same font → per-character width. */}
+          <span
+            ref={measureRef}
+            aria-hidden
+            className="pointer-events-none absolute left-0 top-0 -z-10 select-none whitespace-pre opacity-0"
+          >
+            00000000000000000000
+          </span>
+
+          {wrapped == null ? (
+            // Pre-measure / no-JS / SSR fallback: the raw text, char-wrapped so
+            // it never scrolls horizontally. The full chart text is always in
+            // the HTML (offline cache); JS reflows it to the aligned wrap on
+            // mount.
+            <pre className="whitespace-pre-wrap break-all font-mono">
+              {chart.content}
+            </pre>
+          ) : (
+            wrapped.map((rows, bi) => (
+              <Fragment key={bi}>
+                {rows.map((row, ri) => {
+                  if (row.blank) {
+                    return (
+                      <div key={ri} className="whitespace-pre" aria-hidden>
+                        {" "}
+                      </div>
+                    );
+                  }
+                  return (
+                    <div key={ri} className="whitespace-pre">
+                      {row.chord != null && (
+                        <span className="block leading-tight">{row.chord}</span>
+                      )}
+                      {(row.text !== "" || row.chord == null) && (
+                        <span className="block">{row.text || " "}</span>
+                      )}
+                    </div>
+                  );
+                })}
+              </Fragment>
+            ))
+          )}
         </div>
       )}
 
