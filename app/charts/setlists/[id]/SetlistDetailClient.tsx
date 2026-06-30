@@ -10,6 +10,9 @@ interface Props {
   initialSetlist: Setlist;
   initialCharts: Chart[];
   library: Chart[];
+  // True for anonymous public visitors — hides every write affordance
+  // (rename, delete, offline toggle, add/remove/reorder charts).
+  readOnly: boolean;
 }
 
 // Vertical gap between rows (Tailwind space-y-2 = 0.5rem). Used by the drag
@@ -28,6 +31,7 @@ export default function SetlistDetailClient({
   initialSetlist,
   initialCharts,
   library: initialLibrary,
+  readOnly,
 }: Props) {
   const router = useRouter();
   const [setlist, setSetlist] = useState<Setlist>(initialSetlist);
@@ -479,31 +483,36 @@ export default function SetlistDetailClient({
         ) : (
           <div className="mt-1 flex items-end justify-between gap-3">
             <h1 className="font-display text-2xl text-cream">{setlist.name}</h1>
-            <div className="flex shrink-0 items-center gap-2">
-              <button
-                onClick={() => {
-                  setNameDraft(setlist.name);
-                  setRenaming(true);
-                }}
-                disabled={!online}
-                title={!online ? "Connect to rename" : undefined}
-                className="border border-rule/60 px-2.5 py-1 font-mono text-[0.6rem] uppercase tracking-kicker text-cream-dim transition-colors hover:border-cat-practice/60 hover:text-cream disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Rename
-              </button>
-              <button
-                onClick={deleteSetlist}
-                disabled={!online}
-                title={!online ? "Connect to delete" : undefined}
-                className="border border-rule/60 px-2.5 py-1 font-mono text-[0.6rem] uppercase tracking-kicker text-cream-dim transition-colors hover:border-cat-music/60 hover:text-cream disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Delete
-              </button>
-            </div>
+            {!readOnly && (
+              <div className="flex shrink-0 items-center gap-2">
+                <button
+                  onClick={() => {
+                    setNameDraft(setlist.name);
+                    setRenaming(true);
+                  }}
+                  disabled={!online}
+                  title={!online ? "Connect to rename" : undefined}
+                  className="border border-rule/60 px-2.5 py-1 font-mono text-[0.6rem] uppercase tracking-kicker text-cream-dim transition-colors hover:border-cat-practice/60 hover:text-cream disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Rename
+                </button>
+                <button
+                  onClick={deleteSetlist}
+                  disabled={!online}
+                  title={!online ? "Connect to delete" : undefined}
+                  className="border border-rule/60 px-2.5 py-1 font-mono text-[0.6rem] uppercase tracking-kicker text-cream-dim transition-colors hover:border-cat-music/60 hover:text-cream disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Delete
+                </button>
+              </div>
+            )}
           </div>
         )}
 
-        {/* Offline toggle — itself a write (PUT), so disabled while offline. */}
+        {/* Offline toggle — itself a write (PUT), so disabled while offline.
+            Hidden for public readers: it's a per-owner device preference, not
+            something a visitor should be flipping. */}
+        {!readOnly && (
         <label
           className={`mt-3 flex items-center gap-2 text-sm text-cream-dim ${
             online ? "cursor-pointer" : "cursor-not-allowed opacity-50"
@@ -519,7 +528,8 @@ export default function SetlistDetailClient({
           />
           <span>Available offline</span>
         </label>
-        {offlineStatus && (
+        )}
+        {!readOnly && offlineStatus && (
           <p
             className={`mt-1 font-mono text-[0.6rem] uppercase tracking-kicker ${
               online ? "text-cream-dimmer" : "text-cat-practice"
@@ -550,7 +560,7 @@ export default function SetlistDetailClient({
           >
             {copied ? "Copied ✓" : "Copy"}
           </button>
-          {!picking && (
+          {!readOnly && !picking && (
             <button
               onClick={openPicker}
               disabled={!online}
@@ -563,7 +573,7 @@ export default function SetlistDetailClient({
         </div>
       </div>
 
-      {picking && (
+      {!readOnly && picking && (
         <section className="mb-6 border border-cat-practice/40 bg-ink-raised/30 p-4">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="font-display text-lg text-cream">Add from library</h2>
@@ -639,22 +649,24 @@ export default function SetlistDetailClient({
                     : "border-rule/60"
                 } ${dragIndex !== null && !dragging ? "opacity-90" : ""}`}
               >
-                <button
-                  type="button"
-                  aria-label={`Drag to reorder ${c.title}`}
-                  onPointerDown={(e) => startDrag(e, i)}
-                  onPointerMove={onDragMove}
-                  onPointerUp={endDrag}
-                  onPointerCancel={endDrag}
-                  disabled={!online}
-                  title={!online ? "Connect to reorder" : undefined}
-                  style={{ touchAction: "none" }}
-                  className={`flex h-9 w-7 shrink-0 cursor-grab touch-none select-none items-center justify-center font-mono text-base text-cream-dimmer transition-colors hover:text-cat-practice active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-40 ${
-                    dragging ? "text-cat-practice" : ""
-                  }`}
-                >
-                  ⠿
-                </button>
+                {!readOnly && (
+                  <button
+                    type="button"
+                    aria-label={`Drag to reorder ${c.title}`}
+                    onPointerDown={(e) => startDrag(e, i)}
+                    onPointerMove={onDragMove}
+                    onPointerUp={endDrag}
+                    onPointerCancel={endDrag}
+                    disabled={!online}
+                    title={!online ? "Connect to reorder" : undefined}
+                    style={{ touchAction: "none" }}
+                    className={`flex h-9 w-7 shrink-0 cursor-grab touch-none select-none items-center justify-center font-mono text-base text-cream-dimmer transition-colors hover:text-cat-practice active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-40 ${
+                      dragging ? "text-cat-practice" : ""
+                    }`}
+                  >
+                    ⠿
+                  </button>
+                )}
                 <span className="w-5 shrink-0 text-right font-mono text-[0.7rem] text-cream-dimmer">
                   {i + 1}
                 </span>
@@ -671,15 +683,17 @@ export default function SetlistDetailClient({
                     {lineCount(c.content)} lines
                   </span>
                 </Link>
-                <button
-                  aria-label={`Remove ${c.title} from setlist`}
-                  onClick={() => removeChart(c)}
-                  disabled={!online}
-                  title={!online ? "Connect to remove" : undefined}
-                  className="flex h-7 w-7 shrink-0 items-center justify-center border border-rule/50 font-mono text-xs text-cream-dim transition-colors hover:border-cat-music/60 hover:text-cream disabled:cursor-not-allowed disabled:opacity-30"
-                >
-                  ✕
-                </button>
+                {!readOnly && (
+                  <button
+                    aria-label={`Remove ${c.title} from setlist`}
+                    onClick={() => removeChart(c)}
+                    disabled={!online}
+                    title={!online ? "Connect to remove" : undefined}
+                    className="flex h-7 w-7 shrink-0 items-center justify-center border border-rule/50 font-mono text-xs text-cream-dim transition-colors hover:border-cat-music/60 hover:text-cream disabled:cursor-not-allowed disabled:opacity-30"
+                  >
+                    ✕
+                  </button>
+                )}
               </li>
             );
           })}

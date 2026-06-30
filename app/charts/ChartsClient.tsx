@@ -13,6 +13,9 @@ interface Props {
   // cache warming. updatedAt is folded into the warm key so editing a member
   // chart re-warms its page rather than serving a stale render offline.
   offlineSetlists: { id: string; charts: { id: string; updatedAt: string }[] }[];
+  // True for anonymous public visitors — hides every write affordance
+  // (Add/Bulk/Delete). See lib/auth.ts#isAuthenticated.
+  readOnly: boolean;
 }
 
 // Library sort. The full charts list loads at once, so sorting is a cheap
@@ -73,6 +76,7 @@ export default function ChartsClient({
   initialCharts,
   setlistCount,
   offlineSetlists,
+  readOnly,
 }: Props) {
   const router = useRouter();
   const [charts, setCharts] = useState<Chart[]>(initialCharts);
@@ -327,7 +331,7 @@ export default function ChartsClient({
             </p>
           )}
         </div>
-        {!form && (
+        {!form && !readOnly && (
           // Writes need the network; disable Add/Bulk while offline so a
           // doomed request can't fail mysteriously mid-gig.
           <div className="flex shrink-0 items-center gap-2">
@@ -386,9 +390,15 @@ export default function ChartsClient({
 
       {charts.length === 0 && !form ? (
         <p className="mt-8 text-sm text-cream-dim">
-          No charts yet. Tap{" "}
-          <span className="font-mono text-cream">+ Add</span> to paste or upload
-          a chord chart.
+          {readOnly ? (
+            "No charts yet."
+          ) : (
+            <>
+              No charts yet. Tap{" "}
+              <span className="font-mono text-cream">+ Add</span> to paste or
+              upload a chord chart.
+            </>
+          )}
         </p>
       ) : (
         <>
@@ -428,15 +438,17 @@ export default function ChartsClient({
                     {lineCount(c.content)} lines
                   </span>
                 </Link>
-                <div className="flex shrink-0 items-center gap-1">
-                  <IconBtn
-                    label="Delete"
-                    onClick={() => remove(c)}
-                    disabled={!online}
-                  >
-                    ✕
-                  </IconBtn>
-                </div>
+                {!readOnly && (
+                  <div className="flex shrink-0 items-center gap-1">
+                    <IconBtn
+                      label="Delete"
+                      onClick={() => remove(c)}
+                      disabled={!online}
+                    >
+                      ✕
+                    </IconBtn>
+                  </div>
+                )}
               </li>
             ))}
           </ol>

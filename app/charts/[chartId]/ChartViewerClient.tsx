@@ -36,6 +36,7 @@ export default function ChartViewerClient({
   back,
   next,
   autoStart = false,
+  readOnly,
 }: {
   chart: Chart;
   back: { href: string; label: string };
@@ -47,6 +48,8 @@ export default function ChartViewerClient({
   // is carried forward by the Next shortcut, so every song stepped through in
   // the setlist re-arms, not just the one entered from the setlist page.
   autoStart?: boolean;
+  // True for anonymous public visitors — hides the Edit affordance.
+  readOnly: boolean;
 }) {
   const router = useRouter();
   // Hold the chart locally so an in-page edit updates the view immediately
@@ -442,14 +445,16 @@ export default function ChartViewerClient({
                   Next ▸
                 </Link>
               )}
-              <button
-                onClick={openEdit}
-                disabled={!online}
-                title={!online ? "Connect to edit" : undefined}
-                className="border border-rule/60 px-3 py-1 font-mono text-[0.65rem] uppercase tracking-kicker text-cream-dim transition-colors hover:border-cat-practice/60 hover:text-cream disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Edit
-              </button>
+              {!readOnly && (
+                <button
+                  onClick={openEdit}
+                  disabled={!online}
+                  title={!online ? "Connect to edit" : undefined}
+                  className="border border-rule/60 px-3 py-1 font-mono text-[0.65rem] uppercase tracking-kicker text-cream-dim transition-colors hover:border-cat-practice/60 hover:text-cream disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Edit
+                </button>
+              )}
             </div>
           )}
         </div>
