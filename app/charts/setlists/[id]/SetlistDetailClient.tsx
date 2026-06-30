@@ -523,14 +523,8 @@ export default function SetlistDetailClient({
           {!picking && (
             <button
               onClick={() => setPicking(true)}
-              disabled={!online || available.length === 0}
-              title={
-                !online
-                  ? "Connect to add charts"
-                  : available.length === 0
-                    ? "Every library chart is already here"
-                    : undefined
-              }
+              disabled={!online}
+              title={!online ? "Connect to add charts" : undefined}
               className="border border-cat-practice/60 bg-cat-practice/10 px-3 py-1.5 font-mono text-[0.7rem] uppercase tracking-kicker text-cream transition-colors hover:bg-cat-practice/20 disabled:cursor-not-allowed disabled:opacity-50"
             >
               + Add tabs
