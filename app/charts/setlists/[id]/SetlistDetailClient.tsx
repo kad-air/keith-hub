@@ -38,6 +38,7 @@ export default function SetlistDetailClient({
   const [renaming, setRenaming] = useState(false);
   const [nameDraft, setNameDraft] = useState(initialSetlist.name);
   const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   const warmedRef = useRef<string>("");
 
   useEffect(() => {
@@ -227,6 +228,32 @@ export default function SetlistDetailClient({
       }
     },
     [setlist.id],
+  );
+
+  // Copy the setlist to the clipboard as plain "Song - Artist" lines (just the
+  // song when there's no artist), in performance order. Read-only, so it works
+  // offline at a gig — no online gating. Briefly flips the label to confirm.
+  const copyError = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const copySetlist = useCallback(async () => {
+    if (charts.length === 0) return;
+    const text = charts
+      .map((c) => (c.artist ? `${c.title} - ${c.artist}` : c.title))
+      .join("\n");
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      if (copyError.current) clearTimeout(copyError.current);
+      copyError.current = setTimeout(() => setCopied(false), 1500);
+    } catch {
+      setError("Couldn't copy to clipboard.");
+    }
+  }, [charts]);
+
+  useEffect(
+    () => () => {
+      if (copyError.current) clearTimeout(copyError.current);
+    },
+    [],
   );
 
   // ---- Drag-to-reorder ---------------------------------------------------
@@ -479,22 +506,37 @@ export default function SetlistDetailClient({
         <p className="font-mono text-[0.65rem] uppercase tracking-kicker text-cream-dimmer">
           {charts.length} chart{charts.length === 1 ? "" : "s"}
         </p>
-        {!picking && (
+        <div className="flex shrink-0 items-center gap-2">
+          {/* Read-only — works offline, so no online gating. */}
           <button
-            onClick={() => setPicking(true)}
-            disabled={!online || available.length === 0}
+            onClick={copySetlist}
+            disabled={charts.length === 0}
             title={
-              !online
-                ? "Connect to add charts"
-                : available.length === 0
-                  ? "Every library chart is already here"
-                  : undefined
+              charts.length === 0
+                ? "Nothing to copy yet"
+                : "Copy as Song - Artist lines"
             }
-            className="border border-cat-practice/60 bg-cat-practice/10 px-3 py-1.5 font-mono text-[0.7rem] uppercase tracking-kicker text-cream transition-colors hover:bg-cat-practice/20 disabled:cursor-not-allowed disabled:opacity-50"
+            className="border border-rule/60 px-3 py-1.5 font-mono text-[0.7rem] uppercase tracking-kicker text-cream-dim transition-colors hover:border-cat-practice/60 hover:text-cream disabled:cursor-not-allowed disabled:opacity-50"
           >
-            + Add tabs
+            {copied ? "Copied ✓" : "Copy"}
           </button>
-        )}
+          {!picking && (
+            <button
+              onClick={() => setPicking(true)}
+              disabled={!online || available.length === 0}
+              title={
+                !online
+                  ? "Connect to add charts"
+                  : available.length === 0
+                    ? "Every library chart is already here"
+                    : undefined
+              }
+              className="border border-cat-practice/60 bg-cat-practice/10 px-3 py-1.5 font-mono text-[0.7rem] uppercase tracking-kicker text-cream transition-colors hover:bg-cat-practice/20 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              + Add tabs
+            </button>
+          )}
+        </div>
       </div>
 
       {picking && (
