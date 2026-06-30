@@ -199,11 +199,16 @@ export default function SetlistDetailClient({
           body: JSON.stringify({ chartId: chart.id }),
         });
         if (!res.ok) throw new Error("add failed");
+        // Invalidate the client Router Cache so leaving and returning to this
+        // page (e.g. tap the chart to play it, then Back) re-mounts with the
+        // new member instead of the pre-add RSC payload. The optimistic append
+        // above keeps the in-session view correct; this only fixes remounts.
+        router.refresh();
       } catch {
         setCharts((cur) => cur.filter((c) => c.id !== chart.id));
       }
     },
-    [online, setlist.id],
+    [online, setlist.id, router],
   );
 
   const removeChart = useCallback(
@@ -217,6 +222,9 @@ export default function SetlistDetailClient({
           { method: "DELETE" },
         );
         if (!res.ok) throw new Error("remove failed");
+        // Refresh the Router Cache so a Back-navigation doesn't resurrect the
+        // removed chart from a stale RSC payload (see addChart).
+        router.refresh();
       } catch {
         // Re-insert at the original position functionally, rather than
         // overwriting with a captured snapshot that a concurrent reconcile may
@@ -229,7 +237,7 @@ export default function SetlistDetailClient({
         });
       }
     },
-    [online, charts, setlist.id],
+    [online, charts, setlist.id, router],
   );
 
   // Persist a new order to the server, rolling back on failure.
@@ -242,11 +250,14 @@ export default function SetlistDetailClient({
           body: JSON.stringify({ ids: next.map((c) => c.id) }),
         });
         if (!res.ok) throw new Error("reorder failed");
+        // Refresh the Router Cache so a Back-navigation reflects the new order
+        // rather than the pre-reorder RSC payload (see addChart).
+        router.refresh();
       } catch {
         setCharts(prev);
       }
     },
-    [setlist.id],
+    [setlist.id, router],
   );
 
   // Copy the setlist to the clipboard as plain "Song - Artist" lines (just the
