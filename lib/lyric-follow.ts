@@ -27,6 +27,16 @@ const AHEAD_WINDOW = 40;
 const BACK_WINDOW = 6;
 /** Max lyric words skippable between two matched words in one alignment. */
 const SKIP = 2;
+/**
+ * The song is sung top to bottom: from any line, the overwhelmingly likely
+ * next position is the rest of that line or the following lyric line. Those
+ * "near" advances need only the usual 2 matched words. Anything farther —
+ * skipping a line, hopping from one chorus to the next — is a leap, and songs
+ * repeat themselves enough (choruses, echoed lines) that a couple of matched
+ * words is routinely ambiguous between "next line" and "same line, later
+ * section". Leaps therefore need FAR_NEED matched words.
+ */
+const FAR_NEED = 5;
 
 /** Lowercase, drop apostrophes, strip everything non-alphanumeric. */
 export function normalizeWord(raw: string): string {
@@ -113,11 +123,24 @@ export function wordsMatch(a: string, b: string): boolean {
 export class LyricMatcher {
   private readonly norms: string[];
   private readonly blockOf: number[];
+  /**
+   * Ordinal of the lyric LINE each word belongs to (0, 1, 2, … counting only
+   * singable lines). Block indices can't measure line distance directly —
+   * chord-only lines and headers sit between lyric blocks — so this is the
+   * yardstick for "how many lines would this match skip?".
+   */
+  private readonly lineOf: number[];
   private pos = -1; // index of the last confidently matched lyric word
 
   constructor(words: LyricWordRef[]) {
     this.norms = words.map((w) => w.norm);
     this.blockOf = words.map((w) => w.blockIndex);
+    this.lineOf = [];
+    let line = -1;
+    for (let i = 0; i < words.length; i++) {
+      if (i === 0 || words[i].blockIndex !== words[i - 1].blockIndex) line++;
+      this.lineOf.push(line);
+    }
   }
 
   get wordCount(): number {
@@ -158,12 +181,12 @@ export class LyricMatcher {
     if (tail.length === 0) return null;
     // A lone short word ("the", "on") appearing ahead is no evidence at all.
     if (tail.length === 1 && tail[0].length < 4) return null;
-    const need = Math.min(2, tail.length);
+    const nearNeed = Math.min(2, tail.length);
+    const curLine = this.pos >= 0 ? this.lineOf[this.pos] : -1;
 
     const lo = Math.max(0, this.pos - BACK_WINDOW);
     const hi = Math.min(this.norms.length - 1, this.pos + AHEAD_WINDOW);
     let bestEnd = -1;
-    let bestScore = 0;
     for (let start = lo; start <= hi; start++) {
       // Greedy in-order alignment of the tail against lyric words from
       // `start`, tolerating up to SKIP unmatched lyric words between hits.
@@ -186,18 +209,19 @@ export class LyricMatcher {
           si = found + 1;
         }
       }
-      // Forward-only; on ties prefer the smallest jump (repeated lyrics
-      // resolve to the nearest occurrence).
-      if (
-        end > this.pos &&
-        (matched > bestScore || (matched === bestScore && end < bestEnd))
-      ) {
-        bestScore = matched;
-        bestEnd = end;
-      }
+      // Forward-only, with a distance-scaled evidence bar: staying on the
+      // current line or moving to the FOLLOWING line needs the usual 2 hits;
+      // landing any farther is a leap and needs FAR_NEED. Among qualifying
+      // candidates the NEAREST wins outright (not the highest score) — a
+      // repeated line always resolves to its closest occurrence ahead, so a
+      // later chorus can't outbid the current one by matching one more word.
+      if (end <= this.pos || matched === 0) continue;
+      const need = this.lineOf[end] - curLine <= 1 ? nearNeed : FAR_NEED;
+      if (matched < need) continue;
+      if (bestEnd < 0 || end < bestEnd) bestEnd = end;
     }
 
-    if (bestScore >= need && bestEnd > this.pos) {
+    if (bestEnd >= 0) {
       this.pos = bestEnd;
       return this.blockOf[bestEnd];
     }
