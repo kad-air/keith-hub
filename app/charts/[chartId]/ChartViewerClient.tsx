@@ -379,6 +379,9 @@ export default function ChartViewerClient({
     setVoiceError(null);
 
     const attach = (rec: SpeechRecognitionLike) => {
+      // A new recognizer = a new (empty) transcript. Tell the matcher so its
+      // fresh-word bookkeeping restarts with the session.
+      matcher.sessionRestarted();
       rec.continuous = true;
       rec.interimResults = true;
       rec.lang = "en-US";
