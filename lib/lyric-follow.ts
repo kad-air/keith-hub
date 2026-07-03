@@ -8,7 +8,11 @@
 // of consecutive-ish word hits inside a local window around the last known
 // position, and only moves forward when the evidence clears a threshold.
 // Repositioning backwards is manual (tap a line) — forward-only advancement
-// keeps a stray false match from yanking the chart around mid-song.
+// keeps a stray false match from yanking the chart around mid-song. Evidence
+// must come from words heard SINCE the last accepted match: interim results
+// re-deliver the same tail over and over, and in a repetitious song those
+// already-consumed words also appear on the next similar line, which used to
+// hop the highlight off a line before the singer finished it.
 
 import type { ChartLineBlock } from "./chord-wrap";
 
@@ -37,6 +41,15 @@ const SKIP = 2;
  * section". Leaps therefore need FAR_NEED matched words.
  */
 const FAR_NEED = 5;
+
+/**
+ * A tail word carries its absolute index in the recognized-word stream so an
+ * accepted match can record exactly how much of the stream it consumed.
+ */
+interface TailWord {
+  norm: string;
+  abs: number;
+}
 
 /** Lowercase, drop apostrophes, strip everything non-alphanumeric. */
 export function normalizeWord(raw: string): string {
@@ -131,6 +144,12 @@ export class LyricMatcher {
    */
   private readonly lineOf: number[];
   private pos = -1; // index of the last confidently matched lyric word
+  /**
+   * Count of recognized-stream words already consumed by an accepted match.
+   * Only words at absolute index >= seen participate in matching — see the
+   * fresh-words comment in feed().
+   */
+  private seen = 0;
 
   constructor(words: LyricWordRef[]) {
     this.norms = words.map((w) => w.norm);
@@ -150,6 +169,15 @@ export class LyricMatcher {
   /** Block index of the current position, or null before the first match. */
   get currentBlock(): number | null {
     return this.pos >= 0 ? this.blockOf[this.pos] : null;
+  }
+
+  /**
+   * The recognizer session restarted (silence timeout, engine whim, or the
+   * user toggled listening) — the transcript the viewer feeds is per-session,
+   * so it just reset to empty. Everything heard from here on is fresh.
+   */
+  sessionRestarted(): void {
+    this.seen = 0;
   }
 
   /**
@@ -174,31 +202,51 @@ export class LyricMatcher {
    * advances, or null when the evidence isn't strong enough to move.
    */
   feed(recognizedWords: string[]): number | null {
-    const tail = recognizedWords
-      .slice(-MATCH_TAIL)
-      .map(normalizeWord)
-      .filter((w) => w.length > 0);
+    const total = recognizedWords.length;
+    // Interim revisions occasionally shrink the transcript ("gonna" →
+    // "going to" churn). Nothing new was heard — clamp so the rewritten
+    // words don't all read as fresh. (Session restarts are handled by
+    // sessionRestarted(), not inferred here.)
+    if (total < this.seen) this.seen = total;
+
+    // Only words heard since the last accepted match participate. Interim
+    // results re-deliver the same trailing words constantly, and words the
+    // matcher already consumed sit at/behind pos — in a repetitious song
+    // their only FORWARD occurrence is the next similar line. Letting them
+    // count as evidence (or even anchor the alignment) used to hop the
+    // highlight onto that lookalike line before the singer finished the
+    // current one, and made tap-back repositioning snap forward again. The
+    // matcher's own pos plus nearest-wins is anchoring enough.
+    const from = Math.max(this.seen, total - MATCH_TAIL);
+    const tail: TailWord[] = [];
+    for (let i = from; i < total; i++) {
+      const norm = normalizeWord(recognizedWords[i]);
+      if (norm) tail.push({ norm, abs: i });
+    }
     if (tail.length === 0) return null;
     // A lone short word ("the", "on") appearing ahead is no evidence at all.
-    if (tail.length === 1 && tail[0].length < 4) return null;
+    if (tail.length === 1 && tail[0].norm.length < 4) return null;
+
     const nearNeed = Math.min(2, tail.length);
     const curLine = this.pos >= 0 ? this.lineOf[this.pos] : -1;
 
     const lo = Math.max(0, this.pos - BACK_WINDOW);
     const hi = Math.min(this.norms.length - 1, this.pos + AHEAD_WINDOW);
     let bestEnd = -1;
+    let bestSeen = this.seen;
     for (let start = lo; start <= hi; start++) {
       // Greedy in-order alignment of the tail against lyric words from
       // `start`, tolerating up to SKIP unmatched lyric words between hits.
       let si = start;
       let matched = 0;
       let end = -1;
+      let endAbs = -1;
       for (const w of tail) {
         if (si > hi) break;
         let found = -1;
         const kMax = Math.min(hi, si + SKIP);
         for (let k = si; k <= kMax; k++) {
-          if (wordsMatch(w, this.norms[k])) {
+          if (wordsMatch(w.norm, this.norms[k])) {
             found = k;
             break;
           }
@@ -206,6 +254,7 @@ export class LyricMatcher {
         if (found >= 0) {
           matched++;
           end = found;
+          endAbs = w.abs;
           si = found + 1;
         }
       }
@@ -218,11 +267,17 @@ export class LyricMatcher {
       if (end <= this.pos || matched === 0) continue;
       const need = this.lineOf[end] - curLine <= 1 ? nearNeed : FAR_NEED;
       if (matched < need) continue;
-      if (bestEnd < 0 || end < bestEnd) bestEnd = end;
+      if (bestEnd < 0 || end < bestEnd) {
+        bestEnd = end;
+        // Consume through the last word this alignment matched; anything the
+        // singer got ahead of us on stays fresh for the next feed.
+        bestSeen = endAbs + 1;
+      }
     }
 
     if (bestEnd >= 0) {
       this.pos = bestEnd;
+      this.seen = bestSeen;
       return this.blockOf[bestEnd];
     }
     return null;
