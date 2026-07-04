@@ -8,10 +8,23 @@ import { parseChart, wrapBlock } from "@/lib/chord-wrap";
 import { LyricMatcher, extractLyricWords } from "@/lib/lyric-follow";
 import { ChartForm, type FormState } from "../ChartForm";
 
-const SPEED_MIN = 8;
-const SPEED_MAX = 160;
-const SPEED_STEP = 2;
-const SPEED_DEFAULT = 30; // px/sec
+// Autoscroll speeds in px/sec, slowest first. Seven fixed notches replacing
+// the old free-drag 8–160 slider — in practice only the bottom fifth of that
+// band was ever usable, so the notches span just that stretch.
+const SPEED_NOTCHES = [8, 13, 18, 23, 28, 33, 38];
+
+/** Nearest notch index for a stored px/sec value (migrates old free values). */
+function nearestNotch(pxPerSec: number): number {
+  let best = 0;
+  for (let i = 1; i < SPEED_NOTCHES.length; i++) {
+    if (
+      Math.abs(SPEED_NOTCHES[i] - pxPerSec) <
+      Math.abs(SPEED_NOTCHES[best] - pxPerSec)
+    )
+      best = i;
+  }
+  return best;
+}
 
 const FONT_MIN = 6;
 const FONT_MAX = 30;
@@ -20,11 +33,11 @@ const FONT_DEFAULT = 16;
 
 const MIN_COLS = 12; // never wrap tighter than this many characters per row
 
-// Last-used speed (the default for a song that's never had one set) and the
-// per-song override, keyed by chart id. Per-song wins so each tune scrolls at
-// its own pace next time. Both live in localStorage — writable offline at a
-// gig, unlike a DB column.
-const SPEED_KEY = "setlist-speed";
+// Per-song speed, keyed by chart id, stored as px/sec (so values written by
+// the old free slider still map onto a notch). A song with no stored speed
+// starts at the LOWEST notch — deliberately not "last used": a slow default
+// is recoverable mid-song, a fast one runs away from you. Lives in
+// localStorage — writable offline at a gig, unlike a DB column.
 const speedKeyFor = (id: string) => `setlist-speed:${id}`;
 const FONT_KEY = "setlist-fontsize";
 const MODE_KEY = "setlist-scrollmode";
@@ -66,9 +79,10 @@ function getSpeechRecognitionCtor(): (new () => SpeechRecognitionLike) | null {
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
 }
 
-// Stepping into a song from a setlist arms a short, cancellable countdown
-// before autoscroll kicks in — long enough to get your hands on the guitar.
-const AUTO_START_SECONDS = 5;
+// Stepping into a song from a setlist arms a cancellable countdown before
+// autoscroll kicks in — long enough to get your hands on the guitar and
+// settle in before the chart starts moving.
+const AUTO_START_SECONDS = 15;
 
 export default function ChartViewerClient({
   chart: initialChart,
@@ -95,7 +109,8 @@ export default function ChartViewerClient({
   // without a server round-trip / route refresh.
   const [chart, setChart] = useState<Chart>(initialChart);
   const [playing, setPlaying] = useState(false);
-  const [speed, setSpeed] = useState(SPEED_DEFAULT);
+  // Index into SPEED_NOTCHES; slowest by default (see speedKeyFor comment).
+  const [speedIdx, setSpeedIdx] = useState(0);
   const [fontSize, setFontSize] = useState(FONT_DEFAULT);
   const [progress, setProgress] = useState(0);
   // Seconds left on the pre-roll countdown, or null when not counting down.
@@ -213,25 +228,28 @@ export default function ChartViewerClient({
     }
   }, [form, closeEdit]);
 
-  const speedRef = useRef(speed);
+  const speedRef = useRef(SPEED_NOTCHES[speedIdx]);
   const rafRef = useRef<number | null>(null);
   const lastTsRef = useRef<number | null>(null);
   const accRef = useRef(0);
+  // True while a finger is on the screen during playback — the scroll loop
+  // holds its travel so it doesn't fight the drag (see the nudge effect).
+  const touchActiveRef = useRef(false);
   // Minimal local shape — avoids depending on WakeLock lib.dom types being
   // present, which vary by TS version.
   const wakeRef = useRef<{ release: () => Promise<void> } | null>(null);
   const controlsRef = useRef<HTMLDivElement>(null);
 
-  // Hydrate persisted prefs (speed + font size) after mount. Speed prefers a
-  // per-song value; absent that, the last-used speed; absent that, the default.
-  // hydratedRef gates the save effect so this initial load can't be clobbered
-  // by the default-valued first render writing back over the stored value.
+  // Hydrate persisted prefs (speed + font size) after mount. Speed is the
+  // song's own stored value snapped to the nearest notch; a song without one
+  // stays at the lowest notch. hydratedRef gates the save effect so this
+  // initial load can't be clobbered by the default-valued first render
+  // writing back over the stored value.
   const hydratedRef = useRef(false);
   useEffect(() => {
     const perSong = Number(localStorage.getItem(speedKeyFor(chart.id)));
-    const last = Number(localStorage.getItem(SPEED_KEY));
-    if (perSong >= SPEED_MIN && perSong <= SPEED_MAX) setSpeed(perSong);
-    else if (last >= SPEED_MIN && last <= SPEED_MAX) setSpeed(last);
+    if (Number.isFinite(perSong) && perSong > 0)
+      setSpeedIdx(nearestNotch(perSong));
     const f = Number(localStorage.getItem(FONT_KEY));
     if (f >= FONT_MIN && f <= FONT_MAX) setFontSize(f);
     // Voice follow needs SpeechRecognition; without it the mode stays "auto"
@@ -244,14 +262,12 @@ export default function ChartViewerClient({
   }, [chart.id]);
 
   useEffect(() => {
-    speedRef.current = speed;
+    speedRef.current = SPEED_NOTCHES[speedIdx];
     // Don't persist until the stored value has been loaded (see hydratedRef).
     if (!hydratedRef.current) return;
-    // Remember it both as this song's pace and as the global default for the
-    // next never-played song.
-    localStorage.setItem(SPEED_KEY, String(speed));
-    localStorage.setItem(speedKeyFor(chart.id), String(speed));
-  }, [speed, chart.id]);
+    // This song's pace only — never a global default (see speedKeyFor).
+    localStorage.setItem(speedKeyFor(chart.id), String(SPEED_NOTCHES[speedIdx]));
+  }, [speedIdx, chart.id]);
 
   useEffect(() => {
     localStorage.setItem(FONT_KEY, String(fontSize));
@@ -499,15 +515,21 @@ export default function ChartViewerClient({
       if (lastTsRef.current == null) lastTsRef.current = ts;
       const dt = (ts - lastTsRef.current) / 1000;
       lastTsRef.current = ts;
-      accRef.current += speedRef.current * dt;
-      const whole = Math.floor(accRef.current);
-      if (whole >= 1) {
-        accRef.current -= whole;
-        window.scrollBy(0, whole);
-      }
-      if (atBottom()) {
-        setPlaying(false);
-        return;
+      // While a finger owns the viewport, emit no travel (a manual nudge
+      // repositions without pausing); time spent dragging doesn't accrue.
+      if (touchActiveRef.current) {
+        accRef.current = 0;
+      } else {
+        accRef.current += speedRef.current * dt;
+        const whole = Math.floor(accRef.current);
+        if (whole >= 1) {
+          accRef.current -= whole;
+          window.scrollBy(0, whole);
+        }
+        if (atBottom()) {
+          setPlaying(false);
+          return;
+        }
       }
       rafRef.current = requestAnimationFrame(step);
     };
@@ -616,20 +638,27 @@ export default function ChartViewerClient({
     else setPlaying(true);
   };
 
-  // While playing, a manual wheel/touch on the page pauses so the user can
-  // reposition. Touches on the control bar itself are excluded so the buttons
-  // and slider keep working.
+  // A manual nudge does NOT pause autoscroll — on stage a stray brush of the
+  // screen must never silently stop the chart; pausing is the play button's
+  // job. While a finger is down the rAF loop emits no travel (so it doesn't
+  // fight the drag — see step()), then resumes from wherever the nudge left
+  // the page.
   useEffect(() => {
     if (!playing) return;
-    const maybePause = (e: Event) => {
-      if (controlsRef.current?.contains(e.target as Node)) return;
-      setPlaying(false);
+    const down = () => {
+      touchActiveRef.current = true;
     };
-    window.addEventListener("wheel", maybePause, { passive: true });
-    window.addEventListener("touchstart", maybePause, { passive: true });
+    const up = (e: TouchEvent) => {
+      if (e.touches.length === 0) touchActiveRef.current = false;
+    };
+    window.addEventListener("touchstart", down, { passive: true });
+    window.addEventListener("touchend", up, { passive: true });
+    window.addEventListener("touchcancel", up, { passive: true });
     return () => {
-      window.removeEventListener("wheel", maybePause);
-      window.removeEventListener("touchstart", maybePause);
+      touchActiveRef.current = false;
+      window.removeEventListener("touchstart", down);
+      window.removeEventListener("touchend", up);
+      window.removeEventListener("touchcancel", up);
     };
   }, [playing]);
 
@@ -644,10 +673,10 @@ export default function ChartViewerClient({
         toggle();
       } else if (e.key === "ArrowUp") {
         e.preventDefault();
-        setSpeed((s) => Math.min(SPEED_MAX, s + SPEED_STEP));
+        setSpeedIdx((i) => Math.min(SPEED_NOTCHES.length - 1, i + 1));
       } else if (e.key === "ArrowDown") {
         e.preventDefault();
-        setSpeed((s) => Math.max(SPEED_MIN, s - SPEED_STEP));
+        setSpeedIdx((i) => Math.max(0, i - 1));
       } else if (e.key === "n" && next) {
         e.preventDefault();
         router.push(next.href);
@@ -783,13 +812,16 @@ export default function ChartViewerClient({
         </div>
       )}
 
-      {/* Pre-roll countdown — centered, cancellable. Only the pill is
-          interactive so it doesn't block reading the chart underneath. */}
+      {/* Pre-roll countdown — anchored at the TOP, not centered. Any scroll
+          cancels the countdown, so while it's visible the page is at scroll
+          top, where the viewport shows the title header — the pill sits over
+          that instead of covering lyrics mid-chart. Only the pill itself is
+          interactive so the chart stays readable/tappable underneath. */}
       {autoStartIn != null && !form && (
-        <div className="pointer-events-none fixed inset-0 z-40 flex items-center justify-center px-4">
+        <div className="pointer-events-none fixed inset-x-0 top-3 z-40 flex justify-center px-4">
           <button
             onClick={cancelAutoStart}
-            className="pointer-events-auto rounded-full border border-cat-practice/60 bg-ink/90 px-5 py-3 font-mono text-sm text-cream shadow-lg shadow-black/40 backdrop-blur transition-colors hover:bg-ink"
+            className="pointer-events-auto rounded-full border border-cat-practice/60 bg-ink/90 px-4 py-2 font-mono text-[0.75rem] text-cream shadow-lg shadow-black/40 backdrop-blur transition-colors hover:bg-ink"
           >
             {mode === "voice" ? "Voice follow" : "Autoscroll"} in {autoStartIn}
             s · tap to cancel
@@ -884,19 +916,33 @@ export default function ChartViewerClient({
               <span className="font-mono text-[0.6rem] uppercase tracking-kicker text-cream-dimmer">
                 Speed
               </span>
-              <input
-                type="range"
-                min={SPEED_MIN}
-                max={SPEED_MAX}
-                step={SPEED_STEP}
-                value={speed}
-                onChange={(e) => setSpeed(Number(e.target.value))}
+              {/* Seven discrete notches (1 = slowest) instead of a free
+                  slider — big tap targets beat fine-grained control at a
+                  gig, and every useful speed lives on a notch. */}
+              <div
+                role="radiogroup"
                 aria-label="Autoscroll speed"
-                className="h-1 flex-1 cursor-pointer accent-cat-practice"
-              />
-              <span className="w-7 text-right font-mono text-[0.7rem] tabular-nums text-cream-dim">
-                {speed}
-              </span>
+                className="flex flex-1 overflow-hidden rounded-full border border-rule/60 font-mono text-[0.65rem]"
+              >
+                {SPEED_NOTCHES.map((px, i) => (
+                  <button
+                    key={px}
+                    role="radio"
+                    aria-checked={speedIdx === i}
+                    aria-label={`Speed ${i + 1} of ${SPEED_NOTCHES.length}`}
+                    onClick={() => setSpeedIdx(i)}
+                    className={`flex-1 py-1.5 tabular-nums transition-colors ${
+                      i > 0 ? "border-l border-rule/60" : ""
+                    } ${
+                      speedIdx === i
+                        ? "bg-cat-practice/25 text-cream"
+                        : "text-cream-dimmer hover:text-cream"
+                    }`}
+                  >
+                    {i + 1}
+                  </button>
+                ))}
+              </div>
             </div>
           ) : (
             <div
