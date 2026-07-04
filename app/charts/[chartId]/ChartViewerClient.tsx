@@ -8,10 +8,23 @@ import { parseChart, wrapBlock } from "@/lib/chord-wrap";
 import { LyricMatcher, extractLyricWords } from "@/lib/lyric-follow";
 import { ChartForm, type FormState } from "../ChartForm";
 
-const SPEED_MIN = 8;
-const SPEED_MAX = 160;
-const SPEED_STEP = 2;
-const SPEED_DEFAULT = 30; // px/sec
+// Autoscroll speeds in px/sec, slowest first. Seven fixed notches replacing
+// the old free-drag 8–160 slider — in practice only the bottom fifth of that
+// band was ever usable, so the notches span just that stretch.
+const SPEED_NOTCHES = [8, 13, 18, 23, 28, 33, 38];
+
+/** Nearest notch index for a stored px/sec value (migrates old free values). */
+function nearestNotch(pxPerSec: number): number {
+  let best = 0;
+  for (let i = 1; i < SPEED_NOTCHES.length; i++) {
+    if (
+      Math.abs(SPEED_NOTCHES[i] - pxPerSec) <
+      Math.abs(SPEED_NOTCHES[best] - pxPerSec)
+    )
+      best = i;
+  }
+  return best;
+}
 
 const FONT_MIN = 6;
 const FONT_MAX = 30;
@@ -20,11 +33,11 @@ const FONT_DEFAULT = 16;
 
 const MIN_COLS = 12; // never wrap tighter than this many characters per row
 
-// Last-used speed (the default for a song that's never had one set) and the
-// per-song override, keyed by chart id. Per-song wins so each tune scrolls at
-// its own pace next time. Both live in localStorage — writable offline at a
-// gig, unlike a DB column.
-const SPEED_KEY = "setlist-speed";
+// Per-song speed, keyed by chart id, stored as px/sec (so values written by
+// the old free slider still map onto a notch). A song with no stored speed
+// starts at the LOWEST notch — deliberately not "last used": a slow default
+// is recoverable mid-song, a fast one runs away from you. Lives in
+// localStorage — writable offline at a gig, unlike a DB column.
 const speedKeyFor = (id: string) => `setlist-speed:${id}`;
 const FONT_KEY = "setlist-fontsize";
 const MODE_KEY = "setlist-scrollmode";
@@ -95,7 +108,8 @@ export default function ChartViewerClient({
   // without a server round-trip / route refresh.
   const [chart, setChart] = useState<Chart>(initialChart);
   const [playing, setPlaying] = useState(false);
-  const [speed, setSpeed] = useState(SPEED_DEFAULT);
+  // Index into SPEED_NOTCHES; slowest by default (see speedKeyFor comment).
+  const [speedIdx, setSpeedIdx] = useState(0);
   const [fontSize, setFontSize] = useState(FONT_DEFAULT);
   const [progress, setProgress] = useState(0);
   // Seconds left on the pre-roll countdown, or null when not counting down.
@@ -213,7 +227,7 @@ export default function ChartViewerClient({
     }
   }, [form, closeEdit]);
 
-  const speedRef = useRef(speed);
+  const speedRef = useRef(SPEED_NOTCHES[speedIdx]);
   const rafRef = useRef<number | null>(null);
   const lastTsRef = useRef<number | null>(null);
   const accRef = useRef(0);
@@ -222,16 +236,16 @@ export default function ChartViewerClient({
   const wakeRef = useRef<{ release: () => Promise<void> } | null>(null);
   const controlsRef = useRef<HTMLDivElement>(null);
 
-  // Hydrate persisted prefs (speed + font size) after mount. Speed prefers a
-  // per-song value; absent that, the last-used speed; absent that, the default.
-  // hydratedRef gates the save effect so this initial load can't be clobbered
-  // by the default-valued first render writing back over the stored value.
+  // Hydrate persisted prefs (speed + font size) after mount. Speed is the
+  // song's own stored value snapped to the nearest notch; a song without one
+  // stays at the lowest notch. hydratedRef gates the save effect so this
+  // initial load can't be clobbered by the default-valued first render
+  // writing back over the stored value.
   const hydratedRef = useRef(false);
   useEffect(() => {
     const perSong = Number(localStorage.getItem(speedKeyFor(chart.id)));
-    const last = Number(localStorage.getItem(SPEED_KEY));
-    if (perSong >= SPEED_MIN && perSong <= SPEED_MAX) setSpeed(perSong);
-    else if (last >= SPEED_MIN && last <= SPEED_MAX) setSpeed(last);
+    if (Number.isFinite(perSong) && perSong > 0)
+      setSpeedIdx(nearestNotch(perSong));
     const f = Number(localStorage.getItem(FONT_KEY));
     if (f >= FONT_MIN && f <= FONT_MAX) setFontSize(f);
     // Voice follow needs SpeechRecognition; without it the mode stays "auto"
@@ -244,14 +258,12 @@ export default function ChartViewerClient({
   }, [chart.id]);
 
   useEffect(() => {
-    speedRef.current = speed;
+    speedRef.current = SPEED_NOTCHES[speedIdx];
     // Don't persist until the stored value has been loaded (see hydratedRef).
     if (!hydratedRef.current) return;
-    // Remember it both as this song's pace and as the global default for the
-    // next never-played song.
-    localStorage.setItem(SPEED_KEY, String(speed));
-    localStorage.setItem(speedKeyFor(chart.id), String(speed));
-  }, [speed, chart.id]);
+    // This song's pace only — never a global default (see speedKeyFor).
+    localStorage.setItem(speedKeyFor(chart.id), String(SPEED_NOTCHES[speedIdx]));
+  }, [speedIdx, chart.id]);
 
   useEffect(() => {
     localStorage.setItem(FONT_KEY, String(fontSize));
@@ -644,10 +656,10 @@ export default function ChartViewerClient({
         toggle();
       } else if (e.key === "ArrowUp") {
         e.preventDefault();
-        setSpeed((s) => Math.min(SPEED_MAX, s + SPEED_STEP));
+        setSpeedIdx((i) => Math.min(SPEED_NOTCHES.length - 1, i + 1));
       } else if (e.key === "ArrowDown") {
         e.preventDefault();
-        setSpeed((s) => Math.max(SPEED_MIN, s - SPEED_STEP));
+        setSpeedIdx((i) => Math.max(0, i - 1));
       } else if (e.key === "n" && next) {
         e.preventDefault();
         router.push(next.href);
@@ -884,19 +896,33 @@ export default function ChartViewerClient({
               <span className="font-mono text-[0.6rem] uppercase tracking-kicker text-cream-dimmer">
                 Speed
               </span>
-              <input
-                type="range"
-                min={SPEED_MIN}
-                max={SPEED_MAX}
-                step={SPEED_STEP}
-                value={speed}
-                onChange={(e) => setSpeed(Number(e.target.value))}
+              {/* Seven discrete notches (1 = slowest) instead of a free
+                  slider — big tap targets beat fine-grained control at a
+                  gig, and every useful speed lives on a notch. */}
+              <div
+                role="radiogroup"
                 aria-label="Autoscroll speed"
-                className="h-1 flex-1 cursor-pointer accent-cat-practice"
-              />
-              <span className="w-7 text-right font-mono text-[0.7rem] tabular-nums text-cream-dim">
-                {speed}
-              </span>
+                className="flex flex-1 overflow-hidden rounded-full border border-rule/60 font-mono text-[0.65rem]"
+              >
+                {SPEED_NOTCHES.map((px, i) => (
+                  <button
+                    key={px}
+                    role="radio"
+                    aria-checked={speedIdx === i}
+                    aria-label={`Speed ${i + 1} of ${SPEED_NOTCHES.length}`}
+                    onClick={() => setSpeedIdx(i)}
+                    className={`flex-1 py-1.5 tabular-nums transition-colors ${
+                      i > 0 ? "border-l border-rule/60" : ""
+                    } ${
+                      speedIdx === i
+                        ? "bg-cat-practice/25 text-cream"
+                        : "text-cream-dimmer hover:text-cream"
+                    }`}
+                  >
+                    {i + 1}
+                  </button>
+                ))}
+              </div>
             </div>
           ) : (
             <div
