@@ -79,9 +79,10 @@ function getSpeechRecognitionCtor(): (new () => SpeechRecognitionLike) | null {
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
 }
 
-// Stepping into a song from a setlist arms a short, cancellable countdown
-// before autoscroll kicks in — long enough to get your hands on the guitar.
-const AUTO_START_SECONDS = 5;
+// Stepping into a song from a setlist arms a cancellable countdown before
+// autoscroll kicks in — long enough to get your hands on the guitar and
+// settle in before the chart starts moving.
+const AUTO_START_SECONDS = 15;
 
 export default function ChartViewerClient({
   chart: initialChart,
@@ -795,13 +796,16 @@ export default function ChartViewerClient({
         </div>
       )}
 
-      {/* Pre-roll countdown — centered, cancellable. Only the pill is
-          interactive so it doesn't block reading the chart underneath. */}
+      {/* Pre-roll countdown — anchored at the TOP, not centered. Any scroll
+          cancels the countdown, so while it's visible the page is at scroll
+          top, where the viewport shows the title header — the pill sits over
+          that instead of covering lyrics mid-chart. Only the pill itself is
+          interactive so the chart stays readable/tappable underneath. */}
       {autoStartIn != null && !form && (
-        <div className="pointer-events-none fixed inset-0 z-40 flex items-center justify-center px-4">
+        <div className="pointer-events-none fixed inset-x-0 top-3 z-40 flex justify-center px-4">
           <button
             onClick={cancelAutoStart}
-            className="pointer-events-auto rounded-full border border-cat-practice/60 bg-ink/90 px-5 py-3 font-mono text-sm text-cream shadow-lg shadow-black/40 backdrop-blur transition-colors hover:bg-ink"
+            className="pointer-events-auto rounded-full border border-cat-practice/60 bg-ink/90 px-4 py-2 font-mono text-[0.75rem] text-cream shadow-lg shadow-black/40 backdrop-blur transition-colors hover:bg-ink"
           >
             {mode === "voice" ? "Voice follow" : "Autoscroll"} in {autoStartIn}
             s · tap to cancel
