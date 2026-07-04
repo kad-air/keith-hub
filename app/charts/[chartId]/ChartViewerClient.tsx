@@ -232,6 +232,9 @@ export default function ChartViewerClient({
   const rafRef = useRef<number | null>(null);
   const lastTsRef = useRef<number | null>(null);
   const accRef = useRef(0);
+  // True while a finger is on the screen during playback — the scroll loop
+  // holds its travel so it doesn't fight the drag (see the nudge effect).
+  const touchActiveRef = useRef(false);
   // Minimal local shape — avoids depending on WakeLock lib.dom types being
   // present, which vary by TS version.
   const wakeRef = useRef<{ release: () => Promise<void> } | null>(null);
@@ -512,15 +515,21 @@ export default function ChartViewerClient({
       if (lastTsRef.current == null) lastTsRef.current = ts;
       const dt = (ts - lastTsRef.current) / 1000;
       lastTsRef.current = ts;
-      accRef.current += speedRef.current * dt;
-      const whole = Math.floor(accRef.current);
-      if (whole >= 1) {
-        accRef.current -= whole;
-        window.scrollBy(0, whole);
-      }
-      if (atBottom()) {
-        setPlaying(false);
-        return;
+      // While a finger owns the viewport, emit no travel (a manual nudge
+      // repositions without pausing); time spent dragging doesn't accrue.
+      if (touchActiveRef.current) {
+        accRef.current = 0;
+      } else {
+        accRef.current += speedRef.current * dt;
+        const whole = Math.floor(accRef.current);
+        if (whole >= 1) {
+          accRef.current -= whole;
+          window.scrollBy(0, whole);
+        }
+        if (atBottom()) {
+          setPlaying(false);
+          return;
+        }
       }
       rafRef.current = requestAnimationFrame(step);
     };
@@ -629,20 +638,27 @@ export default function ChartViewerClient({
     else setPlaying(true);
   };
 
-  // While playing, a manual wheel/touch on the page pauses so the user can
-  // reposition. Touches on the control bar itself are excluded so the buttons
-  // and slider keep working.
+  // A manual nudge does NOT pause autoscroll — on stage a stray brush of the
+  // screen must never silently stop the chart; pausing is the play button's
+  // job. While a finger is down the rAF loop emits no travel (so it doesn't
+  // fight the drag — see step()), then resumes from wherever the nudge left
+  // the page.
   useEffect(() => {
     if (!playing) return;
-    const maybePause = (e: Event) => {
-      if (controlsRef.current?.contains(e.target as Node)) return;
-      setPlaying(false);
+    const down = () => {
+      touchActiveRef.current = true;
     };
-    window.addEventListener("wheel", maybePause, { passive: true });
-    window.addEventListener("touchstart", maybePause, { passive: true });
+    const up = (e: TouchEvent) => {
+      if (e.touches.length === 0) touchActiveRef.current = false;
+    };
+    window.addEventListener("touchstart", down, { passive: true });
+    window.addEventListener("touchend", up, { passive: true });
+    window.addEventListener("touchcancel", up, { passive: true });
     return () => {
-      window.removeEventListener("wheel", maybePause);
-      window.removeEventListener("touchstart", maybePause);
+      touchActiveRef.current = false;
+      window.removeEventListener("touchstart", down);
+      window.removeEventListener("touchend", up);
+      window.removeEventListener("touchcancel", up);
     };
   }, [playing]);
 
