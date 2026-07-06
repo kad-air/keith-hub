@@ -99,6 +99,52 @@ export function getSetlist(
   return { setlist, charts };
 }
 
+// Every setlist a chart belongs to, plus the chart that FOLLOWS it in each —
+// powers the viewer's back link, "Next ▸" shortcut, and auto-start. Baked into
+// the chart page's SSR render for ALL memberships, not just the ?setlist= the
+// page was requested with: the offline SW cache stores one query-less render
+// per chart (matched with ignoreSearch), so the active setlist context must be
+// resolvable client-side from whatever ?setlist= the cached page is opened
+// with. Deriving it server-side from searchParams left offline opens with no
+// Next button / auto-start.
+export type ChartSetlistContext = {
+  id: string;
+  name: string;
+  next: { id: string; title: string } | null;
+};
+
+export function getChartSetlistContexts(
+  chartId: string,
+): ChartSetlistContext[] {
+  const db = getDb();
+  const rows = db
+    .prepare(
+      `SELECT s.id, s.name, nc.id AS next_id, nc.title AS next_title
+       FROM setlist_charts sc
+       JOIN setlists s ON s.id = sc.setlist_id
+       LEFT JOIN setlist_charts nsc
+         ON nsc.setlist_id = sc.setlist_id
+        AND nsc.sort_order = (
+          SELECT MIN(x.sort_order) FROM setlist_charts x
+          WHERE x.setlist_id = sc.setlist_id AND x.sort_order > sc.sort_order
+        )
+       LEFT JOIN charts nc ON nc.id = nsc.chart_id
+       WHERE sc.chart_id = ?
+       ORDER BY s.created_at ASC`,
+    )
+    .all(chartId) as {
+    id: string;
+    name: string;
+    next_id: string | null;
+    next_title: string | null;
+  }[];
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    next: r.next_id != null ? { id: r.next_id, title: r.next_title! } : null,
+  }));
+}
+
 export function createSetlist(name: string): Setlist {
   const db = getDb();
   const now = new Date().toISOString();
@@ -192,15 +238,21 @@ export function reorderSetlist(setlistId: string, chartIds: string[]): void {
 // drive service-worker cache warming on the Charts library page. Only these
 // setlists' charts are proactively cached for offline play. Including
 // updatedAt lets the client key its warm guard on content, so editing a member
-// chart re-warms the cache (otherwise the stale page would be served at a gig).
+// chart re-warms the cache (otherwise the stale page would be served at a
+// gig). The setlist's own updatedAt is included too: chart pages bake in
+// their setlists' names and next-song pointers (see ChartSetlistContexts), so
+// a rename/reorder must also re-warm member pages, not just the detail page.
 export function getOfflineSetlists(): {
   id: string;
+  updatedAt: string;
   charts: { id: string; updatedAt: string }[];
 }[] {
   const db = getDb();
   const setlists = db
-    .prepare(`SELECT id FROM setlists WHERE offline = 1 ORDER BY created_at ASC`)
-    .all() as { id: string }[];
+    .prepare(
+      `SELECT id, updated_at FROM setlists WHERE offline = 1 ORDER BY created_at ASC`,
+    )
+    .all() as { id: string; updated_at: string }[];
   const chartsStmt = db.prepare(
     `SELECT c.id, c.updated_at
      FROM setlist_charts sc
@@ -210,6 +262,7 @@ export function getOfflineSetlists(): {
   );
   return setlists.map((s) => ({
     id: s.id,
+    updatedAt: s.updated_at,
     charts: (chartsStmt.all(s.id) as { id: string; updated_at: string }[]).map(
       (r) => ({ id: r.id, updatedAt: r.updated_at }),
     ),

@@ -68,16 +68,18 @@ export default function SetlistDetailClient({
 
   // Warm the SW cache for this setlist when it's flagged offline: fetch each
   // member chart's page (and this setlist page) so they're available with no
-  // signal. Keyed on the member set so adds/removes re-warm.
+  // signal. Keyed on the ORDERED member set so adds/removes/reorders re-warm —
+  // chart pages bake in the setlist's next-song pointers, so order matters.
   // Fold each chart's updatedAt into the key so editing a member chart re-warms
   // its page — keying on id alone would short-circuit the guard and leave the
-  // stale (pre-edit) render cached for offline play.
+  // stale (pre-edit) render cached for offline play. The setlist name is folded
+  // in too: it's baked into member chart pages as the back-link label.
   const warmKey = useMemo(
     () =>
       setlist.offline
-        ? charts.map((c) => `${c.id}@${c.updatedAt}`).join(",")
+        ? `${setlist.name}:${charts.map((c) => `${c.id}@${c.updatedAt}`).join(",")}`
         : "",
-    [setlist.offline, charts],
+    [setlist.offline, setlist.name, charts],
   );
   useEffect(() => {
     if (!online || !setlist.offline) return;

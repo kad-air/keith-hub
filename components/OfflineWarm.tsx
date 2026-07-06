@@ -13,6 +13,7 @@ import { useEffect, useRef } from "react";
 
 type OfflineSetlist = {
   id: string;
+  updatedAt: string;
   charts: { id: string; updatedAt: string }[];
 };
 
@@ -56,11 +57,13 @@ export default function OfflineWarm() {
 
         // Same key shape as ChartsClient's offlineKey: chart updatedAt is
         // folded in so an edit re-warms the page instead of serving a stale
-        // render offline.
+        // render offline; the setlist's own updatedAt is folded in because
+        // chart pages bake in setlist names + next-song pointers, so a
+        // rename/reorder must re-warm member pages too.
         const key = setlists
           .map(
             (s) =>
-              `${s.id}:${s.charts.map((c) => `${c.id}@${c.updatedAt}`).join("+")}`,
+              `${s.id}@${s.updatedAt}:${s.charts.map((c) => `${c.id}@${c.updatedAt}`).join("+")}`,
           )
           .join(",");
         if (cancelled || warmedRef.current === key) return;
