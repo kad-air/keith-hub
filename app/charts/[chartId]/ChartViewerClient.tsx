@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Chart } from "@/lib/charts";
+import type { ChartSetlistContext } from "@/lib/setlists";
 import { parseChart, wrapBlock } from "@/lib/chord-wrap";
 import { LyricMatcher, extractLyricWords } from "@/lib/lyric-follow";
 import { ChartForm, type FormState } from "../ChartForm";
@@ -86,25 +87,52 @@ const AUTO_START_SECONDS = 15;
 
 export default function ChartViewerClient({
   chart: initialChart,
-  back,
-  next,
-  autoStart = false,
+  setlists,
   readOnly,
 }: {
   chart: Chart;
-  back: { href: string; label: string };
-  // The following song in the setlist, when opened from one. null at the end
-  // of the list or when not opened from a setlist.
-  next?: { href: string; title: string } | null;
-  // True whenever we're in "setlist mode" — viewing a song with a setlist
-  // context (?setlist=) where the song is a member. Arms the auto-start. This
-  // is carried forward by the Next shortcut, so every song stepped through in
-  // the setlist re-arms, not just the one entered from the setlist page.
-  autoStart?: boolean;
+  // Every setlist this chart belongs to, with the song that follows it in
+  // each. The ACTIVE one (from ?setlist=) is resolved client-side, not passed
+  // down from the server: the offline SW cache holds one query-less render
+  // per chart (ignoreSearch matching), so any server-derived setlist context
+  // would be absent from a cached page opened offline. See page.tsx.
+  setlists: ChartSetlistContext[];
   // True for anonymous public visitors — hides the Edit affordance.
   readOnly: boolean;
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Resolve ?setlist= AFTER mount (state, not render-time useSearchParams):
+  // the SSR HTML must be identical with and without the query so the cached
+  // query-less render hydrates cleanly when opened as /charts/<id>?setlist=….
+  // Keyed on searchParams so an in-app nav that changes only the query (same
+  // chart, so no key remount) still re-resolves.
+  const [setlistId, setSetlistId] = useState<string | null>(null);
+  useEffect(() => {
+    setSetlistId(searchParams.get("setlist"));
+  }, [searchParams]);
+
+  // The setlist context drives three things: the named back link, the
+  // "Next ▸" shortcut (which carries the ?setlist= chain forward so the next
+  // song auto-starts in turn), and arming the auto-start countdown.
+  const setlist = useMemo(
+    () =>
+      setlistId != null
+        ? setlists.find((s) => s.id === setlistId) ?? null
+        : null,
+    [setlistId, setlists],
+  );
+  const back = setlist
+    ? { href: `/charts/setlists/${setlist.id}`, label: `← ${setlist.name}` }
+    : { href: "/charts", label: "← Charts" };
+  const next = setlist?.next
+    ? {
+        href: `/charts/${setlist.next.id}?setlist=${setlist.id}`,
+        title: setlist.next.title,
+      }
+    : null;
+  const autoStart = setlist != null;
   // Hold the chart locally so an in-page edit updates the view immediately
   // without a server round-trip / route refresh.
   const [chart, setChart] = useState<Chart>(initialChart);

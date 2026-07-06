@@ -11,8 +11,14 @@ interface Props {
   setlistCount: number;
   // Offline-flagged setlists + their member charts (id + updatedAt) — drives SW
   // cache warming. updatedAt is folded into the warm key so editing a member
-  // chart re-warms its page rather than serving a stale render offline.
-  offlineSetlists: { id: string; charts: { id: string; updatedAt: string }[] }[];
+  // chart re-warms its page rather than serving a stale render offline. The
+  // setlist's own updatedAt matters too: chart pages bake in setlist names +
+  // next-song pointers, so a rename/reorder must also re-warm member pages.
+  offlineSetlists: {
+    id: string;
+    updatedAt: string;
+    charts: { id: string; updatedAt: string }[];
+  }[];
   // True for anonymous public visitors — hides every write affordance
   // (Add/Bulk/Delete). See lib/auth.ts#isAuthenticated.
   readOnly: boolean;
@@ -130,13 +136,15 @@ export default function ChartsClient({
   // set so adds/edits/toggles re-warm, and guarded so it runs at most once per
   // unchanged set per session.
   // Fold each member chart's updatedAt into the key so an edit re-warms the
-  // page (id alone would short-circuit the guard and serve a stale render).
+  // page (id alone would short-circuit the guard and serve a stale render),
+  // and the setlist's updatedAt so a rename/reorder re-warms member pages
+  // (their renders bake in the setlist name + next-song pointers).
   const offlineKey = useMemo(
     () =>
       offlineSetlists
         .map(
           (s) =>
-            `${s.id}:${s.charts.map((c) => `${c.id}@${c.updatedAt}`).join("+")}`,
+            `${s.id}@${s.updatedAt}:${s.charts.map((c) => `${c.id}@${c.updatedAt}`).join("+")}`,
         )
         .join(","),
     [offlineSetlists],
