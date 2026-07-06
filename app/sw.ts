@@ -18,21 +18,49 @@ const serwist = new Serwist({
   clientsClaim: true,
   navigationPreload: true,
   runtimeCaching: [
+    // The homepage is the PWA start_url — it MUST render offline or the user
+    // can't reach the Charts section at a gig with no signal. defaultCache
+    // only gives page documents a shared 24h/32-entry cache ("others"), which
+    // silently expires; this dedicated rule keeps the last render of `/`
+    // indefinitely. The feed content will be stale offline (API calls fail
+    // gracefully), but the masthead + Contents navigation is what matters.
+    // Every online visit to `/` refreshes the entry. Like the charts rule
+    // below, RSC requests are excluded — see that rule's comment.
+    {
+      matcher: ({ url, sameOrigin, request }) =>
+        sameOrigin &&
+        request.headers.get("RSC") !== "1" &&
+        url.pathname === "/",
+      handler: new NetworkFirst({
+        cacheName: "app-shell",
+        networkTimeoutSeconds: 4,
+      }),
+    },
     // The Charts section gets a dedicated NetworkFirst cache so chord charts
     // stay available offline — the use case is playing a gig with no signal.
     // Online (or within the 4s timeout) the network wins so edits show up
     // immediately; offline it falls back to the last-cached render of each
     // page. The chart text is baked into the SSR'd HTML and the viewer's
     // interactivity (autoscroll, zoom, wake-lock) is entirely client-side,
-    // so a cached page is fully functional offline. Caching is opt-in per
-    // setlist now: the library no longer warms every chart — only setlists
-    // flagged "Available offline" warm their member chart pages (see
-    // ChartsClient + SetlistDetailClient). This rule still caches any chart
-    // page fetched online (so a chart you open is cached on demand). It must
-    // precede defaultCache so it wins the /charts* routes.
+    // so a cached page is fully functional offline. Warming: OfflineWarm (in
+    // the root layout) warms /charts, /charts/setlists, and every
+    // offline-flagged setlist's pages on each app open; ChartsClient +
+    // SetlistDetailClient re-warm when visited. This rule still caches any
+    // chart page fetched online (so a chart you open is cached on demand).
+    // It must precede defaultCache so it wins the /charts* routes.
+    //
+    // RSC requests (client-side navigations; `RSC: 1` header) are excluded so
+    // this cache only ever holds HTML documents. Without the exclusion,
+    // flight payloads got cached under `?_rsc=` URLs and — because matching
+    // ignores the query string — could be served as the "HTML" for an offline
+    // document load (a blank/garbled page). Offline client-side navs now
+    // either hit defaultCache's pages-rsc entry or fail the flight fetch, and
+    // Next falls back to a full browser navigation, which lands on the cached
+    // HTML here.
     {
-      matcher: ({ url, sameOrigin }) =>
+      matcher: ({ url, sameOrigin, request }) =>
         sameOrigin &&
+        request.headers.get("RSC") !== "1" &&
         (url.pathname === "/charts" || url.pathname.startsWith("/charts/")),
       handler: new NetworkFirst({
         cacheName: "charts-pages",
@@ -54,8 +82,19 @@ serwist.addEventListeners();
 // The runtime cache was renamed setlist-pages -> charts-pages when the section
 // became "Charts". Serwist only cleans its own precache, so drop the old
 // runtime cache on activate to avoid stranding it (a one-time storage leak).
+// Also purge any `?_rsc=` flight entries cached before the charts rule
+// excluded RSC requests — with ignoreSearch matching they could still be
+// returned for an offline document load (the blank-page bug).
 self.addEventListener("activate", (event) => {
-  event.waitUntil(caches.delete("setlist-pages"));
+  event.waitUntil(
+    (async () => {
+      await caches.delete("setlist-pages");
+      const cache = await caches.open("charts-pages");
+      for (const req of await cache.keys()) {
+        if (new URL(req.url).searchParams.has("_rsc")) await cache.delete(req);
+      }
+    })(),
+  );
 });
 
 // ── Web Push ────────────────────────────────────────────────────
