@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Newsreader, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
+import OfflineWarm from "@/components/OfflineWarm";
 import ThemeProvider from "@/components/ThemeProvider";
 import Masthead from "@/components/Masthead";
 
@@ -84,6 +85,7 @@ export default function RootLayout({
           <Masthead />
           <main className="relative z-10">{children}</main>
           <ServiceWorkerRegister />
+          <OfflineWarm />
         </ThemeProvider>
       </body>
     </html>
