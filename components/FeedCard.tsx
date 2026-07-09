@@ -907,6 +907,28 @@ function BlueskyImageThumb({
   );
 }
 
+// Native HLS capability check. canPlayType("application/vnd.apple.mpegurl")
+// is the canonical probe, but iOS WebKit is not reliable about it — in the
+// standalone home-screen PWA context it can return "" even though <video>
+// plays HLS natively, which sent every iPhone tap down the open-the-post
+// fallback. So: try the common MIME spellings, then trust the platform —
+// every iOS browser is WebKit and plays HLS in <video> regardless of what
+// the probe claims.
+function supportsNativeHls(): boolean {
+  const probe = document.createElement("video");
+  const mimes = [
+    "application/vnd.apple.mpegurl",
+    "application/x-mpegURL",
+    "audio/mpegurl",
+  ];
+  if (mimes.some((mime) => probe.canPlayType(mime) !== "")) return true;
+  return (
+    /iPhone|iPad|iPod/.test(navigator.userAgent) ||
+    // iPadOS reports itself as macOS; the touchscreen gives it away.
+    (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1)
+  );
+}
+
 // Bluesky serves video as an HLS playlist (.m3u8). iOS/macOS Safari — the
 // primary surface — play HLS natively in <video>, so we render a poster with
 // a play badge and swap in a real player on tap. Browsers without native HLS
@@ -917,11 +939,14 @@ function BlueskyImageThumb({
 function VideoEmbed({ video }: { video: BlueskyVideo }) {
   const [playing, setPlaying] = useState(false);
   const [canPlayHls, setCanPlayHls] = useState(false);
+  // Tracks whether we've already kicked off playback for the current player
+  // mount, so re-renders (focus changes, etc.) can't call play() again and
+  // resume a video the user deliberately paused.
+  const startedRef = useRef(false);
   // Probe in an effect, not during render: canPlayType needs a DOM and the
   // SSR pass must render the same poster markup the client hydrates.
   useEffect(() => {
-    const probe = document.createElement("video");
-    setCanPlayHls(probe.canPlayType("application/vnd.apple.mpegurl") !== "");
+    setCanPlayHls(supportsNativeHls());
   }, []);
 
   const ar = video.aspect_ratio;
@@ -933,6 +958,20 @@ function VideoEmbed({ video }: { video: BlueskyVideo }) {
   if (playing) {
     return (
       <video
+        // Start playback from the ref callback: React flushes discrete events
+        // synchronously, so this still runs inside the tap's user-gesture
+        // window — the autoPlay attribute alone is processed later and iOS
+        // blocks it for unmuted video, leaving a player the user has to tap
+        // a second time.
+        ref={(el) => {
+          if (el && !startedRef.current) {
+            startedRef.current = true;
+            el.play().catch(() => {
+              // NotAllowedError etc. — controls are visible, a manual tap
+              // on the native play button still works.
+            });
+          }
+        }}
         data-bsky-video
         src={video.playlist}
         poster={video.thumbnail || undefined}
@@ -947,6 +986,14 @@ function VideoEmbed({ video }: { video: BlueskyVideo }) {
         onTouchStart={(e) => e.stopPropagation()}
         onTouchMove={(e) => e.stopPropagation()}
         onTouchEnd={(e) => e.stopPropagation()}
+        onError={() => {
+          // The HLS guess was wrong (or the CDN failed): drop back to the
+          // poster in open-the-post mode so the next tap does something
+          // useful instead of leaving a dead player.
+          startedRef.current = false;
+          setPlaying(false);
+          setCanPlayHls(false);
+        }}
         className="w-full rounded-sm bg-ink object-contain ring-1 ring-rule"
       />
     );
