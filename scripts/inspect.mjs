@@ -166,6 +166,7 @@ function counts() {
          COUNT(*) as total,
          SUM(CASE WHEN i.metadata LIKE '%display_name%' THEN 1 ELSE 0 END) as new_format,
          SUM(CASE WHEN i.metadata LIKE '%"images"%' THEN 1 ELSE 0 END) as images,
+         SUM(CASE WHEN i.metadata LIKE '%"video"%' THEN 1 ELSE 0 END) as video,
          SUM(CASE WHEN i.metadata LIKE '%"external"%' THEN 1 ELSE 0 END) as external,
          SUM(CASE WHEN i.metadata LIKE '%"quoted"%' THEN 1 ELSE 0 END) as quoted,
          SUM(CASE WHEN i.metadata LIKE '%"reply_to"%' THEN 1 ELSE 0 END) as reply,
@@ -179,6 +180,7 @@ function counts() {
     { label: "total", get: (r) => r.total },
     { label: "new format", get: (r) => r.new_format },
     { label: "images", get: (r) => r.images },
+    { label: "video", get: (r) => r.video },
     { label: "external", get: (r) => r.external },
     { label: "quoted", get: (r) => r.quoted },
     { label: "reply", get: (r) => r.reply },
@@ -325,10 +327,11 @@ function sources() {
 }
 
 function bskyRich(args) {
-  const kind = args[0]; // optional: images|external|quoted|reply|repost
+  const kind = args[0]; // optional: images|video|external|quoted|reply|repost
 
   const filterMap = {
     images: `metadata LIKE '%"images"%'`,
+    video: `metadata LIKE '%"video"%'`,
     external: `metadata LIKE '%"external"%'`,
     quoted: `metadata LIKE '%"quoted"%'`,
     reply: `metadata LIKE '%"reply_to"%'`,
@@ -337,7 +340,7 @@ function bskyRich(args) {
 
   if (kind && !filterMap[kind]) {
     console.error(c.red(`Unknown kind '${kind}'`));
-    console.error(c.dim("Try: images external quoted reply repost"));
+    console.error(c.dim("Try: images video external quoted reply repost"));
     process.exit(1);
   }
 
@@ -401,6 +404,11 @@ async function html() {
     "bsky author avatars":     (text.match(/h-4 w-4 flex-shrink-0 rounded-full/g) || []).length,
     "quoted post avatars":     (text.match(/h-3\.5 w-3\.5 flex-shrink-0 rounded-full/g) || []).length,
     "embed images":            (text.match(/feed_fullsize|feed_thumbnail/g) || []).length,
+    // VideoEmbed poster / QuotedPost video thumb — data-bsky-video only
+    // appears on the video wrapper (and the <video> once playing).
+    "video embeds":            (text.match(/data-bsky-video/g) || []).length,
+    // YouTubeEmbed wrapper — external cards pointing at YouTube videos.
+    "youtube embeds":          (text.match(/data-yt-embed/g) || []).length,
     // ExternalCard: <a class="flex overflow-hidden rounded-sm border ...">
     "external link cards":     (text.match(/<a [^>]*class="flex overflow-hidden rounded-sm border/g) || []).length,
     // QuotedPost: <a class="block rounded-sm border border-rule bg-ink/60 px-3.5">
@@ -553,7 +561,7 @@ ${c.bold("Commands:")}
   ${c.cyan("item <id-prefix>")}            Full detail of one item, parsed metadata
   ${c.cyan("sources")}                     Configured sources, item counts, last fetch
   ${c.cyan("bsky-rich [kind]")}            Find Bluesky items with rich content
-                                ${c.dim("kinds: images external quoted reply repost")}
+                                ${c.dim("kinds: images video external quoted reply repost")}
   ${c.cyan("html [path]")}                 Fetch live page, count rendered structures
   ${c.cyan("logs [n]")}                    Last N log lines (pm2 locally; use Railway dashboard in prod)
   ${c.cyan("practice [sub]")}              Practice progress: subs are counts (default), days, licks

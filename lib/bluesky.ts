@@ -4,6 +4,7 @@ import type { SourceConfig } from "@/lib/config";
 import type {
   BlueskyMetadata,
   BlueskyImage,
+  BlueskyVideo,
   BlueskyExternalCard,
   BlueskyQuotedPost,
   BlueskyReplyContext,
@@ -81,6 +82,24 @@ function extractImages(embed: AnyObj | undefined): BlueskyImage[] | undefined {
   return out.length > 0 ? out : undefined;
 }
 
+function extractVideo(embed: AnyObj | undefined): BlueskyVideo | undefined {
+  // Unlike images/external, the video view has no nested container key —
+  // the embed itself IS the video, so we discriminate on $type.
+  if (embed?.$type !== "app.bsky.embed.video#view") return undefined;
+  if (!embed.playlist) return undefined;
+  return {
+    playlist: embed.playlist as string,
+    thumbnail: (embed.thumbnail as string) || null,
+    alt: (embed.alt as string) || "",
+    aspect_ratio: embed.aspectRatio
+      ? {
+          width: embed.aspectRatio.width as number,
+          height: embed.aspectRatio.height as number,
+        }
+      : undefined,
+  };
+}
+
 function extractExternal(embed: AnyObj | undefined): BlueskyExternalCard | undefined {
   const ext = embed?.external;
   if (!ext?.uri) return undefined;
@@ -115,6 +134,7 @@ function extractQuoted(embed: AnyObj | undefined): BlueskyQuotedPost | undefined
   // recursively, but we don't go deeper to avoid runaway nesting.
   const innerEmbed = (viewRecord.embeds as AnyObj[] | undefined)?.[0];
   const innerImages = innerEmbed ? extractImages(innerEmbed) : undefined;
+  const innerVideo = innerEmbed ? extractVideo(innerEmbed) : undefined;
   const innerExternal = innerEmbed ? extractExternal(innerEmbed) : undefined;
 
   return {
@@ -125,6 +145,7 @@ function extractQuoted(embed: AnyObj | undefined): BlueskyQuotedPost | undefined
     indexed_at: (viewRecord.indexedAt as string) || "",
     url: postUrl(author.handle as string, viewRecord.uri as string),
     images: innerImages,
+    video: innerVideo,
     external: innerExternal,
   };
 }
@@ -134,6 +155,7 @@ function extractQuoted(embed: AnyObj | undefined): BlueskyQuotedPost | undefined
 // alongside the quoted card.
 function extractRecordWithMediaMedia(embed: AnyObj | undefined): {
   images?: BlueskyImage[];
+  video?: BlueskyVideo;
   external?: BlueskyExternalCard;
 } {
   if (embed?.$type !== "app.bsky.embed.recordWithMedia#view") return {};
@@ -141,6 +163,7 @@ function extractRecordWithMediaMedia(embed: AnyObj | undefined): {
   if (!media) return {};
   return {
     images: extractImages(media),
+    video: extractVideo(media),
     external: extractExternal(media),
   };
 }
@@ -210,6 +233,7 @@ function buildBlueskyMetadata(feedViewPost: AnyObj): BlueskyMetadata {
       author?.viewer as AnyObj | undefined
     ),
     images: rwmMedia.images ?? extractImages(embed),
+    video: rwmMedia.video ?? extractVideo(embed),
     external: rwmMedia.external ?? extractExternal(embed),
     quoted: extractQuoted(embed),
     reply_to: extractReplyContext(feedViewPost.reply as AnyObj | undefined),
@@ -222,6 +246,7 @@ function buildBlueskyMetadata(feedViewPost: AnyObj): BlueskyMetadata {
 // rich metadata.images array.
 function firstImageThumb(meta: BlueskyMetadata): string | null {
   if (meta.images && meta.images.length > 0) return meta.images[0].thumb;
+  if (meta.video?.thumbnail) return meta.video.thumbnail;
   if (meta.external?.thumb) return meta.external.thumb;
   return null;
 }
