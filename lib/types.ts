@@ -17,6 +17,16 @@ export interface BlueskyExternalCard {
   domain: string;
 }
 
+export interface BlueskyVideo {
+  // HLS (.m3u8) playlist URL from the video CDN. iOS/macOS Safari play this
+  // natively in <video>; browsers without native HLS fall back to opening
+  // the post itself (see VideoEmbed in FeedCard.tsx).
+  playlist: string;
+  thumbnail: string | null;
+  alt: string;
+  aspect_ratio?: { width: number; height: number };
+}
+
 export interface BlueskyQuotedPost {
   handle: string;
   display_name?: string;
@@ -25,6 +35,7 @@ export interface BlueskyQuotedPost {
   indexed_at: string;
   url: string;
   images?: BlueskyImage[];
+  video?: BlueskyVideo;
   external?: BlueskyExternalCard;
 }
 
@@ -67,6 +78,7 @@ export interface BlueskyMetadata {
   viewer?: BlueskyViewerState;
   // Rich content
   images?: BlueskyImage[];
+  video?: BlueskyVideo;
   external?: BlueskyExternalCard;
   quoted?: BlueskyQuotedPost;
   reply_to?: BlueskyReplyContext;

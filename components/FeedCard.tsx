@@ -6,6 +6,7 @@ import type {
   Item,
   BlueskyMetadata,
   BlueskyImage,
+  BlueskyVideo,
   BlueskyExternalCard,
   BlueskyQuotedPost,
 } from "@/lib/types";
@@ -775,6 +776,7 @@ interface BlueskyBodyProps {
 
 function BlueskyBody({ item, bsky }: BlueskyBodyProps) {
   const text = item.body_excerpt || "";
+  const youtubeId = bsky?.external ? youtubeVideoId(bsky.external.url) : null;
   return (
     <>
       {bsky?.reply_to && <ReplyContext reply={bsky.reply_to} />}
@@ -788,9 +790,18 @@ function BlueskyBody({ item, bsky }: BlueskyBodyProps) {
           <ImageGrid images={bsky.images} />
         </div>
       )}
+      {bsky?.video && (
+        <div className="mt-3">
+          <VideoEmbed video={bsky.video} />
+        </div>
+      )}
       {bsky?.external && (
         <div className="mt-3">
-          <ExternalCard external={bsky.external} />
+          {youtubeId ? (
+            <YouTubeEmbed external={bsky.external} videoId={youtubeId} />
+          ) : (
+            <ExternalCard external={bsky.external} />
+          )}
         </div>
       )}
       {bsky?.quoted && (
@@ -896,6 +907,196 @@ function BlueskyImageThumb({
   );
 }
 
+// Bluesky serves video as an HLS playlist (.m3u8). iOS/macOS Safari — the
+// primary surface — play HLS natively in <video>, so we render a poster with
+// a play badge and swap in a real player on tap. Browsers without native HLS
+// (Chrome/Firefox) never get the stopPropagation, so the tap falls through to
+// the card's own click handler and opens the post on bsky.app instead —
+// consume-in-the-native-app is the triage-not-consumption fallback, and it
+// avoids shipping an hls.js dependency for a secondary platform.
+function VideoEmbed({ video }: { video: BlueskyVideo }) {
+  const [playing, setPlaying] = useState(false);
+  const [canPlayHls, setCanPlayHls] = useState(false);
+  // Probe in an effect, not during render: canPlayType needs a DOM and the
+  // SSR pass must render the same poster markup the client hydrates.
+  useEffect(() => {
+    const probe = document.createElement("video");
+    setCanPlayHls(probe.canPlayType("application/vnd.apple.mpegurl") !== "");
+  }, []);
+
+  const ar = video.aspect_ratio;
+  // Cap max height like single images so portrait videos don't dominate
+  const aspectStyle = ar
+    ? { aspectRatio: `${ar.width} / ${ar.height}`, maxHeight: "32rem" }
+    : { aspectRatio: "16 / 9", maxHeight: "32rem" };
+
+  if (playing) {
+    return (
+      <video
+        data-bsky-video
+        src={video.playlist}
+        poster={video.thumbnail || undefined}
+        controls
+        autoPlay
+        playsInline
+        aria-label={video.alt || "Bluesky video"}
+        style={aspectStyle}
+        onClick={(e) => e.stopPropagation()}
+        // Keep scrubbing/volume drags on the native controls from locking
+        // the card's horizontal swipe gesture and dragging the article.
+        onTouchStart={(e) => e.stopPropagation()}
+        onTouchMove={(e) => e.stopPropagation()}
+        onTouchEnd={(e) => e.stopPropagation()}
+        className="w-full rounded-sm bg-ink object-contain ring-1 ring-rule"
+      />
+    );
+  }
+
+  return (
+    <div
+      data-bsky-video
+      role="button"
+      aria-label={canPlayHls ? "Play video" : "Open post to watch video"}
+      onClick={(e) => {
+        if (!canPlayHls) return; // bubble up: card click opens the post
+        e.stopPropagation();
+        setPlaying(true);
+      }}
+      style={aspectStyle}
+      className="relative w-full cursor-pointer overflow-hidden rounded-sm ring-1 ring-rule"
+    >
+      <VideoPoster video={video} />
+    </div>
+  );
+}
+
+// Poster + play badge, fills its (aspect-ratio'd, relative) parent. Shared by
+// the playable VideoEmbed and the static thumbnail inside QuotedPost.
+function VideoPoster({ video }: { video: BlueskyVideo }) {
+  return (
+    <>
+      {video.thumbnail ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={video.thumbnail}
+          alt={video.alt}
+          loading="lazy"
+          className="h-full w-full object-cover"
+        />
+      ) : (
+        <div className="h-full w-full bg-ink-raised" />
+      )}
+      <span className="pointer-events-none absolute inset-0 flex items-center justify-center">
+        <span className="flex h-12 w-12 items-center justify-center rounded-full bg-ink/75 text-cream ring-1 ring-rule backdrop-blur-sm">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+            <polygon points="6 3 20 12 6 21" />
+          </svg>
+        </span>
+      </span>
+    </>
+  );
+}
+
+// Pull the 11-char video id out of the YouTube URL shapes that show up in
+// Bluesky link cards. Returns null for anything else (including channel /
+// playlist links, which should stay plain external cards).
+function youtubeVideoId(url: string): string | null {
+  let u: URL;
+  try {
+    u = new URL(url);
+  } catch {
+    return null;
+  }
+  const host = u.hostname.replace(/^www\.|^m\./, "");
+  const ID = /^[A-Za-z0-9_-]{11}$/;
+  if (host === "youtu.be") {
+    const id = u.pathname.slice(1).split("/")[0];
+    return ID.test(id) ? id : null;
+  }
+  if (host === "youtube.com" || host === "music.youtube.com") {
+    const v = u.searchParams.get("v");
+    if (v && ID.test(v)) return v;
+    const m = u.pathname.match(/^\/(?:shorts|live|embed)\/([A-Za-z0-9_-]{11})(?:\/|$)/);
+    if (m) return m[1];
+  }
+  return null;
+}
+
+// External card pointing at a YouTube video: render a tap-to-load embedded
+// player instead of the link card. The iframe (youtube-nocookie) only mounts
+// after the tap so cards stay cheap; unlike Bluesky's HLS, iframes play
+// everywhere, so there's no capability probe. The title bar below the player
+// keeps the link-out to YouTube for the save-it-for-later case.
+function YouTubeEmbed({
+  external,
+  videoId,
+}: {
+  external: BlueskyExternalCard;
+  videoId: string;
+}) {
+  const [playing, setPlaying] = useState(false);
+  const thumb = external.thumb || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
+  return (
+    <div
+      data-yt-embed
+      className="overflow-hidden rounded-sm border border-rule bg-ink/60"
+    >
+      <div className="relative w-full" style={{ aspectRatio: "16 / 9" }}>
+        {playing ? (
+          <iframe
+            src={`https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&playsinline=1`}
+            title={external.title || "YouTube video"}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowFullScreen
+            className="absolute inset-0 h-full w-full border-0"
+          />
+        ) : (
+          <div
+            role="button"
+            aria-label="Play video"
+            onClick={(e) => {
+              e.stopPropagation();
+              setPlaying(true);
+            }}
+            className="absolute inset-0 cursor-pointer"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={thumb}
+              alt=""
+              loading="lazy"
+              className="h-full w-full object-cover"
+            />
+            <span className="pointer-events-none absolute inset-0 flex items-center justify-center">
+              <span className="flex h-12 w-12 items-center justify-center rounded-full bg-ink/75 text-cream ring-1 ring-rule backdrop-blur-sm">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                  <polygon points="6 3 20 12 6 21" />
+                </svg>
+              </span>
+            </span>
+          </div>
+        )}
+      </div>
+      <a
+        href={external.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={(e) => e.stopPropagation()}
+        className="block px-3.5 py-2.5 transition-colors hover:bg-ink"
+      >
+        <div className="font-mono text-[0.68rem] uppercase tracking-kicker text-cream-dim">
+          {external.domain}
+        </div>
+        {external.title && (
+          <div className="mt-1 line-clamp-2 font-display text-[0.95rem] font-medium leading-snug text-cream opsz-body">
+            {external.title}
+          </div>
+        )}
+      </a>
+    </div>
+  );
+}
+
 function ExternalCard({ external }: { external: BlueskyExternalCard }) {
   return (
     <a
@@ -965,6 +1166,24 @@ function QuotedPost({ post }: { post: BlueskyQuotedPost }) {
       {post.images && post.images.length > 0 && (
         <div className="mt-2.5">
           <ImageGrid images={post.images} />
+        </div>
+      )}
+      {post.video && (
+        // Static poster only — the whole quoted card is an <a>, so inline
+        // playback would fight the link. Tapping opens the post to watch.
+        <div
+          data-bsky-video
+          style={
+            post.video.aspect_ratio
+              ? {
+                  aspectRatio: `${post.video.aspect_ratio.width} / ${post.video.aspect_ratio.height}`,
+                  maxHeight: "20rem",
+                }
+              : { aspectRatio: "16 / 9", maxHeight: "20rem" }
+          }
+          className="relative mt-2.5 w-full overflow-hidden rounded-sm ring-1 ring-rule"
+        >
+          <VideoPoster video={post.video} />
         </div>
       )}
       {post.external && (
