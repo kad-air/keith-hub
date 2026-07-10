@@ -29,6 +29,17 @@ export default function SetlistsClient({ initialSetlists, readOnly }: Props) {
     };
   }, []);
 
+  // Keep this page's own cached render fresh — same reasoning as the /charts
+  // library page: a setlist created or deleted this session must not ghost in
+  // the offline copy until the next app open. Keyed on the setlists state so
+  // settled mutations re-cache the document.
+  useEffect(() => {
+    if (!online || !("serviceWorker" in navigator)) return;
+    fetch("/charts/setlists").catch(() => {
+      /* offline after all — keep whatever render is cached */
+    });
+  }, [online, setlists]);
+
   const create = useCallback(async () => {
     const trimmed = name.trim();
     if (!trimmed) {

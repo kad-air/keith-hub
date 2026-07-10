@@ -25,14 +25,30 @@ export default function OfflineWarm() {
   const router = useRouter();
   const warmedRef = useRef("");
   const busyRef = useRef(false);
+  // Bumped when a new SW takes control mid-warm: pages fetched before the
+  // update may reference the OLD build, so the in-flight run must not record
+  // its key as "warmed" — the next trigger re-fetches everything.
+  const epochRef = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
+
+    // Ask the browser not to evict our caches under storage pressure — iOS
+    // in particular reclaims "best effort" storage from PWAs that haven't
+    // been opened in a while, which is exactly the weeks-of-Feed-use-then-
+    // gig scenario the offline setlists exist for. Fire-and-forget: browsers
+    // that refuse (or don't implement it) just stay best-effort.
+    try {
+      void navigator.storage?.persist?.();
+    } catch {
+      /* ignore */
+    }
 
     async function warm() {
       if (busyRef.current) return;
       if (!navigator.onLine || !("serviceWorker" in navigator)) return;
       busyRef.current = true;
+      const epoch = epochRef.current;
       try {
         // Warm fetches only populate the cache once the SW controls the page.
         // On first install the page isn't controlled yet — bail; clientsClaim
@@ -84,10 +100,13 @@ export default function OfflineWarm() {
             return;
           }
         }
-        if (!cancelled) warmedRef.current = key;
+        if (!cancelled && epoch === epochRef.current) warmedRef.current = key;
       } finally {
         busyRef.current = false;
       }
+      // A SW update landed while this run was in flight — its fetches may
+      // hold the old build. Go again immediately under the new epoch.
+      if (!cancelled && epoch !== epochRef.current) warm();
     }
 
     // Re-check on PWA resume too: the setlists may have been edited from
@@ -97,13 +116,35 @@ export default function OfflineWarm() {
       if (document.visibilityState === "visible") warm();
     };
 
+    // A new deploy's SW taking over (skipWaiting + clientsClaim) purges the
+    // OLD build's precached chunks — cached HTML that references them would
+    // hydrate dead if served offline. On charts pages ServiceWorkerRegister
+    // deliberately does NOT reload on update (never yank a live chart), so
+    // re-warm here instead: reset the key and re-fetch every page so the
+    // cached HTML matches the new build's precache. Elsewhere the register
+    // component reloads the page and the remount warms — this listener just
+    // never gets the chance to matter there.
+    const onControllerChange = () => {
+      epochRef.current++;
+      warmedRef.current = "";
+      warm();
+    };
+
     warm();
     window.addEventListener("online", warm);
     document.addEventListener("visibilitychange", onVisible);
+    navigator.serviceWorker?.addEventListener(
+      "controllerchange",
+      onControllerChange,
+    );
     return () => {
       cancelled = true;
       window.removeEventListener("online", warm);
       document.removeEventListener("visibilitychange", onVisible);
+      navigator.serviceWorker?.removeEventListener(
+        "controllerchange",
+        onControllerChange,
+      );
     };
   }, [router]);
 

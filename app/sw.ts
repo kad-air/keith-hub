@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 import { defaultCache } from "@serwist/next/worker";
-import type { PrecacheEntry, SerwistGlobalConfig } from "serwist";
+import type { PrecacheEntry, SerwistGlobalConfig, SerwistPlugin } from "serwist";
 import { NetworkFirst, Serwist } from "serwist";
 
 declare global {
@@ -12,11 +12,42 @@ declare global {
 
 declare const self: ServiceWorkerGlobalScope;
 
+// Normalize cache keys to the query-less URL for both reads AND writes. The
+// Cache API's `put` only replaces entries whose URL matches exactly, and
+// `match` with ignoreSearch returns the entry in INSERTION order — so without
+// this, a query-full document load (`/charts/<id>?setlist=<id>`, or
+// `/?category=music` on the homepage) would strand a second entry that
+// permanently shadows every later query-less re-warm. One key per path means
+// the freshest render always wins, and the offline homepage cold start at `/`
+// can't miss just because the last online visit carried a query.
+const stripSearchFromCacheKey: SerwistPlugin = {
+  cacheKeyWillBeUsed: async ({ request }) => {
+    const url = new URL(request.url);
+    url.search = "";
+    return url.href;
+  },
+};
+
 const serwist = new Serwist({
   precacheEntries: self.__SW_MANIFEST,
   skipWaiting: true,
   clientsClaim: true,
   navigationPreload: true,
+  // When a document navigation can't be served from network OR cache (a chart
+  // that was never warmed, opened at a gig with no signal), serve the branded
+  // static fallback instead of the browser's network-error page. The page is
+  // `public/offline.html` — fully self-contained (inline styles, no build
+  // chunks) so it renders even when nothing else survived, and precached with
+  // a content-hash revision by @serwist/next's public/ scan. Serwist wires
+  // this plugin into every runtimeCaching handler below.
+  fallbacks: {
+    entries: [
+      {
+        url: "/offline.html",
+        matcher: ({ request }) => request.destination === "document",
+      },
+    ],
+  },
   runtimeCaching: [
     // The homepage is the PWA start_url — it MUST render offline or the user
     // can't reach the Charts section at a gig with no signal. defaultCache
@@ -34,6 +65,12 @@ const serwist = new Serwist({
       handler: new NetworkFirst({
         cacheName: "app-shell",
         networkTimeoutSeconds: 4,
+        // Key + match on the query-less URL: the feed's SSR HTML is identical
+        // for every ?category= (the client resolves the tab from the URL), and
+        // the PWA cold-starts at bare `/` — a query-full entry must never
+        // shadow or miss it. See stripSearchFromCacheKey.
+        plugins: [stripSearchFromCacheKey],
+        matchOptions: { ignoreSearch: true },
       }),
     },
     // The Charts section gets a dedicated NetworkFirst cache so chord charts
@@ -65,11 +102,14 @@ const serwist = new Serwist({
       handler: new NetworkFirst({
         cacheName: "charts-pages",
         networkTimeoutSeconds: 4,
-        // Match ignoring the query string: a chart opened from a setlist links
-        // to /charts/<id>?setlist=<id>, but warming caches the query-less
-        // /charts/<id>. Without this, the offline navigation (query-full) would
-        // miss the warmed (query-less) entry — breaking the exact gig-with-no-
-        // signal flow this cache exists for.
+        // One entry per path, keyed query-less (see stripSearchFromCacheKey):
+        // a chart opened from a setlist loads /charts/<id>?setlist=<id>, but
+        // warming caches the query-less /charts/<id> — they must be the SAME
+        // cache slot, or an old query-full entry would permanently shadow
+        // every later re-warm (Cache API matching is insertion-ordered).
+        // ignoreSearch stays as belt-and-suspenders for entries cached before
+        // key normalization shipped.
+        plugins: [stripSearchFromCacheKey],
         matchOptions: { ignoreSearch: true },
       }),
     },
@@ -82,16 +122,20 @@ serwist.addEventListeners();
 // The runtime cache was renamed setlist-pages -> charts-pages when the section
 // became "Charts". Serwist only cleans its own precache, so drop the old
 // runtime cache on activate to avoid stranding it (a one-time storage leak).
-// Also purge any `?_rsc=` flight entries cached before the charts rule
-// excluded RSC requests — with ignoreSearch matching they could still be
-// returned for an offline document load (the blank-page bug).
+// Also purge any query-full entries cached before cache keys were normalized
+// to the query-less URL: `?_rsc=` flight payloads (the old blank-page bug) and
+// `?setlist=`/`?category=` document entries alike. Because Cache API matching
+// is insertion-ordered, a legacy query-full entry inserted before its
+// query-less sibling would shadow every fresh re-warm forever.
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     (async () => {
       await caches.delete("setlist-pages");
-      const cache = await caches.open("charts-pages");
-      for (const req of await cache.keys()) {
-        if (new URL(req.url).searchParams.has("_rsc")) await cache.delete(req);
+      for (const name of ["charts-pages", "app-shell"]) {
+        const cache = await caches.open(name);
+        for (const req of await cache.keys()) {
+          if (new URL(req.url).search !== "") await cache.delete(req);
+        }
       }
     })(),
   );
