@@ -6,7 +6,12 @@ const withSerwist = withSerwistInit({
   swSrc: "app/sw.ts",
   swDest: "public/sw.js",
   cacheOnNavigation: true,
-  reloadOnOnline: true,
+  // reloadOnOnline is literally `window.addEventListener("online", () =>
+  // location.reload())` — on a gig stage with flapping connectivity that
+  // reloads a LIVE chart mid-song, killing scroll position and autoscroll.
+  // Every page already handles reconnect gracefully (NetworkFirst + the
+  // OfflineWarm re-warm on `online`), so the hard reload buys nothing.
+  reloadOnOnline: false,
   // Disable SW in dev so HMR isn't fighting cached responses.
   disable: process.env.NODE_ENV === "development",
 });

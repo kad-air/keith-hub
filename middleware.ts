@@ -43,6 +43,10 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|icons|manifest\\.webmanifest|sw\\.js|swe-worker-.*\\.js|login|api/auth).*)",
+    // offline.html is the service worker's offline fallback page — the SW
+    // precaches it at install time, including for logged-out visitors on the
+    // public charts pages. If the middleware gated it, that precache fetch
+    // would follow the 302 and cache the LOGIN page as the fallback.
+    "/((?!_next/static|_next/image|icons|manifest\\.webmanifest|sw\\.js|swe-worker-.*\\.js|offline\\.html|login|api/auth).*)",
   ],
 };

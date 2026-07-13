@@ -127,6 +127,18 @@ export default function ChartsClient({
     };
   }, []);
 
+  // Keep this page's own cached render fresh. OfflineWarm caches /charts on
+  // app open, but a chart added or deleted THIS session would leave the
+  // offline copy stale until the next open — a ghost row (or missing row) at
+  // a gig. Keyed on the charts state so every settled mutation re-caches the
+  // document; the mount-time run just refreshes the entry OfflineWarm made.
+  useEffect(() => {
+    if (!online || !("serviceWorker" in navigator)) return;
+    fetch("/charts").catch(() => {
+      /* offline after all — keep whatever render is cached */
+    });
+  }, [online, charts]);
+
   // Warm the SW cache for OFFLINE-FLAGGED setlists only — the library itself
   // is online-only by default (a chart still gets cached on demand when opened
   // online via the NetworkFirst rule). For each offline setlist we fetch its

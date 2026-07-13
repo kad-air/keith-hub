@@ -156,6 +156,11 @@ export default function ChartViewerClient({
   const recRef = useRef<SpeechRecognitionLike | null>(null);
   const listeningRef = useRef(false);
   const voiceRestartTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Consecutive SpeechRecognition `network` errors. Most engines recognize
+  // server-side (iOS, Chrome), so with no signal every session dies with a
+  // network error and the onend auto-restart would spin forever — mic on,
+  // battery draining, following nothing. Reset on any successful result.
+  const netErrorsRef = useRef(0);
   // Ref indirection: openEdit (defined below, early) and the auto-start
   // countdown need to reach the voice engine, whose callbacks are defined
   // later (they depend on the wake-lock helpers).
@@ -197,6 +202,28 @@ export default function ChartViewerClient({
       window.removeEventListener("offline", update);
     };
   }, []);
+
+  // Self-warm this chart's page into the offline cache. An in-app <Link>
+  // navigation here never issues a document request — only an RSC flight
+  // fetch, which the charts-pages SW rule deliberately ignores — so without
+  // this, "a chart you opened is cached on demand" only held for cold loads.
+  // The fetch is query-less to hit the one normalized cache slot. Keyed on
+  // updatedAt so saving an in-page edit immediately re-caches the fresh
+  // render (the warmers keyed on offline setlists don't cover charts outside
+  // them).
+  useEffect(() => {
+    if (!("serviceWorker" in navigator) || !navigator.onLine) return;
+    let cancelled = false;
+    navigator.serviceWorker.ready.then(() => {
+      if (cancelled || !navigator.serviceWorker.controller) return;
+      fetch(`/charts/${chart.id}`).catch(() => {
+        /* offline after all — the NetworkFirst rule keeps the old entry */
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [chart.id, chart.updatedAt]);
 
   const openEdit = useCallback(() => {
     setPlaying(false);
@@ -421,6 +448,7 @@ export default function ChartViewerClient({
       return;
     }
     setVoiceError(null);
+    netErrorsRef.current = 0;
 
     const attach = (rec: SpeechRecognitionLike) => {
       // A new recognizer = a new (empty) transcript. Tell the matcher so its
@@ -430,6 +458,7 @@ export default function ChartViewerClient({
       rec.interimResults = true;
       rec.lang = "en-US";
       rec.onresult = (e) => {
+        netErrorsRef.current = 0;
         // Full session transcript (final + interim); the matcher only reads
         // the tail, so re-feeding the whole thing every event is fine and
         // keeps this trivially correct across interim revisions.
@@ -444,12 +473,27 @@ export default function ChartViewerClient({
         const err = e.error ?? "";
         if (err === "not-allowed" || err === "service-not-allowed") {
           stopListening();
-          setVoiceError("Mic access was denied — allow it and try again.");
+          // Safari reports an unreachable speech SERVICE the same way as a
+          // permission refusal — with no connection, say what's actually
+          // wrong instead of sending the user to mic settings mid-gig.
+          setVoiceError(
+            err === "service-not-allowed" && !navigator.onLine
+              ? "Voice follow needs a connection — switch to Timer."
+              : "Mic access was denied — allow it and try again.",
+          );
         } else if (err === "audio-capture") {
           stopListening();
           setVoiceError("No microphone found.");
+        } else if (err === "network") {
+          // A lone blip is transient (onend restarts us), but offline — or
+          // failing back-to-back — the restart loop would spin forever.
+          netErrorsRef.current += 1;
+          if (!navigator.onLine || netErrorsRef.current >= 3) {
+            stopListening();
+            setVoiceError("Voice follow needs a connection — switch to Timer.");
+          }
         }
-        // no-speech / network / aborted: transient — onend restarts us.
+        // no-speech / aborted: transient — onend restarts us.
       };
       rec.onend = () => {
         // Engines end sessions on silence; keep the follow alive. A fresh

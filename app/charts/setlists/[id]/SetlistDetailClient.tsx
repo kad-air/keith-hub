@@ -113,6 +113,21 @@ export default function SetlistDetailClient({
     };
   }, [online, setlist.offline, setlist.id, charts, warmKey, router]);
 
+  // Even when NOT flagged offline, keep this page's own cached render fresh:
+  // in-app navigations never issue a document request (the SW rule only sees
+  // full loads), so a setlist browsed online could otherwise be a network-
+  // error page offline. Members aren't warmed here — that stays opt-in via
+  // the toggle — but the list itself renders, and any un-cached chart tap
+  // lands on the branded offline fallback instead of a dead end. Keyed on
+  // name/membership so edits re-cache the fresh render.
+  useEffect(() => {
+    if (setlist.offline) return; // the full warm effect above covers it
+    if (!online || !("serviceWorker" in navigator)) return;
+    fetch(`/charts/setlists/${setlist.id}`).catch(() => {
+      /* offline after all — keep whatever render is cached */
+    });
+  }, [setlist.offline, online, setlist.id, setlist.name, charts]);
+
   const offlineStatus = !setlist.offline
     ? ""
     : !online

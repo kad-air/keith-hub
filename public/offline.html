@@ -1,0 +1,112 @@
+<!doctype html>
+<!--
+  Offline fallback, served by the service worker (app/sw.ts `fallbacks`) when
+  a document navigation can't be answered from network or cache — e.g. a chart
+  that isn't in any offline setlist, opened at a gig with no signal.
+
+  Deliberately a static file in public/ (NOT an app route):
+  - @serwist/next's public/ scan precaches it with a content-hash revision, so
+    it's always available offline and updates when this file changes.
+  - It's fully self-contained (inline styles, no _next/ chunks, no web fonts),
+    so it renders even when the build assets it would otherwise reference have
+    been purged by a newer deploy's precache cleanup.
+  Colors mirror the ink/cream theme tokens in app/globals.css.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#0c0a08" />
+<title>Offline — hub</title>
+<style>
+  :root {
+    --ink: rgb(12 10 8);
+    --cream: rgb(245 239 225);
+    --cream-dim: rgb(172 160 138);
+    --cream-dimmer: rgb(124 114 98);
+    --rule: rgb(42 36 24);
+    --practice: rgb(222 176 104);
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --ink: rgb(246 243 238);
+      --cream: rgb(26 23 20);
+      --cream-dim: rgb(107 99 89);
+      --cream-dimmer: rgb(154 145 134);
+      --rule: rgb(208 200 186);
+      --practice: rgb(172 122 58);
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--ink);
+    color: var(--cream);
+    font-family: Georgia, "Times New Roman", serif;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    padding-bottom: calc(1.5rem + env(safe-area-inset-bottom));
+  }
+  main { max-width: 26rem; width: 100%; }
+  .kicker {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--practice);
+  }
+  h1 { font-size: 1.6rem; font-weight: 500; margin-top: 0.4rem; }
+  p { margin-top: 0.75rem; font-size: 0.95rem; line-height: 1.5; color: var(--cream-dim); }
+  nav { margin-top: 1.5rem; display: flex; flex-direction: column; gap: 0.5rem; }
+  nav a, button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    border: 1px solid var(--rule);
+    background: transparent;
+    color: var(--cream);
+    text-decoration: none;
+    padding: 0.7rem 0.9rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.75rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+  nav a:active, button:active { border-color: var(--practice); }
+  .hint {
+    margin-top: 1.25rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--cream-dimmer);
+    line-height: 1.6;
+  }
+</style>
+</head>
+<body>
+<main>
+  <p class="kicker">hub</p>
+  <h1>This page isn’t saved for offline.</h1>
+  <p>
+    No connection, and this page was never cached. Charts in a setlist marked
+    “Available offline” are always saved — everything else needs signal.
+  </p>
+  <nav>
+    <a href="/charts">Charts library →</a>
+    <a href="/charts/setlists">Setlists →</a>
+    <a href="/">Home →</a>
+    <button onclick="location.reload()">Try again</button>
+  </nav>
+  <p class="hint">Back online, this page retries automatically.</p>
+  <script>
+    // When signal returns, retry the navigation the user actually wanted —
+    // this page is served UNDER the original URL, so a reload re-runs it.
+    window.addEventListener("online", function () { location.reload(); });
+  </script>
+</main>
+</body>
+</html>
