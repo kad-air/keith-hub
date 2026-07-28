@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useTheme, type ThemeMode } from "@/components/ThemeProvider";
 
 const THEME_OPTIONS: Array<{ value: ThemeMode; label: string }> = [
@@ -183,6 +184,23 @@ export default function AppMenu() {
               <div className="mx-4 h-px bg-rule" />
             </>
           )}
+
+          {/* Feed section */}
+          <div className="px-4 py-3">
+            <h3 className="mb-2.5 font-mono text-[0.68rem] uppercase tracking-kicker text-cream-dim">
+              Feed
+            </h3>
+            <Link
+              href="/tune"
+              onClick={() => setOpen(false)}
+              className="block w-full rounded-sm border border-rule px-2 py-1.5 text-center font-mono text-[0.7rem] uppercase tracking-kicker text-cream-dim transition-colors hover:border-rule-strong hover:text-cream"
+            >
+              Tune sources &amp; algorithm
+            </Link>
+          </div>
+
+          {/* Divider */}
+          <div className="mx-4 h-px bg-rule" />
 
           {/* Version section */}
           <div className="px-4 py-3">

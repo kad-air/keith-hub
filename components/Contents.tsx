@@ -10,6 +10,7 @@ const GROUP_ORDER: SectionGroup[] = [
   "Tracking",
   "Library",
   "Guitar",
+  "System",
 ];
 
 const SHORTCUT_HINTS = [

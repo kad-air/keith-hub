@@ -5,7 +5,29 @@ app:
   items_per_page: 50
   retention_days: 30
 
+# Optional — All-view algorithm knobs. Every field falls back to the defaults
+# in lib/config.ts (shown below), so this whole block can be omitted. Editable
+# live from the Tune section (/tune), which is also where the effects can be
+# previewed before saving.
+# algorithm:
+#   priority:            # interleave priority; 0 removes a category from All
+#     music: 4
+#     books: 4
+#     film: 4
+#     tech_review: 4
+#     podcasts: 3
+#     reading: 2
+#     bluesky: 1
+#   bsky_ratio: 4        # 1 bluesky post per N RSS items in the All view
+#   bsky_window: 100     # unread bluesky posts kept; older ones hard-deleted
+#   surprise: 3          # recency bias of the bluesky sample (0 = uniform)
+#   jitter: 0.35         # interleave cadence jitter (0 = mechanical)
+#   ttl_days: 7          # RSS unread shelf life; or per-category { music: 14, default: 7 }
+#   retention_days: 7    # silently-dismissed items hard-deleted after this
+
 sources:
+  # Per-source options: poll_interval_minutes (min minutes between fetches;
+  # unset = every crawl) and paused: true (skip the source, keep its items).
   - id: pitchfork
     name: Pitchfork
     type: rss

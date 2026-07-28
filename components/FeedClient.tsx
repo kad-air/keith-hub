@@ -689,6 +689,7 @@ export default function FeedClient({
       "g h": () => router.push("/"),
       "g s": () => router.push("/saved"),
       "g r": () => router.push("/read"),
+      "g t": () => router.push("/tune"),
       "?": () => setHelpOpen((v) => !v),
     },
     !helpOpen

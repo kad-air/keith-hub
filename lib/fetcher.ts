@@ -251,6 +251,7 @@ export async function fetchRssSource(
           : err.message
         : String(err);
     console.error(`[fetcher] Failed to fetch ${source.name}:`, message);
+    recordSourceError(db, source.id, message);
     return 0;
   }
 
@@ -274,7 +275,7 @@ export async function fetchRssSource(
   `);
 
   const updateSource = db.prepare(`
-    UPDATE sources SET last_fetched_at = @last_fetched_at WHERE id = @id
+    UPDATE sources SET last_fetched_at = @last_fetched_at, last_error = NULL WHERE id = @id
   `);
 
   // Pre-check existence so we can count NEW posts accurately. With ON
@@ -375,6 +376,34 @@ export async function fetchRssSource(
   return insertedCount;
 }
 
+// Record a fetch failure on the source row. NULL last_error = healthy; the
+// Tune sources roster reads this for the per-source health indicator.
+// last_fetched_at is deliberately left alone so it keeps meaning "last
+// successful fetch" — the due-check below retries failed sources every cycle.
+function recordSourceError(db: Database.Database, sourceId: string, message: string): void {
+  db.prepare(`UPDATE sources SET last_error = ? WHERE id = ?`).run(
+    message.slice(0, 500),
+    sourceId
+  );
+}
+
+// Per-source poll frequency. A source with poll_interval_minutes set is only
+// fetched when at least that much time has passed since its last SUCCESSFUL
+// fetch (failures retry every cycle). Unset = fetched every crawl, which was
+// the historical behavior — the config field existed but was never honored.
+// The 30s slack keeps an interval equal to the poller's own cadence from
+// skipping every other cycle to timer drift.
+function isSourceDue(
+  source: SourceConfig,
+  lastFetchedAt: string | null | undefined,
+  hasError: boolean
+): boolean {
+  if (!source.poll_interval_minutes || hasError || !lastFetchedAt) return true;
+  const elapsed = Date.now() - Date.parse(lastFetchedAt);
+  if (!Number.isFinite(elapsed)) return true;
+  return elapsed >= source.poll_interval_minutes * 60_000 - 30_000;
+}
+
 // Per-crawl breakdown of new rows. `rss` covers rss + podcast sources —
 // everything that actually grows the main feed. Bluesky is reported
 // separately because its All-view contribution is derived from the RSS
@@ -401,7 +430,7 @@ export function fetchAllSources(db: Database.Database): Promise<FetchSummary> {
 }
 
 async function fetchAllSourcesImpl(db: Database.Database): Promise<FetchSummary> {
-  invalidateConfig(); // Re-read feeds.yml on every poll cycle
+  invalidateConfig(); // Re-read the live config (DB copy or feeds.yml) every cycle
   const config = getConfig();
 
   // Sync sources table with config
@@ -438,8 +467,27 @@ async function fetchAllSourcesImpl(db: Database.Database): Promise<FetchSummary>
   let rssFetched = 0;
   let blueskyFetched = 0;
 
+  // Paused sources are skipped entirely (items kept — they're still in
+  // config, so the removed-source prune above leaves them alone). Sources
+  // with a poll_interval_minutes longer than the crawl cadence are skipped
+  // until due.
+  const sourceRows = new Map(
+    (
+      db.prepare(`SELECT id, last_fetched_at, last_error FROM sources`).all() as Array<{
+        id: string;
+        last_fetched_at: string | null;
+        last_error: string | null;
+      }>
+    ).map((r) => [r.id, r])
+  );
+  const shouldFetch = (s: SourceConfig): boolean => {
+    if (s.paused) return false;
+    const row = sourceRows.get(s.id);
+    return isSourceDue(s, row?.last_fetched_at, Boolean(row?.last_error));
+  };
+
   const rssSources = config.sources.filter(
-    (s) => s.type === "rss" || s.type === "podcast"
+    (s) => (s.type === "rss" || s.type === "podcast") && shouldFetch(s)
   );
   for (const source of rssSources) {
     const count = await fetchRssSource(source, db);
@@ -476,7 +524,9 @@ async function fetchAllSourcesImpl(db: Database.Database): Promise<FetchSummary>
     dedup();
   }
 
-  const blueskySources = config.sources.filter((s) => s.type === "bluesky");
+  const blueskySources = config.sources.filter(
+    (s) => s.type === "bluesky" && shouldFetch(s)
+  );
   for (const source of blueskySources) {
     const count = await fetchBlueskySource(source, db);
     blueskyFetched += count;

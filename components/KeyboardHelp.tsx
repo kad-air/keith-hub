@@ -19,6 +19,7 @@ const SHORTCUTS: Array<{
       { keys: ["g", "h"], label: "Go home" },
       { keys: ["g", "s"], label: "Go to saved" },
       { keys: ["g", "r"], label: "Go to read" },
+      { keys: ["g", "t"], label: "Go to Tune" },
     ],
   },
   {

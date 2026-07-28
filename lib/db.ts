@@ -117,6 +117,17 @@ export function getDb(): Database.Database {
     CREATE INDEX IF NOT EXISTS idx_setlist_charts ON setlist_charts(setlist_id, sort_order);
   `);
 
+  // Additive migrations — CREATE IF NOT EXISTS above never alters existing
+  // tables, so new columns get bolted on here, guarded by a PRAGMA check.
+  const sourceCols = (
+    dbInstance.prepare(`PRAGMA table_info(sources)`).all() as Array<{ name: string }>
+  ).map((c) => c.name);
+  if (!sourceCols.includes("last_error")) {
+    // Last fetch failure message; NULL = last fetch succeeded. Read by the
+    // Tune sources roster for the per-source health indicator.
+    dbInstance.exec(`ALTER TABLE sources ADD COLUMN last_error TEXT`);
+  }
+
   return dbInstance;
 }
 
