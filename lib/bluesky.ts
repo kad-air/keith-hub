@@ -276,7 +276,7 @@ export async function fetchBlueskySource(
   `);
 
   const updateSource = db.prepare(`
-    UPDATE sources SET last_fetched_at = @last_fetched_at WHERE id = @id
+    UPDATE sources SET last_fetched_at = @last_fetched_at, last_error = NULL WHERE id = @id
   `);
 
   let posts: AnyObj[] = [];
@@ -300,9 +300,12 @@ export async function fetchBlueskySource(
       return 0;
     }
   } catch (err) {
-    console.error(
-      `[bluesky] Failed to fetch ${source.name}:`,
-      err instanceof Error ? err.message : err
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`[bluesky] Failed to fetch ${source.name}:`, message);
+    // Surface the failure on the source row for the Tune roster's health dot
+    db.prepare(`UPDATE sources SET last_error = ? WHERE id = ?`).run(
+      message.slice(0, 500),
+      source.id
     );
     // Re-auth on next attempt if session expired
     agent = null;

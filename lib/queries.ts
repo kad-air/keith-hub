@@ -1,75 +1,29 @@
 import type Database from "better-sqlite3";
 import { getDb } from "./db";
+import {
+  getAlgorithm,
+  RSS_CATEGORIES,
+  type ResolvedAlgorithm,
+} from "./config";
 import type { CategoryCounts, Item } from "./types";
 
-// ── Time-based falloff ─────────────────────────────────────────────────────
-// RSS items older than their TTL are auto-marked read each poll cycle.
-// consumed_at is NEVER set, so /read history is unaffected. Pruned items
-// become "pending": still in items, with item_state.read_at set, invisible
-// to every view.
+// ── Algorithm knobs ─────────────────────────────────────────────────────────
+// All tunables (per-category priority, bluesky ratio/window, surprise, jitter,
+// TTL, retention) live in the `algorithm:` block of the config — defaults in
+// ALGORITHM_DEFAULTS in lib/config.ts, editable live via the Tune section.
+// Every entry point below resolves them per call via getAlgorithm(), and the
+// feed-composition functions accept an overrides param so /api/tune/preview
+// can dry-run draft knob values without persisting anything.
 //
-// Bluesky uses a position-based window instead of a TTL (see BSKY_WINDOW
-// below). Anything outside the newest-N unread posts gets auto-marked read,
-// so the well is bounded: clearing the feed does NOT dig deeper into the
-// backlog — the next refresh only surfaces genuinely-new posts.
-export const UNREAD_TTL_HOURS: Record<string, number> = {
-  music:       168,   // 7 days
-  books:       168,   // 7 days
-  film:        168,   // 7 days
-  podcasts:    168,   // 7 days
-  reading:     168,   // 7 days
-  tech_review: 168,   // 7 days
-};
-
-// ── Priority weights for interleave ────────────────────────────────────────
-// Higher priority → earlier phase offset → items appear sooner/denser in the
-// All view. Reviews are the highest-signal content, bluesky is social filler.
-export const ALL_VIEW_PRIORITY: Record<keyof CategoryCounts, number> = {
-  all:         0,
-  music:       4,   // album reviews — highest
-  books:       4,   // book reviews — highest
-  film:        4,   // film reviews — highest
-  tech_review: 4,   // Verge reviews — escalated to review tier
-  podcasts:    3,   // daily listening
-  reading:     2,   // Verge articles + quickposts
-  bluesky:     1,   // social filler
-};
-
-// ── Bluesky derivation ────────────────────────────────────────────────────
-// Bluesky count is derived from RSS total, not independently capped.
-// When RSS items exist: 1 bsky per BSKY_INTERLEAVE_RATIO RSS items.
-// When RSS is empty: no bsky in the All view — the feed goes empty and
-// honors "enough for now". The Bluesky tab (category filter, pure recency)
-// still surfaces every unread post, so the backlog is never stranded.
-//
-// BSKY_WINDOW sizes the bounded unread backlog: each poll cycle, any unread
-// bsky post outside the newest N gets hard-deleted. Combined with the
-// RSS-empty = zero-bsky rule above, a dismiss-all settles to empty until
-// a genuinely-new post (or RSS item) arrives on the next poll.
-export const BSKY_INTERLEAVE_RATIO = 4;
-export const BSKY_WINDOW = 100;
-
-// ── Universal retention ───────────────────────────────────────────────────
-// Items with read_at set but no saved_at and no consumed_at get hard-deleted
-// this many hours after being marked read. Applies to every category.
-// Saved (saved_at) and opened (consumed_at) items are kept forever.
-export const READ_RETENTION_HOURS = 168; // 7 days
-
-// ── Variety knobs for the All view ─────────────────────────────────────────
-// These control the surprise sampling (for bluesky's capped selection) and
-// the interleave jitter (for all categories).
-
-// SURPRISE_POOL_MULTIPLIER — how much to oversample bluesky before narrowing.
-// 1.0 = no surprise. 1.5 = pull 50% more then sample down.
-export const SURPRISE_POOL_MULTIPLIER = 1.5;
-
-// SURPRISE_RECENCY_BIAS — how strongly the weighted sample favors newer items.
-// 0 = uniform random. 3 = newest ~20x more likely than oldest.
-export const SURPRISE_RECENCY_BIAS = 3;
-
-// INTERLEAVE_JITTER — perturbation applied to stride-scheduled positions.
-// 0 = perfectly mechanical cadence. ~0.35 = mild swaps between adjacent slots.
-export const INTERLEAVE_JITTER = 0.35;
+// Semantics (unchanged from when these were constants in this file):
+// - RSS items older than their category's TTL are auto-marked read each poll
+//   cycle; consumed_at is NEVER set, so /read history is unaffected.
+// - Bluesky uses a position-based window instead of a TTL: unread posts
+//   outside the newest bskyWindow get hard-deleted each cycle.
+// - Priority: higher → earlier phase offset → sooner/denser in the All view.
+//   0 removes the category from the All view entirely (its tab still works).
+// - Silently-dismissed items (read, never saved/opened) are hard-deleted
+//   after retentionHours; saved and opened items are kept forever.
 
 const ITEM_SELECT = `
   SELECT
@@ -115,11 +69,11 @@ function weightedSample<T>(
  * Output preserves recency order so the interleaver downstream can use rank
  * as position cleanly.
  */
-function selectWithSurprise(items: Item[], quota: number): Item[] {
+function selectWithSurprise(items: Item[], quota: number, bias: number): Item[] {
   if (items.length <= quota) return items;
   const poolSize = items.length;
   return weightedSample(items, quota, (_item, rank) =>
-    Math.exp((-SURPRISE_RECENCY_BIAS * rank) / Math.max(poolSize - 1, 1))
+    Math.exp((-bias * rank) / Math.max(poolSize - 1, 1))
   );
 }
 
@@ -131,7 +85,8 @@ function selectWithSurprise(items: Item[], quota: number): Item[] {
  * INTERLEAVE_JITTER perturbs positions for mild randomness.
  */
 function interleaveByPriority(
-  byCategory: Array<{ cat: keyof CategoryCounts; items: Item[] }>
+  byCategory: Array<{ cat: keyof CategoryCounts; items: Item[] }>,
+  algo: ResolvedAlgorithm
 ): Item[] {
   const active = byCategory.filter((c) => c.items.length > 0);
   if (active.length === 0) return [];
@@ -141,7 +96,7 @@ function interleaveByPriority(
 
   // Sort by priority DESC so high-priority categories get early phase offsets
   const sorted = [...active].sort(
-    (a, b) => (ALL_VIEW_PRIORITY[b.cat] || 0) - (ALL_VIEW_PRIORITY[a.cat] || 0)
+    (a, b) => (algo.priority[b.cat] || 0) - (algo.priority[a.cat] || 0)
   );
 
   type Slot = { vpos: number; item: Item };
@@ -152,7 +107,7 @@ function interleaveByPriority(
     const stride = totalItems / count;
     const phase = (stride * catIdx) / sorted.length;
     for (let rank = 0; rank < items.length; rank++) {
-      const jitter = (Math.random() - 0.5) * stride * INTERLEAVE_JITTER;
+      const jitter = (Math.random() - 0.5) * stride * algo.jitter;
       slots.push({ vpos: phase + rank * stride + jitter, item: items[rank] });
     }
   });
@@ -175,8 +130,10 @@ function interleaveByPriority(
  */
 export function getMainFeedItems(
   db: Database.Database,
-  _limit: number
+  _limit: number,
+  overrides?: Partial<ResolvedAlgorithm>
 ): Item[] {
+  const algo = { ...getAlgorithm(), ...overrides };
   const stmtAll = db.prepare(
     `${ITEM_SELECT}
      WHERE ist.read_at IS NULL AND s.category = ?
@@ -191,11 +148,11 @@ export function getMainFeedItems(
 
   const byCategory: Array<{ cat: keyof CategoryCounts; items: Item[] }> = [];
 
-  // Every unread RSS item flows in (TTL prune is the only bound)
-  const rssCategories: Array<keyof CategoryCounts> = [
-    "music", "books", "film", "tech_review", "podcasts", "reading",
-  ];
-  for (const cat of rssCategories) {
+  // Every unread RSS item flows in (TTL prune is the only bound). A category
+  // at priority 0 is excluded from the All view entirely — its own tab still
+  // surfaces everything.
+  for (const cat of RSS_CATEGORIES as readonly (keyof CategoryCounts)[]) {
+    if ((algo.priority[cat] || 0) <= 0) continue;
     const items = stmtAll.all(cat) as Item[];
     if (items.length > 0) byCategory.push({ cat, items });
   }
@@ -205,17 +162,17 @@ export function getMainFeedItems(
   // genuinely clears. Unread bsky is still fully available via the
   // Bluesky tab (category filter, pure recency).
   const totalRss = byCategory.reduce((sum, { items }) => sum + items.length, 0);
-  if (totalRss > 0) {
-    const bskyTarget = Math.max(10, Math.ceil(totalRss / BSKY_INTERLEAVE_RATIO));
+  if (totalRss > 0 && (algo.priority.bluesky || 0) > 0) {
+    const bskyTarget = Math.max(10, Math.ceil(totalRss / algo.bskyRatio));
     const bskyPool = stmtLimited.all(
       "bluesky",
-      Math.ceil(bskyTarget * SURPRISE_POOL_MULTIPLIER)
+      Math.ceil(bskyTarget * algo.surprisePool)
     ) as Item[];
-    const bskyItems = selectWithSurprise(bskyPool, bskyTarget);
+    const bskyItems = selectWithSurprise(bskyPool, bskyTarget, algo.surprise);
     if (bskyItems.length > 0) byCategory.push({ cat: "bluesky", items: bskyItems });
   }
 
-  return interleaveByPriority(byCategory);
+  return interleaveByPriority(byCategory, algo);
 }
 
 /**
@@ -227,6 +184,7 @@ export function getMainFeedItems(
  * fresh items get a chance to be ranked before older ones expire.
  */
 export function pruneExpiredUnread(db: Database.Database): number {
+  const algo = getAlgorithm();
   const now = new Date().toISOString();
   const stmt = db.prepare(`
     INSERT INTO item_state (item_id, read_at)
@@ -241,7 +199,7 @@ export function pruneExpiredUnread(db: Database.Database): number {
   `);
 
   let total = 0;
-  for (const [category, hours] of Object.entries(UNREAD_TTL_HOURS)) {
+  for (const [category, hours] of Object.entries(algo.ttlHours)) {
     const cutoff = new Date(Date.now() - hours * 3600_000).toISOString();
     const result = stmt.run(now, category, cutoff);
     total += result.changes;
@@ -272,7 +230,7 @@ export function pruneExpiredUnread(db: Database.Database): number {
            LIMIT ?
          )`
     )
-    .all(BSKY_WINDOW) as Array<{ id: string }>;
+    .all(algo.bskyWindow) as Array<{ id: string }>;
   if (bskyTargetIds.length > 0) {
     // item_state has a FK to items with no ON DELETE CASCADE — delete state
     // rows first (if any exist), then the items themselves.
@@ -293,7 +251,7 @@ export function pruneExpiredUnread(db: Database.Database): number {
   // and TTL-pruned items both land here. Saved or consumed items survive
   // forever (so /saved is permanent and /read is a full history).
   const staleReadCutoff = new Date(
-    Date.now() - READ_RETENTION_HOURS * 3600_000
+    Date.now() - algo.retentionHours * 3600_000
   ).toISOString();
   const staleDeleteState = db.prepare(`
     DELETE FROM item_state
@@ -370,8 +328,10 @@ export function markAllUnreadAsRead(
  * all RSS items + derived bluesky contribution.
  */
 export function getCategoryCounts(
-  db: Database.Database
+  db: Database.Database,
+  overrides?: Partial<ResolvedAlgorithm>
 ): CategoryCounts {
+  const algo = { ...getAlgorithm(), ...overrides };
   const rows = db
     .prepare(
       `SELECT s.category as cat, COUNT(*) as n
@@ -402,11 +362,15 @@ export function getCategoryCounts(
 
   // All count = RSS totals + derived bsky contribution (mirrors getMainFeedItems).
   // No RSS = no bsky in the All view, so the badge reads zero — matches
-  // what the user actually sees when the feed is drained.
-  const totalRss = counts.music + counts.books + counts.film + counts.tech_review + counts.podcasts + counts.reading;
-  const bskyContribution = totalRss > 0
-    ? Math.min(counts.bluesky, Math.max(10, Math.ceil(totalRss / BSKY_INTERLEAVE_RATIO)))
-    : 0;
+  // what the user actually sees when the feed is drained. Priority-0
+  // categories are excluded here too, since they don't appear in All.
+  const totalRss = (RSS_CATEGORIES as readonly (keyof CategoryCounts)[])
+    .filter((cat) => (algo.priority[cat] || 0) > 0)
+    .reduce((sum, cat) => sum + counts[cat], 0);
+  const bskyContribution =
+    totalRss > 0 && (algo.priority.bluesky || 0) > 0
+      ? Math.min(counts.bluesky, Math.max(10, Math.ceil(totalRss / algo.bskyRatio)))
+      : 0;
   counts.all = totalRss + bskyContribution;
 
   return counts;
