@@ -202,10 +202,17 @@ UI is trusted.
 ## 8. The UI/UX (mobile-first PWA, The Feed's magazine language)
 
 ### Wiring
-- New section in `lib/sections.ts`: `HOOPS_SECTION` in the **Library** group (alongside Comics),
-  its own `cat.hoops` token added to `tailwind.config.ts` (never hardcode hexes).
-- Sub-nav via `SubBar` (the real nav is `Masthead` / `SubBar` / `Contents` — **not** the
-  `HeaderNav`/`BottomNav` that keith-hub's CLAUDE.md still wrongly names; fix that drift alongside).
+- New section in `lib/sections.ts`: `HOOPS_SECTION` in the **Library** group (alongside Comics).
+  `SectionGroup` is now `Reading | Tracking | Library | Guitar | System`, so a dedicated `Hoops`
+  group is also available if the section grows past a single entry.
+- Its own `cat.hoops` colour — add the token to `tailwind.config.ts` **and** its backing
+  `--cat-hoops` CSS var: the `cat.*` entries are `rgb(var(--cat-x) / <alpha-value>)`, so a Tailwind
+  entry alone renders nothing. Never hardcode hexes.
+- 🔴 **There is no sub-tab bar to hang screens off.** Navigation is `Masthead` (sticky header,
+  section switcher, global `⌘K`) plus `Contents` (fullscreen section-jump overlay). `SubBar`,
+  `HeaderNav` and `BottomNav` have all been removed upstream. So `/hoops`'s six screens must
+  self-host their own in-page navigation rather than extend global chrome — worth settling in the
+  mockup (§11) before milestone 3.
 - Visual language reused: **Newsreader** for scores/names, **JetBrains Mono** for stats / kickers /
   `run_id`, ink-on-cream, accent reserved for the primary **Sim** action.
 - PWA gotchas preserved: hand-rolled manifest link, anchor-click (not `window.open`) for any
@@ -272,5 +279,8 @@ UI is trusted.
 - **Measure K** before quoting the payload size as fact (§3).
 - **Mobile roster-editor interaction** is the real unsketched design work (trade / add / availability
   on a phone) — worth a mockup against the real theme tokens before building milestone 4.
-- **Doc drift to fix alongside:** keith-hub's CLAUDE.md still names `HeaderNav.tsx`/`BottomNav.tsx`
-  (gone; real nav is `Masthead`/`SubBar`/`Contents`).
+- **Sibling precedents to read before building.** `/comics` is the closest structural match
+  (offline generator → committed data → own tables → own pages, outside the poller), but it is no
+  longer the only one: `lib/charts.ts`, `lib/setlists.ts` and `lib/practice/` are newer non-feed
+  sections built against the *current* nav and offline story, and `/tune` is an in-app config UI.
+  Where they disagree with `/comics`, follow the newer ones.
