@@ -115,6 +115,118 @@ export function getDb(): Database.Database {
       PRIMARY KEY (setlist_id, chart_id)
     );
     CREATE INDEX IF NOT EXISTS idx_setlist_charts ON setlist_charts(setlist_id, sort_order);
+
+    -- ── Hoops ───────────────────────────────────────────────────────────────
+    -- The NBA simulation section. Follows the comic_state precedent: its own
+    -- tables, entirely outside items/item_state, entirely outside the poller.
+    --
+    -- Two families, and the split is load-bearing:
+    --
+    --   READ-MODEL (hoops_params/teams/players/schedule/results/lines) —
+    --   projected from the committed hoops-sim export in hoops-data/*.json.
+    --   REWRITTEN WHOLESALE on import, like the sources table. Not edited in-app.
+    --
+    --   USER (hoops_scratch, hoops_runs) — roster experiments and saved sims.
+    --   🔴 These NEVER sync back to git or to hoops-sim. A roster edit made on
+    --   the phone must not reach hoops-sim's data/roster_edits.json, which
+    --   drives the CLI — that is a two-writers-one-file bug that is very hard
+    --   to see afterwards. One direction only: Mini → hub. The importer
+    --   truncates only the read-model tables; see lib/hoops/import.ts.
+
+    -- Singleton (id = 1). The fitted parameter blob, stored verbatim.
+    CREATE TABLE IF NOT EXISTS hoops_params (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      param_version TEXT NOT NULL,
+      blob TEXT NOT NULL,
+      generated_at TEXT NOT NULL,
+      imported_at TEXT NOT NULL,
+      content_hash TEXT NOT NULL
+    );
+
+    -- Wide, not long: one row per team with all three rating modes as
+    -- columns, so tri stays a real primary key and the mode is chosen at
+    -- query time rather than filtered for on every read.
+    CREATE TABLE IF NOT EXISTS hoops_teams (
+      tri TEXT PRIMARY KEY,
+      conference TEXT NOT NULL,
+      division TEXT NOT NULL,
+      results_off REAL NOT NULL,
+      results_def REAL NOT NULL,
+      roster_off REAL NOT NULL,
+      roster_def REAL NOT NULL,
+      blend_off REAL NOT NULL,
+      blend_def REAL NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS hoops_players (
+      athlete_id INTEGER PRIMARY KEY,
+      nba_player_id INTEGER,
+      tri TEXT NOT NULL,
+      name TEXT NOT NULL,
+      minutes REAL NOT NULL,
+      value_per36 REAL,
+      game_rates TEXT,
+      per36 TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_hoops_players_team ON hoops_players(tri, minutes DESC);
+
+    CREATE TABLE IF NOT EXISTS hoops_schedule (
+      game_id TEXT PRIMARY KEY,
+      date TEXT NOT NULL,
+      home TEXT NOT NULL,
+      away TEXT NOT NULL,
+      neutral_site INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE INDEX IF NOT EXISTS idx_hoops_schedule_date ON hoops_schedule(date);
+
+    CREATE TABLE IF NOT EXISTS hoops_results (
+      game_id TEXT PRIMARY KEY,
+      date TEXT NOT NULL,
+      home TEXT NOT NULL,
+      away TEXT NOT NULL,
+      home_score INTEGER NOT NULL,
+      away_score INTEGER NOT NULL,
+      neutral_site INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE INDEX IF NOT EXISTS idx_hoops_results_date ON hoops_results(date DESC);
+
+    -- LINES ONLY. No score columns, deliberately: the line provider's own
+    -- scores disagree with the truth on 3/1315 games, so real finals live
+    -- exclusively in hoops_results. Don't add score columns here.
+    CREATE TABLE IF NOT EXISTS hoops_lines (
+      game_id TEXT PRIMARY KEY,
+      date TEXT NOT NULL,
+      home TEXT NOT NULL,
+      away TEXT NOT NULL,
+      home_spread REAL,
+      total REAL,
+      home_odds REAL,
+      away_odds REAL,
+      n_books_spread INTEGER,
+      n_books_total INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS idx_hoops_lines_date ON hoops_lines(date);
+
+    -- USER tables. Never truncated by the importer, never exported.
+    CREATE TABLE IF NOT EXISTS hoops_scratch (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      edits TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS hoops_runs (
+      run_id TEXT PRIMARY KEY,
+      home TEXT NOT NULL,
+      away TEXT NOT NULL,
+      neutral_site INTEGER NOT NULL DEFAULT 0,
+      mode TEXT NOT NULL,
+      edits TEXT,
+      result TEXT NOT NULL,
+      saved_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_hoops_runs_saved ON hoops_runs(saved_at DESC);
   `);
 
   // Additive migrations — CREATE IF NOT EXISTS above never alters existing

@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "check:hoops": "node scripts/check-hoops.mjs",
+    "prebuild": "node scripts/check-hoops.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"

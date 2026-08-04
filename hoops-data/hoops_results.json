@@ -1,0 +1,1807 @@
+{
+  "games": [
+    {
+      "away": "POR",
+      "away_score": 127,
+      "date": "2026-03-18",
+      "game_id": "0022501001",
+      "home": "IND",
+      "home_score": 119,
+      "neutral_site": false
+    },
+    {
+      "away": "TOR",
+      "away_score": 139,
+      "date": "2026-03-18",
+      "game_id": "0022501002",
+      "home": "CHI",
+      "home_score": 109,
+      "neutral_site": false
+    },
+    {
+      "away": "UTA",
+      "away_score": 111,
+      "date": "2026-03-18",
+      "game_id": "0022501004",
+      "home": "MIN",
+      "home_score": 147,
+      "neutral_site": false
+    },
+    {
+      "away": "LAC",
+      "away_score": 109,
+      "date": "2026-03-18",
+      "game_id": "0022501005",
+      "home": "NOP",
+      "home_score": 124,
+      "neutral_site": false
+    },
+    {
+      "away": "ATL",
+      "away_score": 135,
+      "date": "2026-03-18",
+      "game_id": "0022501006",
+      "home": "DAL",
+      "home_score": 120,
+      "neutral_site": false
+    },
+    {
+      "away": "LAL",
+      "away_score": 124,
+      "date": "2026-03-18",
+      "game_id": "0022501007",
+      "home": "HOU",
+      "home_score": 116,
+      "neutral_site": false
+    },
+    {
+      "away": "ORL",
+      "away_score": 111,
+      "date": "2026-03-19",
+      "game_id": "0022501008",
+      "home": "CHA",
+      "home_score": 130,
+      "neutral_site": false
+    },
+    {
+      "away": "DET",
+      "away_score": 117,
+      "date": "2026-03-19",
+      "game_id": "0022501009",
+      "home": "WAS",
+      "home_score": 95,
+      "neutral_site": false
+    },
+    {
+      "away": "LAL",
+      "away_score": 134,
+      "date": "2026-03-19",
+      "game_id": "0022501010",
+      "home": "MIA",
+      "home_score": 126,
+      "neutral_site": false
+    },
+    {
+      "away": "CLE",
+      "away_score": 115,
+      "date": "2026-03-19",
+      "game_id": "0022501011",
+      "home": "CHI",
+      "home_score": 110,
+      "neutral_site": false
+    },
+    {
+      "away": "LAC",
+      "away_score": 99,
+      "date": "2026-03-19",
+      "game_id": "0022501012",
+      "home": "NOP",
+      "home_score": 105,
+      "neutral_site": false
+    },
+    {
+      "away": "PHX",
+      "away_score": 100,
+      "date": "2026-03-19",
+      "game_id": "0022501013",
+      "home": "SAS",
+      "home_score": 101,
+      "neutral_site": false
+    },
+    {
+      "away": "MIL",
+      "away_score": 96,
+      "date": "2026-03-19",
+      "game_id": "0022501014",
+      "home": "UTA",
+      "home_score": 128,
+      "neutral_site": false
+    },
+    {
+      "away": "PHI",
+      "away_score": 139,
+      "date": "2026-03-19",
+      "game_id": "0022501015",
+      "home": "SAC",
+      "home_score": 118,
+      "neutral_site": false
+    },
+    {
+      "away": "NYK",
+      "away_score": 93,
+      "date": "2026-03-20",
+      "game_id": "0022501016",
+      "home": "BKN",
+      "home_score": 92,
+      "neutral_site": false
+    },
+    {
+      "away": "GSW",
+      "away_score": 101,
+      "date": "2026-03-20",
+      "game_id": "0022501017",
+      "home": "DET",
+      "home_score": 115,
+      "neutral_site": false
+    },
+    {
+      "away": "ATL",
+      "away_score": 95,
+      "date": "2026-03-20",
+      "game_id": "0022501018",
+      "home": "HOU",
+      "home_score": 117,
+      "neutral_site": false
+    },
+    {
+      "away": "BOS",
+      "away_score": 117,
+      "date": "2026-03-20",
+      "game_id": "0022501019",
+      "home": "MEM",
+      "home_score": 112,
+      "neutral_site": false
+    },
+    {
+      "away": "POR",
+      "away_score": 108,
+      "date": "2026-03-20",
+      "game_id": "0022501020",
+      "home": "MIN",
+      "home_score": 104,
+      "neutral_site": false
+    },
+    {
+      "away": "TOR",
+      "away_score": 115,
+      "date": "2026-03-20",
+      "game_id": "0022501021",
+      "home": "DEN",
+      "home_score": 121,
+      "neutral_site": false
+    },
+    {
+      "away": "OKC",
+      "away_score": 132,
+      "date": "2026-03-21",
+      "game_id": "0022501022",
+      "home": "WAS",
+      "home_score": 111,
+      "neutral_site": false
+    },
+    {
+      "away": "MEM",
+      "away_score": 101,
+      "date": "2026-03-21",
+      "game_id": "0022501023",
+      "home": "CHA",
+      "home_score": 124,
+      "neutral_site": false
+    },
+    {
+      "away": "LAL",
+      "away_score": 105,
+      "date": "2026-03-21",
+      "game_id": "0022501024",
+      "home": "ORL",
+      "home_score": 104,
+      "neutral_site": false
+    },
+    {
+      "away": "CLE",
+      "away_score": 111,
+      "date": "2026-03-21",
+      "game_id": "0022501025",
+      "home": "NOP",
+      "home_score": 106,
+      "neutral_site": false
+    },
+    {
+      "away": "GSW",
+      "away_score": 110,
+      "date": "2026-03-21",
+      "game_id": "0022501026",
+      "home": "ATL",
+      "home_score": 126,
+      "neutral_site": false
+    },
+    {
+      "away": "MIA",
+      "away_score": 122,
+      "date": "2026-03-21",
+      "game_id": "0022501027",
+      "home": "HOU",
+      "home_score": 123,
+      "neutral_site": false
+    },
+    {
+      "away": "IND",
+      "away_score": 119,
+      "date": "2026-03-21",
+      "game_id": "0022501028",
+      "home": "SAS",
+      "home_score": 134,
+      "neutral_site": false
+    },
+    {
+      "away": "LAC",
+      "away_score": 138,
+      "date": "2026-03-21",
+      "game_id": "0022501029",
+      "home": "DAL",
+      "home_score": 131,
+      "neutral_site": false
+    },
+    {
+      "away": "PHI",
+      "away_score": 126,
+      "date": "2026-03-21",
+      "game_id": "0022501030",
+      "home": "UTA",
+      "home_score": 116,
+      "neutral_site": false
+    },
+    {
+      "away": "MIL",
+      "away_score": 108,
+      "date": "2026-03-21",
+      "game_id": "0022501031",
+      "home": "PHX",
+      "home_score": 105,
+      "neutral_site": false
+    },
+    {
+      "away": "POR",
+      "away_score": 112,
+      "date": "2026-03-22",
+      "game_id": "0022501032",
+      "home": "DEN",
+      "home_score": 128,
+      "neutral_site": false
+    },
+    {
+      "away": "BKN",
+      "away_score": 122,
+      "date": "2026-03-22",
+      "game_id": "0022501033",
+      "home": "SAC",
+      "home_score": 126,
+      "neutral_site": false
+    },
+    {
+      "away": "WAS",
+      "away_score": 113,
+      "date": "2026-03-22",
+      "game_id": "0022501034",
+      "home": "NYK",
+      "home_score": 145,
+      "neutral_site": false
+    },
+    {
+      "away": "MIN",
+      "away_score": 102,
+      "date": "2026-03-22",
+      "game_id": "0022501035",
+      "home": "BOS",
+      "home_score": 92,
+      "neutral_site": false
+    },
+    {
+      "away": "TOR",
+      "away_score": 98,
+      "date": "2026-03-22",
+      "game_id": "0022501036",
+      "home": "PHX",
+      "home_score": 120,
+      "neutral_site": false
+    },
+    {
+      "away": "MEM",
+      "away_score": 107,
+      "date": "2026-03-23",
+      "game_id": "0022501037",
+      "home": "ATL",
+      "home_score": 146,
+      "neutral_site": false
+    },
+    {
+      "away": "LAL",
+      "away_score": 110,
+      "date": "2026-03-23",
+      "game_id": "0022501038",
+      "home": "DET",
+      "home_score": 113,
+      "neutral_site": false
+    },
+    {
+      "away": "IND",
+      "away_score": 128,
+      "date": "2026-03-23",
+      "game_id": "0022501039",
+      "home": "ORL",
+      "home_score": 126,
+      "neutral_site": false
+    },
+    {
+      "away": "OKC",
+      "away_score": 123,
+      "date": "2026-03-23",
+      "game_id": "0022501040",
+      "home": "PHI",
+      "home_score": 103,
+      "neutral_site": false
+    },
+    {
+      "away": "SAS",
+      "away_score": 136,
+      "date": "2026-03-23",
+      "game_id": "0022501041",
+      "home": "MIA",
+      "home_score": 111,
+      "neutral_site": false
+    },
+    {
+      "away": "HOU",
+      "away_score": 124,
+      "date": "2026-03-23",
+      "game_id": "0022501042",
+      "home": "CHI",
+      "home_score": 132,
+      "neutral_site": false
+    },
+    {
+      "away": "TOR",
+      "away_score": 143,
+      "date": "2026-03-23",
+      "game_id": "0022501043",
+      "home": "UTA",
+      "home_score": 127,
+      "neutral_site": false
+    },
+    {
+      "away": "GSW",
+      "away_score": 137,
+      "date": "2026-03-23",
+      "game_id": "0022501044",
+      "home": "DAL",
+      "home_score": 131,
+      "neutral_site": false
+    },
+    {
+      "away": "BKN",
+      "away_score": 99,
+      "date": "2026-03-23",
+      "game_id": "0022501045",
+      "home": "POR",
+      "home_score": 134,
+      "neutral_site": false
+    },
+    {
+      "away": "MIL",
+      "away_score": 96,
+      "date": "2026-03-23",
+      "game_id": "0022501046",
+      "home": "LAC",
+      "home_score": 129,
+      "neutral_site": false
+    },
+    {
+      "away": "SAC",
+      "away_score": 90,
+      "date": "2026-03-24",
+      "game_id": "0022501047",
+      "home": "CHA",
+      "home_score": 134,
+      "neutral_site": false
+    },
+    {
+      "away": "NOP",
+      "away_score": 116,
+      "date": "2026-03-24",
+      "game_id": "0022501048",
+      "home": "NYK",
+      "home_score": 121,
+      "neutral_site": false
+    },
+    {
+      "away": "ORL",
+      "away_score": 131,
+      "date": "2026-03-24",
+      "game_id": "0022501049",
+      "home": "CLE",
+      "home_score": 136,
+      "neutral_site": false
+    },
+    {
+      "away": "DEN",
+      "away_score": 125,
+      "date": "2026-03-24",
+      "game_id": "0022501050",
+      "home": "PHX",
+      "home_score": 123,
+      "neutral_site": false
+    },
+    {
+      "away": "ATL",
+      "away_score": 130,
+      "date": "2026-03-25",
+      "game_id": "0022501051",
+      "home": "DET",
+      "home_score": 129,
+      "neutral_site": false
+    },
+    {
+      "away": "LAL",
+      "away_score": 137,
+      "date": "2026-03-25",
+      "game_id": "0022501052",
+      "home": "IND",
+      "home_score": 130,
+      "neutral_site": false
+    },
+    {
+      "away": "CHI",
+      "away_score": 137,
+      "date": "2026-03-25",
+      "game_id": "0022501053",
+      "home": "PHI",
+      "home_score": 157,
+      "neutral_site": false
+    },
+    {
+      "away": "OKC",
+      "away_score": 109,
+      "date": "2026-03-25",
+      "game_id": "0022501054",
+      "home": "BOS",
+      "home_score": 119,
+      "neutral_site": false
+    },
+    {
+      "away": "MIA",
+      "away_score": 120,
+      "date": "2026-03-25",
+      "game_id": "0022501055",
+      "home": "CLE",
+      "home_score": 103,
+      "neutral_site": false
+    },
+    {
+      "away": "SAS",
+      "away_score": 123,
+      "date": "2026-03-25",
+      "game_id": "0022501056",
+      "home": "MEM",
+      "home_score": 98,
+      "neutral_site": false
+    },
+    {
+      "away": "WAS",
+      "away_score": 133,
+      "date": "2026-03-25",
+      "game_id": "0022501057",
+      "home": "UTA",
+      "home_score": 110,
+      "neutral_site": false
+    },
+    {
+      "away": "HOU",
+      "away_score": 108,
+      "date": "2026-03-25",
+      "game_id": "0022501058",
+      "home": "MIN",
+      "home_score": 110,
+      "neutral_site": false
+    },
+    {
+      "away": "DAL",
+      "away_score": 135,
+      "date": "2026-03-25",
+      "game_id": "0022501059",
+      "home": "DEN",
+      "home_score": 142,
+      "neutral_site": false
+    },
+    {
+      "away": "BKN",
+      "away_score": 106,
+      "date": "2026-03-25",
+      "game_id": "0022501060",
+      "home": "GSW",
+      "home_score": 109,
+      "neutral_site": false
+    },
+    {
+      "away": "MIL",
+      "away_score": 99,
+      "date": "2026-03-25",
+      "game_id": "0022501061",
+      "home": "POR",
+      "home_score": 130,
+      "neutral_site": false
+    },
+    {
+      "away": "TOR",
+      "away_score": 94,
+      "date": "2026-03-25",
+      "game_id": "0022501062",
+      "home": "LAC",
+      "home_score": 119,
+      "neutral_site": false
+    },
+    {
+      "away": "NYK",
+      "away_score": 103,
+      "date": "2026-03-26",
+      "game_id": "0022501063",
+      "home": "CHA",
+      "home_score": 114,
+      "neutral_site": false
+    },
+    {
+      "away": "NOP",
+      "away_score": 108,
+      "date": "2026-03-26",
+      "game_id": "0022501064",
+      "home": "DET",
+      "home_score": 129,
+      "neutral_site": false
+    },
+    {
+      "away": "SAC",
+      "away_score": 117,
+      "date": "2026-03-26",
+      "game_id": "0022501065",
+      "home": "ORL",
+      "home_score": 121,
+      "neutral_site": false
+    },
+    {
+      "away": "LAC",
+      "away_score": 114,
+      "date": "2026-03-27",
+      "game_id": "0022501066",
+      "home": "IND",
+      "home_score": 113,
+      "neutral_site": false
+    },
+    {
+      "away": "ATL",
+      "away_score": 102,
+      "date": "2026-03-27",
+      "game_id": "0022501067",
+      "home": "BOS",
+      "home_score": 109,
+      "neutral_site": false
+    },
+    {
+      "away": "MIA",
+      "away_score": 128,
+      "date": "2026-03-27",
+      "game_id": "0022501068",
+      "home": "CLE",
+      "home_score": 149,
+      "neutral_site": false
+    },
+    {
+      "away": "HOU",
+      "away_score": 119,
+      "date": "2026-03-27",
+      "game_id": "0022501069",
+      "home": "MEM",
+      "home_score": 109,
+      "neutral_site": false
+    },
+    {
+      "away": "CHI",
+      "away_score": 113,
+      "date": "2026-03-27",
+      "game_id": "0022501070",
+      "home": "OKC",
+      "home_score": 131,
+      "neutral_site": false
+    },
+    {
+      "away": "NOP",
+      "away_score": 106,
+      "date": "2026-03-27",
+      "game_id": "0022501071",
+      "home": "TOR",
+      "home_score": 119,
+      "neutral_site": false
+    },
+    {
+      "away": "UTA",
+      "away_score": 129,
+      "date": "2026-03-27",
+      "game_id": "0022501072",
+      "home": "DEN",
+      "home_score": 135,
+      "neutral_site": false
+    },
+    {
+      "away": "WAS",
+      "away_score": 126,
+      "date": "2026-03-27",
+      "game_id": "0022501073",
+      "home": "GSW",
+      "home_score": 131,
+      "neutral_site": false
+    },
+    {
+      "away": "DAL",
+      "away_score": 100,
+      "date": "2026-03-27",
+      "game_id": "0022501074",
+      "home": "POR",
+      "home_score": 93,
+      "neutral_site": false
+    },
+    {
+      "away": "BKN",
+      "away_score": 99,
+      "date": "2026-03-27",
+      "game_id": "0022501075",
+      "home": "LAL",
+      "home_score": 116,
+      "neutral_site": false
+    },
+    {
+      "away": "SAS",
+      "away_score": 127,
+      "date": "2026-03-28",
+      "game_id": "0022501076",
+      "home": "MIL",
+      "home_score": 95,
+      "neutral_site": false
+    },
+    {
+      "away": "PHI",
+      "away_score": 118,
+      "date": "2026-03-28",
+      "game_id": "0022501077",
+      "home": "CHA",
+      "home_score": 114,
+      "neutral_site": false
+    },
+    {
+      "away": "SAC",
+      "away_score": 113,
+      "date": "2026-03-28",
+      "game_id": "0022501078",
+      "home": "ATL",
+      "home_score": 123,
+      "neutral_site": false
+    },
+    {
+      "away": "CHI",
+      "away_score": 124,
+      "date": "2026-03-28",
+      "game_id": "0022501079",
+      "home": "MEM",
+      "home_score": 125,
+      "neutral_site": false
+    },
+    {
+      "away": "DET",
+      "away_score": 109,
+      "date": "2026-03-28",
+      "game_id": "0022501080",
+      "home": "MIN",
+      "home_score": 87,
+      "neutral_site": false
+    },
+    {
+      "away": "UTA",
+      "away_score": 109,
+      "date": "2026-03-28",
+      "game_id": "0022501081",
+      "home": "PHX",
+      "home_score": 134,
+      "neutral_site": false
+    },
+    {
+      "away": "LAC",
+      "away_score": 127,
+      "date": "2026-03-29",
+      "game_id": "0022501082",
+      "home": "MIL",
+      "home_score": 113,
+      "neutral_site": false
+    },
+    {
+      "away": "MIA",
+      "away_score": 118,
+      "date": "2026-03-29",
+      "game_id": "0022501083",
+      "home": "IND",
+      "home_score": 135,
+      "neutral_site": false
+    },
+    {
+      "away": "SAC",
+      "away_score": 99,
+      "date": "2026-03-29",
+      "game_id": "0022501084",
+      "home": "BKN",
+      "home_score": 116,
+      "neutral_site": false
+    },
+    {
+      "away": "BOS",
+      "away_score": 114,
+      "date": "2026-03-29",
+      "game_id": "0022501085",
+      "home": "CHA",
+      "home_score": 99,
+      "neutral_site": false
+    },
+    {
+      "away": "ORL",
+      "away_score": 87,
+      "date": "2026-03-29",
+      "game_id": "0022501086",
+      "home": "TOR",
+      "home_score": 139,
+      "neutral_site": false
+    },
+    {
+      "away": "WAS",
+      "away_score": 88,
+      "date": "2026-03-29",
+      "game_id": "0022501087",
+      "home": "POR",
+      "home_score": 123,
+      "neutral_site": false
+    },
+    {
+      "away": "HOU",
+      "away_score": 134,
+      "date": "2026-03-29",
+      "game_id": "0022501088",
+      "home": "NOP",
+      "home_score": 102,
+      "neutral_site": false
+    },
+    {
+      "away": "NYK",
+      "away_score": 100,
+      "date": "2026-03-29",
+      "game_id": "0022501089",
+      "home": "OKC",
+      "home_score": 111,
+      "neutral_site": false
+    },
+    {
+      "away": "GSW",
+      "away_score": 93,
+      "date": "2026-03-29",
+      "game_id": "0022501090",
+      "home": "DEN",
+      "home_score": 116,
+      "neutral_site": false
+    },
+    {
+      "away": "PHI",
+      "away_score": 109,
+      "date": "2026-03-30",
+      "game_id": "0022501091",
+      "home": "MIA",
+      "home_score": 119,
+      "neutral_site": false
+    },
+    {
+      "away": "BOS",
+      "away_score": 102,
+      "date": "2026-03-30",
+      "game_id": "0022501092",
+      "home": "ATL",
+      "home_score": 112,
+      "neutral_site": false
+    },
+    {
+      "away": "PHX",
+      "away_score": 131,
+      "date": "2026-03-30",
+      "game_id": "0022501093",
+      "home": "MEM",
+      "home_score": 105,
+      "neutral_site": false
+    },
+    {
+      "away": "CHI",
+      "away_score": 114,
+      "date": "2026-03-30",
+      "game_id": "0022501094",
+      "home": "SAS",
+      "home_score": 129,
+      "neutral_site": false
+    },
+    {
+      "away": "MIN",
+      "away_score": 124,
+      "date": "2026-03-30",
+      "game_id": "0022501095",
+      "home": "DAL",
+      "home_score": 94,
+      "neutral_site": false
+    },
+    {
+      "away": "CLE",
+      "away_score": 122,
+      "date": "2026-03-30",
+      "game_id": "0022501096",
+      "home": "UTA",
+      "home_score": 113,
+      "neutral_site": false
+    },
+    {
+      "away": "DET",
+      "away_score": 110,
+      "date": "2026-03-30",
+      "game_id": "0022501097",
+      "home": "OKC",
+      "home_score": 114,
+      "neutral_site": false
+    },
+    {
+      "away": "WAS",
+      "away_score": 101,
+      "date": "2026-03-30",
+      "game_id": "0022501098",
+      "home": "LAL",
+      "home_score": 120,
+      "neutral_site": false
+    },
+    {
+      "away": "DAL",
+      "away_score": 99,
+      "date": "2026-03-31",
+      "game_id": "0022500652",
+      "home": "MIL",
+      "home_score": 123,
+      "neutral_site": false
+    },
+    {
+      "away": "PHX",
+      "away_score": 111,
+      "date": "2026-03-31",
+      "game_id": "0022501099",
+      "home": "ORL",
+      "home_score": 115,
+      "neutral_site": false
+    },
+    {
+      "away": "CHA",
+      "away_score": 117,
+      "date": "2026-03-31",
+      "game_id": "0022501100",
+      "home": "BKN",
+      "home_score": 86,
+      "neutral_site": false
+    },
+    {
+      "away": "TOR",
+      "away_score": 116,
+      "date": "2026-03-31",
+      "game_id": "0022501101",
+      "home": "DET",
+      "home_score": 127,
+      "neutral_site": false
+    },
+    {
+      "away": "NYK",
+      "away_score": 94,
+      "date": "2026-03-31",
+      "game_id": "0022501102",
+      "home": "HOU",
+      "home_score": 111,
+      "neutral_site": false
+    },
+    {
+      "away": "CLE",
+      "away_score": 113,
+      "date": "2026-03-31",
+      "game_id": "0022501103",
+      "home": "LAL",
+      "home_score": 127,
+      "neutral_site": false
+    },
+    {
+      "away": "POR",
+      "away_score": 114,
+      "date": "2026-03-31",
+      "game_id": "0022501104",
+      "home": "LAC",
+      "home_score": 104,
+      "neutral_site": false
+    },
+    {
+      "away": "NYK",
+      "away_score": 130,
+      "date": "2026-04-01",
+      "game_id": "0022501003",
+      "home": "MEM",
+      "home_score": 119,
+      "neutral_site": false
+    },
+    {
+      "away": "PHI",
+      "away_score": 153,
+      "date": "2026-04-01",
+      "game_id": "0022501105",
+      "home": "WAS",
+      "home_score": 131,
+      "neutral_site": false
+    },
+    {
+      "away": "BOS",
+      "away_score": 147,
+      "date": "2026-04-01",
+      "game_id": "0022501106",
+      "home": "MIA",
+      "home_score": 129,
+      "neutral_site": false
+    },
+    {
+      "away": "ATL",
+      "away_score": 130,
+      "date": "2026-04-01",
+      "game_id": "0022501107",
+      "home": "ORL",
+      "home_score": 101,
+      "neutral_site": false
+    },
+    {
+      "away": "SAC",
+      "away_score": 123,
+      "date": "2026-04-01",
+      "game_id": "0022501108",
+      "home": "TOR",
+      "home_score": 115,
+      "neutral_site": false
+    },
+    {
+      "away": "IND",
+      "away_score": 145,
+      "date": "2026-04-01",
+      "game_id": "0022501109",
+      "home": "CHI",
+      "home_score": 126,
+      "neutral_site": false
+    },
+    {
+      "away": "MIL",
+      "away_score": 113,
+      "date": "2026-04-01",
+      "game_id": "0022501110",
+      "home": "HOU",
+      "home_score": 119,
+      "neutral_site": false
+    },
+    {
+      "away": "DEN",
+      "away_score": 130,
+      "date": "2026-04-01",
+      "game_id": "0022501112",
+      "home": "UTA",
+      "home_score": 117,
+      "neutral_site": false
+    },
+    {
+      "away": "SAS",
+      "away_score": 127,
+      "date": "2026-04-01",
+      "game_id": "0022501113",
+      "home": "GSW",
+      "home_score": 113,
+      "neutral_site": false
+    },
+    {
+      "away": "PHX",
+      "away_score": 107,
+      "date": "2026-04-02",
+      "game_id": "0022501114",
+      "home": "CHA",
+      "home_score": 127,
+      "neutral_site": false
+    },
+    {
+      "away": "MIN",
+      "away_score": 108,
+      "date": "2026-04-02",
+      "game_id": "0022501115",
+      "home": "DET",
+      "home_score": 113,
+      "neutral_site": false
+    },
+    {
+      "away": "LAL",
+      "away_score": 96,
+      "date": "2026-04-02",
+      "game_id": "0022501116",
+      "home": "OKC",
+      "home_score": 139,
+      "neutral_site": false
+    },
+    {
+      "away": "CLE",
+      "away_score": 118,
+      "date": "2026-04-02",
+      "game_id": "0022501117",
+      "home": "GSW",
+      "home_score": 111,
+      "neutral_site": false
+    },
+    {
+      "away": "NOP",
+      "away_score": 106,
+      "date": "2026-04-02",
+      "game_id": "0022501118",
+      "home": "POR",
+      "home_score": 118,
+      "neutral_site": false
+    },
+    {
+      "away": "SAS",
+      "away_score": 118,
+      "date": "2026-04-02",
+      "game_id": "0022501119",
+      "home": "LAC",
+      "home_score": 99,
+      "neutral_site": false
+    },
+    {
+      "away": "IND",
+      "away_score": 108,
+      "date": "2026-04-03",
+      "game_id": "0022501120",
+      "home": "CHA",
+      "home_score": 129,
+      "neutral_site": false
+    },
+    {
+      "away": "MIN",
+      "away_score": 103,
+      "date": "2026-04-03",
+      "game_id": "0022501121",
+      "home": "PHI",
+      "home_score": 115,
+      "neutral_site": false
+    },
+    {
+      "away": "ATL",
+      "away_score": 141,
+      "date": "2026-04-03",
+      "game_id": "0022501122",
+      "home": "BKN",
+      "home_score": 107,
+      "neutral_site": false
+    },
+    {
+      "away": "CHI",
+      "away_score": 96,
+      "date": "2026-04-03",
+      "game_id": "0022501123",
+      "home": "NYK",
+      "home_score": 136,
+      "neutral_site": false
+    },
+    {
+      "away": "UTA",
+      "away_score": 106,
+      "date": "2026-04-03",
+      "game_id": "0022501124",
+      "home": "HOU",
+      "home_score": 140,
+      "neutral_site": false
+    },
+    {
+      "away": "TOR",
+      "away_score": 128,
+      "date": "2026-04-03",
+      "game_id": "0022501125",
+      "home": "MEM",
+      "home_score": 96,
+      "neutral_site": false
+    },
+    {
+      "away": "BOS",
+      "away_score": 133,
+      "date": "2026-04-03",
+      "game_id": "0022501126",
+      "home": "MIL",
+      "home_score": 101,
+      "neutral_site": false
+    },
+    {
+      "away": "ORL",
+      "away_score": 138,
+      "date": "2026-04-03",
+      "game_id": "0022501127",
+      "home": "DAL",
+      "home_score": 127,
+      "neutral_site": false
+    },
+    {
+      "away": "NOP",
+      "away_score": 113,
+      "date": "2026-04-03",
+      "game_id": "0022501128",
+      "home": "SAC",
+      "home_score": 117,
+      "neutral_site": false
+    },
+    {
+      "away": "WAS",
+      "away_score": 136,
+      "date": "2026-04-04",
+      "game_id": "0022501129",
+      "home": "MIA",
+      "home_score": 152,
+      "neutral_site": false
+    },
+    {
+      "away": "SAS",
+      "away_score": 134,
+      "date": "2026-04-04",
+      "game_id": "0022501130",
+      "home": "DEN",
+      "home_score": 136,
+      "neutral_site": false
+    },
+    {
+      "away": "DET",
+      "away_score": 116,
+      "date": "2026-04-04",
+      "game_id": "0022501131",
+      "home": "PHI",
+      "home_score": 93,
+      "neutral_site": false
+    },
+    {
+      "away": "TOR",
+      "away_score": 101,
+      "date": "2026-04-05",
+      "game_id": "0022501132",
+      "home": "BOS",
+      "home_score": 115,
+      "neutral_site": false
+    },
+    {
+      "away": "WAS",
+      "away_score": 115,
+      "date": "2026-04-05",
+      "game_id": "0022501133",
+      "home": "BKN",
+      "home_score": 121,
+      "neutral_site": false
+    },
+    {
+      "away": "PHX",
+      "away_score": 120,
+      "date": "2026-04-05",
+      "game_id": "0022501134",
+      "home": "CHI",
+      "home_score": 110,
+      "neutral_site": false
+    },
+    {
+      "away": "MEM",
+      "away_score": 115,
+      "date": "2026-04-05",
+      "game_id": "0022501135",
+      "home": "MIL",
+      "home_score": 131,
+      "neutral_site": false
+    },
+    {
+      "away": "IND",
+      "away_score": 108,
+      "date": "2026-04-05",
+      "game_id": "0022501136",
+      "home": "CLE",
+      "home_score": 117,
+      "neutral_site": false
+    },
+    {
+      "away": "CHA",
+      "away_score": 122,
+      "date": "2026-04-05",
+      "game_id": "0022501137",
+      "home": "MIN",
+      "home_score": 108,
+      "neutral_site": false
+    },
+    {
+      "away": "ORL",
+      "away_score": 112,
+      "date": "2026-04-05",
+      "game_id": "0022501138",
+      "home": "NOP",
+      "home_score": 108,
+      "neutral_site": false
+    },
+    {
+      "away": "UTA",
+      "away_score": 111,
+      "date": "2026-04-05",
+      "game_id": "0022501139",
+      "home": "OKC",
+      "home_score": 146,
+      "neutral_site": false
+    },
+    {
+      "away": "LAL",
+      "away_score": 128,
+      "date": "2026-04-05",
+      "game_id": "0022501140",
+      "home": "DAL",
+      "home_score": 134,
+      "neutral_site": false
+    },
+    {
+      "away": "LAC",
+      "away_score": 138,
+      "date": "2026-04-05",
+      "game_id": "0022501141",
+      "home": "SAC",
+      "home_score": 109,
+      "neutral_site": false
+    },
+    {
+      "away": "HOU",
+      "away_score": 117,
+      "date": "2026-04-05",
+      "game_id": "0022501142",
+      "home": "GSW",
+      "home_score": 116,
+      "neutral_site": false
+    },
+    {
+      "away": "NYK",
+      "away_score": 108,
+      "date": "2026-04-06",
+      "game_id": "0022501143",
+      "home": "ATL",
+      "home_score": 105,
+      "neutral_site": false
+    },
+    {
+      "away": "DET",
+      "away_score": 107,
+      "date": "2026-04-06",
+      "game_id": "0022501144",
+      "home": "ORL",
+      "home_score": 123,
+      "neutral_site": false
+    },
+    {
+      "away": "CLE",
+      "away_score": 142,
+      "date": "2026-04-06",
+      "game_id": "0022501145",
+      "home": "MEM",
+      "home_score": 126,
+      "neutral_site": false
+    },
+    {
+      "away": "PHI",
+      "away_score": 102,
+      "date": "2026-04-06",
+      "game_id": "0022501146",
+      "home": "SAS",
+      "home_score": 115,
+      "neutral_site": false
+    },
+    {
+      "away": "POR",
+      "away_score": 132,
+      "date": "2026-04-06",
+      "game_id": "0022501147",
+      "home": "DEN",
+      "home_score": 137,
+      "neutral_site": false
+    },
+    {
+      "away": "CHI",
+      "away_score": 129,
+      "date": "2026-04-07",
+      "game_id": "0022501148",
+      "home": "WAS",
+      "home_score": 98,
+      "neutral_site": false
+    },
+    {
+      "away": "CHA",
+      "away_score": 102,
+      "date": "2026-04-07",
+      "game_id": "0022501149",
+      "home": "BOS",
+      "home_score": 113,
+      "neutral_site": false
+    },
+    {
+      "away": "MIL",
+      "away_score": 90,
+      "date": "2026-04-07",
+      "game_id": "0022501150",
+      "home": "BKN",
+      "home_score": 96,
+      "neutral_site": false
+    },
+    {
+      "away": "MIA",
+      "away_score": 95,
+      "date": "2026-04-07",
+      "game_id": "0022501151",
+      "home": "TOR",
+      "home_score": 121,
+      "neutral_site": false
+    },
+    {
+      "away": "MIN",
+      "away_score": 124,
+      "date": "2026-04-07",
+      "game_id": "0022501152",
+      "home": "IND",
+      "home_score": 104,
+      "neutral_site": false
+    },
+    {
+      "away": "UTA",
+      "away_score": 137,
+      "date": "2026-04-07",
+      "game_id": "0022501153",
+      "home": "NOP",
+      "home_score": 156,
+      "neutral_site": false
+    },
+    {
+      "away": "SAC",
+      "away_score": 105,
+      "date": "2026-04-07",
+      "game_id": "0022501154",
+      "home": "GSW",
+      "home_score": 110,
+      "neutral_site": false
+    },
+    {
+      "away": "OKC",
+      "away_score": 123,
+      "date": "2026-04-07",
+      "game_id": "0022501155",
+      "home": "LAL",
+      "home_score": 87,
+      "neutral_site": false
+    },
+    {
+      "away": "DAL",
+      "away_score": 103,
+      "date": "2026-04-07",
+      "game_id": "0022501156",
+      "home": "LAC",
+      "home_score": 116,
+      "neutral_site": false
+    },
+    {
+      "away": "HOU",
+      "away_score": 119,
+      "date": "2026-04-07",
+      "game_id": "0022501157",
+      "home": "PHX",
+      "home_score": 105,
+      "neutral_site": false
+    },
+    {
+      "away": "ATL",
+      "away_score": 116,
+      "date": "2026-04-08",
+      "game_id": "0022501158",
+      "home": "CLE",
+      "home_score": 122,
+      "neutral_site": false
+    },
+    {
+      "away": "MIN",
+      "away_score": 120,
+      "date": "2026-04-08",
+      "game_id": "0022501159",
+      "home": "ORL",
+      "home_score": 132,
+      "neutral_site": false
+    },
+    {
+      "away": "MIL",
+      "away_score": 111,
+      "date": "2026-04-08",
+      "game_id": "0022501160",
+      "home": "DET",
+      "home_score": 137,
+      "neutral_site": false
+    },
+    {
+      "away": "POR",
+      "away_score": 101,
+      "date": "2026-04-08",
+      "game_id": "0022501161",
+      "home": "SAS",
+      "home_score": 112,
+      "neutral_site": false
+    },
+    {
+      "away": "MEM",
+      "away_score": 119,
+      "date": "2026-04-08",
+      "game_id": "0022501162",
+      "home": "DEN",
+      "home_score": 136,
+      "neutral_site": false
+    },
+    {
+      "away": "OKC",
+      "away_score": 128,
+      "date": "2026-04-08",
+      "game_id": "0022501163",
+      "home": "LAC",
+      "home_score": 110,
+      "neutral_site": false
+    },
+    {
+      "away": "DAL",
+      "away_score": 107,
+      "date": "2026-04-08",
+      "game_id": "0022501164",
+      "home": "PHX",
+      "home_score": 112,
+      "neutral_site": false
+    },
+    {
+      "away": "MIA",
+      "away_score": 114,
+      "date": "2026-04-09",
+      "game_id": "0022501165",
+      "home": "TOR",
+      "home_score": 128,
+      "neutral_site": false
+    },
+    {
+      "away": "CHI",
+      "away_score": 119,
+      "date": "2026-04-09",
+      "game_id": "0022501166",
+      "home": "WAS",
+      "home_score": 108,
+      "neutral_site": false
+    },
+    {
+      "away": "IND",
+      "away_score": 123,
+      "date": "2026-04-09",
+      "game_id": "0022501167",
+      "home": "BKN",
+      "home_score": 94,
+      "neutral_site": false
+    },
+    {
+      "away": "BOS",
+      "away_score": 106,
+      "date": "2026-04-09",
+      "game_id": "0022501168",
+      "home": "NYK",
+      "home_score": 112,
+      "neutral_site": false
+    },
+    {
+      "away": "PHI",
+      "away_score": 102,
+      "date": "2026-04-09",
+      "game_id": "0022501169",
+      "home": "HOU",
+      "home_score": 113,
+      "neutral_site": false
+    },
+    {
+      "away": "LAL",
+      "away_score": 119,
+      "date": "2026-04-09",
+      "game_id": "0022501170",
+      "home": "GSW",
+      "home_score": 103,
+      "neutral_site": false
+    },
+    {
+      "away": "DET",
+      "away_score": 118,
+      "date": "2026-04-10",
+      "game_id": "0022501171",
+      "home": "CHA",
+      "home_score": 100,
+      "neutral_site": false
+    },
+    {
+      "away": "MIA",
+      "away_score": 140,
+      "date": "2026-04-10",
+      "game_id": "0022501172",
+      "home": "WAS",
+      "home_score": 117,
+      "neutral_site": false
+    },
+    {
+      "away": "CLE",
+      "away_score": 102,
+      "date": "2026-04-10",
+      "game_id": "0022501173",
+      "home": "ATL",
+      "home_score": 124,
+      "neutral_site": false
+    },
+    {
+      "away": "NOP",
+      "away_score": 118,
+      "date": "2026-04-10",
+      "game_id": "0022501174",
+      "home": "BOS",
+      "home_score": 144,
+      "neutral_site": false
+    },
+    {
+      "away": "PHI",
+      "away_score": 105,
+      "date": "2026-04-10",
+      "game_id": "0022501175",
+      "home": "IND",
+      "home_score": 94,
+      "neutral_site": false
+    },
+    {
+      "away": "TOR",
+      "away_score": 95,
+      "date": "2026-04-10",
+      "game_id": "0022501176",
+      "home": "NYK",
+      "home_score": 112,
+      "neutral_site": false
+    },
+    {
+      "away": "ORL",
+      "away_score": 127,
+      "date": "2026-04-10",
+      "game_id": "0022501177",
+      "home": "CHI",
+      "home_score": 103,
+      "neutral_site": false
+    },
+    {
+      "away": "MIN",
+      "away_score": 136,
+      "date": "2026-04-10",
+      "game_id": "0022501178",
+      "home": "HOU",
+      "home_score": 132,
+      "neutral_site": false
+    },
+    {
+      "away": "BKN",
+      "away_score": 108,
+      "date": "2026-04-10",
+      "game_id": "0022501179",
+      "home": "MIL",
+      "home_score": 125,
+      "neutral_site": false
+    },
+    {
+      "away": "DAL",
+      "away_score": 120,
+      "date": "2026-04-10",
+      "game_id": "0022501180",
+      "home": "SAS",
+      "home_score": 139,
+      "neutral_site": false
+    },
+    {
+      "away": "MEM",
+      "away_score": 101,
+      "date": "2026-04-10",
+      "game_id": "0022501181",
+      "home": "UTA",
+      "home_score": 147,
+      "neutral_site": false
+    },
+    {
+      "away": "OKC",
+      "away_score": 107,
+      "date": "2026-04-10",
+      "game_id": "0022501182",
+      "home": "DEN",
+      "home_score": 127,
+      "neutral_site": false
+    },
+    {
+      "away": "LAC",
+      "away_score": 97,
+      "date": "2026-04-10",
+      "game_id": "0022501183",
+      "home": "POR",
+      "home_score": 116,
+      "neutral_site": false
+    },
+    {
+      "away": "GSW",
+      "away_score": 118,
+      "date": "2026-04-10",
+      "game_id": "0022501184",
+      "home": "SAC",
+      "home_score": 124,
+      "neutral_site": false
+    },
+    {
+      "away": "PHX",
+      "away_score": 73,
+      "date": "2026-04-10",
+      "game_id": "0022501185",
+      "home": "LAL",
+      "home_score": 101,
+      "neutral_site": false
+    },
+    {
+      "away": "ORL",
+      "away_score": 108,
+      "date": "2026-04-12",
+      "game_id": "0022501186",
+      "home": "BOS",
+      "home_score": 113,
+      "neutral_site": false
+    },
+    {
+      "away": "WAS",
+      "away_score": 117,
+      "date": "2026-04-12",
+      "game_id": "0022501187",
+      "home": "CLE",
+      "home_score": 130,
+      "neutral_site": false
+    },
+    {
+      "away": "DET",
+      "away_score": 133,
+      "date": "2026-04-12",
+      "game_id": "0022501188",
+      "home": "IND",
+      "home_score": 121,
+      "neutral_site": false
+    },
+    {
+      "away": "ATL",
+      "away_score": 117,
+      "date": "2026-04-12",
+      "game_id": "0022501189",
+      "home": "MIA",
+      "home_score": 143,
+      "neutral_site": false
+    },
+    {
+      "away": "CHA",
+      "away_score": 110,
+      "date": "2026-04-12",
+      "game_id": "0022501190",
+      "home": "NYK",
+      "home_score": 96,
+      "neutral_site": false
+    },
+    {
+      "away": "MIL",
+      "away_score": 106,
+      "date": "2026-04-12",
+      "game_id": "0022501191",
+      "home": "PHI",
+      "home_score": 126,
+      "neutral_site": false
+    },
+    {
+      "away": "BKN",
+      "away_score": 101,
+      "date": "2026-04-12",
+      "game_id": "0022501192",
+      "home": "TOR",
+      "home_score": 136,
+      "neutral_site": false
+    },
+    {
+      "away": "CHI",
+      "away_score": 128,
+      "date": "2026-04-12",
+      "game_id": "0022501193",
+      "home": "DAL",
+      "home_score": 149,
+      "neutral_site": false
+    },
+    {
+      "away": "MEM",
+      "away_score": 101,
+      "date": "2026-04-12",
+      "game_id": "0022501194",
+      "home": "HOU",
+      "home_score": 132,
+      "neutral_site": false
+    },
+    {
+      "away": "NOP",
+      "away_score": 126,
+      "date": "2026-04-12",
+      "game_id": "0022501195",
+      "home": "MIN",
+      "home_score": 132,
+      "neutral_site": false
+    },
+    {
+      "away": "PHX",
+      "away_score": 135,
+      "date": "2026-04-12",
+      "game_id": "0022501196",
+      "home": "OKC",
+      "home_score": 103,
+      "neutral_site": false
+    },
+    {
+      "away": "DEN",
+      "away_score": 128,
+      "date": "2026-04-12",
+      "game_id": "0022501197",
+      "home": "SAS",
+      "home_score": 118,
+      "neutral_site": false
+    },
+    {
+      "away": "UTA",
+      "away_score": 107,
+      "date": "2026-04-12",
+      "game_id": "0022501198",
+      "home": "LAL",
+      "home_score": 131,
+      "neutral_site": false
+    },
+    {
+      "away": "GSW",
+      "away_score": 110,
+      "date": "2026-04-12",
+      "game_id": "0022501199",
+      "home": "LAC",
+      "home_score": 115,
+      "neutral_site": false
+    },
+    {
+      "away": "SAC",
+      "away_score": 110,
+      "date": "2026-04-12",
+      "game_id": "0022501200",
+      "home": "POR",
+      "home_score": 122,
+      "neutral_site": false
+    }
+  ],
+  "generated_at": "2026-08-04T16:13:20.875308+00:00",
+  "n": 200,
+  "window": "most recent 200 completed regular-season games league-wide, by date"
+}

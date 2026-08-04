@@ -1,0 +1,487 @@
+{
+  "avg_poss_per_team_game": 99.5041,
+  "generated_at": "2026-08-04T16:13:20.365168+00:00",
+  "hca_pts": 1.9503,
+  "teams": {
+    "ATL": {
+      "blend": {
+        "def": 0.234,
+        "off": 0.3593
+      },
+      "conference": "East",
+      "division": "Southeast",
+      "results": {
+        "def": 0.9801,
+        "off": 2.1427
+      },
+      "roster": {
+        "def": 0.059,
+        "off": -0.059
+      }
+    },
+    "BKN": {
+      "blend": {
+        "def": 3.6836,
+        "off": -5.3746
+      },
+      "conference": "East",
+      "division": "Atlantic",
+      "results": {
+        "def": 2.6395,
+        "off": -11.5395
+      },
+      "roster": {
+        "def": 3.9285,
+        "off": -3.9285
+      }
+    },
+    "BOS": {
+      "blend": {
+        "def": -5.021,
+        "off": 2.9729
+      },
+      "conference": "East",
+      "division": "Atlantic",
+      "results": {
+        "def": -9.101,
+        "off": -1.6783
+      },
+      "roster": {
+        "def": -4.0639,
+        "off": 4.0639
+      }
+    },
+    "CHA": {
+      "blend": {
+        "def": -0.3119,
+        "off": -0.697
+      },
+      "conference": "East",
+      "division": "Southeast",
+      "results": {
+        "def": -7.3042,
+        "off": 1.9941
+      },
+      "roster": {
+        "def": 1.3282,
+        "off": -1.3282
+      }
+    },
+    "CHI": {
+      "blend": {
+        "def": 3.2951,
+        "off": -1.378
+      },
+      "conference": "East",
+      "division": "Central",
+      "results": {
+        "def": 9.2102,
+        "off": 0.8799
+      },
+      "roster": {
+        "def": 1.9076,
+        "off": -1.9076
+      }
+    },
+    "CLE": {
+      "blend": {
+        "def": -1.4663,
+        "off": 1.5116
+      },
+      "conference": "East",
+      "division": "Central",
+      "results": {
+        "def": -1.9153,
+        "off": 2.1535
+      },
+      "roster": {
+        "def": -1.361,
+        "off": 1.361
+      }
+    },
+    "DAL": {
+      "blend": {
+        "def": 3.1954,
+        "off": -1.3866
+      },
+      "conference": "West",
+      "division": "Southwest",
+      "results": {
+        "def": 8.0593,
+        "off": 1.4605
+      },
+      "roster": {
+        "def": 2.0545,
+        "off": -2.0545
+      }
+    },
+    "DEN": {
+      "blend": {
+        "def": -1.0016,
+        "off": 2.3451
+      },
+      "conference": "West",
+      "division": "Northwest",
+      "results": {
+        "def": 0.8854,
+        "off": 6.1857
+      },
+      "roster": {
+        "def": -1.4443,
+        "off": 1.4443
+      }
+    },
+    "DET": {
+      "blend": {
+        "def": -2.414,
+        "off": 0.3808
+      },
+      "conference": "East",
+      "division": "Central",
+      "results": {
+        "def": -8.8262,
+        "off": -1.8746
+      },
+      "roster": {
+        "def": -0.9099,
+        "off": 0.9099
+      }
+    },
+    "GSW": {
+      "blend": {
+        "def": -0.135,
+        "off": 0.1639
+      },
+      "conference": "West",
+      "division": "Pacific",
+      "results": {
+        "def": 2.2555,
+        "off": -2.1035
+      },
+      "roster": {
+        "def": -0.6957,
+        "off": 0.6957
+      }
+    },
+    "HOU": {
+      "blend": {
+        "def": -2.5145,
+        "off": 0.6551
+      },
+      "conference": "West",
+      "division": "Southwest",
+      "results": {
+        "def": -6.8828,
+        "off": -2.9035
+      },
+      "roster": {
+        "def": -1.4898,
+        "off": 1.4898
+      }
+    },
+    "IND": {
+      "blend": {
+        "def": 3.684,
+        "off": -2.2286
+      },
+      "conference": "East",
+      "division": "Central",
+      "results": {
+        "def": 6.7914,
+        "off": 0.8686
+      },
+      "roster": {
+        "def": 2.9551,
+        "off": -2.9551
+      }
+    },
+    "LAC": {
+      "blend": {
+        "def": -1.1146,
+        "off": 0.6908
+      },
+      "conference": "West",
+      "division": "Pacific",
+      "results": {
+        "def": -2.0917,
+        "off": -0.1386
+      },
+      "roster": {
+        "def": -0.8854,
+        "off": 0.8854
+      }
+    },
+    "LAL": {
+      "blend": {
+        "def": -1.2308,
+        "off": -0.0079
+      },
+      "conference": "West",
+      "division": "Pacific",
+      "results": {
+        "def": -4.6962,
+        "off": -1.8233
+      },
+      "roster": {
+        "def": -0.4179,
+        "off": 0.4179
+      }
+    },
+    "MEM": {
+      "blend": {
+        "def": 4.7707,
+        "off": -2.9586
+      },
+      "conference": "West",
+      "division": "Southwest",
+      "results": {
+        "def": 11.3924,
+        "off": -1.8551
+      },
+      "roster": {
+        "def": 3.2174,
+        "off": -3.2174
+      }
+    },
+    "MIA": {
+      "blend": {
+        "def": -0.9904,
+        "off": 3.7056
+      },
+      "conference": "East",
+      "division": "Southeast",
+      "results": {
+        "def": 6.534,
+        "off": 7.7566
+      },
+      "roster": {
+        "def": -2.7554,
+        "off": 2.7554
+      }
+    },
+    "MIL": {
+      "blend": {
+        "def": 3.5528,
+        "off": -3.6106
+      },
+      "conference": "East",
+      "division": "Central",
+      "results": {
+        "def": 4.7227,
+        "off": -5.0266
+      },
+      "roster": {
+        "def": 3.2784,
+        "off": -3.2784
+      }
+    },
+    "MIN": {
+      "blend": {
+        "def": -0.6795,
+        "off": 0.0946
+      },
+      "conference": "West",
+      "division": "Northwest",
+      "results": {
+        "def": -2.7601,
+        "off": -0.3184
+      },
+      "roster": {
+        "def": -0.1914,
+        "off": 0.1914
+      }
+    },
+    "NOP": {
+      "blend": {
+        "def": 2.668,
+        "off": -1.0888
+      },
+      "conference": "West",
+      "division": "Southwest",
+      "results": {
+        "def": 5.7932,
+        "off": 2.5182
+      },
+      "roster": {
+        "def": 1.9349,
+        "off": -1.9349
+      }
+    },
+    "NYK": {
+      "blend": {
+        "def": -5.6487,
+        "off": 3.6384
+      },
+      "conference": "East",
+      "division": "Atlantic",
+      "results": {
+        "def": -13.5791,
+        "off": 2.9986
+      },
+      "roster": {
+        "def": -3.7885,
+        "off": 3.7885
+      }
+    },
+    "OKC": {
+      "blend": {
+        "def": -6.463,
+        "off": 6.053
+      },
+      "conference": "West",
+      "division": "Northwest",
+      "results": {
+        "def": -7.1153,
+        "off": 4.9575
+      },
+      "roster": {
+        "def": -6.31,
+        "off": 6.31
+      }
+    },
+    "ORL": {
+      "blend": {
+        "def": -1.8237,
+        "off": 0.8736
+      },
+      "conference": "East",
+      "division": "Southeast",
+      "results": {
+        "def": -3.302,
+        "off": -1.6982
+      },
+      "roster": {
+        "def": -1.4769,
+        "off": 1.4769
+      }
+    },
+    "PHI": {
+      "blend": {
+        "def": 0.3997,
+        "off": -0.5812
+      },
+      "conference": "East",
+      "division": "Atlantic",
+      "results": {
+        "def": -0.6154,
+        "off": -0.34
+      },
+      "roster": {
+        "def": 0.6378,
+        "off": -0.6378
+      }
+    },
+    "PHX": {
+      "blend": {
+        "def": -0.7697,
+        "off": -0.2836
+      },
+      "conference": "West",
+      "division": "Pacific",
+      "results": {
+        "def": -2.963,
+        "off": -2.5809
+      },
+      "roster": {
+        "def": -0.2552,
+        "off": 0.2552
+      }
+    },
+    "POR": {
+      "blend": {
+        "def": -0.6581,
+        "off": -0.7692
+      },
+      "conference": "West",
+      "division": "Northwest",
+      "results": {
+        "def": -4.7208,
+        "off": -2.7908
+      },
+      "roster": {
+        "def": 0.2949,
+        "off": -0.2949
+      }
+    },
+    "SAC": {
+      "blend": {
+        "def": 3.6152,
+        "off": -2.8237
+      },
+      "conference": "West",
+      "division": "Pacific",
+      "results": {
+        "def": 6.6522,
+        "off": -2.4863
+      },
+      "roster": {
+        "def": 2.9028,
+        "off": -2.9028
+      }
+    },
+    "SAS": {
+      "blend": {
+        "def": -5.7094,
+        "off": 4.8077
+      },
+      "conference": "West",
+      "division": "Southwest",
+      "results": {
+        "def": -9.8885,
+        "off": 5.1428
+      },
+      "roster": {
+        "def": -4.7291,
+        "off": 4.7291
+      }
+    },
+    "TOR": {
+      "blend": {
+        "def": -1.4526,
+        "off": 0.4712
+      },
+      "conference": "East",
+      "division": "Atlantic",
+      "results": {
+        "def": -4.6557,
+        "off": -0.5093
+      },
+      "roster": {
+        "def": -0.7012,
+        "off": 0.7012
+      }
+    },
+    "UTA": {
+      "blend": {
+        "def": 4.7253,
+        "off": -2.0183
+      },
+      "conference": "West",
+      "division": "Northwest",
+      "results": {
+        "def": 11.9612,
+        "off": 2.2863
+      },
+      "roster": {
+        "def": 3.028,
+        "off": -3.028
+      }
+    },
+    "WAS": {
+      "blend": {
+        "def": 5.5811,
+        "off": -3.5172
+      },
+      "conference": "East",
+      "division": "Southeast",
+      "results": {
+        "def": 12.5401,
+        "off": -1.6778
+      },
+      "roster": {
+        "def": 3.9487,
+        "off": -3.9487
+      }
+    }
+  }
+}

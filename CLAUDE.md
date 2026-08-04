@@ -15,9 +15,12 @@ npm run dev        # Start dev server (http://localhost:3000)
 npm run build      # Production build (run before committing to verify types)
 npm run start      # Start production server
 npm run lint       # next lint — not enforced in CI, but available
+npm run check:hoops # Hoops read-model gate — also runs automatically as `prebuild`
 ```
 
-No test suite. `npm run build` is the type-check gate — always run it before pushing.
+No test suite. `npm run build` is the type-check gate — always run it before pushing. It is
+**also** the data gate: `prebuild` runs `scripts/check-hoops.mjs`, so a stale or malformed hoops
+export fails the build (and the Railway deploy) rather than shipping. See "Hoops" below.
 
 ## Runtime debugging — `scripts/inspect.mjs`
 
@@ -137,13 +140,13 @@ First-class gesture in `FeedClient.tsx`. An indicator zone above the category na
 Section navigation went through a rewrite: the old `HeaderNav` + `BottomNav` split was replaced by a single pattern that works the same on mobile and desktop.
 
 - **Masthead** (`components/Masthead.tsx`) is the sticky top header: wordmark on the left, centered section switcher button, gear `AppMenu` on the right. The switcher shows the current section's name and opens `Contents`. Masthead also owns the `⌘K` / `Ctrl+K` global binding. It is the ONLY persistent chrome — there is no sub-tab bar below it.
-- **Contents** (`components/Contents.tsx`) is the fullscreen section picker. Sections come from `lib/sections.ts`, grouped into **Reading** (Feed, Saved, Read — each a full section, so the masthead switcher correctly reads "Saved"/"Read" on those routes), **Tracking** (one entry per tracker in `TRACKER_CONFIGS`), **Library** (Comics). Type to filter; Enter jumps to the first match; Esc closes. Adding a tracker to `TRACKER_CONFIGS` automatically adds it to both the Masthead switcher and Contents — there's no separate nav config to update.
+- **Contents** (`components/Contents.tsx`) is the fullscreen section picker. Sections come from `lib/sections.ts`, grouped into **Reading** (Feed, Saved, Read — each a full section, so the masthead switcher correctly reads "Saved"/"Read" on those routes), **Tracking** (one entry per tracker in `TRACKER_CONFIGS`), **Library** (Comics, Hoops). Type to filter; Enter jumps to the first match; Esc closes. Adding a tracker to `TRACKER_CONFIGS` automatically adds it to both the Masthead switcher and Contents — there's no separate nav config to update.
 - **Saved / Read reachability**: via Contents (switcher tap or `⌘K`), the `g s` / `g r` keyboard chords, and each page's own `<h1>`. They're archive views — occasional visits don't earn always-visible tabs. The old `SubBar` (Today/Saved/Read row under the masthead) was removed for this reason.
 - The Feed's **category row** (`FeedClient.tsx` controls row) is in-page and scrolls away with the content — deliberately not sticky; category switching happens at the top of a session, not mid-scroll. On mobile it's a single horizontally scrollable line (hidden scrollbar), not a wrapping block.
 
 ### Visual identity
 - Fonts loaded via `next/font/google` in `app/layout.tsx`: **Newsreader** (display + body, variable serif) and **JetBrains Mono** (kickers, badges, timestamps). Both exposed as CSS vars `--font-display` / `--font-mono` and aliased in `tailwind.config.ts` as `font-display` / `font-mono`.
-- Theme tokens live in `tailwind.config.ts` (`ink`, `cream`, `rule`, `accent`, per-category `cat.*` for podcasts/music/books/film/tech_review/reading/bluesky/games/tv). Don't hardcode hexes in components — extend the theme. The actual color values come from CSS variables in `app/globals.css`, scoped by `[data-theme="light"]` / `[data-theme="dark"]` / `@media (prefers-color-scheme)` so the Auto/Light/Dark switch in `AppMenu` really does retheme everything in one attribute flip.
+- Theme tokens live in `tailwind.config.ts` (`ink`, `cream`, `rule`, `accent`, per-category `cat.*` for podcasts/music/books/film/tech_review/reading/bluesky/games/tv/hoops/practice). Don't hardcode hexes in components — extend the theme. The actual color values come from CSS variables in `app/globals.css`, scoped by `[data-theme="light"]` / `[data-theme="dark"]` / `@media (prefers-color-scheme)` so the Auto/Light/Dark switch in `AppMenu` really does retheme everything in one attribute flip.
 
 ### API routes
 Items
@@ -166,6 +169,9 @@ Trackers
 Comics
 - `POST /api/comics/[id]/read` — mark a Marvel Unlimited issue as read (`comic_state` row).
 - `POST /api/comics/[id]/unread` — delete the row.
+
+Hoops
+- `GET /api/hoops/teams?mode=results|roster|blend` — 30 teams ranked by net rating (`off - def`), each with roster size and the |results − roster| disagreement, plus the league disagreement summary and the bundle's provenance (`PARAM_VERSION`, data-as-of, row counts). An unknown `mode` falls back to `blend`. Triggers the lazy import on first call.
 
 Push
 - `GET    /api/push/subscribe` — returns `{ subscribed: boolean }`.
@@ -241,6 +247,25 @@ A static catalog of Hickman-era reading orders (X-Men, Avengers/Secret Wars), ea
 **The Marvel Unlimited handoff is the load-bearing UX trick.** `read.marvel.com/#/book/{digitalBookId}` is the obvious URL but it's useless from inside the PWA — iOS routes `target="_blank"` clicks through SFSafariViewController, which doesn't honor universal links. The fix in `components/ComicsClient.tsx` is to link to `marvel.smart.link/fiir7ec77?type=issue&drn={drn}&sourceId={sourceId}` (Marvel's Branch.io deep-link host) **as a plain `<a>` with no `target` and no `preventDefault`**. iOS treats that as a top-level navigation and hands off to the app via the smart.link's app-claim. The PWA gets backgrounded; swiping back returns to the same scroll position.
 
 **Important: do NOT replicate the FeedClient `target="_blank"` anchor pattern here.** The whole PWA-handoff section #2 below explicitly opens in the in-app browser — that's the wrong outcome for comics.
+
+### Hoops — the NBA simulation studio
+An NBA sim & what-if studio as its own section, built to the plan in `HOOPS_PLAN.md` (tracking epic: GitHub #63). **Milestone 1 (the read-model spine, issue #64) has shipped: `/hoops/teams` and `/hoops/teams/[tri]`. No simulation runs anywhere in the app yet** — the engine port is milestone 2 (issues #65/#66), and the plan's own order puts the cross-implementation RNG fixture before the engine because a TS port is a *second implementation* of an already-validated one.
+
+**Zero runtime dependency on the Mac Mini.** Same shape as `/comics`, scaled up: heavy work (fitting a possession model against a 20GB DuckDB over 8TB of parquet) runs offline in `~/Code/hoops-sim`; what ships here is committed data plus, eventually, a TypeScript port of the engine.
+
+**The data lives in `hoops-data/*.json`, NOT under `data/`.** Two reasons, both fatal: `data/` is gitignored, and Railway mounts the persistent volume there — anything committed under it is invisible in production. `lib/hoops/data.ts` reads the bundle with `fs` from `process.cwd()`, the same runtime pattern as `config/feeds.yml`. Regenerate with `uv run hoops export-hub ~/Code/keith-hub/hoops-data` from `~/Code/hoops-sim` (read-only, runs its own freshness gate); see `hoops-data/README.md`.
+
+**Import is lazy, hash-keyed, and outside the poller.** `ensureHoopsImport()` (`lib/hoops/import.ts`) runs once per process on the first hoops read: it hashes the six read-model files and rewrites every read-model table in one transaction only when those bytes changed. A deploy carrying a fresh export therefore imports itself; an unchanged one costs a single `SELECT`. Nothing about hoops touches `fetchAllSources` or the 15-minute poll cycle.
+
+🔴 **Read-model tables are rewritten wholesale; user tables are never touched.** `hoops_params`/`teams`/`players`/`schedule`/`results`/`lines` are projections of the committed bundle. `hoops_scratch` and `hoops_runs` are the user's own (roster experiments, saved sims) and the importer deliberately does not `DELETE` them. **Data flows one direction only: Mini → hub.** A roster edit made on the phone must never write back to hoops-sim's `data/roster_edits.json`, which drives the CLI — that's a two-writers-one-file bug that's very hard to see afterwards.
+
+🔴 **`off - def` is the team's strength, not `off + def`.** hoops-sim's own convention (`rosterratings.py`: "off = +strength/2, def = -strength/2"), and `sim.py` consumes the halves separately as `home_off + away_def`. A positive `def` means points *allowed* above average, so a good defence reads negative. `netOf()` in `lib/hoops/rating.ts` is the single implementation; don't "fix" the minus sign.
+
+**Honesty carries that are correctness, not polish** (every one of these is printed on hoops-sim's CLI output today and has to render in the UI): the ratings-mode choice is exposed with its caveat on screen, never as a tooltip; player value is labelled a model estimate with its as-of date; roster minutes are labelled pre-normalisation. The plan's ">30% roster churn" caveat can't be computed — the export doesn't carry churn — so instead of transcribing hoops-sim's league figure as if it had been measured here, the UI shows the *actual* |results − roster| disagreement from today's bundle (median/max, and a per-team flag above 5 pts). When the engine lands, the variance-honesty note and a visible, shareable `run_id` join this list.
+
+**Key files:** `lib/hoops/types.ts` (the export's shapes), `blob-contract.json` (what the engine expects the blob to be — the stale-blob guard's source of truth), `params.ts` (decode into flat `Float64Array` + stride, throws `StaleBlobError`), `data.ts` (read + hash the bundle), `import.ts` (project into SQLite), `queries.ts` (server reads), `rating.ts` (**pure** — no fs/db, so the client can re-rank all three modes without a round trip), `nba-franchises.json` (the 30 real franchises, as an external fact). UI: `components/hoops/HoopsNav.tsx` (the section self-hosts its in-page nav — there is no global sub-tab bar to extend), `components/hoops/TeamsClient.tsx`, `app/hoops/teams/*`.
+
+**The gate: `npm run check:hoops`, wired as `prebuild`.** It is deliberately *not* the export agreeing with itself — hoops-sim's own `validate_export` already does the producer-side checks. This asserts the committed bundle against things true independently of it: the real NBA (30 franchises with fixed conference/division assignments, 82 games each, 1,230 total, and games that cannot end tied), mathematics (probability rows sum to 1, CDFs are monotone 0→1, the PPP grid matches its declared min/max/step), and the engine's declared contract (`PARAM_VERSION` must match, or a blob from an older fit fails the build). It also pins both landmines carried over from hoops-sim: no score column may reappear in `hoops_lines.json`, and no result may be a tie. Falsification-tested at merge against 14 perturbations (stale `PARAM_VERSION`, dropped team, wrong division, null/NaN rating, tied final, resurrected score column, broken probability row, non-monotone CDF, missing schedule game, mis-joined line, unknown player team, truncated `theta_grid`, fixture swapped for the production fit) — all 14 failed the check.
 
 ## PWA setup (read this before touching app/layout.tsx)
 

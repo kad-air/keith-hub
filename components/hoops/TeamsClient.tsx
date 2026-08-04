@@ -1,0 +1,163 @@
+"use client";
+
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useMemo, useState } from "react";
+import {
+  MODE_COPY,
+  fmtSigned,
+  modeDisagreement,
+  rankTeams,
+  teamName,
+} from "@/lib/hoops/rating";
+import type { HoopsMeta } from "@/lib/hoops/queries";
+import type { RatingMode, TeamRow } from "@/lib/hoops/types";
+import { RATING_MODES } from "@/lib/hoops/types";
+
+interface Props {
+  rows: TeamRow[];
+  rosterSizes: Record<string, number>;
+  meta: HoopsMeta;
+  initialMode: RatingMode;
+}
+
+// A team whose two ratings disagree by more than this is flagged inline. The
+// plan's caveat is "above 30% roster churn"; the export doesn't carry churn,
+// so the flag fires on the disagreement the data actually shows. 5 pts is
+// comfortably above the league median (~3) — it means the ratings genuinely
+// diverge about this team, not that everything is noisy.
+const DISAGREEMENT_FLAG_PTS = 5;
+
+export default function TeamsClient({ rows, rosterSizes, meta, initialMode }: Props) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [mode, setMode] = useState<RatingMode>(initialMode);
+
+  // All three modes ship in the payload (90 numbers), so switching is instant
+  // and offline-safe. ?mode= is kept in sync for deep links.
+  const teams = useMemo(() => rankTeams(rows, mode), [rows, mode]);
+  const spread = useMemo(() => modeDisagreement(rows), [rows]);
+
+  const pick = useCallback(
+    (m: RatingMode) => {
+      setMode(m);
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("mode", m);
+      router.replace(`/hoops/teams?${params.toString()}`, { scroll: false });
+    },
+    [router, searchParams],
+  );
+
+  const flagged = teams.filter((t) => t.modeDisagreement >= DISAGREEMENT_FLAG_PTS);
+
+  return (
+    <>
+      <div className="flex gap-2">
+        {RATING_MODES.map((m) => (
+          <button
+            key={m}
+            type="button"
+            onClick={() => pick(m)}
+            aria-pressed={m === mode}
+            className={`flex-1 border px-3 py-2 font-mono text-[0.7rem] uppercase tracking-kicker transition-colors ${
+              m === mode
+                ? "border-cat-hoops/70 bg-cat-hoops/10 text-cat-hoops"
+                : "border-rule/60 text-cream-dim hover:border-cat-hoops/40 hover:text-cream"
+            }`}
+          >
+            {MODE_COPY[m].label}
+          </button>
+        ))}
+      </div>
+
+      {/* The honesty carry. Always on screen, never a tooltip. */}
+      <p className="mt-3 border-l-2 border-cat-hoops/50 pl-3 text-sm text-cream-dim">
+        {MODE_COPY[mode].blurb}
+      </p>
+      <p className="mt-2 border-l-2 border-rule/60 pl-3 text-sm text-cream-dimmer">
+        Results and roster ratings currently disagree by{" "}
+        <span className="font-mono text-cream-dim">{spread.median.toFixed(1)}</span> points for the
+        median team, and by as much as{" "}
+        <span className="font-mono text-cream-dim">{spread.max.toFixed(1)}</span> for {spread.maxTeam}
+        . The bottom-up roster rating is the noisier of the two — treat a big gap as{" "}
+        <em>these two views disagree</em>, not as a correction.
+        {flagged.length > 0 && (
+          <>
+            {" "}
+            Flagged below (<span className="text-cat-hoops">!</span>):{" "}
+            <span className="font-mono">{flagged.map((t) => t.tri).join(" ")}</span>.
+          </>
+        )}
+      </p>
+
+      <ol className="mt-5">
+        <li className="flex items-baseline gap-2 border-b border-rule/60 pb-1 font-mono text-[0.62rem] uppercase tracking-kicker text-cream-dimmer">
+          <span className="w-6 shrink-0 text-right">#</span>
+          <span className="flex-1">Team</span>
+          <span className="w-14 text-right">Net</span>
+          <span className="w-12 text-right">Off</span>
+          <span className="w-12 text-right">Def</span>
+        </li>
+        {teams.map((t) => (
+          <li key={t.tri}>
+            <Link
+              href={`/hoops/teams/${t.tri}?mode=${mode}`}
+              className="flex items-baseline gap-2 border-b border-rule/40 py-2 transition-colors hover:bg-ink-raised/60"
+            >
+              <span className="w-6 shrink-0 text-right font-mono text-[0.7rem] text-cream-dimmer">
+                {t.rank}
+              </span>
+              <span className="flex-1 truncate">
+                <span className="font-mono text-[0.72rem] text-cat-hoops">{t.tri}</span>{" "}
+                <span className="font-display text-cream">{teamName(t.tri)}</span>
+                {t.modeDisagreement >= DISAGREEMENT_FLAG_PTS && (
+                  <span
+                    title={`results and roster ratings differ by ${t.modeDisagreement.toFixed(1)} pts`}
+                    className="ml-1 font-mono text-[0.7rem] text-cat-hoops"
+                  >
+                    !
+                  </span>
+                )}
+                <span className="ml-2 font-mono text-[0.62rem] uppercase tracking-kicker text-cream-dimmer">
+                  {t.conference} · {rosterSizes[t.tri] ?? 0}
+                </span>
+              </span>
+              <span
+                className={`w-14 text-right font-mono text-sm ${
+                  t.net >= 0 ? "text-cream" : "text-cream-dim"
+                }`}
+              >
+                {fmtSigned(t.net)}
+              </span>
+              <span className="w-12 text-right font-mono text-[0.72rem] text-cream-dim">
+                {fmtSigned(t.off)}
+              </span>
+              <span className="w-12 text-right font-mono text-[0.72rem] text-cream-dim">
+                {fmtSigned(t.def)}
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ol>
+
+      <p className="mt-4 text-xs text-cream-dimmer">
+        Net is points per 100 possessions (off − def). A positive <em>Def</em> means points allowed
+        above league average, so a good defence reads negative — that is hoops-sim&rsquo;s own
+        convention, carried through unchanged.
+      </p>
+
+      <dl className="mt-6 grid grid-cols-2 gap-x-4 gap-y-1 border-t border-rule/60 pt-3 font-mono text-[0.65rem] text-cream-dimmer">
+        <dt>Fit</dt>
+        <dd className="text-right text-cream-dim">{meta.paramVersion}</dd>
+        <dt>Data as of</dt>
+        <dd className="text-right text-cream-dim">{meta.dataAsOf}</dd>
+        <dt>Exported</dt>
+        <dd className="text-right text-cream-dim">{meta.generatedAt.slice(0, 10)}</dd>
+        <dt>Rows</dt>
+        <dd className="text-right text-cream-dim">
+          {meta.teams} teams · {meta.players} players · {meta.scheduledGames} games
+        </dd>
+      </dl>
+    </>
+  );
+}

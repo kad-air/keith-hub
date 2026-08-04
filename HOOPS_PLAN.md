@@ -3,7 +3,12 @@
 > A full NBA simulation & what-if studio, living as a section of The Feed.
 > Self-contained: fit on the Mac Mini, commit the data, run the engine in the browser.
 
-**Status:** PLAN (no code yet). Decision recorded 2026-07-31.
+**Status:** IN PROGRESS. Decision recorded 2026-07-31. Tracking epic: GitHub #63.
+**Milestone 1 (§10.1, issue #64) shipped 2026-08-04** — the export/import spine, `/hoops/teams`
+and `/hoops/teams/[tri]`, gated by `npm run check:hoops`. hoops-sim's `export-hub` generator
+(that repo's issue #21) shipped the same day. No simulation runs yet; the engine port is next.
+🔴 Read `~/Code/hoops-sim/CLAUDE.md`, not this doc, for any model constant — see the epic's
+"the plan has drifted" table.
 **Supersedes:** hoops-sim's `docs/IDEA_hub-sandbox.md` (the "toy sandbox" idea), **deleted
 2026-07-31** — recoverable from that repo's git history at commit `8c85b64`. This doc scopes the
 *full* product (db + api + engine + full UI/UX), not just a single-game toy; everything from that
@@ -175,11 +180,20 @@ season/playoff link. **Does not port:** anything touching DuckDB — that bounda
 
 ### 🔴 The #1 technical risk: bit-exact RNG parity
 
-`hoops.rng` seeds a numpy PCG64 `Generator` from a digest of `(run_id, purpose, coords)`. For a
+`hoops.rng` seeds a numpy `Generator` from a blake2b digest of `(run_id, purpose, coords)`. For a
 **shared** fixture (§7) to pass in TS, the TS RNG must produce the *identical* stream — which means
-porting both the digest keying **and** PCG64 itself, bit-for-bit. This is the crux of the
-self-contained approach. Mitigation: a reference PCG64 port + the exact seeding digest, proven by
-the fixture on day one of the port (build the fixture first, not last).
+porting both the digest keying **and** the bit generator itself, bit-for-bit. This is the crux of
+the self-contained approach. Mitigation: the exact seeding digest + a reference port, proven by the
+fixture on day one of the port (build the fixture first, not last).
+
+🔴 **Correction (2026-08-04, found while building the Python half of the fixture).** This section
+originally said PCG64. It is **Philox4x64** — `hoops.rng.stream` constructs
+`np.random.Generator(np.random.Philox(key=key, counter=counter))`, confirmed against that module's
+own docstring and the live type of the object it returns. This *reduces* the port's risk rather
+than merely relabelling it: PCG64 is an LCG-family generator whose 64→128-bit multiply is awkward
+to port bit-for-bit into JS, while Philox is counter-based block-cipher-style lane arithmetic —
+straightforward with `BigInt` 64-bit lane math and no multi-precision multiplication at all. See
+`~/Code/hoops-sim/docs/milestones/export-hub.md`.
 
 ---
 
