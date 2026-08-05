@@ -5,12 +5,14 @@
   "scripts": {
     "dev": "next dev",
     "check:hoops": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-hoops.ts",
-    "prebuild": "npm run check:hoops && npm run check:hoops:fixture && npm run check:hoops:pricing-fixture",
+    "prebuild": "npm run check:hoops && npm run check:hoops:fixture && npm run check:hoops:pricing-fixture && npm run check:hoops:multinomial && npm run check:hoops:boxscore",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
     "check:hoops:fixture": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-hoops-fixture.ts",
-    "check:hoops:pricing-fixture": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-hoops-pricing-fixture.ts"
+    "check:hoops:pricing-fixture": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-hoops-pricing-fixture.ts",
+    "check:hoops:multinomial": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-hoops-multinomial.ts",
+    "check:hoops:boxscore": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-hoops-boxscore.ts"
   },
   "dependencies": {
     "@atproto/api": "^0.19.6",

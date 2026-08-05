@@ -3,8 +3,15 @@ import Link from "next/link";
 // 🔴 There is no global sub-tab bar to hang hoops screens off — SubBar,
 // HeaderNav and BottomNav were all removed upstream, and Masthead + Contents
 // are the only persistent chrome. So the section self-hosts its own in-page
-// nav here. One entry today; Matchup / Studio / Season / Tonight land in
-// later milestones and slot into the same row.
+// nav here. Studio / Season / Tonight land in later milestones and slot into
+// the same row.
+//
+// This answers the first half of the #68 design spike ("is /hoops one screen
+// with modes, or six sibling pages with an in-section switcher?") in favour of
+// SIBLING PAGES: each screen owns a route, so every result is linkable and
+// server-renderable, and the switcher is this row. /hoops/game/[runId] is
+// deliberately NOT a tab — it is a result you arrive at, not a destination you
+// navigate to, so it highlights Matchup while you are on it.
 
 export interface HoopsTab {
   key: string;
@@ -12,7 +19,10 @@ export interface HoopsTab {
   href: string;
 }
 
-export const HOOPS_TABS: HoopsTab[] = [{ key: "teams", label: "Teams", href: "/hoops/teams" }];
+export const HOOPS_TABS: HoopsTab[] = [
+  { key: "matchup", label: "Matchup", href: "/hoops" },
+  { key: "teams", label: "Teams", href: "/hoops/teams" },
+];
 
 export default function HoopsNav({ active }: { active: string }) {
   return (

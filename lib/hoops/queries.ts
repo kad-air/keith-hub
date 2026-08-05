@@ -4,14 +4,18 @@
 // populated from the committed bundle before anything reads them.
 
 import { getDb } from "@/lib/db";
+import type { BoxPlayer } from "./boxscore";
 import { ensureHoopsImport } from "./import";
 import type { ImportSource } from "./import";
+import { decodeParams } from "./params";
+import type { DecodedParams } from "./params";
 import { modeDisagreement, rankTeams } from "./rating";
 import type { ModeDisagreement } from "./rating";
 import type {
   PlayerRow,
   RankedTeam,
   RatingMode,
+  RawParamsFile,
   RawPlayerGameRates,
   RawPlayerPer36,
   TeamRow,
@@ -74,6 +78,48 @@ export function getRoster(tri: string): PlayerRow[] {
     .prepare(`SELECT * FROM hoops_players WHERE tri = ? ORDER BY minutes DESC, name ASC`)
     .all(tri.toUpperCase()) as PlayerDbRow[];
   return rows.map(hydratePlayer);
+}
+
+/**
+ * One team's roster in the shape the box-score simulator wants.
+ *
+ * 🔴 This is the PARTICIPANT LIST, and it is everyone on the exported roster —
+ * hoops-sim's own list is narrower (last-game actives, or the season-typical
+ * rotation when that is stale). The bundle carries no game-by-game actives to
+ * narrow it with; see lib/hoops/boxscore.ts's header for what that changes.
+ */
+export function getBoxRoster(tri: string): BoxPlayer[] {
+  return getRoster(tri).map((p) => ({
+    athlete_id: p.athlete_id,
+    name: p.name,
+    minutes: p.minutes,
+    per36: p.per36,
+    game_rates: p.game_rates,
+  }));
+}
+
+/**
+ * The decoded parameter blob, memoised per process and keyed on the row's
+ * content hash.
+ *
+ * Decoding parses a ~290KB JSON and flattens it into typed arrays; doing that
+ * per request would dominate a sim that otherwise takes a few hundred
+ * milliseconds. Keying on content_hash (rather than caching forever) is what
+ * makes a Mac Mini push take effect without a restart — importPushedBundle
+ * rewrites the row, the hash moves, and the next read re-decodes.
+ */
+let paramsCache: { hash: string; params: DecodedParams } | null = null;
+
+export function getDecodedParams(): DecodedParams {
+  ensureHoopsImport();
+  const row = getDb()
+    .prepare(`SELECT blob, content_hash FROM hoops_params WHERE id = 1`)
+    .get() as { blob: string; content_hash: string } | undefined;
+  if (!row) throw new Error("hoops_params is empty — the import did not run");
+  if (paramsCache && paramsCache.hash === row.content_hash) return paramsCache.params;
+  const params = decodeParams(JSON.parse(row.blob) as RawParamsFile);
+  paramsCache = { hash: row.content_hash, params };
+  return params;
 }
 
 export function getRosterSizes(): Map<string, number> {
