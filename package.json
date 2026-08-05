@@ -5,11 +5,12 @@
   "scripts": {
     "dev": "next dev",
     "check:hoops": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-hoops.ts",
-    "prebuild": "npm run check:hoops && npm run check:hoops:fixture",
+    "prebuild": "npm run check:hoops && npm run check:hoops:fixture && npm run check:hoops:pricing-fixture",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "check:hoops:fixture": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-hoops-fixture.ts"
+    "check:hoops:fixture": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-hoops-fixture.ts",
+    "check:hoops:pricing-fixture": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-hoops-pricing-fixture.ts"
   },
   "dependencies": {
     "@atproto/api": "^0.19.6",

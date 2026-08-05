@@ -134,13 +134,25 @@ export function getDb(): Database.Database {
     --   truncates only the read-model tables; see lib/hoops/import.ts.
 
     -- Singleton (id = 1). The fitted parameter blob, stored verbatim.
+    --
+    -- 🔴 import_source distinguishes a committed-bundle cold-start seed from a
+    -- real Mac Mini push (kad-air/keith-hub#73 / kad-air/hoops-sim#24). Once a
+    -- push lands, ensureHoopsImport() never lets the committed hoops-data/*.json
+    -- overwrite it again on a later boot -- see lib/hoops/import.ts.
     CREATE TABLE IF NOT EXISTS hoops_params (
       id INTEGER PRIMARY KEY CHECK (id = 1),
       param_version TEXT NOT NULL,
       blob TEXT NOT NULL,
       generated_at TEXT NOT NULL,
       imported_at TEXT NOT NULL,
-      content_hash TEXT NOT NULL
+      content_hash TEXT NOT NULL,
+      import_source TEXT NOT NULL DEFAULT 'seed',
+      hca_pts REAL,
+      replacement_per36 REAL,
+      value_as_of TEXT,
+      pricing_version INTEGER,
+      features_json TEXT,
+      constants_json TEXT
     );
 
     -- Wide, not long: one row per team with all three rating modes as
@@ -239,6 +251,25 @@ export function getDb(): Database.Database {
     // Tune sources roster for the per-source health indicator.
     dbInstance.exec(`ALTER TABLE sources ADD COLUMN last_error TEXT`);
   }
+
+  // hoops_params: added for kad-air/keith-hub#73 (the Mac Mini push endpoint).
+  // A pre-existing prod DB has hoops_params from before these columns existed
+  // — CREATE TABLE IF NOT EXISTS above never alters it, so bolt them on here.
+  const hoopsParamsCols = (
+    dbInstance.prepare(`PRAGMA table_info(hoops_params)`).all() as Array<{ name: string }>
+  ).map((c) => c.name);
+  const addHoopsParamsCol = (name: string, ddl: string): void => {
+    if (!hoopsParamsCols.includes(name)) {
+      dbInstance!.exec(`ALTER TABLE hoops_params ADD COLUMN ${ddl}`);
+    }
+  };
+  addHoopsParamsCol("import_source", `import_source TEXT NOT NULL DEFAULT 'seed'`);
+  addHoopsParamsCol("hca_pts", `hca_pts REAL`);
+  addHoopsParamsCol("replacement_per36", `replacement_per36 REAL`);
+  addHoopsParamsCol("value_as_of", `value_as_of TEXT`);
+  addHoopsParamsCol("pricing_version", `pricing_version INTEGER`);
+  addHoopsParamsCol("features_json", `features_json TEXT`);
+  addHoopsParamsCol("constants_json", `constants_json TEXT`);
 
   return dbInstance;
 }

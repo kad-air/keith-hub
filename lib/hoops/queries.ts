@@ -4,8 +4,8 @@
 // populated from the committed bundle before anything reads them.
 
 import { getDb } from "@/lib/db";
-import { loadBundle } from "./data";
 import { ensureHoopsImport } from "./import";
+import type { ImportSource } from "./import";
 import { modeDisagreement, rankTeams } from "./rating";
 import type { ModeDisagreement } from "./rating";
 import type {
@@ -95,6 +95,9 @@ export interface HoopsMeta {
   /** Value per 36 of a replacement-level player — the zero line for value. */
   replacementPer36: number;
   valueAsOf: string;
+  /** 'seed' = the committed hoops-data/*.json fallback; 'push' = a real Mac
+   *  Mini push (kad-air/keith-hub#73). See lib/hoops/import.ts. */
+  importSource: ImportSource;
   teams: number;
   players: number;
   scheduledGames: number;
@@ -102,14 +105,38 @@ export interface HoopsMeta {
   lines: number;
 }
 
-/** Provenance for the UI footer — what fit this is, and when it was taken. */
+/**
+ * Provenance for the UI footer — what fit this is, and when it was taken.
+ *
+ * 🔴 Reads EXCLUSIVELY off the SQLite read model, never `loadBundle()` (disk).
+ * Before kad-air/keith-hub#73, hca_pts/replacementPer36/valueAsOf were read
+ * straight off the committed hoops-data/*.json bundle on every call — fine
+ * when disk was the only byte source, but silently wrong once a push can
+ * update the DB without ever touching those files. `writeBundle`
+ * (lib/hoops/import.ts) now persists all three into hoops_params at import
+ * time, from EITHER source, so this function reflects whichever one is
+ * actually live.
+ */
 export function getHoopsMeta(): HoopsMeta {
   ensureHoopsImport();
   const db = getDb();
   const row = db
-    .prepare(`SELECT param_version, blob, generated_at, imported_at FROM hoops_params WHERE id = 1`)
+    .prepare(
+      `SELECT param_version, blob, generated_at, imported_at, import_source,
+              hca_pts, replacement_per36, value_as_of
+       FROM hoops_params WHERE id = 1`,
+    )
     .get() as
-    | { param_version: string; blob: string; generated_at: string; imported_at: string }
+    | {
+        param_version: string;
+        blob: string;
+        generated_at: string;
+        imported_at: string;
+        import_source: ImportSource;
+        hca_pts: number;
+        replacement_per36: number;
+        value_as_of: string;
+      }
     | undefined;
   if (!row) throw new Error("hoops_params is empty — the import did not run");
 
@@ -120,20 +147,17 @@ export function getHoopsMeta(): HoopsMeta {
   const count = (table: string): number =>
     (db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get() as { n: number }).n;
 
-  // hca_pts lives in the teams export, not in the DB read model — it's a
-  // single scalar the engine needs, read straight off the bundle.
-  const bundle = loadBundle();
-
   return {
     paramVersion: row.param_version,
     generatedAt: row.generated_at,
     importedAt: row.imported_at,
     dataAsOf: blob.parameter_set.data_as_of,
     fittedAt: blob.parameter_set.fitted_at,
-    hcaPts: bundle.teams.hca_pts,
+    hcaPts: row.hca_pts,
     avgPossPerTeamGame: blob.parameter_set.avg_poss_per_team_game,
-    replacementPer36: bundle.players.replacement_per36,
-    valueAsOf: bundle.players.value_as_of,
+    replacementPer36: row.replacement_per36,
+    valueAsOf: row.value_as_of,
+    importSource: row.import_source,
     teams: count("hoops_teams"),
     players: count("hoops_players"),
     scheduledGames: count("hoops_schedule"),
