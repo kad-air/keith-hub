@@ -18,6 +18,7 @@
 // on the public internet.
 
 import crypto from "crypto";
+import zlib from "zlib";
 import { NextRequest, NextResponse } from "next/server";
 import { BUNDLE_FILES } from "@/lib/hoops/data";
 import {
@@ -77,9 +78,24 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // 🔴 The sender gzips the bundle and sets `Content-Encoding: gzip` (hoops-sim's
+  // `hoops.exporthub`, ~1.2 MB raw -> ~145 KB on the wire). `req.json()` does NOT
+  // transparently inflate a gzipped REQUEST body — fetch decompresses *response*
+  // bodies, not request bodies — so reading it directly fails with "invalid JSON
+  // body" on every real publish. Found on the first live publish after both halves
+  // shipped; the wire contract (kad-air/hoops-sim#24) said "gzip" without saying
+  // how, and each side picked a different half of the answer.
+  //
+  // Read raw bytes and inflate when the header says to. An UNCOMPRESSED body still
+  // works, so a hand-rolled `curl -d @bundle.json` for debugging is unaffected.
   let body: unknown;
   try {
-    body = await req.json();
+    const raw = Buffer.from(await req.arrayBuffer());
+    const encoding = (req.headers.get("content-encoding") ?? "").toLowerCase();
+    const text = encoding.includes("gzip")
+      ? zlib.gunzipSync(raw).toString("utf8")
+      : raw.toString("utf8");
+    body = JSON.parse(text);
   } catch {
     return NextResponse.json({ error: "invalid JSON body" }, { status: 400 });
   }
