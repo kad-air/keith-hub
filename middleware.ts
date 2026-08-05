@@ -47,6 +47,13 @@ export const config = {
     // precaches it at install time, including for logged-out visitors on the
     // public charts pages. If the middleware gated it, that precache fetch
     // would follow the 302 and cache the LOGIN page as the fallback.
-    "/((?!_next/static|_next/image|icons|manifest\\.webmanifest|sw\\.js|swe-worker-.*\\.js|offline\\.html|login|api/auth).*)",
+    //
+    // api/hoops/import (kad-air/keith-hub#73) is exempted the same way
+    // api/auth is: it does its OWN auth entirely (a dedicated
+    // HOOPS_IMPORT_TOKEN bearer check, not the FEED_PASSWORD cookie) —
+    // see app/api/hoops/import/route.ts. 🔴 That route's own check fails
+    // CLOSED when its token is unset, the opposite of this middleware's
+    // FEED_PASSWORD convention below — do not "fix" that to match this file.
+    "/((?!_next/static|_next/image|icons|manifest\\.webmanifest|sw\\.js|swe-worker-.*\\.js|offline\\.html|login|api/auth|api/hoops/import).*)",
   ],
 };

@@ -1,17 +1,34 @@
-// Project the committed hoops-sim export into the SQLite read model.
+// Project a hoops-sim export into the SQLite read model.
 //
-// Wholesale rewrite, like the `sources` sync — not an incremental merge. The
-// export is the source of truth for everything it covers, so a re-import
-// deletes and re-inserts every read-model row inside one transaction.
+// Two byte sources, one write path (`writeBundle`):
+//
+//   SEED  — the committed hoops-data/*.json in this repo. Cold-start only:
+//           `ensureHoopsImport()` reaches for it exactly once, when the
+//           volume has never held ANY hoops data at all, so a fresh Railway
+//           deploy doesn't ship a blank /hoops. See "cold start" below.
+//   PUSH  — POST /api/hoops/import (kad-air/keith-hub#73), the Mac Mini
+//           pushing a fresh bundle at will. This is the PRODUCTION byte
+//           source going forward — see CLAUDE.md's "Hoops" section.
+//
+// 🔴 Cold-start choice, stated explicitly: committed bundle as fallback, with
+// VOLUME STATE WINNING once anything real has landed. `hoops_params.
+// import_source` records which family produced the current data ('seed' or
+// 'push'). The instant a push lands, the disk path is permanently disabled
+// for that volume — ensureHoopsImport() checks import_source FIRST and
+// returns immediately if it's already 'push', never even reading disk. That
+// is what makes "Mini pushes stale committed bytes back over a fresh push on
+// the next redeploy" structurally impossible rather than merely unlikely:
+// there's a redeploy on every push to main, and a real trade could land on
+// the Mini in between.
+//
+// Until the first push, behaviour is UNCHANGED from before this milestone:
+// a redeploy carrying a refreshed committed bundle still auto-imports it
+// (hash comparison, as always) — this is what keeps /hoops non-blank between
+// "the repo has a section" and "the Mini has pushed for the first time".
 //
 // 🔴 The USER tables (hoops_scratch, hoops_runs) are NOT touched here. The
 // data flows one way only: Mini → hub. Nothing in keith-hub ever writes back
 // to hoops-sim.
-//
-// Trigger: lazily, once per process, on first hoops read (ensureHoopsImport).
-// It's keyed on a content hash of the committed files, so a deploy carrying a
-// fresh export imports it automatically, a restart on unchanged data is a
-// single SELECT, and none of it goes anywhere near the background poller.
 
 import type Database from "better-sqlite3";
 import { getDb } from "@/lib/db";
@@ -19,12 +36,15 @@ import { bundleHash, loadBundle, readParamsBlobText } from "./data";
 import { decodeParams } from "./params";
 import type { HoopsBundle } from "./types";
 
+export type ImportSource = "seed" | "push";
+
 export interface ImportSummary {
   imported: boolean;
-  reason: "unchanged" | "first-import" | "content-changed";
+  reason: "unchanged" | "first-import" | "content-changed" | "push-authoritative";
   paramVersion: string;
   generatedAt: string;
   contentHash: string;
+  importSource: ImportSource;
   counts: {
     teams: number;
     players: number;
@@ -34,18 +54,53 @@ export interface ImportSummary {
   };
 }
 
-function currentHash(db: Database.Database): { hash: string; count: number } | null {
+interface StoredState {
+  hash: string;
+  generatedAt: string;
+  count: number;
+  importSource: ImportSource;
+  /** false for a row written before kad-air/keith-hub#73's migration added
+   *  hca_pts/replacement_per36/value_as_of — see the no-op check below. */
+  hasScalars: boolean;
+}
+
+function currentState(db: Database.Database): StoredState | null {
   const row = db
-    .prepare(`SELECT content_hash AS hash FROM hoops_params WHERE id = 1`)
-    .get() as { hash: string } | undefined;
+    .prepare(`SELECT content_hash, generated_at, import_source, hca_pts FROM hoops_params WHERE id = 1`)
+    .get() as
+    | { content_hash: string; generated_at: string; import_source: ImportSource; hca_pts: number | null }
+    | undefined;
   if (!row) return null;
   const count = (
     db.prepare(`SELECT COUNT(*) AS n FROM hoops_teams`).get() as { n: number }
   ).n;
-  return { hash: row.hash, count };
+  return {
+    hash: row.content_hash,
+    generatedAt: row.generated_at,
+    count,
+    importSource: row.import_source,
+    hasScalars: row.hca_pts !== null,
+  };
 }
 
-function writeBundle(db: Database.Database, bundle: HoopsBundle, hash: string): void {
+interface WriteMeta {
+  hash: string;
+  generatedAt: string;
+  importSource: ImportSource;
+  paramsBlobText: string;
+  /** Full, merged constants object for this write — stored verbatim (JSON) so
+   *  a constant this receiver doesn't yet read by name is still preserved,
+   *  never dropped, in case a future feature wants it (#24's design
+   *  principle: push variability into the payload). null for the disk-seed
+   *  path, which has no envelope-level constants block of its own — the
+   *  engine's stale-blob guard already requires hoops_params.json's own
+   *  nested `constants` regardless (see decodeParams). */
+  constants: Record<string, unknown> | null;
+  pricingVersion: number | null;
+  features: string[] | null;
+}
+
+function writeBundle(db: Database.Database, bundle: HoopsBundle, meta: WriteMeta): void {
   const now = new Date().toISOString();
 
   const tx = db.transaction(() => {
@@ -60,14 +115,23 @@ function writeBundle(db: Database.Database, bundle: HoopsBundle, hash: string): 
     `);
 
     db.prepare(
-      `INSERT INTO hoops_params (id, param_version, blob, generated_at, imported_at, content_hash)
-       VALUES (1, ?, ?, ?, ?, ?)`,
+      `INSERT INTO hoops_params
+         (id, param_version, blob, generated_at, imported_at, content_hash, import_source,
+          hca_pts, replacement_per36, value_as_of, pricing_version, features_json, constants_json)
+       VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
       bundle.params.parameter_set.param_version,
-      readParamsBlobText(),
-      bundle.params.generated_at,
+      meta.paramsBlobText,
+      meta.generatedAt,
       now,
-      hash,
+      meta.hash,
+      meta.importSource,
+      bundle.teams.hca_pts,
+      bundle.players.replacement_per36,
+      bundle.players.value_as_of,
+      meta.pricingVersion,
+      meta.features ? JSON.stringify(meta.features) : null,
+      meta.constants ? JSON.stringify(meta.constants) : null,
     );
 
     const insTeam = db.prepare(
@@ -155,45 +219,21 @@ function writeBundle(db: Database.Database, bundle: HoopsBundle, hash: string): 
   tx();
 }
 
-/**
- * Import the committed export, unconditionally. Returns what it wrote.
- * `force` re-imports even when the content hash is unchanged.
- */
-export function importHoopsData(force = false): ImportSummary {
-  const db = getDb();
-  const bundle = loadBundle();
-
-  // 🔴 Stale-blob guard, on the write path. A blob the engine doesn't
-  // recognise never reaches SQLite — decodeParams throws instead.
-  decodeParams(bundle.params);
-
-  const hash = bundleHash();
-  const existing = currentHash(db);
-  const counts = {
+function countsOf(bundle: HoopsBundle): ImportSummary["counts"] {
+  return {
     teams: Object.keys(bundle.teams.teams).length,
     players: bundle.players.players.length,
     schedule: bundle.schedule.games.length,
     results: bundle.results.games.length,
     lines: bundle.lines.lines.length,
   };
+}
 
-  if (!force && existing && existing.hash === hash && existing.count > 0) {
-    return {
-      imported: false,
-      reason: "unchanged",
-      paramVersion: bundle.params.parameter_set.param_version,
-      generatedAt: bundle.params.generated_at,
-      contentHash: hash,
-      counts,
-    };
-  }
-
-  writeBundle(db, bundle, hash);
-
+function verifyWrite(db: Database.Database, counts: ImportSummary["counts"]): void {
   // Post-write verification: what landed must be what the bundle said. A
   // silent row shortfall (a failed insert, a UNIQUE collision) would show up
-  // three screens later as a missing team, which is exactly the kind of thing
-  // that's very hard to see afterwards.
+  // three screens later as a missing team, which is exactly the kind of
+  // thing that's very hard to see afterwards.
   const wrote = {
     teams: (db.prepare(`SELECT COUNT(*) AS n FROM hoops_teams`).get() as { n: number }).n,
     players: (db.prepare(`SELECT COUNT(*) AS n FROM hoops_players`).get() as { n: number }).n,
@@ -208,13 +248,131 @@ export function importHoopsData(force = false): ImportSummary {
       );
     }
   }
+}
+
+/**
+ * Import the committed disk bundle (hoops-data/*.json). `force` re-imports
+ * even when the content hash is unchanged. Never overwrites a 'push'-sourced
+ * read model, regardless of `force` — see the module docstring's cold-start
+ * section. This is the ONLY thing that ever calls `loadBundle()` for a write.
+ */
+export function importHoopsData(force = false): ImportSummary {
+  const db = getDb();
+  const bundle = loadBundle();
+
+  // 🔴 Stale-blob guard, on the write path. A blob the engine doesn't
+  // recognise never reaches SQLite — decodeParams throws instead.
+  decodeParams(bundle.params);
+
+  const hash = bundleHash();
+  const state = currentState(db);
+  const counts = countsOf(bundle);
+
+  if (state?.importSource === "push") {
+    // A real push is always authoritative over the committed fallback, full
+    // stop — see the module docstring. This is what a fresh git commit to
+    // hoops-data/*.json (still possible during the transition, or after) can
+    // never silently clobber.
+    return {
+      imported: false,
+      reason: "push-authoritative",
+      paramVersion: bundle.params.parameter_set.param_version,
+      generatedAt: state.generatedAt,
+      contentHash: state.hash,
+      importSource: "push",
+      counts,
+    };
+  }
+
+  // `state.hasScalars` false means the stored row predates this migration
+  // (hca_pts/replacement_per36/value_as_of were added to hoops_params here) —
+  // fall through to a real rewrite even though the hash is unchanged, so an
+  // existing prod DB backfills those columns on its next boot instead of
+  // reading meta.replacementPer36 as null forever (getHoopsMeta no longer
+  // has a disk fallback for it — see queries.ts).
+  if (!force && state && state.hash === hash && state.count > 0 && state.hasScalars) {
+    return {
+      imported: false,
+      reason: "unchanged",
+      paramVersion: bundle.params.parameter_set.param_version,
+      generatedAt: bundle.params.generated_at,
+      contentHash: hash,
+      importSource: "seed",
+      counts,
+    };
+  }
+
+  writeBundle(db, bundle, {
+    hash,
+    generatedAt: bundle.params.generated_at,
+    importSource: "seed",
+    paramsBlobText: readParamsBlobText(),
+    constants: (bundle.params.constants as unknown as Record<string, unknown>) ?? null,
+    pricingVersion: null,
+    features: null,
+  });
+  verifyWrite(db, counts);
 
   return {
     imported: true,
-    reason: existing ? "content-changed" : "first-import",
+    reason: state ? "content-changed" : "first-import",
     paramVersion: bundle.params.parameter_set.param_version,
     generatedAt: bundle.params.generated_at,
     contentHash: hash,
+    importSource: "seed",
+    counts,
+  };
+}
+
+export interface PushMeta {
+  hash: string;
+  generatedAt: string;
+  pricingVersion: number;
+  features: string[];
+  /** The envelope's top-level (post-merge-with-fallback) constants object. */
+  constants: Record<string, unknown>;
+}
+
+/**
+ * Import a bundle pushed via POST /api/hoops/import. Always wins over the
+ * disk seed (`importSource: 'push'`), and over an EARLIER push too — the
+ * newest push is always what's live. Caller (the route handler) has already
+ * run the wire-contract negotiation (features/pricing_version/required
+ * constants/staleness) — this function does the structural stale-blob guard
+ * and the actual transactional write, nothing else.
+ *
+ * Throws on a structurally invalid bundle (decodeParams, or a missing field
+ * better-sqlite3 refuses to bind) BEFORE or DURING the transaction — either
+ * way the transaction rolls back and the previous read model is untouched
+ * (better-sqlite3's `db.transaction()` wraps the whole body and issues
+ * ROLLBACK on any thrown exception, so this needs no separate try/catch of
+ * its own to get that guarantee).
+ */
+export function importPushedBundle(bundle: HoopsBundle, meta: PushMeta): ImportSummary {
+  const db = getDb();
+
+  decodeParams(bundle.params);
+
+  const counts = countsOf(bundle);
+  writeBundle(db, bundle, {
+    hash: meta.hash,
+    generatedAt: meta.generatedAt,
+    importSource: "push",
+    paramsBlobText: JSON.stringify(bundle.params),
+    constants: meta.constants,
+    pricingVersion: meta.pricingVersion,
+    features: meta.features,
+  });
+  verifyWrite(db, counts);
+
+  const state = currentState(db);
+  return {
+    imported: true,
+    reason: state && state.hash === meta.hash ? "content-changed" : "first-import",
+    paramVersion: bundle.params.parameter_set.param_version,
+    generatedAt: meta.generatedAt,
+    contentHash: meta.hash,
+    importSource: "push",
     counts,
   };
 }
@@ -223,7 +381,9 @@ let ensured = false;
 
 /**
  * Called by every hoops read. Cheap after the first call in a process — the
- * hash is computed once and memoized.
+ * hash is computed once and memoized. Only ever touches disk (the committed
+ * cold-start seed) — see the module docstring for why a push, once it has
+ * landed, disables this permanently for the life of the volume.
  */
 export function ensureHoopsImport(): void {
   if (ensured) return;
@@ -234,6 +394,10 @@ export function ensureHoopsImport(): void {
         `${summary.counts.teams} teams, ${summary.counts.players} players, ` +
         `${summary.counts.schedule} scheduled, ${summary.counts.results} results, ` +
         `${summary.counts.lines} lines — PARAM_VERSION ${summary.paramVersion}`,
+    );
+  } else if (summary.reason === "push-authoritative") {
+    console.log(
+      `[hoops] skipping committed seed — a pushed bundle (${summary.generatedAt}) is already live`,
     );
   }
   ensured = true;
