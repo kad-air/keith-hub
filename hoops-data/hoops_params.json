@@ -9,7 +9,7 @@
     "replacement_percentile": 0.1,
     "total_team_minutes": 240.0
   },
-  "generated_at": "2026-08-04T16:13:18.109013+00:00",
+  "generated_at": "2026-08-05T03:36:51.575892+00:00",
   "parameter_set": {
     "avg_poss_per_team_game": 99.5041,
     "base_mean_ppp": [
@@ -8897,7 +8897,7 @@
     ],
     "efficiency_sigma": 0.0,
     "endgame_window_seconds": 180.0,
-    "fitted_at": "2026-08-04T16:13:18.108830+00:00",
+    "fitted_at": "2026-08-05T03:36:51.575710+00:00",
     "grid_ppp": [
       0.15,
       0.16,

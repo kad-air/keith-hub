@@ -5110,7 +5110,7 @@
   "hca_pts": 1.9503,
   "n_sims": 200,
   "param_version": "m2-possession-v2",
-  "params_sha256": "3745593877d9be94f095758616b41acd4fa198f676ffe729bc05cb806340cb59",
+  "params_sha256": "c62f472f5f43f214da76ee37b1a524c2496603f2a030a0f428de5efcbb6da4d3",
   "replicates_reaching_ot": 39,
   "run_id": "real-blob-crosscheck-v1"
 }

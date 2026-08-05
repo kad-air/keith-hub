@@ -1,0 +1,211 @@
+{
+  "cases": [
+    {
+      "expected": {
+        "def": -2.936507937,
+        "ghost_minutes": 0.0,
+        "net": 5.873015873,
+        "off": 2.936507937,
+        "raw_strength": 10.873015873
+      },
+      "name": "ordinary full roster: every player has known raw minutes and a known value",
+      "players": [
+        {
+          "athlete_id": 101,
+          "raw_minutes": 34.0,
+          "value_per36": 3.0
+        },
+        {
+          "athlete_id": 102,
+          "raw_minutes": 30.0,
+          "value_per36": 1.5
+        },
+        {
+          "athlete_id": 103,
+          "raw_minutes": 20.0,
+          "value_per36": -0.5
+        }
+      ]
+    },
+    {
+      "expected": {
+        "def": -3.421052632,
+        "ghost_minutes": 0.0,
+        "net": 6.842105263,
+        "off": 3.421052632,
+        "raw_strength": 11.842105263
+      },
+      "name": "bench-default-minutes and replacement-value fallback: athlete_id 104 has neither raw_minutes nor value_per36 on record",
+      "players": [
+        {
+          "athlete_id": 101,
+          "raw_minutes": 34.0,
+          "value_per36": 3.0
+        },
+        {
+          "athlete_id": 102,
+          "raw_minutes": 30.0,
+          "value_per36": 1.5
+        },
+        {
+          "athlete_id": 104,
+          "raw_minutes": null,
+          "value_per36": null
+        }
+      ]
+    },
+    {
+      "expected": {
+        "def": -4.857723577,
+        "ghost_minutes": 0.0,
+        "net": 9.715447154,
+        "off": 4.857723577,
+        "raw_strength": 14.715447154
+      },
+      "name": "absorption_off: the SAME 3 remaining players as absorption_on, no absent player supplied at all (plain allocate_minutes, ghost_minutes must read 0)",
+      "players": [
+        {
+          "athlete_id": 201,
+          "raw_minutes": 36.0,
+          "value_per36": 5.0
+        },
+        {
+          "athlete_id": 202,
+          "raw_minutes": 28.0,
+          "value_per36": 1.0
+        },
+        {
+          "athlete_id": 203,
+          "raw_minutes": 18.0,
+          "value_per36": -1.5
+        }
+      ]
+    },
+    {
+      "absent": [
+        {
+          "athlete_id": 204,
+          "raw_minutes": 24.0,
+          "value_per36": null
+        }
+      ],
+      "expected": {
+        "def": -4.504313545,
+        "ghost_minutes": 7.933584906,
+        "net": 9.00862709,
+        "off": 4.504313545,
+        "raw_strength": 14.00862709
+      },
+      "name": "absorption_on: same 3 remaining players as absorption_off, athlete_id 204 removed and supplied as absent with his own (no-hindsight) raw minutes -- absorption_phi of his minutes must land on the ghost slot, the rest spread proportionally across the 3 remaining players",
+      "players": [
+        {
+          "athlete_id": 201,
+          "raw_minutes": 36.0,
+          "value_per36": 5.0
+        },
+        {
+          "athlete_id": 202,
+          "raw_minutes": 28.0,
+          "value_per36": 1.0
+        },
+        {
+          "athlete_id": 203,
+          "raw_minutes": 18.0,
+          "value_per36": -1.5
+        }
+      ]
+    },
+    {
+      "expected": {
+        "def": -7.222222222,
+        "ghost_minutes": 0.0,
+        "net": 14.444444444,
+        "off": 7.222222222,
+        "raw_strength": 19.444444444
+      },
+      "name": "fictional player with a declared per-36 value -- ARITHMETIC IDENTITY ONLY: a directly-supplied value_per36 is honored exactly, with no lookup. The unconverted-units/DB-resolution semantics that make a value 'fictional' in the first place are outside this ported function set -- see the section docstring above",
+      "players": [
+        {
+          "athlete_id": 301,
+          "raw_minutes": 32.0,
+          "value_per36": 2.0
+        },
+        {
+          "athlete_id": 9001,
+          "raw_minutes": 22.0,
+          "value_per36": 4.25
+        }
+      ]
+    },
+    {
+      "expected": {
+        "def": -2.166666667,
+        "ghost_minutes": 0.0,
+        "net": 4.333333333,
+        "off": 2.166666667,
+        "raw_strength": 9.333333333
+      },
+      "name": "delta identity, part 1: team A's full roster (2 players)",
+      "players": [
+        {
+          "athlete_id": 401,
+          "raw_minutes": 34.0,
+          "value_per36": 4.0
+        },
+        {
+          "athlete_id": 402,
+          "raw_minutes": 26.0,
+          "value_per36": -2.0
+        }
+      ]
+    },
+    {
+      "expected": {
+        "def": -10.833333333,
+        "ghost_minutes": 0.0,
+        "net": 21.666666667,
+        "off": 10.833333333,
+        "raw_strength": 26.666666667
+      },
+      "name": "delta identity, part 2: team A with athlete_id 402 removed (only team A's OWN raw_strength/off/def/net may differ from part 1 -- team B, part 3, must be unaffected)",
+      "players": [
+        {
+          "athlete_id": 401,
+          "raw_minutes": 34.0,
+          "value_per36": 4.0
+        }
+      ]
+    },
+    {
+      "expected": {
+        "def": 0.833333333,
+        "ghost_minutes": 0.0,
+        "net": -1.666666667,
+        "off": -0.833333333,
+        "raw_strength": 3.333333333
+      },
+      "name": "delta identity, part 3: team B, computed under the SAME top-level league_recenter as parts 1-2 -- there is no per-case recenter for team A's edit to disturb, which is what makes 'editing one team moves every other team's rating' structurally impossible here",
+      "players": [
+        {
+          "athlete_id": 501,
+          "raw_minutes": 30.0,
+          "value_per36": 0.5
+        },
+        {
+          "athlete_id": 502,
+          "raw_minutes": 30.0,
+          "value_per36": 0.5
+        }
+      ]
+    }
+  ],
+  "constants": {
+    "absorption_phi": 0.146,
+    "bench_default_minutes": 12.0,
+    "ghost_athlete_id": -1,
+    "replacement_per36": -1.0,
+    "total_team_minutes": 240.0
+  },
+  "description": "The pricing-layer cross-implementation fixture (GitHub issue #24) -- a FIXED, SYNTHETIC roster + values feeding the REAL hoops.rosterratings.raw_team_strength/team_net_rating -> known raw_strength/off/def/net per case. Schema matches keith-hub's own lib/hoops/pricing.ts + scripts/check-hoops-pricing-fixture.ts exactly (the receiver shipped first; its shape is authoritative per the issue #24 amendment, 2026-08-05). Port teamNetRating/rawTeamStrength/allocateMinutes/allocateMinutesWithAbsorption against THIS and reproduce every case's `expected` block to 1e-6 before trusting a roster edit's priced effect.",
+  "league_recenter": 5.0
+}
