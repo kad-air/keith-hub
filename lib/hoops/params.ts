@@ -1,17 +1,17 @@
 // Decode the committed hoops-sim parameter blob into typed arrays, and refuse
 // to decode one the engine doesn't recognise.
 //
-// 🔴 This is the stale-blob guard. `blob-contract.json` is what the TS engine
+// 🔴 This is the stale-blob guard. `blob-contract.ts` is what the TS engine
 // port expects the blob to BE; `hoops_params.json` is what it actually is. A
 // blob from an older parameter fit fails here — loudly, at import and at build
-// (scripts/check-hoops.mjs) — rather than silently producing wrong simulations
+// (scripts/check-hoops.ts) — rather than silently producing wrong simulations
 // three milestones later.
 //
 // 2D arrays are flattened into a single Float64Array + stride, which is the
 // shape the possession loop wants: `theta[table * gridSize + i]`. No numpy,
 // no nested-array pointer chasing in the hot loop.
 
-import CONTRACT from "./blob-contract.json";
+import { BLOB_CONTRACT as CONTRACT } from "./blob-contract.ts";
 import type { HoopsConstants, RawParameterSet, RawParamsFile } from "./types";
 
 export const BLOB_CONTRACT = CONTRACT;
@@ -116,18 +116,31 @@ function vector(values: number[], name: string, expectLen: number): Float64Array
  * Decode + verify. Throws StaleBlobError on any disagreement with the
  * contract — a wrong number here is not recoverable, it's a wrong simulation.
  */
-export function decodeParams(file: RawParamsFile): DecodedParams {
+export interface DecodeOptions {
+  /**
+   * Version the blob must declare. Defaults to what the engine expects.
+   * Pass `null` ONLY for the shared cross-implementation fixture, whose
+   * parameter set is deliberately synthetic ("hub-fixture-v1") so the pinned
+   * result doesn't move every time the model is re-fit. Never pass null for
+   * anything that reaches a screen.
+   */
+  expectVersion?: string | null;
+}
+
+export function decodeParams(file: RawParamsFile, options: DecodeOptions = {}): DecodedParams {
+  const expectVersion =
+    options.expectVersion === undefined ? EXPECTED_PARAM_VERSION : options.expectVersion;
   expect(!!file && !!file.parameter_set, "hoops_params.json: missing parameter_set");
   const ps: RawParameterSet = file.parameter_set;
 
   // The load-bearing one: the fit this blob came from must be the fit the
   // engine was written against.
   expect(
-    ps.param_version === EXPECTED_PARAM_VERSION,
+    expectVersion === null || ps.param_version === expectVersion,
     `stale parameter blob: hoops_params.json is PARAM_VERSION "${ps.param_version}", ` +
-      `the engine expects "${EXPECTED_PARAM_VERSION}". ` +
+      `the engine expects "${expectVersion}". ` +
       `Re-export from hoops-sim (uv run hoops export-hub) and update ` +
-      `lib/hoops/blob-contract.json only after checking the engine still matches the fit.`,
+      `lib/hoops/blob-contract.ts only after checking the engine still matches the fit.`,
   );
 
   // The blob carries its own shape constants; they must agree with the
@@ -171,18 +184,39 @@ export function decodeParams(file: RawParamsFile): DecodedParams {
     `outcome_class_of_category: length ${ps.outcome_class_of_category.length} != categories ${nCategories}`,
   );
 
-  const gridSize = CONTRACT.gridSize;
-  const nBinEdges = CONTRACT.durationBinEdges;
+  // The PPP grid and the duration histogram are sized by the blob itself —
+  // the fixture's synthetic set uses every real STRUCTURAL constant (47
+  // tables, 62 duration rows, the real indexing functions) but a deliberately
+  // smaller grid, so a port bug in the gather logic still shows up while the
+  // pinned result stays cheap to audit. The contract pins these only for a
+  // real fit, which is where a wrong grid would mean a wrong simulation.
+  expect(Array.isArray(ps.grid_ppp) && ps.grid_ppp.length > 1, "grid_ppp: missing or too short");
+  expect(
+    Array.isArray(ps.duration_bin_edges) && ps.duration_bin_edges.length > 1,
+    "duration_bin_edges: missing or too short",
+  );
+  const gridSize = ps.grid_ppp.length;
+  const nBinEdges = ps.duration_bin_edges.length;
 
   const gridPpp = vector(ps.grid_ppp, "grid_ppp", gridSize);
-  expect(
-    Math.abs(gridPpp[0] - CONTRACT.gridPppMin) < 1e-9,
-    `grid_ppp[0]: ${gridPpp[0]} != contract min ${CONTRACT.gridPppMin}`,
-  );
-  expect(
-    Math.abs(gridPpp[gridSize - 1] - CONTRACT.gridPppMax) < 1e-9,
-    `grid_ppp[last]: ${gridPpp[gridSize - 1]} != contract max ${CONTRACT.gridPppMax}`,
-  );
+  if (expectVersion !== null) {
+    expect(
+      gridSize === CONTRACT.gridSize,
+      `grid_ppp: length ${gridSize}, contract says ${CONTRACT.gridSize}`,
+    );
+    expect(
+      nBinEdges === CONTRACT.durationBinEdges,
+      `duration_bin_edges: length ${nBinEdges}, contract says ${CONTRACT.durationBinEdges}`,
+    );
+    expect(
+      Math.abs(gridPpp[0] - CONTRACT.gridPppMin) < 1e-9,
+      `grid_ppp[0]: ${gridPpp[0]} != contract min ${CONTRACT.gridPppMin}`,
+    );
+    expect(
+      Math.abs(gridPpp[gridSize - 1] - CONTRACT.gridPppMax) < 1e-9,
+      `grid_ppp[last]: ${gridPpp[gridSize - 1]} != contract max ${CONTRACT.gridPppMax}`,
+    );
+  }
 
   const decoded: DecodedParams = {
     paramVersion: ps.param_version,

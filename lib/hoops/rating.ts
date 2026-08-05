@@ -4,11 +4,10 @@
 // three modes in the browser without a round trip (30 teams × 3 modes is 90
 // numbers; there is no reason to ask the server).
 
-import FRANCHISES from "./nba-franchises.json";
+import { FRANCHISES } from "./nba-franchises.ts";
 import type { RankedTeam, RatingMode, TeamRow } from "./types";
 
-export const FRANCHISE: Record<string, { name: string; conference: string; division: string }> =
-  FRANCHISES.franchises;
+export const FRANCHISE = FRANCHISES;
 
 export function teamName(tri: string): string {
   return FRANCHISE[tri]?.name ?? tri;

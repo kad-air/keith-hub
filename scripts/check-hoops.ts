@@ -14,11 +14,11 @@
 //   committed bundle against things that are true INDEPENDENTLY of it:
 //
 //     • the real NBA — 30 franchises with fixed conference/division
-//       assignments (lib/hoops/nba-franchises.json), an 82-game schedule,
+//       assignments (lib/hoops/nba-franchises.ts), an 82-game schedule,
 //       1,230 games, and games that cannot end tied;
 //     • mathematics — a probability row sums to 1, a CDF is monotone from 0
 //       to 1, a grid is its own declared min/max/step;
-//     • the engine's declared contract (lib/hoops/blob-contract.json) — the
+//     • the engine's declared contract (lib/hoops/blob-contract.ts) — the
 //       stale-blob guard. A blob from an older fit fails the BUILD rather
 //       than silently producing wrong simulations three milestones later.
 //
@@ -32,16 +32,11 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { BLOB_CONTRACT as CONTRACT } from "../lib/hoops/blob-contract.ts";
+import { FRANCHISES } from "../lib/hoops/nba-franchises.ts";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const DATA = path.join(ROOT, "hoops-data");
-
-const CONTRACT = JSON.parse(
-  fs.readFileSync(path.join(ROOT, "lib", "hoops", "blob-contract.json"), "utf-8"),
-);
-const FRANCHISES = JSON.parse(
-  fs.readFileSync(path.join(ROOT, "lib", "hoops", "nba-franchises.json"), "utf-8"),
-).franchises;
 
 const TRIS = Object.keys(FRANCHISES).sort();
 
@@ -50,18 +45,18 @@ const N_TEAMS = 30;
 const GAMES_PER_TEAM = 82;
 const N_SCHEDULE_GAMES = (N_TEAMS * GAMES_PER_TEAM) / 2;
 
-const problems = [];
-const notes = [];
+const problems: string[] = [];
+const notes: string[] = [];
 
-function fail(msg) {
+function fail(msg: string): void {
   problems.push(msg);
 }
 
-function check(cond, msg) {
+function check(cond: boolean, msg: string): void {
   if (!cond) fail(msg);
 }
 
-function readJson(name) {
+function readJson(name: string): any {
   const p = path.join(DATA, name);
   if (!fs.existsSync(p)) {
     fail(
@@ -72,16 +67,16 @@ function readJson(name) {
   try {
     return JSON.parse(fs.readFileSync(p, "utf-8"));
   } catch (err) {
-    fail(`${name}: not valid JSON — ${err.message}`);
+    fail(`${name}: not valid JSON — ${(err as Error).message}`);
     return null;
   }
 }
 
-const finite = (v) => typeof v === "number" && Number.isFinite(v);
+const finite = (v: unknown): boolean => typeof v === "number" && Number.isFinite(v);
 
 // ───────────────────────────────────────────────────────────── params ──
 
-function checkParams(file) {
+function checkParams(file: any): void {
   if (!file) return;
   const ps = file.parameter_set;
   if (!ps) return fail("hoops_params.json: missing parameter_set");
@@ -90,7 +85,7 @@ function checkParams(file) {
   check(
     ps.param_version === CONTRACT.paramVersion,
     `STALE BLOB: hoops_params.json is PARAM_VERSION "${ps.param_version}", the engine expects ` +
-      `"${CONTRACT.paramVersion}" (lib/hoops/blob-contract.json). Re-export from hoops-sim, and ` +
+      `"${CONTRACT.paramVersion}" (lib/hoops/blob-contract.ts). Re-export from hoops-sim, and ` +
       `only bump the contract after confirming the engine still matches the fit.`,
   );
 
@@ -115,18 +110,18 @@ function checkParams(file) {
   notes.push(`K (fitted outcome categories) = ${K}`);
 
   // Declared dimensions vs actual array shapes.
-  const matrix = (name, arr, rows, cols) => {
+  const matrix = (name: string, arr: any, rows: number, cols: number): void => {
     check(
       Array.isArray(arr) && arr.length === rows,
       `hoops_params.json: ${name} has ${arr?.length} rows, expected ${rows}`,
     );
     if (!Array.isArray(arr)) return;
-    const badRow = arr.findIndex((r) => !Array.isArray(r) || r.length !== cols);
+    const badRow = arr.findIndex((r: any) => !Array.isArray(r) || r.length !== cols);
     check(badRow === -1, `hoops_params.json: ${name}[${badRow}] has wrong width (expected ${cols})`);
-    const badVal = arr.findIndex((r) => Array.isArray(r) && r.some((v) => !finite(v)));
+    const badVal = arr.findIndex((r: any) => Array.isArray(r) && r.some((v: number) => !finite(v)));
     check(badVal === -1, `hoops_params.json: ${name}[${badVal}] contains a non-finite value`);
   };
-  const vector = (name, arr, len) => {
+  const vector = (name: string, arr: any, len: number): void => {
     check(
       Array.isArray(arr) && arr.length === len,
       `hoops_params.json: ${name} has length ${arr?.length}, expected ${len}`,
@@ -161,8 +156,8 @@ function checkParams(file) {
   if (Array.isArray(ps.base_probs)) {
     let worst = 0;
     let worstRow = -1;
-    ps.base_probs.forEach((row, i) => {
-      const s = row.reduce((a, b) => a + b, 0);
+    ps.base_probs.forEach((row: any, i: number) => {
+      const s = row.reduce((a: number, b: number) => a + b, 0);
       if (Math.abs(s - 1) > worst) {
         worst = Math.abs(s - 1);
         worstRow = i;
@@ -177,7 +172,7 @@ function checkParams(file) {
 
   // A CDF runs 0 → 1, monotonically.
   if (Array.isArray(ps.duration_cumprobs)) {
-    ps.duration_cumprobs.forEach((row, i) => {
+    ps.duration_cumprobs.forEach((row: any, i: number) => {
       if (!Array.isArray(row)) return;
       check(Math.abs(row[0]) < 1e-9, `duration_cumprobs[${i}] starts at ${row[0]}, not 0`);
       check(
@@ -193,7 +188,7 @@ function checkParams(file) {
     });
   }
   if (Array.isArray(ps.transition_cumprobs)) {
-    ps.transition_cumprobs.forEach((row, i) => {
+    ps.transition_cumprobs.forEach((row: any, i: number) => {
       check(
         Math.abs(row[row.length - 1] - 1) < 1e-6,
         `transition_cumprobs[${i}] ends at ${row[row.length - 1]}, not 1`,
@@ -212,13 +207,13 @@ function checkParams(file) {
       Math.abs(g[g.length - 1] - CONTRACT.gridPppMax) < 1e-9,
       `grid_ppp ends at ${g[g.length - 1]}, contract says ${CONTRACT.gridPppMax}`,
     );
-    const badStep = g.findIndex((v, i) => i > 0 && Math.abs(v - g[i - 1] - CONTRACT.gridPppStep) > 1e-9);
+    const badStep = g.findIndex((v: number, i: number) => i > 0 && Math.abs(v - g[i - 1] - CONTRACT.gridPppStep) > 1e-9);
     check(badStep === -1, `grid_ppp step breaks at index ${badStep}`);
   }
   if (Array.isArray(ps.duration_bin_edges)) {
     const d = ps.duration_bin_edges;
     check(d[0] === 0, `duration_bin_edges starts at ${d[0]}, not 0`);
-    const badStep = d.findIndex((v, i) => i > 0 && Math.abs(v - d[i - 1] - 1) > 1e-9);
+    const badStep = d.findIndex((v: number, i: number) => i > 0 && Math.abs(v - d[i - 1] - 1) > 1e-9);
     check(badStep === -1, `duration_bin_edges step breaks at index ${badStep}`);
   }
 
@@ -228,7 +223,7 @@ function checkParams(file) {
 
 // ────────────────────────────────────────────────────────────── teams ──
 
-function checkTeams(file) {
+function checkTeams(file: any): void {
   if (!file) return;
   const teams = file.teams ?? {};
   const got = Object.keys(teams).sort();
@@ -236,12 +231,12 @@ function checkTeams(file) {
   check(got.length === N_TEAMS, `hoops_teams.json: expected ${N_TEAMS} teams, got ${got.length}`);
 
   // EXTERNAL: the actual NBA franchise list.
-  const missing = TRIS.filter((t) => !got.includes(t));
-  const extra = got.filter((t) => !TRIS.includes(t));
+  const missing = TRIS.filter((t: any) => !got.includes(t));
+  const extra = got.filter((t: any) => !TRIS.includes(t));
   check(missing.length === 0, `hoops_teams.json: missing franchises ${missing.join(", ")}`);
   check(extra.length === 0, `hoops_teams.json: unknown tri codes ${extra.join(", ")}`);
 
-  for (const [tri, t] of Object.entries(teams)) {
+  for (const [tri, t] of Object.entries(teams) as [string, any][]) {
     const truth = FRANCHISES[tri];
     if (!truth) continue;
     // EXTERNAL: conference/division are facts about the league, not the fit.
@@ -269,9 +264,9 @@ function checkTeams(file) {
   }
 
   // EXTERNAL: 15 per conference, 6 divisions of 5.
-  const byConf = {};
-  const byDiv = {};
-  for (const t of Object.values(teams)) {
+  const byConf: Record<string, number> = {};
+  const byDiv: Record<string, number> = {};
+  for (const t of Object.values(teams) as any[]) {
     byConf[t.conference] = (byConf[t.conference] ?? 0) + 1;
     byDiv[t.division] = (byDiv[t.division] ?? 0) + 1;
   }
@@ -289,14 +284,14 @@ function checkTeams(file) {
 
 // ──────────────────────────────────────────────────────────── players ──
 
-function checkPlayers(file) {
+function checkPlayers(file: any): void {
   if (!file) return;
   const players = file.players ?? [];
   check(players.length > 0, "hoops_players.json: no players");
 
-  const perTeam = {};
-  const seen = new Set();
-  for (const p of players) {
+  const perTeam: Record<string, number> = {};
+  const seen = new Set<number>();
+  for (const p of players as any[]) {
     check(TRIS.includes(p.team), `hoops_players.json: ${p.name} has unknown team "${p.team}"`);
     // The producer's own gate enforces this; assert it survived the trip.
     check(finite(p.minutes), `hoops_players.json: ${p.name} has non-finite minutes`);
@@ -318,7 +313,7 @@ function checkPlayers(file) {
     );
   }
 
-  const noValue = players.filter((p) => p.value_per36 == null).length;
+  const noValue = players.filter((p: any) => p.value_per36 == null).length;
   notes.push(
     `${players.length} players · ${noValue} without a value (no-history rookies — allowed)`,
   );
@@ -326,7 +321,7 @@ function checkPlayers(file) {
 
 // ─────────────────────────────────────────── schedule / results / lines ──
 
-function checkSchedule(file) {
+function checkSchedule(file: any): any {
   if (!file) return null;
   const games = file.games ?? [];
 
@@ -336,9 +331,9 @@ function checkSchedule(file) {
     `hoops_schedule.json: ${games.length} games, an NBA regular season is ${N_SCHEDULE_GAMES}`,
   );
 
-  const ids = new Set();
-  const played = {};
-  for (const g of games) {
+  const ids = new Set<string>();
+  const played: Record<string, number> = {};
+  for (const g of games as any[]) {
     check(!ids.has(g.game_id), `hoops_schedule.json: duplicate game_id ${g.game_id}`);
     ids.add(g.game_id);
     check(g.home !== g.away, `hoops_schedule.json: ${g.game_id} has ${g.home} playing itself`);
@@ -351,21 +346,21 @@ function checkSchedule(file) {
     played[g.home] = (played[g.home] ?? 0) + 1;
     played[g.away] = (played[g.away] ?? 0) + 1;
   }
-  const wrong = TRIS.filter((t) => played[t] !== GAMES_PER_TEAM);
+  const wrong = TRIS.filter((t: any) => played[t] !== GAMES_PER_TEAM);
   check(
     wrong.length === 0,
-    `hoops_schedule.json: ${wrong.map((t) => `${t}=${played[t] ?? 0}`).join(", ")} — every team plays ${GAMES_PER_TEAM}`,
+    `hoops_schedule.json: ${wrong.map((t: any) => `${t}=${played[t] ?? 0}`).join(", ")} — every team plays ${GAMES_PER_TEAM}`,
   );
 
-  return { ids, byId: new Map(games.map((g) => [g.game_id, g])) };
+  return { ids, byId: new Map(games.map((g: any) => [g.game_id, g])) };
 }
 
-function checkResults(file) {
+function checkResults(file: any): void {
   if (!file) return;
   const games = file.games ?? [];
   check(games.length > 0, "hoops_results.json: no games");
 
-  for (const g of games) {
+  for (const g of games as any[]) {
     check(TRIS.includes(g.home) && TRIS.includes(g.away), `hoops_results.json: unknown team in ${g.game_id}`);
     check(g.home !== g.away, `hoops_results.json: ${g.game_id} has ${g.home} playing itself`);
     check(
@@ -389,21 +384,21 @@ function checkResults(file) {
   notes.push(`${games.length} real finals, none tied`);
 }
 
-function checkLines(file, schedule) {
+function checkLines(file: any, schedule: any): void {
   if (!file) return;
   const lines = file.lines ?? [];
   check(lines.length > 0, "hoops_lines.json: no lines");
 
   // 🔴 LANDMINE: the line provider's own scores disagree with the truth on
   // 3/1315 games, so this file must never carry any.
-  const scoreKey = Object.keys(lines[0] ?? {}).find((k) => k.includes("score"));
+  const scoreKey = Object.keys(lines[0] ?? {}).find((k: any) => k.includes("score"));
   check(
     !scoreKey,
     `hoops_lines.json carries a "${scoreKey}" column — it must supply LINES ONLY; real finals live ` +
       `in hoops_results.json (the line provider disagrees with the truth on 3/1315 games)`,
   );
 
-  for (const l of lines) {
+  for (const l of lines as any[]) {
     if (schedule) {
       const g = schedule.byId.get(l.game_id);
       check(!!g, `hoops_lines.json: ${l.game_id} is not in the schedule`);
@@ -432,7 +427,7 @@ function checkLines(file, schedule) {
 
 // ──────────────────────────────────────────────────────────── fixture ──
 
-function checkFixture(file) {
+function checkFixture(file: any): void {
   if (!file) return;
   // The cross-implementation fixture isn't asserted here — that's the engine
   // port's job (issue #65, which asserts the SAME file the Python side pins).

@@ -1,0 +1,48 @@
+// The 30 NBA franchises as an EXTERNAL fact — not derived from the export.
+//
+// scripts/check-hoops.ts asserts the committed hoops-sim bundle agrees with
+// this file on the tri set and on every conference/division assignment. That
+// is what makes the build gate a second-source check rather than the export
+// agreeing with itself. It also supplies display names, which the export
+// doesn't carry.
+
+export interface Franchise {
+  name: string;
+  conference: "East" | "West";
+  division: string;
+}
+
+export const FRANCHISES: Record<string, Franchise> = {
+  ATL: { name: "Atlanta Hawks", conference: "East", division: "Southeast" },
+  BKN: { name: "Brooklyn Nets", conference: "East", division: "Atlantic" },
+  BOS: { name: "Boston Celtics", conference: "East", division: "Atlantic" },
+  CHA: { name: "Charlotte Hornets", conference: "East", division: "Southeast" },
+  CHI: { name: "Chicago Bulls", conference: "East", division: "Central" },
+  CLE: { name: "Cleveland Cavaliers", conference: "East", division: "Central" },
+  DAL: { name: "Dallas Mavericks", conference: "West", division: "Southwest" },
+  DEN: { name: "Denver Nuggets", conference: "West", division: "Northwest" },
+  DET: { name: "Detroit Pistons", conference: "East", division: "Central" },
+  GSW: { name: "Golden State Warriors", conference: "West", division: "Pacific" },
+  HOU: { name: "Houston Rockets", conference: "West", division: "Southwest" },
+  IND: { name: "Indiana Pacers", conference: "East", division: "Central" },
+  LAC: { name: "LA Clippers", conference: "West", division: "Pacific" },
+  LAL: { name: "Los Angeles Lakers", conference: "West", division: "Pacific" },
+  MEM: { name: "Memphis Grizzlies", conference: "West", division: "Southwest" },
+  MIA: { name: "Miami Heat", conference: "East", division: "Southeast" },
+  MIL: { name: "Milwaukee Bucks", conference: "East", division: "Central" },
+  MIN: { name: "Minnesota Timberwolves", conference: "West", division: "Northwest" },
+  NOP: { name: "New Orleans Pelicans", conference: "West", division: "Southwest" },
+  NYK: { name: "New York Knicks", conference: "East", division: "Atlantic" },
+  OKC: { name: "Oklahoma City Thunder", conference: "West", division: "Northwest" },
+  ORL: { name: "Orlando Magic", conference: "East", division: "Southeast" },
+  PHI: { name: "Philadelphia 76ers", conference: "East", division: "Atlantic" },
+  PHX: { name: "Phoenix Suns", conference: "West", division: "Pacific" },
+  POR: { name: "Portland Trail Blazers", conference: "West", division: "Northwest" },
+  SAC: { name: "Sacramento Kings", conference: "West", division: "Pacific" },
+  SAS: { name: "San Antonio Spurs", conference: "West", division: "Southwest" },
+  TOR: { name: "Toronto Raptors", conference: "East", division: "Atlantic" },
+  UTA: { name: "Utah Jazz", conference: "West", division: "Northwest" },
+  WAS: { name: "Washington Wizards", conference: "East", division: "Southeast" },
+};
+
+export default FRANCHISES;

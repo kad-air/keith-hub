@@ -2,17 +2,23 @@
 
 Generated data. **Do not hand-edit any JSON in this directory.**
 
-These seven files are the entire boundary between `~/Code/hoops-sim` (the Mac
+These eight files are the entire boundary between `~/Code/hoops-sim` (the Mac
 Mini: 20GB DuckDB over 8TB of parquet, Python model fitting) and The Feed's
 Hoops section. The fitting stays there; the engine ports here; this bundle is
 the only thing that crosses. Zero runtime dependency on the Mini.
 
 ## Regenerate
 
+**Two commands, both from `~/Code/hoops-sim`.** The second is not optional — the
+real-blob engine cases are pinned to the blob's sha256 and the build fails
+loudly if they drift apart.
+
 ```bash
 cd ~/Code/hoops-sim
 uv run hoops export-hub ~/Code/keith-hub/hoops-data
-cd ~/Code/keith-hub && npm run check:hoops
+uv run python ~/Code/keith-hub/scripts/gen_real_blob_cases.py
+
+cd ~/Code/keith-hub && npm run check:hoops && npm run check:hoops:fixture
 git add hoops-data && git commit -m "hoops: refresh the committed export"
 ```
 
@@ -36,6 +42,7 @@ rewrites the read-model tables and an unchanged bundle costs one `SELECT`.
 | `hoops_results.json` | the 200 most recent real finals |
 | `hoops_lines.json` | closing spread/total per game — **lines only, no scores** |
 | `hoops_fixture.json` | the Python half of the cross-implementation RNG fixture |
+| `hoops_realblob_cases.json` | Python engine results over THIS blob — the other half of the engine check |
 
 ## Two landmines these files encode
 
@@ -47,6 +54,14 @@ rewrites the read-model tables and an unchanged bundle costs one `SELECT`.
   the signature of reading a stale "End of period" play-by-play row instead of
   `dim_game` (one 2025-26 game reads 60–55 against a true 112–123 that way).
   Also asserted by the check.
+
+## The two engine fixtures are not redundant
+
+Established by falsification, not assumption. `hoops_fixture.json` is the only
+check that exercises `pace_sigma`/`efficiency_sigma` — production ships both at
+0.0, so against the real blob you can delete both latents and nothing notices.
+`hoops_realblob_cases.json` is the only one that reaches overtime, the end-game
+time buckets and the margin buckets, which 8 replicates never do. Both ship.
 
 ## `hoops_fixture.json` is not read-model data
 

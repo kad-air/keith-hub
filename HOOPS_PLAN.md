@@ -4,9 +4,18 @@
 > Self-contained: fit on the Mac Mini, commit the data, run the engine in the browser.
 
 **Status:** IN PROGRESS. Decision recorded 2026-07-31. Tracking epic: GitHub #63.
-**Milestone 1 (§10.1, issue #64) shipped 2026-08-04** — the export/import spine, `/hoops/teams`
-and `/hoops/teams/[tri]`, gated by `npm run check:hoops`. hoops-sim's `export-hub` generator
-(that repo's issue #21) shipped the same day. No simulation runs yet; the engine port is next.
+**Milestones 1 and 2 shipped 2026-08-04.** M1 (§10.1, issue #64): the export/import spine,
+`/hoops/teams` and `/hoops/teams/[tri]`, gated by `npm run check:hoops`. M2 (§10.2, issues #65 and
+#66): `rng.ts`/`philox.ts`/`blake2b.ts`/`engine.ts`, with bit-exact numpy parity **achieved** —
+480k draws bit-identical, and every per-replicate box-score value identical to Python — gated by
+`npm run check:hoops:fixture`. hoops-sim's `export-hub` generator (that repo's #21) shipped the
+same day. The engine has no UI yet; that's §10.3.
+
+⚠️ **§0.2's sizing needs revisiting before the studio (§10.4).** Measured: a 2000-replicate
+distribution is **~606ms** on a Mac Mini, not the "tens to a few hundred ms" assumed. The scalar
+JS port is only ~3× slower than vectorized numpy (better than the 10–50× assumed), but the
+absolute number is what the live-while-editing UX depends on. ~53% is the BigInt Philox, so
+32-bit limb arithmetic is the lever; 500 replicates is 172ms.
 🔴 Read `~/Code/hoops-sim/CLAUDE.md`, not this doc, for any model constant — see the epic's
 "the plan has drifted" table.
 **Supersedes:** hoops-sim's `docs/IDEA_hub-sandbox.md` (the "toy sandbox" idea), **deleted

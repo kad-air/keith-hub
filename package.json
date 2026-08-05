@@ -4,11 +4,12 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "check:hoops": "node scripts/check-hoops.mjs",
-    "prebuild": "node scripts/check-hoops.mjs",
+    "check:hoops": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-hoops.ts",
+    "prebuild": "npm run check:hoops && npm run check:hoops:fixture",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "check:hoops:fixture": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-hoops-fixture.ts"
   },
   "dependencies": {
     "@atproto/api": "^0.19.6",
@@ -36,5 +37,8 @@
     "sharp": "^0.34.5",
     "tailwindcss": "^3.4.1",
     "typescript": "^5"
+  },
+  "engines": {
+    "node": ">=24"
   }
 }
