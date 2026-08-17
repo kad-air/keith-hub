@@ -208,10 +208,13 @@ export default function BookDetailClient({ book, sync, history }: Props) {
             </Link>
           </div>
 
-          <dl className="mt-2 grid grid-cols-3 gap-x-4 gap-y-2">
+          {/* Two tiles, not three — "Sittings" used to sit here and was
+              removed: the X3 pushes progress manually, so a sitting count
+              measured how often sync was tapped. */}
+          <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2">
             <div>
               <dt className="font-mono text-[0.6rem] uppercase tracking-kicker text-cream-dimmer">
-                Days read
+                Days with progress
               </dt>
               <dd className="font-display text-xl tabular-nums text-cream">{history.daysRead}</dd>
             </div>
@@ -228,12 +231,6 @@ export default function BookDetailClient({ book, sync, history }: Props) {
                   </span>
                 )}
               </dd>
-            </div>
-            <div>
-              <dt className="font-mono text-[0.6rem] uppercase tracking-kicker text-cream-dimmer">
-                Sittings
-              </dt>
-              <dd className="font-display text-xl tabular-nums text-cream">{history.sessions}</dd>
             </div>
           </dl>
 

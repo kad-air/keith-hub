@@ -45,12 +45,6 @@ function relSpan(days: number): string {
   return `${Math.round(days / 30)} months`;
 }
 
-function fmtHour(h: number): string {
-  if (h === 0) return "12am";
-  if (h === 12) return "12pm";
-  return h < 12 ? `${h}am` : `${h - 12}pm`;
-}
-
 function plural(n: number, one: string, many = one + "s"): string {
   return `${n.toLocaleString()} ${n === 1 ? one : many}`;
 }
@@ -84,7 +78,6 @@ export default function BooksStatsClient({ stats }: { stats: ReadingStats }) {
       <RecordsRow stats={stats} />
       <FinishedShelf stats={stats} />
       <Badges stats={stats} />
-      <WhenYouRead stats={stats} />
       <Provenance stats={stats} />
     </article>
   );
@@ -433,7 +426,6 @@ function NowReadingRow({ item }: { item: NowReading }) {
 
 function RecordsRow({ stats }: { stats: ReadingStats }) {
   const best = stats.records.bestDay;
-  const session = stats.records.longestSession;
   return (
     <section className="mb-8">
       <h2 className="mb-3 border-b border-rule/40 pb-1 font-display text-lg text-cream">
@@ -446,11 +438,7 @@ function RecordsRow({ stats }: { stats: ReadingStats }) {
           unit={best ? `pages · ${fmtDay(best.day)}` : "pages"}
         />
         <Tile label="Longest streak" value={stats.records.longestStreak} unit="days" />
-        <Tile
-          label="Longest sitting"
-          value={session ? `${session.minutes}m` : "—"}
-          unit={session ? `est. · ${fmtTs(session.start)}` : "estimated"}
-        />
+        <Tile label="Days read" value={stats.totals.daysRead} unit="days with progress" />
         <Tile label="All time" value={stats.totals.pages} unit="pages read here" />
       </div>
     </section>
@@ -568,43 +556,6 @@ function Badges({ stats }: { stats: ReadingStats }) {
   );
 }
 
-// ── when ───────────────────────────────────────────────────────────────────
-
-function WhenYouRead({ stats }: { stats: ReadingStats }) {
-  const max = Math.max(...stats.byHour, 1);
-  const total = stats.byHour.reduce((a, b) => a + b, 0);
-  if (total === 0) return null;
-  const peak = stats.byHour.indexOf(max);
-
-  return (
-    <section className="mb-8">
-      <div className="mb-3 flex items-baseline justify-between gap-3 border-b border-rule/40 pb-1">
-        <h2 className="font-display text-lg text-cream">When you read</h2>
-        <p className="font-mono text-[0.65rem] uppercase tracking-kicker text-cream-dimmer">
-          peak {fmtHour(peak)}
-        </p>
-      </div>
-      <div className="flex h-20 items-end gap-[3px]">
-        {stats.byHour.map((n, h) => (
-          <div key={h} className="flex flex-1 flex-col items-center gap-1" title={`${fmtHour(h)} — ${n} syncs`}>
-            <div
-              className={`w-full ${h === peak ? "bg-accent" : "bg-rule"}`}
-              style={{ height: `${Math.max(2, (n / max) * 64)}px` }}
-            />
-          </div>
-        ))}
-      </div>
-      <div className="mt-1 flex justify-between font-mono text-[0.6rem] text-cream-dimmer">
-        <span>12am</span>
-        <span>6am</span>
-        <span>noon</span>
-        <span>6pm</span>
-        <span>11pm</span>
-      </div>
-    </section>
-  );
-}
-
 // ── honesty ────────────────────────────────────────────────────────────────
 
 function Provenance({ stats }: { stats: ReadingStats }) {
@@ -630,11 +581,16 @@ function Provenance({ stats }: { stats: ReadingStats }) {
           printed edition. Page counts here are estimates, and comparable with each other.
         </p>
         <p>
-          {/* The one genuinely inferred quantity, said plainly rather than
-              buried — a sitting that synced once has no measurable span. */}
-          <span className="text-cream">Sitting lengths are estimated</span> from the gaps between
-          syncs, so a session your device only reported once counts as zero minutes. Treat those as
-          a floor, not a measurement. Everything else — days, positions, pages — is measured.
+          {/* The real caveat, in place of the old one about sitting lengths.
+              The X3 pushes progress manually, so a timestamp marks the push,
+              not the reading — which is why there is no clock or duration
+              anywhere on this page. */}
+          A day&apos;s progress lands on{" "}
+          <span className="text-cream">the day the X3 pushed it</span>, not necessarily the day you
+          read it. Since that push is manual and usually happens in the evening, reading spread over
+          two days can arrive as one big day — a quiet Monday next to a double Tuesday. Nothing here
+          is spread backwards to guess which hours it covered, and nothing reports how long you read
+          or what time of day: a sync timestamp simply doesn&apos;t carry it.
         </p>
         {stats.since != null && (
           <p>

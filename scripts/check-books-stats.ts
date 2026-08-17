@@ -499,6 +499,80 @@ console.log("\n── finishing is a crossing, not a state ──");
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+console.log("\n── 🔴 a sync timestamp is a PUSH, not a reading ──");
+// ═══════════════════════════════════════════════════════════════════════════
+// The X3 pushes progress MANUALLY — tapped about once a day, in the evening,
+// when handing off to Readest. The overwhelming majority of reading happens
+// there. So a timestamp records when sync was tapped, and any statistic built
+// on the clock or on the spacing between syncs measures the push instead of
+// the reading. Sittings, session lengths and an hour-of-day histogram were all
+// built, found to be measuring exactly that, and removed.
+//
+// Pinned structurally: these must not creep back, because each one renders as
+// a confident number ("your longest sitting was 3 minutes", "you read most at
+// 8pm") that looks plausible and is measuring the wrong thing entirely.
+{
+  const t = Math.floor(new Date("2026-08-10T21:00:00Z").getTime() / 1000);
+  const day = 86400;
+
+  // The real usage pattern: ONE push a day, carrying a whole day of reading.
+  const events = [ev("x3", 0.0, 0, t, { kind: "baseline", device: "CrossPoint" })];
+  for (let d = 1; d <= 5; d++) {
+    events.push(ev("x3", 0.1 * d, 0.1, t + d * day, { device: "CrossPoint" }));
+  }
+  const stats = computeReadingStats({
+    events,
+    books: [BOOK("x3", 100_000)],
+    now: t + 5 * day + 3600,
+    timeZone: TZ,
+  });
+
+  assert(stats.streak.current === 5, "a once-a-day manual push still builds a streak (5)");
+  assert(stats.totals.daysRead === 5, "…and counts five days with progress");
+  assert(stats.totals.pages === 129, `…and attributes pages normally (got ${stats.totals.pages})`);
+
+  const model = stats as unknown as Record<string, unknown>;
+  for (const gone of ["sessions", "byHour"]) {
+    assert(!(gone in model), `🔴 the model exposes no "${gone}" — it would measure the push`);
+  }
+  assert(
+    !("longestSession" in (stats.records as unknown as Record<string, unknown>)),
+    "🔴 records carries no longestSession",
+  );
+  const badgeKeys = stats.badges.map((b: { key: string }) => b.key);
+  for (const gone of ["marathon", "night-owl", "dawn-patrol", "one-sitting"]) {
+    assert(!badgeKeys.includes(gone), `🔴 no "${gone}" badge — it would award a sync time`);
+  }
+  assert(
+    !/localHour|SESSION_GAP|estimatedMinutes/.test(
+      fs.readFileSync(path.resolve(repoRoot, "lib/books/stats.ts"), "utf8").replace(/^\/\/.*$/gm, ""),
+    ),
+    "🔴 no clock-of-day or session helper survives in the model (comments aside)",
+  );
+
+  // The distortion this leaves behind, asserted rather than hidden: two days of
+  // reading pushed once land wholly on the push day. Spreading it backwards
+  // would be inventing data, so the page states it instead.
+  const lumped = computeReadingStats({
+    events: [
+      ev("x3", 0.0, 0, t, { kind: "baseline" }),
+      ev("x3", 0.2, 0.2, t + 2 * day), // read across two days, pushed on the second
+    ],
+    books: [BOOK("x3", 100_000)],
+    now: t + 2 * day + 3600,
+    timeZone: TZ,
+  });
+  const pushDay = dayKey(t + 2 * day, TZ);
+  const quietDay = dayKey(t + day, TZ);
+  const cellOn = (d: string) => lumped.calendar.find((c: { day: string }) => c.day === d)!;
+  assert(
+    cellOn(pushDay).pages === 52 && cellOn(quietDay).pages === 0,
+    "🔴 two days of reading pushed once lands entirely on the push day (the stated distortion)",
+  );
+  assert(lumped.streak.current === 1, "…and reads as one day, not two");
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 console.log("\n── a projection refuses thin evidence ──");
 // ═══════════════════════════════════════════════════════════════════════════
 {

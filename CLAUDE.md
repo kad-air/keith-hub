@@ -401,9 +401,30 @@ from `epubText.ts` (the tidy-looking place, next to the counting) drags AdmZip i
 bundle and shipped **182 kB** of zip library to `/books/stats` with everything still working
 perfectly. Only the bundle size ever said so; `check:books:stats` now pins it statically.
 
-**The one inferred quantity is TIME, and it says so on screen.** Sitting lengths are reconstructed
-by clustering syncs (`SESSION_GAP_MINUTES`), so a session the device reported once spans zero
-minutes — a floor, not a measurement. Days, positions and pages are measured. Projections refuse
+🔴 **A sync timestamp records WHEN THE DEVICE PUSHED, not when the reading happened — and on the
+X3, pushing is MANUAL.** The owner taps it about once a day, in the evening, when handing off to
+Readest on the phone, and the overwhelming majority of reading is on the X3. This single fact is
+why several obvious-looking statistics are *deliberately absent rather than merely unbuilt*. Each
+was built, found to be measuring the push, and removed:
+- **Sittings / session lengths.** Clustering syncs reconstructs the shape of the *pushes*. One push
+  a day means every sitting spans zero minutes. There is no duration signal in this data — not a
+  weak one, none. (Took `SESSION_GAP_MINUTES`, the `Session` type, `records.longestSession`, the
+  `Marathon` badge and the per-book "Sittings" tile with it.)
+- **Time of day.** An hour histogram plots when sync was tapped, so it reads "you read most at 8pm"
+  regardless of when the reading happened. (Took `byHour`, `localHour`, and the `Night Owl` /
+  `Dawn Patrol` badges.)
+
+`check:books:stats` pins their **absence** structurally — no `sessions`/`byHour` on the model, no
+`longestSession` on `records`, none of those badge keys, and no clock/session helper in the source
+— because each one renders as a confident, plausible number that measures the wrong thing.
+Falsification-tested by reintroducing each; all caught. Replacements that *are* derivable from
+day-and-progress: `Double Century` (200 pages in a day), `Comeback` (resume a book after 30+ days),
+`Series Sweep` (finish two from one series).
+
+**The known distortion is stated on screen, not smoothed away:** a day's progress lands on the day
+it was *pushed*, so reading spread over two days can arrive as one big day — a quiet Monday beside
+a double Tuesday. Spreading a delta backwards across the days it "probably" covers would be
+inventing data. Days, positions and pages are measured; nothing else is claimed. Projections refuse
 thin evidence: under three reading days in the window, no forecast is shown at all rather than a
 confident wrong date. Finishing is a CROSSING of `FINISH_THRESHOLD` (0.97 — readers stop short of
 1.0), not a state, so a device idling at 99% doesn't re-finish a book on every check-in.

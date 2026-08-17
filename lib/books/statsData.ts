@@ -44,8 +44,6 @@ export function getReadingStats(now: number = Math.floor(Date.now() / 1000)): Re
 export type BookHistory = {
   daysRead: number;
   pages: number;
-  sessions: number;
-  estimatedMinutes: number;
   firstSeen: number | null;
   lastRead: number | null;
   finishes: Array<{ finishedAt: number; daysTaken: number | null }>;
@@ -95,8 +93,6 @@ export function getBookHistory(
   return {
     daysRead: stats.totals.daysRead,
     pages: stats.totals.pages,
-    sessions: stats.sessions.count,
-    estimatedMinutes: stats.sessions.estimatedMinutes,
     firstSeen: stats.since,
     lastRead: current?.lastReadAt ?? stats.finished[0]?.finishedAt ?? null,
     finishes: stats.finished.map((f) => ({ finishedAt: f.finishedAt, daysTaken: f.daysTaken })),
