@@ -14,33 +14,50 @@ import type { ReadingEvent } from "./readingEvents.ts";
 // Python), instead of asserting the code agrees with itself. Same discipline
 // as lib/hoops/rating.ts and matchup.ts. Keep it that way.
 //
-// ── What is measured, and what is inferred ────────────────────────────────
+// ── 🔴 What a sync timestamp actually is ──────────────────────────────────
+//
+// A reading_events row records WHEN THE DEVICE PUSHED, not when the reading
+// happened. On the Xteink X3 — where the overwhelming majority of this
+// library's reading is done — pushing progress is a MANUAL action, tapped
+// roughly once a day, typically in the evening when handing off to Readest on
+// the phone. Readest's own syncs are closer to the moment, but they are the
+// minority.
+//
+// Everything below follows from that one fact, and it is the reason several
+// obvious-looking statistics are deliberately absent rather than merely
+// unbuilt:
 //
 // MEASURED, and safe to state plainly:
-//   · WHEN a sync happened (the device's clock, to the second)
+//   · WHICH DAY progress arrived (to the day, in READING_TIMEZONE)
 //   · WHERE in the book it landed (the device's own percentage)
-//   · therefore: which days had reading, and how much of a book was covered
-//   · pages, once a book's word count is known — see epubText.ts
+//   · therefore: how much of a book was covered, and pages once a word count
+//     is known — see epubText.ts
 //
-// INFERRED, and labelled as such wherever it renders:
-//   · TIME SPENT. Nothing reports duration. Sessions are reconstructed by
-//     clustering syncs, so a session that synced once has no measurable span
-//     and contributes zero. Every minutes figure here is a FLOOR, not a
-//     measurement, and the UI says so rather than hiding it in a tooltip.
-//
-// NOT DERIVABLE, and therefore never shown:
+// 🔴 NOT DERIVABLE, and therefore NEVER SHOWN. Each of these was built, found
+// to be measuring the push rather than the reading, and removed:
+//   · TIME SPENT / sittings. Clustering syncs into sessions reconstructs the
+//     shape of the PUSHES. One manual push a day means every "sitting" spans
+//     zero minutes, and a "longest sitting" is noise. There is no duration
+//     signal in this data at all — not a weak one, none.
+//   · TIME OF DAY. An hour histogram plots when the reader taps sync, which
+//     is the evening handoff, and would read as "you read most at 8pm" no
+//     matter when the reading happened. Same for any badge keyed on the clock
+//     (a "night owl" award for pushing after midnight).
 //   · anything before the first event. kosync_progress upserts, so the era
 //     before this log existed left no history to mine. Baselines carry the
 //     current position with delta 0 and the UI dates the record honestly.
+//
+// KNOWN DISTORTION, stated on screen rather than smoothed away: a day's
+// progress lands on the day it was PUSHED. Read Monday and Tuesday, push
+// Tuesday evening, and Monday shows empty while Tuesday shows double. Spreading
+// a delta backwards across the days it "probably" covers would be inventing
+// data, so the page reports what it knows and says what that means.
 
 /** A book crosses into "finished" here. KOReader/CrossPoint routinely stop
  *  reporting a hair under 1.0 at the true end of a book — back matter, the
  *  final page never being "turned" — so demanding 100% would mean almost
  *  nothing ever finishes. */
 export const FINISH_THRESHOLD = 0.97;
-
-/** Syncs closer together than this belong to one sitting. */
-export const SESSION_GAP_MINUTES = 30;
 
 /** A book with no sync for this long has gone quiet, and gets a nudge. */
 export const STALLED_DAYS = 10;
@@ -97,14 +114,6 @@ export type Finish = {
   daysTaken: number | null;
 };
 
-export type Session = {
-  start: number;
-  end: number;
-  minutes: number;
-  pages: number;
-  documents: string[];
-};
-
 export type Badge = {
   key: string;
   name: string;
@@ -130,10 +139,8 @@ export type ReadingStats = {
   calendar: DayCell[];
   nowReading: NowReading[];
   finished: Finish[];
-  sessions: { longest: Session | null; count: number; estimatedMinutes: number };
   records: {
     bestDay: { day: string; pages: number } | null;
-    longestSession: Session | null;
     longestStreak: number;
   };
   totals: {
@@ -145,8 +152,6 @@ export type ReadingStats = {
     booksFinishedThisYear: number;
   };
   pace: { last7: number; last30: number; window: number };
-  /** Local-hour histogram, 24 entries — "you read most at 10pm". */
-  byHour: number[];
   devices: Array<{ device: string; pages: number; syncs: number }>;
   badges: Badge[];
   /** Documents synced that no catalog book matches, so their pages can't be
@@ -182,24 +187,9 @@ function dayFormatter(timeZone: string): Intl.DateTimeFormat {
   return f;
 }
 
-const hourFormatters = new Map<string, Intl.DateTimeFormat>();
-function hourFormatter(timeZone: string): Intl.DateTimeFormat {
-  let f = hourFormatters.get(timeZone);
-  if (!f) {
-    f = new Intl.DateTimeFormat("en-GB", { timeZone, hour: "2-digit", hourCycle: "h23" });
-    hourFormatters.set(timeZone, f);
-  }
-  return f;
-}
-
 /** Local calendar day (YYYY-MM-DD) of a unix-seconds instant. */
 export function dayKey(ts: number, timeZone: string = READING_TIMEZONE): string {
   return dayFormatter(timeZone).format(new Date(ts * 1000));
-}
-
-/** Local hour 0–23 of a unix-seconds instant. */
-export function localHour(ts: number, timeZone: string = READING_TIMEZONE): number {
-  return Number(hourFormatter(timeZone).format(new Date(ts * 1000)));
 }
 
 /**
@@ -249,7 +239,6 @@ export function computeReadingStats(input: StatsInput): ReadingStats {
 
   // ── per-day rollup ───────────────────────────────────────────────────────
   const dayMap = new Map<string, { pages: number; syncs: number; docs: Set<string> }>();
-  const hours = new Array(24).fill(0);
   const deviceMap = new Map<string, { pages: number; syncs: number }>();
   const unmeasuredDocs = new Set<string>();
   let unmeasuredSyncs = 0;
@@ -265,7 +254,6 @@ export function computeReadingStats(input: StatsInput): ReadingStats {
     }
     cell.syncs++;
     cell.docs.add(e.document);
-    hours[localHour(e.timestamp, tz)]++;
 
     // 🔴 Backwards movement never subtracts. A reader flipping back a chapter,
     // or a second device syncing a position it hadn't caught up from, has not
@@ -372,31 +360,6 @@ export function computeReadingStats(input: StatsInput): ReadingStats {
   }
   finished.sort((a, b) => b.finishedAt - a.finishedAt);
 
-  // ── sessions ─────────────────────────────────────────────────────────────
-  const sessions: Session[] = [];
-  const gap = SESSION_GAP_MINUTES * 60;
-  for (const e of reads) {
-    const last = sessions[sessions.length - 1];
-    const pages = pagesFor(e.document, Math.max(0, e.delta)) ?? 0;
-    if (last && e.timestamp - last.end <= gap) {
-      last.end = e.timestamp;
-      last.pages += pages;
-      if (!last.documents.includes(e.document)) last.documents.push(e.document);
-    } else {
-      sessions.push({
-        start: e.timestamp,
-        end: e.timestamp,
-        minutes: 0,
-        pages,
-        documents: [e.document],
-      });
-    }
-  }
-  for (const s of sessions) s.minutes = Math.round((s.end - s.start) / 60);
-  const longestSession =
-    sessions.length > 0 ? sessions.reduce((a, b) => (b.minutes > a.minutes ? b : a)) : null;
-  const estimatedMinutes = sessions.reduce((sum, s) => sum + s.minutes, 0);
-
   // ── now reading ──────────────────────────────────────────────────────────
   const latestByDoc = new Map<string, ReadingEvent>();
   for (const e of events) latestByDoc.set(e.document, e);
@@ -478,10 +441,8 @@ export function computeReadingStats(input: StatsInput): ReadingStats {
     calendar,
     nowReading,
     finished,
-    sessions: { longest: longestSession, count: sessions.length, estimatedMinutes },
     records: {
       bestDay: bestDayEntry,
-      longestSession,
       longestStreak: longest,
     },
     totals: {
@@ -497,7 +458,6 @@ export function computeReadingStats(input: StatsInput): ReadingStats {
       last30: Number((pagesSince(30) / 30).toFixed(1)),
       window: PACE_WINDOW_DAYS,
     },
-    byHour: hours,
     devices: [...deviceMap.entries()]
       .map(([device, d]) => ({ device, pages: Math.round(d.pages), syncs: d.syncs }))
       .sort((a, b) => b.syncs - a.syncs),
@@ -505,7 +465,7 @@ export function computeReadingStats(input: StatsInput): ReadingStats {
     unmeasured: { documents: unmeasuredDocs.size, syncs: unmeasuredSyncs },
   };
 
-  stats.badges = computeBadges(stats, reads, tz);
+  stats.badges = computeBadges(stats, reads);
   return stats;
 }
 
@@ -516,12 +476,7 @@ export function computeReadingStats(input: StatsInput): ReadingStats {
 // unearned badge reports honest progress toward itself so the list reads as a
 // set of goals rather than a wall of locked boxes.
 
-function computeBadges(stats: ReadingStats, reads: ReadingEvent[], tz: string): Badge[] {
-  const firstAt = (pred: (e: ReadingEvent) => boolean): number | null => {
-    const hit = reads.find(pred);
-    return hit ? hit.timestamp : null;
-  };
-
+function computeBadges(stats: ReadingStats, reads: ReadingEvent[]): Badge[] {
   const streakBadge = (days: number, key: string, name: string, blurb: string): Badge => ({
     key,
     name,
@@ -532,13 +487,37 @@ function computeBadges(stats: ReadingStats, reads: ReadingEvent[], tz: string): 
 
   const finishes = stats.finished;
   const bestDayPages = stats.records.bestDay?.pages ?? 0;
-  const longestSessionMin = stats.records.longestSession?.minutes ?? 0;
 
   // Days on which two or more distinct books moved.
   const multiBookDay = stats.calendar.find((c) => c.books >= 2) ?? null;
 
   const doorstopper = finishes.find((f) => (f.words ?? 0) >= 200_000) ?? null;
   const sprint = finishes.find((f) => f.daysTaken != null && f.daysTaken <= 3) ?? null;
+
+  // Picking a quiet book back up — the thing the "quiet for 3 weeks" nudge is
+  // asking for, so it gets rewarded. A gap between consecutive syncs of the
+  // same document is measurable in days, which survives the manual-push
+  // caveat that killed the clock-based badges.
+  const lastSeen = new Map<string, number>();
+  let comebackAt: number | null = null;
+  for (const e of reads) {
+    const prev = lastSeen.get(e.document);
+    if (comebackAt == null && prev != null && e.timestamp - prev >= 30 * 86400) {
+      comebackAt = e.timestamp;
+    }
+    lastSeen.set(e.document, e.timestamp);
+  }
+
+  // Two books from one series, finished. Series comes off the catalog row.
+  const seriesFinishes = new Map<string, number>();
+  let seriesSweepAt: number | null = null;
+  for (const f of [...finishes].reverse()) {
+    const series = f.book?.series;
+    if (!series) continue;
+    const n = (seriesFinishes.get(series) ?? 0) + 1;
+    seriesFinishes.set(series, n);
+    if (n === 2 && seriesSweepAt == null) seriesSweepAt = f.finishedAt;
+  }
 
   return [
     {
@@ -554,26 +533,6 @@ function computeBadges(stats: ReadingStats, reads: ReadingEvent[], tz: string): 
     streakBadge(30, "the-long-haul", "The Long Haul", "Thirty consecutive days."),
     streakBadge(100, "centurion", "Centurion", "A hundred days. Genuinely absurd."),
     {
-      key: "night-owl",
-      name: "Night Owl",
-      blurb: "Turn a page between midnight and 4am.",
-      earnedAt: firstAt((e) => {
-        const h = localHour(e.timestamp, tz);
-        return h >= 0 && h < 4;
-      }),
-      progress: 0,
-    },
-    {
-      key: "dawn-patrol",
-      name: "Dawn Patrol",
-      blurb: "Read before 6am.",
-      earnedAt: firstAt((e) => {
-        const h = localHour(e.timestamp, tz);
-        return h >= 4 && h < 6;
-      }),
-      progress: 0,
-    },
-    {
       key: "century",
       name: "Century",
       blurb: "A hundred pages in one day.",
@@ -581,11 +540,11 @@ function computeBadges(stats: ReadingStats, reads: ReadingEvent[], tz: string): 
       progress: Math.min(1, bestDayPages / 100),
     },
     {
-      key: "marathon",
-      name: "Marathon",
-      blurb: "A two-hour sitting.",
-      earnedAt: longestSessionMin >= 120 ? (stats.records.longestSession?.start ?? null) : null,
-      progress: Math.min(1, longestSessionMin / 120),
+      key: "double-century",
+      name: "Double Century",
+      blurb: "Two hundred pages in a single day.",
+      earnedAt: bestDayPages >= 200 ? (stats.since ?? null) : null,
+      progress: Math.min(1, bestDayPages / 200),
     },
     {
       key: "the-end",
@@ -609,11 +568,25 @@ function computeBadges(stats: ReadingStats, reads: ReadingEvent[], tz: string): 
       progress: doorstopper ? 1 : 0,
     },
     {
-      key: "one-sitting",
+      key: "devoured",
       name: "Devoured",
       blurb: "Finish a book within three days of starting it.",
       earnedAt: sprint?.finishedAt ?? null,
       progress: sprint ? 1 : 0,
+    },
+    {
+      key: "comeback",
+      name: "Comeback",
+      blurb: "Pick a book back up after a month away.",
+      earnedAt: comebackAt,
+      progress: comebackAt != null ? 1 : 0,
+    },
+    {
+      key: "series-sweep",
+      name: "Series Sweep",
+      blurb: "Finish two books from the same series.",
+      earnedAt: seriesSweepAt,
+      progress: Math.min(1, Math.max(0, ...[...seriesFinishes.values()], 0) / 2),
     },
     {
       key: "two-timer",
