@@ -1,4 +1,4 @@
-import { TRACKER_CONFIGS } from "@/lib/tracker-config";
+import { TRACKER_CONFIGS, TRACKERS_ENABLED } from "@/lib/tracker-config";
 
 export type SectionGroup = "Reading" | "Tracking" | "Library" | "Guitar" | "System";
 
@@ -98,7 +98,12 @@ const CHARTS_SECTION: Section = {
 };
 
 export const SECTIONS: Section[] = (() => {
-  const trackerSections: Section[] = TRACKER_CONFIGS.map((t) => ({
+  // Empty while the Tracking section is hidden, which drops the group from the
+  // Masthead switcher and Contents (Contents filters out empty groups) and
+  // renumbers everything below it.
+  const trackerSections: Section[] = (
+    TRACKERS_ENABLED ? TRACKER_CONFIGS : []
+  ).map((t) => ({
     key: t.slug,
     num: "",
     name: t.label,

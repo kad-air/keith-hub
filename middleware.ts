@@ -1,6 +1,24 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { AUTH_COOKIE, deriveAuthToken, publicUrl } from "@/lib/auth";
+import { TRACKERS_ENABLED } from "@/lib/tracker-config";
+
+// The Craft-backed Tracking section is hidden (Stow replaced it) — see
+// lib/tracker-config.ts for the one flag that governs it. Refusing here rather
+// than only inside the routes is deliberate, for two reasons:
+//   1. The pages' own `notFound()` renders the not-found BODY but returns HTTP
+//      200 — an async `generateMetadata` commits the response status before the
+//      component throws (Next 14). Middleware answers with a real 404.
+//   2. Nothing tracker-shaped executes at all, so a stale bookmark or an old
+//      release-alert deep link can't spend a Craft API call on a dead section.
+function isHiddenTrackerPath(pathname: string): boolean {
+  return (
+    pathname === "/trackers" ||
+    pathname.startsWith("/trackers/") ||
+    pathname === "/api/trackers" ||
+    pathname.startsWith("/api/trackers/")
+  );
+}
 
 // Charts + setlists are viewable (not editable) without auth — see
 // app/charts/*/page.tsx, which reads the same cookie to decide whether to
@@ -17,6 +35,20 @@ function isPublicReadPath(pathname: string): boolean {
 }
 
 export async function middleware(request: NextRequest) {
+  // Routing rule, not an auth rule — so it runs before the cookie check and a
+  // logged-out request gets the same 404 instead of a login redirect to a
+  // section that no longer exists.
+  if (!TRACKERS_ENABLED && isHiddenTrackerPath(request.nextUrl.pathname)) {
+    if (request.nextUrl.pathname.startsWith("/api/")) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    // Rewrite to a path no route matches: the App Router answers it with a
+    // real 404 status AND its own not-found page. `NextResponse.rewrite(…,
+    // {status: 404})` does NOT work — the status of a rewrite comes from the
+    // rewritten route, so it renders the not-found body under a 200 (measured).
+    return NextResponse.rewrite(new URL("/section-not-found", request.url));
+  }
+
   const password = process.env.FEED_PASSWORD;
   if (!password) {
     // No password configured — allow everything (local dev without auth)

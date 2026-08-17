@@ -19,6 +19,7 @@ npm run check:hoops              # Hoops read-model gate (runs automatically as 
 npm run check:hoops:fixture      # Hoops cross-implementation engine fixture (same)
 npm run check:hoops:multinomial  # numpy-parity gate on the box-score allocation (same)
 npm run check:hoops:boxscore     # Box-score gate: integer identity + level anchors (same)
+npm run check:tracking-hidden    # Tracking section stays hidden (needs a running server; NOT in prebuild)
 ```
 
 No test suite. `npm run build` is the type-check gate — always run it before pushing. It is
@@ -103,7 +104,7 @@ Standard "the user reports a bug" workflow:
 - `lib/bsky-actions.ts` — shared helpers for the three Bluesky write endpoints (`/api/items/[id]/bsky-like|bsky-repost|bsky-follow`). `loadBlueskyItem(id)` hydrates + validates the metadata JSON, throwing a typed `BlueskyActionError` (404/400/409) when the row isn't a Bluesky post or is still missing its `uri`/`cid` from the pre-identity-backfill era. `saveBlueskyMetadata` persists the mutated metadata. `propagateFollowToSiblings` is the one extra wrinkle — on a successful follow, we sweep every other Bluesky item authored by the same DID and stamp their `viewer.following_uri` so their Follow chips hide too.
 - `lib/auth.ts` — `deriveAuthToken(password)` derives a stable HMAC-SHA256 token from the env password. The middleware compares that token to the `hub-auth` cookie, so the raw password never leaves the server. Works in both Edge (middleware) and Node runtimes via Web Crypto. `publicUrl(path, request)` reconstructs the public origin from `x-forwarded-host` / `-proto` — required behind Railway's reverse proxy where `request.url` resolves to localhost.
 - `lib/types.ts` — shared types including `BlueskyMetadata`, its sub-shapes (`BlueskyImage`, `BlueskyExternalCard`, `BlueskyQuotedPost`, `BlueskyReplyContext`, `BlueskyRepostContext`), and `BlueskyViewerState` for the own-record URIs. `CategoryCounts` is the source of truth for the full RSS+bluesky category set (currently `reading`, `tech_review`, `books`, `music`, `film`, `podcasts`, `bluesky`). Read by `lib/bluesky.ts` + the bsky-action endpoints (writers) and `components/FeedCard.tsx` (reader).
-- `lib/sections.ts` — single source of truth for the top-level sections that appear in `Masthead` + `Contents`. Derives the Tracking group from `TRACKER_CONFIGS` so adding a tracker updates every nav surface automatically. `getCurrentSection(pathname)` picks the active section for the masthead switcher.
+- `lib/sections.ts` — single source of truth for the top-level sections that appear in `Masthead` + `Contents`. Derives the Tracking group from `TRACKER_CONFIGS` so adding a tracker updates every nav surface automatically — **currently an empty list, because `TRACKERS_ENABLED` is `false`** (see "Tracker data"). `getCurrentSection(pathname)` picks the active section for the masthead switcher.
 - `lib/groupByDate.ts` — buckets items into Today / Yesterday / This week / Earlier (preserves input order within buckets, so the caller's sort wins).
 - `lib/useKeyboard.ts` — keyboard shortcut hook with single-key + chord (`g h`) support. Ignores typing in inputs and any modifier-key combo (preserving cmd/ctrl shortcuts).
 - `components/Masthead.tsx` — sticky top header: `hub` wordmark on the left, centered section switcher (opens `Contents`), gear `AppMenu` on the right. Also hosts the global `⌘K` / `Ctrl+K` binding that opens `Contents`. Replaces the old `HeaderNav` + `BottomNav` duo (and the later `SubBar` feed-tab row — Saved/Read are plain sections now).
@@ -119,7 +120,7 @@ Standard "the user reports a bug" workflow:
 - `lib/tracker-detail.ts` — helpers for the detail page: `getExternalLinkLabel` picks a friendly CTA label based on domain; `buildExtraProps` filters the Craft schema to the properties worth rendering (skips ones already shown as primary UI, hides empty values and `false` booleans).
 - `components/Toast.tsx` — undo / status toast with countdown progress bar; bottom anchor respects iOS `env(safe-area-inset-bottom)`.
 - `components/KeyboardHelp.tsx` — `?` overlay listing shortcuts. **Source of truth for the user-facing keyboard list.**
-- `components/AppMenu.tsx` — gear icon dropdown with theme toggle (Auto/Light/Dark), push-notifications toggle (`Enable release alerts` / `Release alerts on` / `Blocked in system settings`), commit + last-merge version info baked in by `next.config.mjs`, and the Log out button (posts to `/api/auth/logout`).
+- `components/AppMenu.tsx` — gear icon dropdown with theme toggle (Auto/Light/Dark), push-notifications toggle (`Enable release alerts` / `Release alerts on` / `Blocked in system settings` — **hidden while `TRACKERS_ENABLED` is `false`**, since tracker releases are the only push sender), commit + last-merge version info baked in by `next.config.mjs`, and the Log out button (posts to `/api/auth/logout`).
 - `components/ServiceWorkerRegister.tsx` — registers the Serwist-generated SW on the client.
 
 ### Touch UX — swipe gestures
@@ -146,7 +147,7 @@ First-class gesture in `FeedClient.tsx`. An indicator zone above the category na
 Section navigation went through a rewrite: the old `HeaderNav` + `BottomNav` split was replaced by a single pattern that works the same on mobile and desktop.
 
 - **Masthead** (`components/Masthead.tsx`) is the sticky top header: wordmark on the left, centered section switcher button, gear `AppMenu` on the right. The switcher shows the current section's name and opens `Contents`. Masthead also owns the `⌘K` / `Ctrl+K` global binding. It is the ONLY persistent chrome — there is no sub-tab bar below it.
-- **Contents** (`components/Contents.tsx`) is the fullscreen section picker. Sections come from `lib/sections.ts`, grouped into **Reading** (Feed, Saved, Read — each a full section, so the masthead switcher correctly reads "Saved"/"Read" on those routes), **Tracking** (one entry per tracker in `TRACKER_CONFIGS`), **Library** (Comics, Hoops). Type to filter; Enter jumps to the first match; Esc closes. Adding a tracker to `TRACKER_CONFIGS` automatically adds it to both the Masthead switcher and Contents — there's no separate nav config to update.
+- **Contents** (`components/Contents.tsx`) is the fullscreen section picker. Sections come from `lib/sections.ts`, grouped into **Reading** (Feed, Saved, Read — each a full section, so the masthead switcher correctly reads "Saved"/"Read" on those routes), **Tracking** (one entry per tracker in `TRACKER_CONFIGS` — **currently renders nothing; the group is hidden**, see "Tracker data"), **Library** (Comics, Hoops). Type to filter; Enter jumps to the first match; Esc closes. Adding a tracker to `TRACKER_CONFIGS` automatically adds it to both the Masthead switcher and Contents — there's no separate nav config to update.
 - **Saved / Read reachability**: via Contents (switcher tap or `⌘K`), the `g s` / `g r` keyboard chords, and each page's own `<h1>`. They're archive views — occasional visits don't earn always-visible tabs. The old `SubBar` (Today/Saved/Read row under the masthead) was removed for this reason.
 - The Feed's **category row** (`FeedClient.tsx` controls row) is in-page and scrolls away with the content — deliberately not sticky; category switching happens at the top of a session, not mid-scroll. On mobile it's a single horizontally scrollable line (hidden scrollbar), not a wrapping block.
 
@@ -168,7 +169,7 @@ Items
 - `POST /api/items/read-all` — body `{ category?: string }`. Bulk dismiss every unread item in scope (omit category for "everything"). Returns the affected IDs so the client can build an undo. **Sets only `read_at`, never `consumed_at`** — see the bulk-dismiss invariant above. The current UI prefers `read-bulk` for the footer button (to only dismiss what the user actually saw); this endpoint remains for any "wipe everything" flows.
 - `POST /api/refresh` — forces an immediate `fetchAllSources()` run.
 
-Trackers
+Trackers — **all 404 while `TRACKERS_ENABLED` is `false`** (see "Tracker data")
 - `GET  /api/trackers/[slug]` — returns `{ items: TrackerItem[] }` by fetching the Craft collection and normalizing via `lib/craft.ts`.
 - `PUT  /api/trackers/[slug]/[itemId]` — body may include `status`, `rating`, or `ranking`; forwards to Craft via `updateCollectionItem`. Handles the music collection's trailing-space `now listening ` quirk via `untrimStatus`.
 
@@ -215,14 +216,29 @@ The `metadata` column is a JSON blob. Schema varies by type:
 - **Podcast**: `{ show_name, duration, audio_url, artwork_url, apple_id }`
 - **Bluesky**: `BlueskyMetadata` from `lib/types.ts`. Always has `handle`, `avatar_url`, `like_count`, `reply_count`, `repost_count`. Optionally has `display_name`, `images[]` (with `thumb`/`fullsize`/`alt`/`aspect_ratio`), `video{}` (native Bluesky video from `app.bsky.embed.video#view`: HLS `playlist` URL + `thumbnail`/`alt`/`aspect_ratio` — rendered as a tap-to-play `<video>` where native HLS is supported, i.e. Safari/iOS; elsewhere the tap falls through to opening the post), `external{}` (link card with `url`/`title`/`description`/`thumb`/`domain` — external cards pointing at a YouTube video render as a tap-to-load `youtube-nocookie.com` iframe embed instead of the link card, detected client-side by `youtubeVideoId` in `FeedCard.tsx`, so no fetcher/schema change was needed), `quoted{}` (a nested post that may itself have images, a video, and an external link — its video renders as a static poster since the quoted card is a link), `reply_to{}` (parent author + truncated text), `reposted_by{}` (the reposter when the post appears via a repost). The Bluesky fetcher also writes post identity (`uri`, `cid`, `did`) and a `viewer` block (`like_uri`, `repost_uri`, `following_uri`) — the AT Protocol URIs of the viewer's own like/repost/follow records when present, used both to render "already done" state and as the target for delete calls. The fetcher extracts everything from the `app.bsky.embed.*` and `feedViewPost.reply`/`reason` fields; the Bluesky write endpoints mutate the viewer block in place when the user interacts. Older rows that aged out of the source feed before a given field was added still have the old shape — the renderer treats all rich fields as optional, and the write endpoints surface a 409 "Post identity not available yet" when `uri`/`cid`/`did` are missing (next poll repopulates them).
 
-### Tracker data (Craft.do collections)
+### Tracker data (Craft.do collections) — 🔴 HIDDEN, not deleted
+
+🔴 **The whole Tracking section is switched off behind `TRACKERS_ENABLED` in `lib/tracker-config.ts` (currently `false`) — Stow (`~/Code/stow`) replaced it.** Everything below still describes code that is present and intact; none of it is reachable. Flip the flag to `true` and the entire section returns — there is no second switch. What the flag gates, in the five places that read it:
+- `lib/sections.ts` — the Tracking sections aren't built, so the group vanishes from the Masthead switcher and Contents (Contents drops empty groups on its own) and the remaining sections renumber. Verified in the built client bundle, not just by reading: `trackers/books` appears zero times in `.next/static/chunks` with the flag off.
+- `middleware.ts` — `/trackers/*` and `/api/trackers/*` are refused before the auth check (it's a routing rule, not an auth rule, so a logged-out request 404s rather than being sent to `/login` for a section that's gone). 🔴 **The page 404 is done by rewriting to an unmatched path** (`/section-not-found`), NOT by `NextResponse.rewrite(…, { status: 404 })` — a rewrite takes its status from the rewritten route, so that form renders the not-found body under HTTP **200**. Measured both ways; the check below is what caught it.
+- `getTrackerConfig` (same file as the flag) returns `undefined` for every slug, so even if the middleware rule were removed the routes still refuse: `/trackers/[slug]` and `/trackers/[slug]/[itemId]` `notFound()` on an unknown slug and both `/api/trackers/*` routes 404. 🔴 That in-route path alone is **not** sufficient, which is why the middleware rule exists: those pages' `generateMetadata` is `async`, and Next 14 commits the response status before the component throws — so `notFound()` there renders the right body under a 200.
+- `lib/release-notify.ts` — `checkReleaseNotifications` returns immediately, so the poll cycle stops scanning Craft daily and can't push a notification whose deep link now 404s.
+- `components/AppMenu.tsx` — the "Release alerts" toggle and its subscription probe are hidden, because tracker release dates are the only thing that has ever pushed. The push plumbing itself (`app/sw.ts`, `lib/push.ts`, `/api/push/*`) is untouched and still works.
+
+Deliberately NOT done, so the flag stays a clean revert: `CRAFT_API_KEY` is still read by `lib/craft.ts` and still listed as required, the Craft client and all four Tracker components remain, and nothing was renamed.
+
+**The gate: `npm run check:tracking-hidden`** (`scripts/check-tracking-hidden.mjs`, `FEED_BASE` defaults to `http://localhost:3000`; pass `--password` or set `FEED_PASSWORD` for production). Two halves. **Static**: every module that imports `TRACKER_CONFIGS` must also read `TRACKERS_ENABLED` — the landmine pin, because the easy way to accidentally un-hide the section is a NEW consumer that iterates the configs without checking. **Live**: asks a running instance for all 15 tracker URLs and requires a real 404 from each, having first asserted `/` is 200 so a dead server can't make the 404s pass for the wrong reason. Falsified at merge by flipping the flag back to `true`, rebuilding, and confirming exit 1 with 16 failures. It is deliberately **not** in `prebuild` — half B needs a server, and a check that skips its own assertions when one isn't there is worse than no check.
+
 Trackers are backed by Craft.do collections fetched via the Craft Connect API (`lib/craft.ts`). Each tracker is configured in `lib/tracker-config.ts` with a `collectionId`, display options, and field mappings. `normalizeItems` in `lib/craft.ts` maps raw Craft items into `TrackerItem` objects (`lib/craft-types.ts`).
 
 **Release dates**: `normalizeItems` extracts `releaseDate` from Craft properties. Music, movies, TV, and games all have a `release_date` (date type) property. Books uses `publication_year` (number type) instead — displayed as just the year. `TrackerCard` formats dates as "Mon DD, YYYY" for full dates.
 
 The Craft schema for each collection also includes extra fields not currently surfaced in the UI (e.g. `genre`, `synopsis`, `runtime_minutes`, `in_plex` for movies; `number_of_songs`, `genre` for music; `length_in_pages` for books; `season` for TV). These live in `item.properties` and can be accessed if needed.
 
-### Push notifications (release date alerts)
+### Push notifications (release date alerts) — dormant while Tracking is hidden
+
+Nothing pushes right now: release alerts were the only sender, and both the toggle and the daily checker are behind `TRACKERS_ENABLED` (see above). `POST /api/push/test` still sends to an existing subscription. The rest of this section describes the flow as it works with the flag on.
+
 Web Push via VAPID, powered by the `web-push` npm package. Single-user, so the subscription is stored in the SQLite `kv` table (key `push_subscription`).
 
 **Flow:**
@@ -392,6 +408,8 @@ The **Charts** section (`/charts`) is a personal library of guitar chord charts 
 - DNS: CNAME record `hub` → Railway's provided CNAME target, managed in DigitalOcean DNS. Domain registered at Squarespace.
 
 ### Auth
+`middleware.ts` also carries one non-auth rule, first in the handler: the hidden Tracking section's 404 (see "Tracker data").
+
 Password-protected via Next.js middleware (`middleware.ts`). A `hub-auth` httpOnly cookie gates all routes except `/login`, `/api/auth/*`, static assets, the manifest, the service worker, and `offline.html` (the SW precaches the offline fallback at install time — gating it would cache the login redirect as the fallback). The cookie value is **not** the password itself — `lib/auth.ts` derives a stable HMAC-SHA256 token from `FEED_PASSWORD` (via Web Crypto so it works in both Edge middleware and Node API routes) and compares tokens, so the plaintext password never leaves env. If `FEED_PASSWORD` is unset the middleware waves everything through (local dev). API routes that fail auth return 401; everything else 302-redirects to `/login`. Log out via the gear menu.
 
 The login/logout `POST` handlers (`app/api/auth/{login,logout}/route.ts`) must return **303** redirects, not the default 307. iOS Safari preserves the POST method on 307 and tries to POST to `/`, which fails with "Safari can't open the page because the address is invalid" until manual refresh. Redirects also go through `publicUrl()` in `lib/auth.ts` so Railway's forwarded `host`/`proto` headers win over the localhost `request.url` on the internal network.

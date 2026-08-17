@@ -36,17 +36,17 @@ Bluesky posts render with full rich content: images, link cards, quoted posts, r
 - **Saved** keeps anything you swiped right on, newest first. It lives forever — your reading list across every source in one place.
 - **Read** is the append-only log of everything you actually opened. Re-opening from here bumps it to the top. Items you only dismissed never show up here, so it stays a real history of what you engaged with.
 
-### Trackers
+### Trackers — retired
 
-The **Tracking** sections (Books / Music / TV / Movies / Games) mirror your Craft.do collections. Each item shows cover art, release date, status, and rating; tap a card for the detail page with the external link (Apple Music, IMDb, etc.) and inline editing for status / rating / ranking.
+The **Tracking** sections (Books / Music / TV / Movies / Games) mirrored Craft.do collections. **Stow now handles the media backlog, so the section is switched off** — set `TRACKERS_ENABLED = true` in `lib/tracker-config.ts` to bring it back; the code is all still here.
 
 ### Comics
 
 The **Library** section indexes Marvel Unlimited reading orders (Hickman-era X-Men and Avengers/Secret Wars) as checklists. Tap an issue and the OS hands off to the Marvel Unlimited iOS app at the right page. Read state syncs back so you can see your progress per storyline.
 
-### Release alerts
+### Release alerts — off with the trackers
 
-Enable push notifications from the gear menu and you'll get a push the morning anything in your trackers releases — new album, book pub date, movie premiere — deep-linked to that item's detail page.
+Release-date pushes existed only for the tracker collections, so the gear menu's toggle is hidden while Tracking is. It returns with the same flag.
 
 ### Themes & navigation
 
