@@ -139,7 +139,11 @@ assert(
   tsWords === expected.text.words,
   `🔴 fixture word count matches the offline Python reference (${expected.text.words})`,
 );
-assert(PAGE_WORDS === 250, "a page is 250 words — the one place the convention is defined");
+// 🔴 The page constant is MEASURED against two epubs that carry their print
+// edition's own pagination (see pages.ts for the derivation). 250 is the
+// manuscript-page convention and is the wrong one — it put a 352-page Two
+// Towers at 621 pages. Pinned so it can't drift back to a tidy-looking value.
+assert(PAGE_WORDS === 387, "a page is the measured 387 words, not the 250-word manuscript convention");
 
 // The committed fixture has a single spine document, so it cannot prove the
 // spine is being walked at all — a naive "count every xhtml in the zip" gets
@@ -328,9 +332,10 @@ assert(addDays("2028-02-28", 1) === "2028-02-29", "addDays knows 2028 is a leap 
 // ═══════════════════════════════════════════════════════════════════════════
 console.log("\n── pages, end to end, against the verified word count ──");
 // ═══════════════════════════════════════════════════════════════════════════
-// 180,000 words ÷ 250 = 720 pages. A quarter of the book is 180 pages. The
-// denominator is the Python-verified number above, so this is arithmetic on
-// an externally-anchored fact, not on itself.
+// 180,000 words ÷ 387 = 465 pages. A quarter of the book is 116. The
+// denominator is the Python-verified word count, and the divisor is the
+// measured page constant — so this is arithmetic on two externally-anchored
+// facts, not on itself.
 {
   const t = Math.floor(new Date("2026-08-10T21:00:00Z").getTime() / 1000);
   const stats = computeReadingStats({
@@ -339,12 +344,32 @@ console.log("\n── pages, end to end, against the verified word count ──"
     now: t + 7200,
     timeZone: TZ,
   });
-  assert(stats.totals.pages === 180, `25% of a 180,000-word book is 180 pages (got ${stats.totals.pages})`);
+  assert(stats.totals.pages === 116, `25% of a 180,000-word book is 116 pages (got ${stats.totals.pages})`);
   assert(
-    stats.nowReading[0].pagesLeft === 540,
-    `540 pages left of 720 (got ${stats.nowReading[0].pagesLeft})`,
+    stats.nowReading[0].pagesLeft === 349,
+    `349 pages left of 465 (got ${stats.nowReading[0].pagesLeft})`,
   );
   assert(stats.totals.words === 45_000, "45,000 words read");
+}
+
+// 🔴 The calibration itself, restated as the failure it prevents. The Two
+// Towers is 155,347 words by this repo's own counter and 352 pages in the
+// edition whose pagination its epub carries. The old 250-word manuscript
+// convention put it at 621 — a 76% overshoot that rendered as a confident
+// "403 pages to go" on a book with 229 left.
+{
+  const TT_WORDS = 155_347;
+  const TT_REAL_PAGES = 352;
+  const estimated = Math.round(TT_WORDS / PAGE_WORDS);
+  const errorPct = Math.abs(estimated - TT_REAL_PAGES) / TT_REAL_PAGES;
+  assert(
+    Math.round(TT_WORDS / 250) === 621,
+    "the manuscript convention would put a 352-page Two Towers at 621 pages",
+  );
+  assert(
+    errorPct < 0.2,
+    `🔴 the measured constant lands within 20% of a real edition (${estimated} vs ${TT_REAL_PAGES}, ${(errorPct * 100).toFixed(0)}% out)`,
+  );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -421,8 +446,8 @@ console.log("\n── what must never inflate a statistic ──");
     timeZone: TZ,
   });
   assert(
-    backwards.totals.pages === 40,
-    `🔴 backwards movement never subtracts (10% of 100k = 40 pages, got ${backwards.totals.pages})`,
+    backwards.totals.pages === 26,
+    `🔴 backwards movement never subtracts (10% of 100k = 26 pages, got ${backwards.totals.pages})`,
   );
 }
 

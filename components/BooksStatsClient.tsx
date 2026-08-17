@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import type { DayCell, NowReading, ReadingStats } from "@/lib/books/stats";
 import { READING_TIMEZONE } from "@/lib/books/stats";
+// pages.ts imports nothing — safe in a client bundle, unlike epubText.
+import { PAGE_WORDS } from "@/lib/books/pages";
 
 // The reading-statistics page. Everything on it comes from the kosync sync
 // log; nothing is entered by hand and nothing is awarded for opening the app.
@@ -614,9 +616,18 @@ function Provenance({ stats }: { stats: ReadingStats }) {
       <div className="mt-2 space-y-2 text-[0.8rem] leading-relaxed text-cream-dim">
         <p>
           Every figure here is derived from reading positions your devices synced — nothing is
-          entered by hand, and nothing counts for opening this app. A page is{" "}
-          <span className="text-cream">250 words</span> of the book&apos;s own text, so page counts
-          are comparable between books rather than tied to a font size.
+          entered by hand, and nothing counts for opening this app.
+        </p>
+        <p>
+          {/* The page unit is a fitted estimate from a sample of two, and says
+              so — a reader comparing "403 pages to go" against the number on
+              the back of the book deserves to know which way it can be wrong. */}
+          A page is <span className="text-cream">{PAGE_WORDS} words</span> of the book&apos;s own
+          text — measured against the two books in this library whose files carry their print
+          edition&apos;s real pagination, not a publishing rule of thumb. Books are typeset very
+          differently, though (those two disagreed by 60%), so{" "}
+          <span className="text-cream">expect any single book to land within about 20%</span> of its
+          printed edition. Page counts here are estimates, and comparable with each other.
         </p>
         <p>
           {/* The one genuinely inferred quantity, said plainly rather than
