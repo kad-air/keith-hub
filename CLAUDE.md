@@ -21,7 +21,7 @@ npm run check:hoops:multinomial  # numpy-parity gate on the box-score allocation
 npm run check:hoops:boxscore     # Box-score gate: integer identity + level anchors (same)
 npm run check:tracking-hidden    # Tracking section stays hidden (needs a running server; NOT in prebuild)
 npm run check:books:bytes        # Books byte-identity gate: partialMd5 vs offline Python reference, ingest stores untouched bytes (same)
-npm run check:books:opds         # Books OPDS device-contract gate: CrossPoint parser constraints, anchored on Stump's device-proven feed (same)
+npm run check:books:opds         # Books OPDS device-contract gate: CrossPoint parser constraints + the To Read shelf, anchored on Stump's device-proven feed (same)
 npm run check:books:kosync       # Books kosync protocol gate: md5 wire auth, opaque progress round-trip, no-rollback import (same)
 npm run check:books:metadata     # Books metadata gate: an edit never touches the file/sha256/partial_md5 (same)
 npm run check:books:stats        # Books reading-stats gate: word count vs. Python, real DST calendar, sync survives a stats failure (same)
@@ -317,6 +317,22 @@ Stump's device-proven feed, `books-fixture/stump-books-feed.xml`): ≤62 entries
 (`PAGE_SIZE=50`), acquisition type EXACTLY `application/epub+zip` (strcmp), rel containing
 `opds-spec.org/acquisition`, href containing `.epub`, pagination rel `previous` never `prev`.
 
+**The "To Read" shelf** (`books.to_read` / `to_read_at`, additive migration). A per-book star in
+the hub — on each grid cover and on the detail page — that puts the book in its own OPDS feed at
+`{base}/to-read`, listed **first** in the catalog root with a live count in its summary.
+🔴 **It exists for the DEVICE, not the hub: the X3 has no search**, so reaching a specific book
+means scrolling the whole catalog, which stops being viable as the library grows. A shortcut buried
+below the other entries would be a shortcut to nothing, hence the ordering. The shelf is ordered
+**newest decision first** (`to_read_at DESC`) and deliberately *not* run through `sortForCatalog` —
+re-sorting it by author is exactly what the shelf exists to avoid. Clearing the flag nulls
+`to_read_at`, so re-adding puts a book back on top. An empty shelf still returns a valid empty
+acquisition feed, never a 404, because the catalog entry is always advertised and must always open.
+Toggled via `POST /api/books/[id]/to-read` `{toRead}` — its own endpoint rather than a field on
+`PUT /api/books/[id]`, so `BookEdit` (the shape `check:books:metadata` reasons about) is unchanged.
+🔴 `setToRead` is a **second write path into the `books` table**, and `check:books:metadata` says
+nothing about it — so `check:books:opds` asserts there too that flagging leaves the file, its
+sha256 and its `partial_md5` untouched. Flagging the book you're reading must be free.
+
 **Metadata comes from the epub, never from the folder.** 🔴 Author/series are read from the
 file's OWN internal OPF at ingest — `/Volumes/HDD/Books`'s `Author/Series/NN - Title.epub` layout
 is for human browsing only, and the hub never sees it (the upload endpoint receives a bare
@@ -332,7 +348,8 @@ should get its series back automatically; one-off corrections belong in the UI, 
 extraction; failure falls back to filename, never fails ingest), `normalize.ts` (author/series
 rules + `SERIES_OVERRIDES`, ported from `~/Stump/organize-books.py`), `store.ts` (CRUD + ingest,
 content-addressed dedupe on sha256), `opds.ts` (pure XML emitters), `kosync.ts` (protocol
-semantics), `apiKey.ts` (the credential gate). Routes: `app/opds/[key]/v1.2/[...path]/route.ts`
+semantics), `apiKey.ts` (the credential gate); `store.ts` also carries `listToRead`/`setToRead` for
+the To Read shelf. Routes: `app/opds/[key]/v1.2/[...path]/route.ts`
 (catalog/feeds/search/file with Range support/cover), `app/kosync/[key]/[...path]/route.ts` (the
 five kosync endpoints), `app/api/books/*` (cookie-gated manage + `kosync-import` for the Stump
 migration). UI: `app/books/*`, `components/BooksClient.tsx` (grid + upload + on-screen device

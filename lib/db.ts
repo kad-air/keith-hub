@@ -366,9 +366,23 @@ export function getDb(): Database.Database {
   const bookCols = (
     dbInstance.prepare(`PRAGMA table_info(books)`).all() as Array<{ name: string }>
   ).map((c) => c.name);
-  if (!bookCols.includes("word_count")) {
-    dbInstance.exec(`ALTER TABLE books ADD COLUMN word_count INTEGER`);
-  }
+  const addBookCol = (name: string, ddl: string): void => {
+    if (!bookCols.includes(name)) dbInstance!.exec(`ALTER TABLE books ADD COLUMN ${ddl}`);
+  };
+  addBookCol("word_count", `word_count INTEGER`);
+
+  // books.to_read: the "To Read" shelf, surfaced as its own OPDS feed.
+  //
+  // 🔴 This exists for the DEVICE, not the hub. The X3 has no search — the only
+  // way to reach a specific book is to scroll the catalog, which stops being
+  // viable as the library grows. A flag the reader sets here becomes a short,
+  // guaranteed-to-be-near-the-top feed on the device.
+  //
+  // to_read_at orders that shelf most-recently-added first: the reason to flag
+  // a book is "this is what I want next", so the newest decision belongs on top
+  // where the device shows it without scrolling. NULL whenever to_read is 0.
+  addBookCol("to_read", `to_read INTEGER NOT NULL DEFAULT 0`);
+  addBookCol("to_read_at", `to_read_at TEXT`);
 
   // hoops_params: added for kad-air/keith-hub#73 (the Mac Mini push endpoint).
   // A pre-existing prod DB has hoops_params from before these columns existed

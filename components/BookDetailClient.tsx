@@ -22,6 +22,7 @@ export default function BookDetailClient({ book, sync, history }: Props) {
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
+  const [toRead, setToRead] = useState(book.toRead);
   const [form, setForm] = useState({
     title: book.title,
     author: book.author ?? "",
@@ -50,6 +51,29 @@ export default function BookDetailClient({ book, sync, history }: Props) {
       router.refresh();
     } catch (err) {
       setStatus(`Save failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Optimistic: the flag is a one-column write and the only cost of a failed
+  // round trip is the star flipping back.
+  async function toggleToRead() {
+    const next = !toRead;
+    setToRead(next);
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/books/${book.id}/to-read`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ toRead: next }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setStatus(next ? "Added to To Read — it's on the device now" : "Removed from To Read");
+      router.refresh();
+    } catch (err) {
+      setToRead(!next);
+      setStatus(`Couldn't update: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setBusy(false);
     }
@@ -130,6 +154,18 @@ export default function BookDetailClient({ book, sync, history }: Props) {
           <div className="mt-4 flex flex-wrap items-center gap-3">
             {!editing ? (
               <>
+                <button
+                  onClick={toggleToRead}
+                  disabled={busy}
+                  aria-pressed={toRead}
+                  className={`border px-3 py-1 font-mono text-[0.7rem] uppercase tracking-kicker disabled:opacity-50 ${
+                    toRead
+                      ? "border-accent bg-accent/15 text-accent"
+                      : "border-rule/60 text-cream-dim hover:border-accent/60 hover:text-accent"
+                  }`}
+                >
+                  {toRead ? "★ On To Read" : "☆ To Read"}
+                </button>
                 <a
                   href={`/api/books/${book.id}/file`}
                   className="border border-accent/60 px-3 py-1 font-mono text-[0.7rem] uppercase tracking-kicker text-accent hover:bg-accent/10"
