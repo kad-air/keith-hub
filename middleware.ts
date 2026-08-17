@@ -92,6 +92,6 @@ export const config = {
     // x-auth-user/x-auth-key for kosync — a reading device cannot present the
     // hub-auth cookie or complete a challenge), and both fail CLOSED when
     // their credentials are unset. See lib/books/apiKey.ts + lib/books/kosync.ts.
-    "/((?!_next/static|_next/image|icons|manifest\\.webmanifest|sw\\.js|swe-worker-.*\\.js|offline\\.html|login|api/auth|api/hoops/import|api/books-admin|opds|kosync).*)",
+    "/((?!_next/static|_next/image|icons|manifest\\.webmanifest|sw\\.js|swe-worker-.*\\.js|offline\\.html|login|api/auth|api/hoops/import|opds|kosync).*)",
   ],
 };

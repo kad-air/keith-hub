@@ -5,22 +5,23 @@
 //   npm run check:books:metadata   (standalone)
 //   npm run build                  (via prebuild)
 //
-// Exists because an AGENT now writes metadata (the MCP books tools). The whole
-// safety argument for letting it do that is one property:
+// One property, asserted on every build:
 //
 //   a metadata edit can never change the stored file, its sha256, or its
-//   partial_md5 — so the worst case is a wrong series number, never a book
-//   that silently stops syncing on every device at once.
+//   partial_md5 — so the worst case of a bad edit is a wrong series number,
+//   never a book that silently stops syncing on every device at once.
 //
-// That is currently true by construction (BookEdit can't express those
-// fields). Once something automated is writing here, "true by construction"
-// needs to be "asserted on every build" — a later refactor that let an edit
-// re-serialize the epub would otherwise be invisible until reading positions
-// started vanishing.
+// This is what makes the /books edit UI safe to use freely: title, author,
+// series and description are database columns, while reading-progress sync
+// (KOReader/kosync on the X3 and Readest) identifies a book by a hash of its
+// BYTES. The two cannot interfere — which is why editing a book you're
+// currently reading can't lose your place.
 //
-// Also pins the quality heuristics against hand-labelled cases, so the
-// needs-attention surface can't silently start flagging everything (noise an
-// agent would dutifully act on) or nothing.
+// True by construction today (BookEdit can't express those fields), but a
+// later refactor that re-serialised the epub on save — writing metadata back
+// into the OPF, say, which is a completely reasonable-sounding feature —
+// would silently detach every device's progress. That failure has no error
+// surface, so it gets a gate rather than a comment.
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -32,8 +33,7 @@ const fixtureBytes = fs.readFileSync(path.resolve(repoRoot, "books-fixture/fixtu
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "books-meta-check-"));
 process.chdir(tmp);
 
-const { ingestBook, updateBook, getBook, bookFilePath } = await import("../lib/books/store.ts");
-const { metadataIssues, needsAttention } = await import("../lib/books/quality.ts");
+const { ingestBook, updateBook, bookFilePath } = await import("../lib/books/store.ts");
 
 let failures = 0;
 function assert(cond: boolean, label: string): void {
@@ -47,7 +47,6 @@ const sha256 = (b: Buffer) => createHash("sha256").update(b).digest("hex");
 
 console.log("check:books:metadata — metadata edits are cosmetic\n");
 
-// ── the load-bearing property ──────────────────────────────────────────────
 const { book } = ingestBook(fixtureBytes, "The Fixture Book.epub");
 const fileBefore = sha256(fs.readFileSync(bookFilePath(book)));
 const mtimeBefore = fs.statSync(bookFilePath(book)).mtimeMs;
@@ -72,7 +71,7 @@ assert(edited.partialMd5 === book.partialMd5, "🔴 books.partial_md5 (the sync 
 assert(edited.fileSize === book.fileSize, "books.file_size unchanged");
 assert(edited.fileName === book.fileName, "books.file_name unchanged");
 
-// An edit that tries to smuggle in the protected fields must not land them.
+// An edit payload that names the protected fields must not land them.
 const smuggled = updateBook(book.id, {
   title: "Another Title",
   // @ts-expect-error — deliberately outside BookEdit; must be ignored
@@ -83,71 +82,6 @@ assert(
   smuggled.sha256 === book.sha256 && smuggled.partialMd5 === book.partialMd5,
   "🔴 an edit payload naming sha256/partial_md5 cannot change them",
 );
-
-// ── the quality heuristics, hand-labelled ──────────────────────────────────
-const base = getBook(book.id)!;
-const withMeta = (o: Partial<typeof base>) => ({ ...base, ...o });
-
-assert(
-  metadataIssues(withMeta({ author: "Pratchett, Terry" })).includes("author_unflipped"),
-  'flags "Last, First" authors',
-);
-assert(
-  !metadataIssues(withMeta({ author: "Terry Pratchett" })).includes("author_unflipped"),
-  "does not flag a normal author",
-);
-assert(
-  metadataIssues(withMeta({ author: null })).includes("no_author"),
-  "flags a missing author",
-);
-assert(
-  metadataIssues(withMeta({ title: "Mort (z-lib.org).epub" })).includes(
-    "title_looks_like_filename",
-  ),
-  "flags a filename-shaped title",
-);
-assert(
-  !metadataIssues(withMeta({ title: "The Ladies of Grace Adieu" })).includes(
-    "title_looks_like_filename",
-  ),
-  "does not flag a normal title",
-);
-assert(
-  metadataIssues(withMeta({ title: "Discworld Book 15", series: null, seriesIndex: null })).includes(
-    "series_number_stranded_in_title",
-  ),
-  "flags a volume number stranded in the title",
-);
-assert(
-  metadataIssues(withMeta({ series: "Discworld", seriesIndex: null })).includes(
-    "series_without_index",
-  ),
-  "flags a series with no position",
-);
-assert(
-  metadataIssues(withMeta({ series: null, seriesIndex: 3 })).includes("index_without_series"),
-  "flags a position with no series",
-);
-
-// The precision guard: a fully clean book must be silent, or the agent gets a
-// list of everything and treats noise as signal.
-const clean = withMeta({
-  title: "The Ladies of Grace Adieu",
-  author: "Susanna Clarke",
-  series: null,
-  seriesIndex: null,
-  description: "Short stories.",
-  language: "en",
-});
-assert(metadataIssues(clean).length === 0, "a clean book has NO issues at all");
-assert(!needsAttention(clean), "a clean book does not need attention");
-// A missing description alone is cosmetic — it must not drag a book into the
-// needs-attention list (8 of 13 real books have none).
-assert(
-  !needsAttention({ ...clean, description: null }),
-  "a missing description alone does not trigger needs-attention",
-);
-assert(needsAttention({ ...clean, author: null }), "a missing author does trigger it");
 
 fs.rmSync(tmp, { recursive: true, force: true });
 

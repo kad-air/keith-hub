@@ -23,6 +23,7 @@ npm run check:tracking-hidden    # Tracking section stays hidden (needs a runnin
 npm run check:books:bytes        # Books byte-identity gate: partialMd5 vs offline Python reference, ingest stores untouched bytes (same)
 npm run check:books:opds         # Books OPDS device-contract gate: CrossPoint parser constraints, anchored on Stump's device-proven feed (same)
 npm run check:books:kosync       # Books kosync protocol gate: md5 wire auth, opaque progress round-trip, no-rollback import (same)
+npm run check:books:metadata     # Books metadata gate: an edit never touches the file/sha256/partial_md5 (same)
 ```
 
 No test suite. `npm run build` is the type-check gate — always run it before pushing. It is
@@ -313,6 +314,17 @@ assertions are ported from `~/Stump/healthcheck.sh` and anchored on a committed 
 Stump's device-proven feed, `books-fixture/stump-books-feed.xml`): ≤62 entries/feed page
 (`PAGE_SIZE=50`), acquisition type EXACTLY `application/epub+zip` (strcmp), rel containing
 `opds-spec.org/acquisition`, href containing `.epub`, pagination rel `previous` never `prev`.
+
+**Metadata comes from the epub, never from the folder.** 🔴 Author/series are read from the
+file's OWN internal OPF at ingest — `/Volumes/HDD/Books`'s `Author/Series/NN - Title.epub` layout
+is for human browsing only, and the hub never sees it (the upload endpoint receives a bare
+filename). Consequence: a book whose OPF lacks series data gets none however its folder is named,
+and the fix is to edit it in the `/books` UI, which exposes every field. 🔴 That is safe to do
+freely — and `check:books:metadata` is the gate that keeps it so: a metadata edit writes database
+columns only and can never change the file, its sha256, or its `partial_md5`, so editing a book
+you're currently reading cannot lose your place. (Falsification-tested by making `updateBook`
+touch the file.) `SERIES_OVERRIDES` in `normalize.ts` handles the case where a re-ingested file
+should get its series back automatically; one-off corrections belong in the UI, not in that table.
 
 **Key files:** `lib/books/partialMd5.ts` (the hash — do not touch), `epubMeta.ts` (regex OPF
 extraction; failure falls back to filename, never fails ingest), `normalize.ts` (author/series
