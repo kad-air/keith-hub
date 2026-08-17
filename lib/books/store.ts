@@ -36,6 +36,11 @@ export type Book = {
    *  the reading-stats page. null when never computed, 0 when the file
    *  yielded no readable text. See lib/books/epubText.ts. */
   wordCount: number | null;
+  /** On the "To Read" shelf — a short OPDS feed the X3 can reach without
+   *  scrolling the whole catalog (it has no search). */
+  toRead: boolean;
+  /** When it was put on the shelf; orders the feed newest-first. */
+  toReadAt: string | null;
   addedAt: string;
   updatedAt: string;
 };
@@ -54,6 +59,8 @@ type BookRow = {
   partial_md5: string;
   cover_name: string | null;
   word_count: number | null;
+  to_read: number;
+  to_read_at: string | null;
   added_at: string;
   updated_at: string;
 };
@@ -73,6 +80,8 @@ function rowToBook(row: BookRow): Book {
     partialMd5: row.partial_md5,
     coverName: row.cover_name,
     wordCount: row.word_count,
+    toRead: row.to_read === 1,
+    toReadAt: row.to_read_at,
     addedAt: row.added_at,
     updatedAt: row.updated_at,
   };
@@ -226,6 +235,40 @@ export function backfillWordCounts(limit = 500): number {
     filled++;
   }
   return filled;
+}
+
+/** Books on the "To Read" shelf, newest decision first — the order the OPDS
+ *  feed uses, so the thing you most recently chose is the first thing the
+ *  device shows you. */
+export function listToRead(): Book[] {
+  const rows = getDb()
+    .prepare(`SELECT * FROM books WHERE to_read = 1 ORDER BY to_read_at DESC, title ASC`)
+    .all() as BookRow[];
+  return rows.map(rowToBook);
+}
+
+/**
+ * Put a book on the To Read shelf, or take it off.
+ *
+ * 🔴 A DB-column write and nothing more — it never opens, rewrites or touches
+ * the stored epub, so sha256 and partial_md5 (the kosync sync key) are
+ * untouched and flagging a book you are currently reading cannot lose your
+ * place. Same guarantee as a metadata edit; check:books:opds asserts it here
+ * too, because this is a SECOND write path into the books table and the first
+ * one's gate says nothing about it.
+ *
+ * Clearing the flag nulls to_read_at, so re-adding a book later puts it back
+ * at the top of the shelf rather than wherever it sat before.
+ */
+export function setToRead(id: string, toRead: boolean): Book | null {
+  const db = getDb();
+  if (!getBook(id)) return null;
+  db.prepare(`UPDATE books SET to_read = ?, to_read_at = ? WHERE id = ?`).run(
+    toRead ? 1 : 0,
+    toRead ? new Date().toISOString() : null,
+    id,
+  );
+  return getBook(id);
 }
 
 export type BookEdit = Partial<

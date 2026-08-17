@@ -6,6 +6,7 @@ import {
   bookCoverPath,
   getBook,
   listBooks,
+  listToRead,
   type Book,
 } from "@/lib/books/store";
 import {
@@ -91,7 +92,20 @@ export async function GET(
 
   // ── catalog: the navigation root ─────────────────────────────────────────
   if (path.length === 1 && path[0] === "catalog") {
+    // 🔴 "To Read" is FIRST, deliberately. The whole point of the shelf is that
+    // the X3 has no search, so reaching a specific book means scrolling — and a
+    // shortcut buried under three other entries is a shortcut to nothing. The
+    // count rides in the summary so the shelf's state is visible from the root
+    // without opening it.
+    const toReadCount = listToRead().length;
     const entries = [
+      navEntry(
+        "To Read",
+        `${base}/to-read`,
+        toReadCount === 0
+          ? "Nothing on the shelf yet — flag books in the hub"
+          : `${toReadCount} book${toReadCount === 1 ? "" : "s"} you've picked out`,
+      ),
       navEntry("All Books", `${base}/books`, "Every book, by author and series"),
       navEntry("Recently Added", `${base}/books/latest`, "Newest additions first"),
       navEntry("Series", `${base}/series`, "Browse by series"),
@@ -108,6 +122,25 @@ export async function GET(
         searchHref: `${base}/search`,
       }),
       NAV_TYPE,
+    );
+  }
+
+  // ── to-read ──────────────────────────────────────────────────────────────
+  // Already ordered newest-decision-first by listToRead(); deliberately NOT
+  // run through sortForCatalog, which would re-sort it by author and lose the
+  // "what I picked out most recently" ordering the shelf exists for.
+  //
+  // An empty shelf still returns a valid, empty acquisition feed rather than a
+  // 404: the entry is always in the catalog root, so it must always open.
+  if (path.length === 1 && path[0] === "to-read") {
+    return acquisitionFeed(
+      base,
+      `${base}/to-read`,
+      `${base}/to-read`,
+      "To Read",
+      listToRead(),
+      page,
+      (p) => `${base}/to-read?page=${p}`,
     );
   }
 
