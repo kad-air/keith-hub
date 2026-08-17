@@ -32,7 +32,9 @@ const kosyncPass = opt("kosync-pass", "stumpsync");
 const wireKey = createHash("md5").update(kosyncPass).digest("hex");
 
 // ── pull from stump.db ──────────────────────────────────────────────────────
-const db = path.join(os.homedir(), ".stump", "stump.db");
+// STUMP_DB overrides for running against a quiesced .backup copy — the live
+// db can refuse read-only opens while the stump server holds it.
+const db = process.env.STUMP_DB || path.join(os.homedir(), ".stump", "stump.db");
 const sql = `
   SELECT m.koreader_hash, m.name, rs.koreader_progress, rs.end_percentage,
          COALESCE(rs.updated_at, rs.created_at), rs.device_ids
@@ -42,7 +44,7 @@ const sql = `
     AND rs.koreader_progress IS NOT NULL AND rs.koreader_progress != ''
   ORDER BY COALESCE(rs.updated_at, rs.created_at) ASC;
 `;
-const out = execFileSync("sqlite3", ["-separator", "", `file:${db}?mode=ro`, sql])
+const out = execFileSync("sqlite3", ["-separator", "", `file:${db}?immutable=1`, sql])
   .toString()
   .trim();
 
