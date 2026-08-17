@@ -1,5 +1,16 @@
 import type { TrackerConfig, TrackerSlug } from "./craft-types";
 
+/**
+ * The Craft-backed Tracking section is hidden — Stow (`~/Code/stow`) took over
+ * the media backlog. Nothing here was deleted: flip this to `true` and the
+ * whole section comes back at once. Every surface reads this one flag —
+ * the nav entries (`lib/sections.ts`), the `/trackers/*` pages and
+ * `/api/trackers/*` routes (via `getTrackerConfig` below), the daily
+ * release-date push scan (`lib/release-notify.ts`), and the "Release alerts"
+ * toggle in `components/AppMenu.tsx` (which exists only to serve that scan).
+ */
+export const TRACKERS_ENABLED = false;
+
 export const TRACKER_CONFIGS: TrackerConfig[] = [
   {
     slug: "books",
@@ -58,9 +69,16 @@ export const TRACKER_CONFIGS: TrackerConfig[] = [
   },
 ];
 
+/**
+ * While `TRACKERS_ENABLED` is false every slug resolves to `undefined`, which
+ * is how the section stops answering on direct URLs too: both `/trackers`
+ * pages call `notFound()` on an unknown slug and both API routes 404, so
+ * hiding the nav can't leave a live-but-unlisted section behind.
+ */
 export function getTrackerConfig(
   slug: string,
 ): TrackerConfig | undefined {
+  if (!TRACKERS_ENABLED) return undefined;
   return TRACKER_CONFIGS.find(
     (c) => c.slug === (slug as TrackerSlug),
   );

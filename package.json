@@ -12,7 +12,8 @@
     "check:hoops:fixture": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-hoops-fixture.ts",
     "check:hoops:pricing-fixture": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-hoops-pricing-fixture.ts",
     "check:hoops:multinomial": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-hoops-multinomial.ts",
-    "check:hoops:boxscore": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-hoops-boxscore.ts"
+    "check:hoops:boxscore": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-hoops-boxscore.ts",
+    "check:tracking-hidden": "node scripts/check-tracking-hidden.mjs"
   },
   "dependencies": {
     "@atproto/api": "^0.19.6",

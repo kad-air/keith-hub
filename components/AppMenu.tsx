@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useTheme, type ThemeMode } from "@/components/ThemeProvider";
+import { TRACKERS_ENABLED } from "@/lib/tracker-config";
 
 const THEME_OPTIONS: Array<{ value: ThemeMode; label: string }> = [
   { value: "auto", label: "Auto" },
@@ -34,6 +35,8 @@ export default function AppMenu() {
 
   // Check push notification state
   useEffect(() => {
+    // Nothing renders it while Tracking is hidden — skip the probe entirely.
+    if (!TRACKERS_ENABLED) return;
     if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
       setPushState("unsupported");
       return;
@@ -150,8 +153,12 @@ export default function AppMenu() {
           {/* Divider */}
           <div className="mx-4 h-px bg-rule" />
 
-          {/* Notifications section */}
-          {pushState !== "unsupported" && (
+          {/* Notifications section. Tracker release dates are the only thing
+              that has ever pushed, so with Tracking hidden this toggle would
+              promise alerts that can never arrive — it comes back with the
+              section. Push plumbing itself (SW, subscription, /api/push/test)
+              is untouched. */}
+          {TRACKERS_ENABLED && pushState !== "unsupported" && (
             <>
               <div className="px-4 py-3">
                 <h3 className="mb-2.5 font-mono text-[0.68rem] uppercase tracking-kicker text-cream-dim">

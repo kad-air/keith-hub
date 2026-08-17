@@ -1,5 +1,5 @@
 import { getDb } from "@/lib/db";
-import { TRACKER_CONFIGS } from "@/lib/tracker-config";
+import { TRACKER_CONFIGS, TRACKERS_ENABLED } from "@/lib/tracker-config";
 import { fetchCollectionItems, normalizeItems } from "@/lib/craft";
 import { sendPush } from "@/lib/push";
 
@@ -51,6 +51,10 @@ function setLastCheckedDate(date: string): void {
  * calendar day in NOTIFY_TIMEZONE, and only after NOTIFY_HOUR local.
  */
 export async function checkReleaseNotifications(): Promise<void> {
+  // Hidden section: don't hit Craft every morning, and above all don't push a
+  // notification whose deep link (/trackers/…) now 404s.
+  if (!TRACKERS_ENABLED) return;
+
   const today = getLocalDate();
 
   // Only run once per local day
