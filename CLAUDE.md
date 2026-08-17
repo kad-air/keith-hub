@@ -441,15 +441,43 @@ day-and-progress: `Double Century` (200 pages in a day), `Comeback` (resume a bo
 **The known distortion is stated on screen, not smoothed away:** a day's progress lands on the day
 it was *pushed*, so reading spread over two days can arrive as one big day — a quiet Monday beside
 a double Tuesday. Spreading a delta backwards across the days it "probably" covers would be
-inventing data. Days, positions and pages are measured; nothing else is claimed. Projections refuse
-thin evidence: under three reading days in the window, no forecast is shown at all rather than a
-confident wrong date. Finishing is a CROSSING of `FINISH_THRESHOLD` (0.97 — readers stop short of
-1.0), not a state, so a device idling at 99% doesn't re-finish a book on every check-in.
+inventing data. Days, positions and pages are measured; nothing else is claimed. Finishing is a
+CROSSING of `FINISH_THRESHOLD` (0.97 — readers stop short of 1.0), not a state, so a device idling
+at 99% doesn't re-finish a book on every check-in.
+
+🔴 **The forecast rate is GLOBAL — one figure for the reader, divided into each book's remaining
+pages — and it must stay that way.** It was per-book first, which sounds more precise and was
+useless: a book had to survive `MIN_RATE_DAYS` (3) separate days inside the 21-day window to earn a
+forecast, so the feature could only ever fire on the books being read *slowly*. This reader puts a
+Discworld away in two days, and those never qualified at all. The evidence belongs to the reader,
+so a book opened this morning is forecast on its first sync — and an **unopened** one can be too
+(`/books/[id]` on a never-synced book shows what the whole thing costs, since nothing about the
+forecast comes from the book beyond its page count). The cost, accepted: a dense book is projected
+at the same rate as an easy one. Pages are word-normalised, so prose density partly washes out; how
+fast this reader moves through a given author does not, and no arithmetic recovers it from a log
+where the fast books never accumulate evidence of their own. Read a per-book number as "if this
+book got all of your reading" — with several on the go each is optimistic while their **sum** is
+right.
+
+🔴 **Two denominators, deliberately, because the push distortion above hits exactly one of them.**
+`perCalendarDay` divides by the FIXED window, so days off count against it and it becomes a real
+date ("around Sep 2") — a weekend of reading arriving in one Sunday push moves only the numerator,
+so it cannot be skewed by bunching. `perReadingDay` divides by days actually read, answers "how
+many more evenings", makes no calendar claim, and *is* exposed to that bunching. The UI shows both
+(`approx. 3 days of reading · around Sep 2`) rather than picking one and being wrong about the
+other. `check:books:stats` measures the asymmetry directly: the same 600 pages spread over four
+pushes vs. bunched into three leaves `perCalendarDay` identical and moves `perReadingDay` 150→200.
+Still refuses thin evidence — under `MIN_RATE_DAYS` days in the window there is no rate and no
+forecast anywhere, rather than a confident wrong date.
 
 **Key files:** `lib/books/stats.ts` (**pure** — no DB, no fs, `now` always passed in, so the gate
-drives it with streams whose answer is known independently; keep it that way), `readingEvents.ts`
-(the recorder + baseline seeding), `statsData.ts` (the only impure edge; also where `getBookHistory`
-runs the SAME model over one document so per-book numbers can't drift), `epubText.ts` (spine-walking
+drives it with streams whose answer is known independently; keep it that way; `readingDaysFor` /
+`calendarDaysFor` / `finishLabel` are exported so a shelf estimate and a Now Reading estimate share
+one implementation), `readingEvents.ts` (the recorder + baseline seeding), `statsData.ts` (the only
+impure edge; 🔴 `getBookHistory` runs the model **twice** on purpose — the FORECAST from the whole
+log because the rate is global, the TOTALS from this document's events alone because "pages read"
+on a book's page means that book. Collapsing it back to the one filtered run it used to be silently
+restores per-book rates on the detail page; the gate pins both halves), `epubText.ts` (spine-walking
 word count), `pages.ts` (the page convention, dependency-free). UI: `app/books/stats/page.tsx`,
 `components/BooksStatsClient.tsx`. Reference generator: `scripts/gen_book_wordcount_reference.py`
 (Python `html.parser` + `ElementTree` — an independent implementation whose answer is committed to

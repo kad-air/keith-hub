@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import type { DayCell, NowReading, ReadingStats } from "@/lib/books/stats";
-import { READING_TIMEZONE } from "@/lib/books/stats";
+import { finishLabel, READING_TIMEZONE } from "@/lib/books/stats";
 // pages.ts imports nothing — safe in a client bundle, unlike epubText.
 import { PAGE_WORDS } from "@/lib/books/pages";
 
@@ -355,18 +355,12 @@ function NowReadingRow({ item }: { item: NowReading }) {
         {measurable && item.pagesLeft > 0 && ` · ${plural(item.pagesLeft, "page")} still to go`}
       </span>
     );
-  } else if (item.daysToFinish != null && item.pace != null) {
-    const finish = new Date(Date.now() + item.daysToFinish * 86400000);
+  } else if (item.readingDaysToFinish != null) {
     line = (
       <span className="text-cream-dim">
-        {plural(item.pagesLeft, "page")} to go · at {item.pace}/day you finish around{" "}
-        <span className="text-accent">
-          {new Intl.DateTimeFormat("en-US", {
-            timeZone: READING_TIMEZONE,
-            month: "short",
-            day: "numeric",
-          }).format(finish)}
-        </span>
+        {plural(item.pagesLeft, "page")} to go · approx.{" "}
+        <span className="text-accent">{plural(item.readingDaysToFinish, "day")} of reading</span>
+        {item.daysToFinish != null && ` · around ${finishLabel(item.daysToFinish, Date.now())}`}
       </span>
     );
   } else if (measurable) {
