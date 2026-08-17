@@ -40,6 +40,23 @@ Bluesky posts render with full rich content: images, link cards, quoted posts, r
 
 The **Tracking** sections (Books / Music / TV / Movies / Games) mirrored Craft.do collections. **Stow now handles the media backlog, so the section is switched off** — set `TRACKERS_ENABLED = true` in `lib/tracker-config.ts` to bring it back; the code is all still here.
 
+### Books
+
+A personal EPUB library that doubles as an ebook server. Upload epubs from any device; the hub
+reads each file's own metadata for title, author and series, and serves the library over **OPDS**
+to real e-readers — an [Xteink X3](https://github.com/crosspoint-reader/crosspoint-reader) running
+CrossPoint firmware, and Readest on iOS. It also runs a **KOReader sync server**, so your place in
+a book follows you between the e-reader and your phone.
+
+The trick that makes that work: a book is identified by a hash of its actual bytes, not its title
+or filename. So the hub never rewrites a stored file — editing a book's metadata changes the
+library card, never the book — and you always download onto a device *from the library* rather
+than copying files around. Organisation is metadata, not folders: rearrange your shelves however
+you like and nothing notices.
+
+Replaced a self-hosted [Stump](https://github.com/stumpapp/stump) server that ran on a Mac Mini;
+see `BOOKS_PLAN.md` for the design and the invariants.
+
 ### Comics
 
 The **Library** section indexes Marvel Unlimited reading orders (Hickman-era X-Men and Avengers/Secret Wars) as checklists. Tap an issue and the OS hands off to the Marvel Unlimited iOS app at the right page. Read state syncs back so you can see your progress per storyline.

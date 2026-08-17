@@ -20,17 +20,19 @@ one session. The evidence chain, in order:
   `~/Stump` + `~/.stump` deleted. Keepers (final stump.db backup, `organize-books.py`, the
   upstream issue draft + repro, the old deployment plan) archived in `~/Stump-retired/`.
   `/Volumes/HDD/Books` remains the master copy.
-- Loose ends: the `books.keiths-home-server.us` CNAME still exists in Cloudflare DNS (routes to
-  the tunnel's 404; deleting needs the dashboard — cloudflared can't remove routes). The X3 still
-  lists the dead "Stump" OPDS entry (delete from the device UI at leisure — not worth an API poke
-  at a 56KB-heap device). Readest on the phone still needs repointing to the two URLs shown in
-  /books → Device setup.
-**Definition of done:** stump is torn out, and the Xteink X3 grabs books and syncs progress
-from `hub.keithadair.com`.
-
-**Replaces:** the Stump deployment documented in `~/Code/stump/MAC-MINI-DEPLOYMENT-PLAN.md`.
-That document is the requirements source for this one — every landmine it records is carried
-forward below. Do not delete it until §11 is complete.
+- **Readest verified working** on the phone against the hub (OPDS + kosync) — both readers live.
+- Remaining loose ends, neither blocking: the `books.keiths-home-server.us` CNAME still exists in
+  Cloudflare DNS (routes to the tunnel's catch-all 404; deleting it needs the dashboard, as
+  cloudflared can't remove routes), and the X3 still lists the dead "Stump" OPDS entry alongside
+  the live one — delete it from the device UI at leisure rather than poking a 56KB-heap device.
+- **Post-ship addition, then reverted deliberately:** an MCP/admin-API path for agent-driven
+  metadata cleanup (`/api/books-admin` + Mac Mini MCP tools) was built and then stood down the same
+  session — the `/books` detail page already exposes every editable field, so it solved a problem
+  that didn't exist, and it made the Mini a dependency for a workflow that never touches it. See
+  commit `78ad7c9` if it's ever revisited; the better version would be hosted on Railway beside the
+  data, and the blocker there is re-implementing MCP transport + OAuth (274 lines of it already
+  solved on the Mini) rather than anything about books. What survives is
+  `npm run check:books:metadata`, trimmed to the assertion that guards the UI's own edit button.
 
 ---
 
@@ -318,9 +320,18 @@ Ordering matters — the replacement must be proven before the original is remov
 
 ## 12. Deferred & open questions
 
-- **Comics / Panels.** Needs a storage answer that isn't the Railway volume. Would mean files on
-  `/Volumes/HDD` behind the tunnel, plus OPDS-PSE links — and accepting a Mini dependency for reads.
-- **If gate zero fails.** If the X3 genuinely can't do TLS to Railway, the fallback is the
+- **Comics / Panels — decided AGAINST 2026-08-17, not merely deferred.** Costed it: Railway storage
+  is **$0.15/GB/mo**, egress **$0.05/GB** (none free), so even a ~400-issue library is only ~$3/mo.
+  But the **Hobby plan caps a volume at 5 GB** (~100 issues at ~50 MB), so the true price is the
+  **+$15/mo Pro upgrade** — five times the storage it unlocks. And the payoff is nil: Panels has no
+  kosync (it syncs via iCloud regardless), and the X3 can't meaningfully read comics, so there is no
+  second-device story of the kind that justified this entire project for EPUBs. The owner's comics
+  live in Google Drive and Humble Bundle, and **Panels reads Google Drive directly** — self-hosting
+  would spend money to lose Drive's storage and gain a second copy to keep in sync. Revisit only if
+  Panels' Drive integration degrades (third-party Drive clients do get squeezed by API policy
+  changes); the OPDS spine already stands, and would need a format column, comic MIME types and a
+  bigger volume — not a rewrite.
+- **If gate zero fails** *(it didn't — see the status header)*. If the X3 genuinely can't do TLS to Railway, the fallback is the
   standalone-on-the-Mini service (Node/TS on port 10801, preserving stump's URL shapes so the device
   needs no reconfiguration). Everything in §3–§10 ports unchanged; only the host moves.
 - **Upstream issue.** `stump-issue-draft.md` is still worth filing — an ESP32 OPDS client is a
