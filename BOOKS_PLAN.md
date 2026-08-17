@@ -3,12 +3,28 @@
 > A personal EPUB library as a section of The Feed: an OPDS 1.2 catalog, a KOReader
 > progress-sync server, and upload/manage. On Railway, like the rest of the hub.
 
-**Status:** BUILT 2026-08-16 — milestones 1–4 (§11) shipped in one session, all three gates
-(`check:books:bytes` / `:opds` / `:kosync`) wired into `prebuild` and falsification-tested, the
-Stump progress migration verified against local dev (3 positions, all resolving by content hash).
-Remaining: the production cutover + §1's device test (X3 needs waking) + §11's teardown.
-`partialMd5` was verified **13/13 against Stump's stored Rust-computed hashes** for the real
-library before anything was built on it.
+**Status:** ✅ COMPLETE 2026-08-16 — built, deployed, device-proven, and Stump torn out, all in
+one session. The evidence chain, in order:
+- `partialMd5` verified **13/13 against Stump's stored Rust-computed hashes** before anything was
+  built on it; all three gates (`check:books:bytes` / `:opds` / `:kosync`) falsification-tested.
+- Production: 13 books pushed; `check-books-live.mjs` verified **all 13 downloads through the
+  deployed /opds path sha256-identical** to the HDD sources; the 3 Stump positions migrated and
+  resolving by content hash.
+- **§1's gate zero + the device test both passed on the real X3**: it browsed the hub catalog over
+  TLS to Railway (settling the relitigated LAN-only question for good), downloaded The Running
+  Man, and pushed progress — landing at the hub as
+  `/body/DocFragment[4]/body/p[3]/text()[1].373` under document hash `4bf66593…`, which equals our
+  ingest-computed `partial_md5` exactly. That equality closes the whole byte-identity loop:
+  HDD → upload → Railway volume → OPDS download → device hash.
+- §11 teardown done: LaunchAgent removed, cloudflared `books.` ingress removed (mcp/plex intact),
+  `~/Stump` + `~/.stump` deleted. Keepers (final stump.db backup, `organize-books.py`, the
+  upstream issue draft + repro, the old deployment plan) archived in `~/Stump-retired/`.
+  `/Volumes/HDD/Books` remains the master copy.
+- Loose ends: the `books.keiths-home-server.us` CNAME still exists in Cloudflare DNS (routes to
+  the tunnel's 404; deleting needs the dashboard — cloudflared can't remove routes). The X3 still
+  lists the dead "Stump" OPDS entry (delete from the device UI at leisure — not worth an API poke
+  at a 56KB-heap device). Readest on the phone still needs repointing to the two URLs shown in
+  /books → Device setup.
 **Definition of done:** stump is torn out, and the Xteink X3 grabs books and syncs progress
 from `hub.keithadair.com`.
 
