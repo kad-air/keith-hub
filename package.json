@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "check:hoops": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-hoops.ts",
-    "prebuild": "npm run check:hoops && npm run check:hoops:fixture && npm run check:hoops:pricing-fixture && npm run check:hoops:multinomial && npm run check:hoops:boxscore && npm run check:books:bytes && npm run check:books:opds && npm run check:books:kosync",
+    "prebuild": "npm run check:hoops && npm run check:hoops:fixture && npm run check:hoops:pricing-fixture && npm run check:hoops:multinomial && npm run check:hoops:boxscore && npm run check:books:bytes && npm run check:books:opds && npm run check:books:kosync && npm run check:books:metadata",
     "check:books:bytes": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-books-bytes.ts",
     "check:books:opds": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-books-opds.ts",
     "check:books:kosync": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-books-kosync.ts",
@@ -16,7 +16,8 @@
     "check:hoops:pricing-fixture": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-hoops-pricing-fixture.ts",
     "check:hoops:multinomial": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-hoops-multinomial.ts",
     "check:hoops:boxscore": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-hoops-boxscore.ts",
-    "check:tracking-hidden": "node scripts/check-tracking-hidden.mjs"
+    "check:tracking-hidden": "node scripts/check-tracking-hidden.mjs",
+    "check:books:metadata": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-books-metadata.ts"
   },
   "dependencies": {
     "@atproto/api": "^0.19.6",
