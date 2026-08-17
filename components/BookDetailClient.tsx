@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Book } from "@/lib/books/store";
+import type { BookHistory } from "@/lib/books/statsData";
 
 type Props = {
   book: Book;
@@ -13,9 +14,10 @@ type Props = {
     device: string | null;
     timestamp: number;
   } | null;
+  history: BookHistory | null;
 };
 
-export default function BookDetailClient({ book, sync }: Props) {
+export default function BookDetailClient({ book, sync, history }: Props) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -191,6 +193,76 @@ export default function BookDetailClient({ book, sync }: Props) {
           </p>
         )}
       </section>
+
+      {history && (
+        <section className="mt-4 border border-rule/60 bg-ink-raised/40 px-4 py-3 text-sm">
+          <div className="flex items-baseline justify-between gap-3">
+            <h2 className="font-mono text-[0.7rem] uppercase tracking-kicker text-cream-dimmer">
+              Your history with this book
+            </h2>
+            <Link
+              href="/books/stats"
+              className="font-mono text-[0.65rem] uppercase tracking-kicker text-cream-dim hover:text-accent"
+            >
+              All stats →
+            </Link>
+          </div>
+
+          <dl className="mt-2 grid grid-cols-3 gap-x-4 gap-y-2">
+            <div>
+              <dt className="font-mono text-[0.6rem] uppercase tracking-kicker text-cream-dimmer">
+                Days read
+              </dt>
+              <dd className="font-display text-xl tabular-nums text-cream">{history.daysRead}</dd>
+            </div>
+            <div>
+              <dt className="font-mono text-[0.6rem] uppercase tracking-kicker text-cream-dimmer">
+                Pages here
+              </dt>
+              <dd className="font-display text-xl tabular-nums text-cream">
+                {history.pages.toLocaleString()}
+                {history.totalPages != null && (
+                  <span className="font-mono text-[0.7rem] text-cream-dimmer">
+                    {" "}
+                    / {history.totalPages.toLocaleString()}
+                  </span>
+                )}
+              </dd>
+            </div>
+            <div>
+              <dt className="font-mono text-[0.6rem] uppercase tracking-kicker text-cream-dimmer">
+                Sittings
+              </dt>
+              <dd className="font-display text-xl tabular-nums text-cream">{history.sessions}</dd>
+            </div>
+          </dl>
+
+          {history.finishes.length > 0 ? (
+            <p className="mt-3 border-t border-rule/40 pt-2 text-cream-dim">
+              <span className="text-accent">Finished</span>{" "}
+              {new Date(history.finishes[0].finishedAt * 1000).toLocaleDateString()}
+              {history.finishes[0].daysTaken != null &&
+                ` — ${history.finishes[0].daysTaken} day${history.finishes[0].daysTaken === 1 ? "" : "s"} start to finish`}
+              {history.finishes.length > 1 && ` · read ${history.finishes.length} times`}
+            </p>
+          ) : history.daysToFinish != null && history.pace != null ? (
+            <p className="mt-3 border-t border-rule/40 pt-2 text-cream-dim">
+              {history.pagesLeft?.toLocaleString()} pages to go — at {history.pace} pages a day
+              that&apos;s about{" "}
+              <span className="text-accent">
+                {history.daysToFinish} more day{history.daysToFinish === 1 ? "" : "s"}
+              </span>
+              .
+            </p>
+          ) : (
+            <p className="mt-3 border-t border-rule/40 pt-2 text-cream-dimmer">
+              {history.pagesLeft != null
+                ? `${history.pagesLeft.toLocaleString()} pages to go — a few more reading days and there'll be a forecast.`
+                : "Not enough history yet for a forecast."}
+            </p>
+          )}
+        </section>
+      )}
 
       <section className="mt-4 text-cream-dimmer">
         <dl className="grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-[0.7rem] sm:grid-cols-3">

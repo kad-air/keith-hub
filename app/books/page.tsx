@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { listBooks } from "@/lib/books/store";
 import { listProgress } from "@/lib/books/kosync";
+import { getReadingStats } from "@/lib/books/statsData";
 import BooksClient from "@/components/BooksClient";
 
 export const dynamic = "force-dynamic";
@@ -34,6 +35,11 @@ export default function BooksPage() {
   // is only shown when configured; this page is behind the hub-auth cookie.
   const key = process.env.BOOKS_API_KEY ?? null;
 
+  // The streak strip. Rendered here rather than on /books/stats alone because
+  // the incentive only works if it's on the page you already open — a number
+  // you have to navigate to is a number you check once.
+  const stats = getReadingStats();
+
   return (
     <BooksClient
       items={withProgress}
@@ -41,6 +47,15 @@ export default function BooksPage() {
       apiKeyConfigured={key != null}
       opdsUrl={key ? `/opds/${key}/v1.2/catalog` : null}
       kosyncUrl={key ? `/kosync/${key}` : null}
+      summary={{
+        hasHistory: stats.hasHistory,
+        streak: stats.streak.current,
+        bankedToday: stats.streak.bankedToday,
+        atRisk: stats.streak.atRisk,
+        pagesToday: stats.today.pages,
+        pagesThisYear: stats.totals.pagesThisYear,
+        booksFinishedThisYear: stats.totals.booksFinishedThisYear,
+      }}
     />
   );
 }

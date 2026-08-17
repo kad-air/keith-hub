@@ -24,6 +24,7 @@ npm run check:books:bytes        # Books byte-identity gate: partialMd5 vs offli
 npm run check:books:opds         # Books OPDS device-contract gate: CrossPoint parser constraints, anchored on Stump's device-proven feed (same)
 npm run check:books:kosync       # Books kosync protocol gate: md5 wire auth, opaque progress round-trip, no-rollback import (same)
 npm run check:books:metadata     # Books metadata gate: an edit never touches the file/sha256/partial_md5 (same)
+npm run check:books:stats        # Books reading-stats gate: word count vs. Python, real DST calendar, sync survives a stats failure (same)
 ```
 
 No test suite. `npm run build` is the type-check gate — always run it before pushing. It is
@@ -278,7 +279,8 @@ A static catalog of Hickman-era reading orders (X-Men, Avengers/Secret Wars), ea
 
 ### Books — the EPUB library + OPDS + KOReader sync server
 Serves the Xteink X3 (CrossPoint firmware) and Readest on iOS: an OPDS 1.2 catalog, the vanilla
-KOReader-sync (kosync) protocol, and an upload/manage UI at `/books`. Replaced the Stump server
+KOReader-sync (kosync) protocol, an upload/manage UI at `/books`, and reading statistics at
+`/books/stats` derived from the sync log. Replaced the Stump server
 that ran on the Mac Mini (torn down per `BOOKS_PLAN.md` §11; requirements source was
 `~/Code/stump/MAC-MINI-DEPLOYMENT-PLAN.md`). Files live at `data/books/<id>/book.epub` on the
 Railway volume; `/Volumes/HDD/Books` on the Mini remains the master copy/backup.
@@ -340,6 +342,64 @@ Content), `components/BookDetailClient.tsx`. Scripts: `push-books.mjs` (bulk upl
 Readium `end_locator`, never rolls back a newer device position, ends by asserting every migrated
 hash resolves to a catalog book). Relative `.ts` imports in `lib/books/` follow the hoops
 convention so plain node runs the check scripts against the real modules.
+
+#### Reading statistics (`/books/stats`)
+
+A streak, a year heatmap, finish projections and badges — all derived from the kosync log, none
+of it entered by hand. Entry points: the `Stats` link and streak strip on `/books`, a per-book
+history block on `/books/[id]`.
+
+🔴 **`kosync_progress` cannot answer a single historical question, which is why `reading_events`
+exists.** That table is ONE UPSERTED row per document — every sync destroys the position it
+replaces, so "when did I read" is not recoverable from it at any later date. `reading_events` is
+an append-only row per sync, written inside `putProgress` from the previous position read *before*
+the upsert overwrites it. Consequence worth stating plainly: **history begins the day this
+shipped**; nothing earlier can be reconstructed, and the UI dates its own record rather than
+implying otherwise.
+
+🔴 **The history write is wrapped in a `try/catch` inside `putProgress`, and that is load-bearing.**
+Statistics are decoration; the reading position is the product. A missing table or a locked DB must
+cost a number on a page, never a reader's place in a book. `check:books:stats` falsifies it by
+DROPping `reading_events` and asserting the PUT still stores and returns the position.
+
+🔴 **Three rules keep the numbers honest, each pinned by the gate** (`lib/books/readingEvents.ts`):
+an UNCHANGED position writes nothing (KOReader/CrossPoint re-PUT the same position on a timer while
+a book merely sits open — recording it would light up the streak for days nobody read); the FIRST
+sync of a document is a `'baseline'` with delta forced to 0 (the device is announcing where it
+already is, and crediting it books a migrated library's entire past to one afternoon); and `delta`
+is stored SIGNED but never subtracts from a day's pages (going backwards is a re-read, not
+un-reading). `computeReadingStats` counts only `kind='read'` events as activity.
+
+🔴 **Day bucketing goes through `Intl` with an explicit `America/Denver`, never `floor(ts/86400)`
+and never server-local time.** Railway runs UTC, so a 9pm page turn is already tomorrow there — an
+evening reader's streak would show gaps on days they actually read, and DST's 23/25-hour days
+drift on top. The gate anchors this on the real 2026 transitions (re-derived from the second-Sunday
+/ first-Sunday rule, not hardcoded) and asserts the naive bucketing DISAGREES.
+
+**Pages come from the epub's own text.** `books.word_count` (additive migration; NULL = never
+attempted, 0 = attempted and empty so a broken file isn't re-unzipped forever) is filled at ingest
+and backfilled lazily by `getReadingStats`. A page is `PAGE_WORDS = 250`, printed on screen next to
+the numbers. 🔴 **`PAGE_WORDS` lives in `lib/books/pages.ts`, which imports NOTHING** — sourcing it
+from `epubText.ts` (the tidy-looking place, next to the counting) drags AdmZip into the client
+bundle and shipped **182 kB** of zip library to `/books/stats` with everything still working
+perfectly. Only the bundle size ever said so; `check:books:stats` now pins it statically.
+
+**The one inferred quantity is TIME, and it says so on screen.** Sitting lengths are reconstructed
+by clustering syncs (`SESSION_GAP_MINUTES`), so a session the device reported once spans zero
+minutes — a floor, not a measurement. Days, positions and pages are measured. Projections refuse
+thin evidence: under three reading days in the window, no forecast is shown at all rather than a
+confident wrong date. Finishing is a CROSSING of `FINISH_THRESHOLD` (0.97 — readers stop short of
+1.0), not a state, so a device idling at 99% doesn't re-finish a book on every check-in.
+
+**Key files:** `lib/books/stats.ts` (**pure** — no DB, no fs, `now` always passed in, so the gate
+drives it with streams whose answer is known independently; keep it that way), `readingEvents.ts`
+(the recorder + baseline seeding), `statsData.ts` (the only impure edge; also where `getBookHistory`
+runs the SAME model over one document so per-book numbers can't drift), `epubText.ts` (spine-walking
+word count), `pages.ts` (the page convention, dependency-free). UI: `app/books/stats/page.tsx`,
+`components/BooksStatsClient.tsx`. Reference generator: `scripts/gen_book_wordcount_reference.py`
+(Python `html.parser` + `ElementTree` — an independent implementation whose answer is committed to
+`books-fixture/expected.json` under `text`; regenerate only when the fixture epub is rebuilt, never
+by copying the TS output back in).
 
 ### Hoops — the NBA simulation studio
 An NBA sim & what-if studio as its own section, built to the plan in `HOOPS_PLAN.md` (tracking epic: GitHub #63). **Shipped so far: milestone 1, the read-model spine (#64) — `/hoops/teams` and `/hoops/teams/[tri]`; milestone 2, the RNG parity + engine port (#65, #66) — `lib/hoops/{rng,philox,blake2b,engine}.ts`; the Mac Mini PUSH endpoint (#73, wire contract kad-air/hoops-sim#24) — `POST /api/hoops/import`; and milestone 3, the matchup + box score (#67) — `/hoops` and `/hoops/game/[runId]`.** The engine now runs from a screen. Next up: the studio (#69), with the design spike (#68) ahead of it.

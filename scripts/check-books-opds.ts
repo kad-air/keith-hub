@@ -65,6 +65,7 @@ const mk = (i: number): FakeBook => ({
   sha256: "x",
   partialMd5: "y",
   coverName: i % 2 ? "cover.jpg" : null,
+  wordCount: 90_000,
   addedAt: "2026-01-01T00:00:00Z",
   updatedAt: "2026-01-01T00:00:00Z",
 });

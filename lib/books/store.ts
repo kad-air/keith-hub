@@ -7,6 +7,7 @@ import path from "path";
 import { getDb } from "../db.ts";
 import { partialMd5 } from "./partialMd5.ts";
 import { extractEpubMeta } from "./epubMeta.ts";
+import { countEpubWords } from "./epubText.ts";
 import { normalizeMeta } from "./normalize.ts";
 
 // File storage: data/books/<id>/book.epub (+ cover.<ext>). One directory per
@@ -31,6 +32,10 @@ export type Book = {
   sha256: string;
   partialMd5: string;
   coverName: string | null;
+  /** Words of prose in the epub — the denominator for every page figure on
+   *  the reading-stats page. null when never computed, 0 when the file
+   *  yielded no readable text. See lib/books/epubText.ts. */
+  wordCount: number | null;
   addedAt: string;
   updatedAt: string;
 };
@@ -48,6 +53,7 @@ type BookRow = {
   sha256: string;
   partial_md5: string;
   cover_name: string | null;
+  word_count: number | null;
   added_at: string;
   updated_at: string;
 };
@@ -66,6 +72,7 @@ function rowToBook(row: BookRow): Book {
     sha256: row.sha256,
     partialMd5: row.partial_md5,
     coverName: row.cover_name,
+    wordCount: row.word_count,
     addedAt: row.added_at,
     updatedAt: row.updated_at,
   };
@@ -145,11 +152,19 @@ export function ingestBook(bytes: Buffer, fileName: string): IngestResult {
     fs.writeFileSync(path.join(dir, coverName), raw.cover.bytes);
   }
 
+  // Length, for the stats page's page counts. A read of the bytes we already
+  // hold in memory — never a rewrite, so the sync key is untouched. Failure
+  // stores 0 rather than null so the backfill doesn't re-unzip a broken file
+  // on every stats load; like metadata extraction, it can never fail an
+  // ingest (BOOKS_PLAN §8).
+  const wordCount = countEpubWords(bytes) ?? 0;
+
   try {
     db.prepare(
       `INSERT INTO books (id, title, author, series, series_index, language, description,
-                          file_name, file_size, sha256, partial_md5, cover_name, added_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                          file_name, file_size, sha256, partial_md5, cover_name, word_count,
+                          added_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
       id,
       meta.title,
@@ -163,6 +178,7 @@ export function ingestBook(bytes: Buffer, fileName: string): IngestResult {
       sha256,
       partialMd5(bytes),
       coverName,
+      wordCount,
       now,
       now,
     );
@@ -173,6 +189,43 @@ export function ingestBook(bytes: Buffer, fileName: string): IngestResult {
   }
 
   return { book: getBook(id)!, created: true };
+}
+
+/**
+ * Fill word_count for books ingested before the column existed, by re-reading
+ * their stored epubs. Idempotent and self-limiting: only rows with NULL are
+ * touched, and a file that yields nothing records 0 so it is never retried.
+ *
+ * 🔴 Read-only with respect to the volume. It opens each epub, counts, and
+ * writes a DB column — the bytes, the sha256 and the partial_md5 are never
+ * touched, which is the same guarantee metadata edits carry (BOOKS_PLAN §4,
+ * check:books:metadata). A book being read on a device right now can be
+ * backfilled without disturbing it.
+ *
+ * Returns the number of rows filled.
+ */
+export function backfillWordCounts(limit = 500): number {
+  const db = getDb();
+  const rows = db
+    .prepare(`SELECT id FROM books WHERE word_count IS NULL LIMIT ?`)
+    .all(limit) as Array<{ id: string }>;
+  if (rows.length === 0) return 0;
+
+  const update = db.prepare(`UPDATE books SET word_count = ? WHERE id = ?`);
+  let filled = 0;
+  for (const { id } of rows) {
+    let words = 0;
+    try {
+      words = countEpubWords(fs.readFileSync(path.join(booksDir(), id, "book.epub"))) ?? 0;
+    } catch {
+      // A missing or unreadable file records 0 and moves on — one broken book
+      // must not stop the stats page from rendering the rest.
+      words = 0;
+    }
+    update.run(words, id);
+    filled++;
+  }
+  return filled;
 }
 
 export type BookEdit = Partial<

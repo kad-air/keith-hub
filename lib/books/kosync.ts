@@ -1,5 +1,6 @@
 import { createHash } from "crypto";
 import { getDb } from "../db.ts";
+import { recordReadingEvent } from "./readingEvents.ts";
 
 // The KOReader sync (kosync) model — the vanilla protocol, deliberately NOT a
 // vendor dialect (BOOKS_PLAN §0): CrossPoint and Readest both speak exactly
@@ -85,9 +86,17 @@ export function putProgress(
   },
 ): { document: string; timestamp: number } {
   const timestamp = Math.floor(Date.now() / 1000);
-  getDb()
-    .prepare(
-      `INSERT INTO kosync_progress (username, document, progress, percentage, device, device_id, timestamp)
+  const db = getDb();
+
+  // Read the outgoing position BEFORE the upsert destroys it — it is the only
+  // thing that makes this sync interpretable as movement rather than a bare
+  // coordinate, and one statement further down it no longer exists anywhere.
+  const previous = db
+    .prepare(`SELECT progress, percentage FROM kosync_progress WHERE username = ? AND document = ?`)
+    .get(username, p.document) as { progress: string; percentage: number } | undefined;
+
+  db.prepare(
+    `INSERT INTO kosync_progress (username, document, progress, percentage, device, device_id, timestamp)
        VALUES (?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT (username, document) DO UPDATE SET
          progress = excluded.progress,
@@ -95,8 +104,20 @@ export function putProgress(
          device = excluded.device,
          device_id = excluded.device_id,
          timestamp = excluded.timestamp`,
-    )
-    .run(username, p.document, p.progress, p.percentage, p.device ?? null, p.device_id ?? null, timestamp);
+  ).run(username, p.document, p.progress, p.percentage, p.device ?? null, p.device_id ?? null, timestamp);
+
+  // 🔴 Statistics are DECORATION; the position is the product. Nothing in here
+  // may cost the reader their place in a book, so the history write is
+  // isolated behind a catch and the position above it is already durable. A
+  // missing reading_events table, a locked DB, a schema that drifted — each
+  // costs a number on a page and nothing else. check:books:stats falsifies
+  // this by dropping the table and asserting the PUT still stores.
+  try {
+    recordReadingEvent(username, p, previous ?? null, timestamp);
+  } catch (err) {
+    console.error("[books] reading history not recorded (the sync itself is fine):", err);
+  }
+
   return { document: p.document, timestamp };
 }
 
