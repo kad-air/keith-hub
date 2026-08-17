@@ -5,6 +5,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Book } from "@/lib/books/store";
 import type { BookHistory } from "@/lib/books/statsData";
+import { finishLabel } from "@/lib/books/stats";
+
+const finishDate = (days: number) => finishLabel(days, Date.now());
 
 type Props = {
   book: Book;
@@ -230,7 +233,18 @@ export default function BookDetailClient({ book, sync, history }: Props) {
         )}
       </section>
 
-      {history && (
+      {history && !history.started && history.readingDaysToFinish != null && (
+        <section className="mt-4 border border-rule/60 bg-ink-raised/40 px-4 py-3 text-sm text-cream-dim">
+          {history.totalPages?.toLocaleString()} pages · approx.{" "}
+          <span className="text-accent">
+            {history.readingDaysToFinish} day{history.readingDaysToFinish === 1 ? "" : "s"} of
+            reading
+          </span>{" "}
+          at your pace
+        </section>
+      )}
+
+      {history?.started && (
         <section className="mt-4 border border-rule/60 bg-ink-raised/40 px-4 py-3 text-sm">
           <div className="flex items-baseline justify-between gap-3">
             <h2 className="font-mono text-[0.7rem] uppercase tracking-kicker text-cream-dimmer">
@@ -278,20 +292,20 @@ export default function BookDetailClient({ book, sync, history }: Props) {
                 ` — ${history.finishes[0].daysTaken} day${history.finishes[0].daysTaken === 1 ? "" : "s"} start to finish`}
               {history.finishes.length > 1 && ` · read ${history.finishes.length} times`}
             </p>
-          ) : history.daysToFinish != null && history.pace != null ? (
+          ) : history.readingDaysToFinish != null ? (
             <p className="mt-3 border-t border-rule/40 pt-2 text-cream-dim">
-              {history.pagesLeft?.toLocaleString()} pages to go — at {history.pace} pages a day
-              that&apos;s about{" "}
+              {history.pagesLeft?.toLocaleString()} pages to go · approx.{" "}
               <span className="text-accent">
-                {history.daysToFinish} more day{history.daysToFinish === 1 ? "" : "s"}
+                {history.readingDaysToFinish} day{history.readingDaysToFinish === 1 ? "" : "s"} of
+                reading
               </span>
-              .
+              {history.daysToFinish != null && ` · around ${finishDate(history.daysToFinish)}`}
             </p>
           ) : (
             <p className="mt-3 border-t border-rule/40 pt-2 text-cream-dimmer">
               {history.pagesLeft != null
-                ? `${history.pagesLeft.toLocaleString()} pages to go — a few more reading days and there'll be a forecast.`
-                : "Not enough history yet for a forecast."}
+                ? `${history.pagesLeft.toLocaleString()} pages to go`
+                : "No page count for this file"}
             </p>
           )}
         </section>

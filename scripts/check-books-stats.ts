@@ -573,36 +573,155 @@ console.log("\n── 🔴 a sync timestamp is a PUSH, not a reading ──");
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-console.log("\n── a projection refuses thin evidence ──");
+console.log("\n── the forecast is measured from the READER, not the book ──");
 // ═══════════════════════════════════════════════════════════════════════════
+// A rate measured per book sounds more precise and is in practice useless: a
+// book has to survive MIN_RATE_DAYS separate days inside the window to earn a
+// forecast, so the feature can only ever fire on the books being read SLOWLY.
+// Anything put away in two evenings is finished before it qualifies. The
+// evidence belongs to the reader; the book only supplies its remaining pages.
 {
   const t = Math.floor(new Date("2026-08-10T21:00:00Z").getTime() / 1000);
   const day = 86400;
+  // 387,000 words is exactly 1,000 pages at PAGE_WORDS, so every number below
+  // is arithmetic done by hand here rather than read back off the model.
+  const KPAGE = 387 * 1000;
+
   const thin = computeReadingStats({
     events: [ev("p", 0.1, 0, t, { kind: "baseline" }), ev("p", 0.2, 0.1, t + day)],
-    books: [BOOK("p", 100_000)],
+    books: [BOOK("p", KPAGE)],
     now: t + day + 3600,
     timeZone: TZ,
   });
+  assert(thin.rate === null, "one reading day in the entire log measures no rate");
   assert(
-    thin.nowReading[0].pace === null && thin.nowReading[0].daysToFinish === null,
-    "🔴 one reading day forecasts nothing rather than a confident wrong date",
+    thin.nowReading[0].readingDaysToFinish === null && thin.nowReading[0].daysToFinish === null,
+    "🔴 …and forecasts nothing rather than a confident wrong date",
   );
 
-  const solid = computeReadingStats({
-    events: [
-      ev("p", 0.0, 0, t, { kind: "baseline" }),
-      ev("p", 0.1, 0.1, t + day),
-      ev("p", 0.2, 0.1, t + 2 * day),
-      ev("p", 0.3, 0.1, t + 3 * day),
-    ],
-    books: [BOOK("p", 100_000)],
-    now: t + 3 * day + 3600,
+  // 🔴 THE LANDMINE. "a" is three days of the reader's history; "fast" was
+  // opened today and has one day of its own — the Discworld case.
+  const fastEvents = [
+    ev("a", 0.0, 0, t, { kind: "baseline" }),
+    ev("a", 0.1, 0.1, t + day),
+    ev("a", 0.2, 0.1, t + 2 * day),
+    ev("a", 0.3, 0.1, t + 3 * day),
+    ev("fast", 0.0, 0, t + 4 * day, { kind: "baseline" }),
+    ev("fast", 0.05, 0.05, t + 4 * day + 3600),
+  ];
+  const twoBooks = [BOOK("a", KPAGE), BOOK("fast", KPAGE, "Guards! Guards!")];
+  const nowAt = t + 4 * day + 7200;
+  const withRate = computeReadingStats({
+    events: fastEvents,
+    books: twoBooks,
+    now: nowAt,
+    timeZone: TZ,
+  });
+  const fast = withRate.nowReading.find((r) => r.document === "fast")!;
+  assert(
+    fast.readingDaysToFinish != null && fast.daysToFinish != null,
+    "🔴 a book opened TODAY is forecast, on the reader's rate",
+  );
+  // 🔴 "Global" has to mean EVERY book, which the assertion above cannot see:
+  // a rate pooled from only the first document still forecasts the second, and
+  // just quietly under-reports the reader. Pin the pool itself — 300 pages from
+  // "a" plus 50 from "fast", over four distinct days.
+  assert(
+    withRate.rate!.pages === 350 && withRate.rate!.readingDays === 4,
+    `🔴 the rate pools every book's pages (got ${withRate.rate!.pages} pages over ${withRate.rate!.readingDays} days)`,
+  );
+
+  // The old implementation, reproduced by handing the same model that book's
+  // own events alone. A gate that passes against both is not a gate.
+  const fastAlone = computeReadingStats({
+    events: fastEvents.filter((e) => e.document === "fast"),
+    books: [BOOK("fast", KPAGE)],
+    now: nowAt,
     timeZone: TZ,
   });
   assert(
-    solid.nowReading[0].pace != null && solid.nowReading[0].daysToFinish != null,
-    "three reading days is enough to forecast",
+    fastAlone.nowReading[0].readingDaysToFinish === null,
+    "🔴 …which measuring that book ALONE could never do (the old behaviour, pinned as wrong)",
+  );
+
+  // The defining property of a global rate: the same book at the same position
+  // finishes sooner for a reader who has been reading more — of anything.
+  const busier = computeReadingStats({
+    events: [
+      ev("a", 0.0, 0, t, { kind: "baseline" }),
+      ev("a", 0.3, 0.3, t + day),
+      ev("a", 0.6, 0.3, t + 2 * day),
+      ev("a", 0.9, 0.3, t + 3 * day),
+      ev("fast", 0.0, 0, t + 4 * day, { kind: "baseline" }),
+      ev("fast", 0.05, 0.05, t + 4 * day + 3600),
+    ],
+    books: twoBooks,
+    now: nowAt,
+    timeZone: TZ,
+  });
+  const fastBusier = busier.nowReading.find((r) => r.document === "fast")!;
+  assert(
+    fastBusier.readingDaysToFinish! < fast.readingDaysToFinish!,
+    `🔴 reading more of ANOTHER book shortens this one's forecast (${fast.readingDaysToFinish} → ${fastBusier.readingDaysToFinish} days)`,
+  );
+
+  // ── two denominators, each answering its own question ──
+  const paced = computeReadingStats({
+    events: [
+      ev("b", 0.0, 0, t, { kind: "baseline" }),
+      ev("b", 0.1, 0.1, t + day),
+      ev("b", 0.2, 0.1, t + 2 * day),
+      ev("b", 0.3, 0.1, t + 3 * day),
+    ],
+    books: [BOOK("b", KPAGE)],
+    now: t + 3 * day + 3600,
+    timeZone: TZ,
+  });
+  assert(paced.rate!.readingDays === 3, "three reading days is enough to measure a rate");
+  assert(
+    paced.rate!.perReadingDay === 100,
+    `300 pages over 3 reading days is 100/day (got ${paced.rate!.perReadingDay})`,
+  );
+  assert(
+    paced.rate!.perCalendarDay === 14.3,
+    `🔴 …and 300 over the FIXED 21-day window is 14.3/day (got ${paced.rate!.perCalendarDay})`,
+  );
+  assert(paced.nowReading[0].pagesLeft === 700, "0.3 of a 1,000-page book leaves 700");
+  assert(paced.nowReading[0].readingDaysToFinish === 7, "700 pages is 7 more days OF READING");
+  assert(
+    paced.nowReading[0].daysToFinish === 49,
+    "🔴 …but 49 days on the CALENDAR, because days off count against a date",
+  );
+
+  // 🔴 Why there are two, as a measurement rather than a claim: the same 600
+  // pages, once spread over four pushes and once bunched into three. The
+  // stated distortion — a day's reading lands on the day it was PUSHED — moves
+  // the per-reading-day figure and cannot move the per-calendar-day one.
+  const window600 = (deltas: number[]) =>
+    computeReadingStats({
+      events: [
+        ev("c", 0, 0, t, { kind: "baseline" }),
+        ...deltas.map((d, i) =>
+          ev("c", deltas.slice(0, i + 1).reduce((s, x) => s + x, 0), d, t + (i + 1) * day),
+        ),
+      ],
+      books: [BOOK("c", KPAGE)],
+      now: t + 5 * day,
+      timeZone: TZ,
+    });
+  const spread = window600([0.15, 0.15, 0.15, 0.15]);
+  const bunched = window600([0.2, 0.2, 0.2]);
+  assert(
+    spread.rate!.pages === 600 && bunched.rate!.pages === 600,
+    "the same 600 pages read either way",
+  );
+  assert(
+    spread.rate!.perCalendarDay === bunched.rate!.perCalendarDay,
+    `🔴 the calendar rate is untouched by how the pushes bunched (${spread.rate!.perCalendarDay}/day both ways)`,
+  );
+  assert(
+    spread.rate!.perReadingDay === 150 && bunched.rate!.perReadingDay === 200,
+    "🔴 …while the per-reading-day rate IS exposed to it — which is why the UI shows both",
   );
 }
 
@@ -681,6 +800,52 @@ assert(
   "🔴 none of this touched the stored epub",
 );
 assert(getBook(book.id)!.partialMd5 === expected.partial_md5, "🔴 …or the sync key");
+
+// ═══════════════════════════════════════════════════════════════════════════
+console.log("\n── 🔴 a book page forecasts from the whole log, and totals from one book ──");
+// ═══════════════════════════════════════════════════════════════════════════
+// getBookHistory runs the model TWICE on purpose. Collapsing it back to the
+// one filtered run it used to be would restore per-book rates on the detail
+// page silently — every number still renders, the fast books just quietly stop
+// getting a forecast. Both halves are pinned here.
+{
+  const { getBookHistory } = await import("../lib/books/statsData.ts");
+  const shelf = ingestBook(synthEpub(), "Never Opened.epub").book;
+  assert(shelf.partialMd5 !== doc, "the second book is a genuinely different file");
+
+  // Three earlier days of reading, all of it in the OTHER book.
+  const nowSec = Math.floor(Date.now() / 1000);
+  const insert = getDb().prepare(
+    `INSERT INTO reading_events (username, document, kind, percentage, delta, device, device_id, timestamp)
+     VALUES ('keith', ?, 'read', ?, ?, 'CrossPoint', 'x3', ?)`,
+  );
+  for (let d = 3; d >= 1; d--) insert.run(doc, 0.05 * (4 - d), 0.05, nowSec - d * 86400);
+
+  const unopened = getBookHistory(shelf.partialMd5, nowSec)!;
+  assert(unopened.started === false, "a never-synced book reports no history");
+  assert(unopened.daysRead === 0 && unopened.pages === 0, "…and claims none");
+  assert(
+    unopened.readingDaysToFinish != null && unopened.readingDaysToFinish > 0,
+    `🔴 …but still costs a knowable number of reading days (${unopened.readingDaysToFinish})`,
+  );
+  assert(
+    unopened.pagesLeft === unopened.totalPages,
+    "🔴 …over the WHOLE book, since none of it has been read",
+  );
+
+  // Now give it exactly one day of its own — the fast-book shape, at the DB.
+  insert.run(shelf.partialMd5, 0.04, 0.04, nowSec - 1800);
+  const opened = getBookHistory(shelf.partialMd5, nowSec)!;
+  assert(opened.started === true, "one sync starts it");
+  assert(
+    opened.daysRead === 1,
+    `🔴 its totals stay ITS OWN — one day, not the reader's four (got ${opened.daysRead})`,
+  );
+  assert(
+    opened.readingDaysToFinish != null,
+    "🔴 …while its forecast comes from the reader's whole log, on one day of its own",
+  );
+}
 
 // 🔴 The load-bearing one. Statistics are wired into the sync write path, so
 // they are one exception away from costing a reading position. Pull the table

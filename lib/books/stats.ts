@@ -65,6 +65,12 @@ export const STALLED_DAYS = 10;
 /** Trailing window for the "recent pace" figures and finish projections. */
 export const PACE_WINDOW_DAYS = 21;
 
+/** Reading days needed inside that window before ANY forecast is shown. The
+ *  bar is cleared by the reader, once, not by each book separately — see the
+ *  reading-rate block in computeReadingStats for why that distinction is the
+ *  whole feature. */
+export const MIN_RATE_DAYS = 3;
+
 export const READING_TIMEZONE = "America/Denver";
 
 export type StatsBook = {
@@ -96,12 +102,75 @@ export type NowReading = {
   pagesLeft: number;
   lastReadAt: number;
   daysIdle: number;
-  /** Pages per day over PACE_WINDOW_DAYS, or null when the evidence is thin. */
-  pace: number | null;
-  /** Days to finish at that pace — null whenever pace is. */
+  /** Days of READING left at the reader's global per-reading-day rate. */
+  readingDaysToFinish: number | null;
+  /** Calendar days left at the global per-calendar-day rate — this is the one
+   *  that becomes a finish DATE. Both are null together: null when the reader
+   *  hasn't cleared MIN_RATE_DAYS, or the book has no measurable length. */
   daysToFinish: number | null;
   stalled: boolean;
 };
+
+/**
+ * The reader's own rate, measured across every book in the window.
+ *
+ * Two denominators, deliberately, because they answer different questions and
+ * each is wrong for the other's:
+ *
+ *  · perCalendarDay divides by the FIXED window, so days off count against it.
+ *    That is what makes it a real calendar date — and what makes it immune to
+ *    the push distortion documented at the top of this file, since a weekend of
+ *    reading arriving in one Sunday push moves only the numerator.
+ *  · perReadingDay divides by days actually read, so it answers "how many more
+ *    evenings" and makes no calendar claim it can't back. It IS exposed to that
+ *    distortion: two days of reading in one push reads as one very good day.
+ */
+export type ReadingRate = {
+  perCalendarDay: number;
+  perReadingDay: number;
+  /** Distinct days with measurable progress in the window — the evidence. */
+  readingDays: number;
+  pages: number;
+  windowDays: number;
+};
+
+/**
+ * What a stack of pages costs, at a rate measured elsewhere.
+ *
+ * Split out and exported because the rate is a property of the READER: these
+ * answer for any number of pages, including a book that has never been opened
+ * (there is nothing to project from in the book itself, and nothing needed).
+ * One implementation, so a shelf estimate and a Now Reading estimate cannot
+ * disagree about the same remaining pages.
+ */
+export function readingDaysFor(pages: number, rate: ReadingRate | null): number | null {
+  if (!rate || pages <= 0) return null;
+  return Math.ceil(pages / rate.perReadingDay);
+}
+
+export function calendarDaysFor(pages: number, rate: ReadingRate | null): number | null {
+  if (!rate || pages <= 0) return null;
+  return Math.ceil(pages / rate.perCalendarDay);
+}
+
+/**
+ * A calendar-days count rendered as the day it lands on ("Sep 2").
+ *
+ * `nowMs` is required rather than defaulted to Date.now() to keep this module
+ * free of ambient time — the same rule the rest of the model follows, and what
+ * lets the gate drive it at a chosen instant.
+ */
+export function finishLabel(
+  days: number,
+  nowMs: number,
+  timeZone: string = READING_TIMEZONE,
+): string {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    month: "short",
+    day: "numeric",
+  }).format(new Date(nowMs + days * 86400000));
+}
 
 export type Finish = {
   book: StatsBook | null;
@@ -137,6 +206,8 @@ export type ReadingStats = {
     atRisk: boolean;
   };
   calendar: DayCell[];
+  /** Null until the reader has MIN_RATE_DAYS of measurable days in the window. */
+  rate: ReadingRate | null;
   nowReading: NowReading[];
   finished: Finish[];
   records: {
@@ -364,7 +435,61 @@ export function computeReadingStats(input: StatsInput): ReadingStats {
   const latestByDoc = new Map<string, ReadingEvent>();
   for (const e of events) latestByDoc.set(e.document, e);
 
+  // ── the reader's rate ────────────────────────────────────────────────────
+  //
+  // 🔴 The rate is GLOBAL: one figure measured across every book in the window,
+  // then divided into each book's remaining pages. It used to be per-book,
+  // which sounds more precise and was in practice useless — a book had to
+  // survive MIN_RATE_DAYS separate days inside the window to earn a forecast,
+  // so the feature could only ever fire on the books being read SLOWLY.
+  // Anything finished in a weekend was done before it qualified, and this
+  // reader puts a Discworld away in two days. The evidence belongs to the
+  // reader, not the book, so a book started this morning is forecast on its
+  // first sync.
+  //
+  // What that costs, and it is a real cost: a dense book is projected at the
+  // same rate as an easy one. Pages are word-normalised (PAGE_WORDS), so prose
+  // density partly washes out; how fast this reader moves through a particular
+  // author does not — and no arithmetic recovers it from a log where the fast
+  // books never accumulate evidence of their own.
+  //
+  // Read as "if this book got all of your reading". With several on the go the
+  // per-book numbers are each optimistic, while their SUM is right — total
+  // pages left ÷ the same rate is exactly what finishing all of them takes.
   const windowStart = now - PACE_WINDOW_DAYS * 86400;
+  const windowDayPages = new Map<string, number>();
+  for (const e of reads) {
+    if (e.timestamp < windowStart) continue;
+    const pages = pagesFor(e.document, Math.max(0, e.delta));
+    // Days are counted only where they produced MEASURABLE pages, so the
+    // per-reading-day rate stays self-consistent: an evening whose only sync
+    // was a sideloaded book contributes nothing to the numerator and must not
+    // dilute the divisor either.
+    if (!pages) continue;
+    const day = dayKey(e.timestamp, tz);
+    windowDayPages.set(day, (windowDayPages.get(day) ?? 0) + pages);
+  }
+  let windowPages = 0;
+  for (const p of windowDayPages.values()) windowPages += p;
+  const readingDaysInWindow = windowDayPages.size;
+
+  // A projection needs evidence. Two days of reading and a rate figure is a
+  // horoscope; below the bar the UI shows no forecast at all rather than a
+  // confident wrong date.
+  const rate: ReadingRate | null =
+    readingDaysInWindow >= MIN_RATE_DAYS && windowPages > 0
+      ? {
+          // One decimal — a rate derived from three weeks of page turns does
+          // not have two significant decimals in it, and printing them implies
+          // a precision the estimate doesn't have.
+          perCalendarDay: Number((windowPages / PACE_WINDOW_DAYS).toFixed(1)),
+          perReadingDay: Number((windowPages / readingDaysInWindow).toFixed(1)),
+          readingDays: readingDaysInWindow,
+          pages: Math.round(windowPages),
+          windowDays: PACE_WINDOW_DAYS,
+        }
+      : null;
+
   const nowReading: NowReading[] = [];
   for (const [document, latest] of latestByDoc) {
     if (latest.percentage >= FINISH_THRESHOLD) continue;
@@ -372,18 +497,6 @@ export function computeReadingStats(input: StatsInput): ReadingStats {
     const words = book?.wordCount ?? null;
     const totalPagesInBook = words ? words / PAGE_WORDS : 0;
 
-    const docReads = reads.filter((e) => e.document === document);
-    const windowPages = docReads
-      .filter((e) => e.timestamp >= windowStart)
-      .reduce((sum, e) => sum + (pagesFor(document, Math.max(0, e.delta)) ?? 0), 0);
-    const windowDays = new Set(
-      docReads.filter((e) => e.timestamp >= windowStart).map((e) => dayKey(e.timestamp, tz)),
-    ).size;
-
-    // A projection needs evidence. Two days of reading and a pace figure is a
-    // horoscope; below the bar, the UI shows no forecast at all rather than a
-    // confident wrong date.
-    const pace = windowDays >= 3 && windowPages > 0 ? windowPages / PACE_WINDOW_DAYS : null;
     const pagesRead = totalPagesInBook * latest.percentage;
     const pagesLeft = Math.max(0, totalPagesInBook - pagesRead);
     const daysIdle = daysBetween(dayKey(latest.timestamp, tz), today);
@@ -396,11 +509,10 @@ export function computeReadingStats(input: StatsInput): ReadingStats {
       pagesLeft: Math.round(pagesLeft),
       lastReadAt: latest.timestamp,
       daysIdle,
-      // One decimal — a pace derived from three weeks of page turns does not
-      // have two significant decimals in it, and printing them implies a
-      // precision the estimate doesn't have.
-      pace: pace != null ? Number(pace.toFixed(1)) : null,
-      daysToFinish: pace != null && pace > 0 ? Math.ceil(pagesLeft / pace) : null,
+      // A book with no measurable length has pagesLeft 0 and gets no forecast —
+      // the page says so rather than projecting a book it cannot count.
+      readingDaysToFinish: readingDaysFor(pagesLeft, rate),
+      daysToFinish: calendarDaysFor(pagesLeft, rate),
       stalled: daysIdle >= STALLED_DAYS,
     });
   }
@@ -439,6 +551,7 @@ export function computeReadingStats(input: StatsInput): ReadingStats {
       atRisk: current > 0 && !bankedToday,
     },
     calendar,
+    rate,
     nowReading,
     finished,
     records: {
