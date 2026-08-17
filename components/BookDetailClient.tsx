@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Book } from "@/lib/books/store";
 import type { BookHistory } from "@/lib/books/statsData";
+import type { PhraseSearchResult, PositionCandidate } from "@/lib/books/xpointer";
 import { finishLabel } from "@/lib/books/stats";
 
 const finishDate = (days: number) => finishLabel(days, Date.now());
@@ -77,6 +78,59 @@ export default function BookDetailClient({ book, sync, history }: Props) {
     } catch (err) {
       setToRead(!next);
       setStatus(`Couldn't update: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // --- Catch up (audiobook → device position) ---
+  const [phrase, setPhrase] = useState("");
+  const [searching, setSearching] = useState(false);
+  const [found, setFound] = useState<PhraseSearchResult | null>(null);
+  const [catchStatus, setCatchStatus] = useState<string | null>(null);
+
+  async function findPosition() {
+    setSearching(true);
+    setCatchStatus(null);
+    setFound(null);
+    try {
+      const res = await fetch(`/api/books/${book.id}/find-position`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phrase }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? `HTTP ${res.status}`);
+      setFound(data);
+      if (data.candidates.length === 0) {
+        setCatchStatus("No good match — try a longer or more distinctive stretch.");
+      }
+    } catch (err) {
+      setCatchStatus(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSearching(false);
+    }
+  }
+
+  async function setPosition(c: PositionCandidate) {
+    setBusy(true);
+    setCatchStatus(null);
+    try {
+      const res = await fetch(`/api/books/${book.id}/set-position`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pointer: c.pointer, percentage: c.percentage }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? `HTTP ${res.status}`);
+      setFound(null);
+      setPhrase("");
+      setCatchStatus(
+        `Position set to ${(c.percentage * 100).toFixed(1)}% — sync the device to pick it up.`,
+      );
+      router.refresh();
+    } catch (err) {
+      setCatchStatus(err instanceof Error ? err.message : String(err));
     } finally {
       setBusy(false);
     }
@@ -230,6 +284,78 @@ export default function BookDetailClient({ book, sync, history }: Props) {
           <p className="mt-2 text-cream-dim">
             No synced position yet — it appears after a device reads this exact file.
           </p>
+        )}
+      </section>
+
+      <section className="mt-4 border border-rule/60 bg-ink-raised/40 px-4 py-3 text-sm">
+        <h2 className="font-mono text-[0.7rem] uppercase tracking-kicker text-cream-dimmer">
+          Catch up from the audiobook
+        </h2>
+        <p className="mt-2 text-[0.8rem] leading-relaxed text-cream-dim">
+          Heard a line? Type or dictate it — a few distinctive words are enough. The match is
+          fuzzy on purpose: spelling, punctuation and a missed word or two don&apos;t matter.
+        </p>
+        <div className="mt-2 flex gap-2">
+          <input
+            className={field}
+            value={phrase}
+            placeholder="a stretch of what you just heard"
+            onChange={(e) => setPhrase(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !searching && phrase.trim()) findPosition();
+            }}
+          />
+          <button
+            onClick={findPosition}
+            disabled={searching || busy || phrase.trim().split(/\s+/).length < 3}
+            className="shrink-0 border border-accent/60 px-3 py-1 font-mono text-[0.7rem] uppercase tracking-kicker text-accent hover:bg-accent/10 disabled:opacity-50"
+          >
+            {searching ? "Searching…" : "Find"}
+          </button>
+        </div>
+
+        {found && found.candidates.length > 0 && (
+          <ul className="mt-3 space-y-2">
+            {found.candidates.map((c) => {
+              const backwards = sync != null && c.percentage < sync.percentage;
+              const grade =
+                c.confidence >= 0.85 ? "strong" : c.confidence >= 0.65 ? "good" : "weak";
+              return (
+                <li key={c.pointer} className="border border-rule/40 bg-ink px-3 py-2">
+                  <p className="text-[0.8rem] leading-relaxed text-cream-dim">{c.snippet}</p>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[0.65rem] uppercase tracking-kicker">
+                    <span className="text-cream">{(c.percentage * 100).toFixed(1)}%</span>
+                    <span
+                      className={
+                        grade === "strong"
+                          ? "text-accent"
+                          : grade === "good"
+                            ? "text-cream-dim"
+                            : "text-red-400"
+                      }
+                    >
+                      {grade} match · {c.matchedWords}/{found.queryWords} words
+                    </span>
+                    {backwards && (
+                      <span className="text-red-400">
+                        behind the device ({(sync!.percentage * 100).toFixed(1)}%)
+                      </span>
+                    )}
+                    <button
+                      onClick={() => setPosition(c)}
+                      disabled={busy}
+                      className="ml-auto border border-accent/60 px-2 py-0.5 text-accent hover:bg-accent/10 disabled:opacity-50"
+                    >
+                      Set position
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        {catchStatus && (
+          <p className="mt-2 font-mono text-[0.7rem] text-accent">{catchStatus}</p>
         )}
       </section>
 

@@ -1,5 +1,5 @@
 {
-  "comment": "Reference hashes for fixture.epub, computed OFFLINE by the Python partial-MD5 reference from ~/Code/stump/MAC-MINI-DEPLOYMENT-PLAN.md — the implementation verified byte-for-byte against Stump's Rust koreader_hash values (13/13) for the real library, which CrossPoint's C++ then matched in production. Regenerate only by rebuilding the fixture and re-running that reference; never by copying the TS output back in.",
+  "comment": "Reference hashes for fixture.epub, computed OFFLINE by the Python partial-MD5 reference from ~/Code/stump/MAC-MINI-DEPLOYMENT-PLAN.md \u2014 the implementation verified byte-for-byte against Stump's Rust koreader_hash values (13/13) for the real library, which CrossPoint's C++ then matched in production. Regenerate only by rebuilding the fixture and re-running that reference; never by copying the TS output back in.",
   "partial_md5": "2d54ce2c70a99dc5b63e58ebfe69bf51",
   "sha256": "6db30acb565a4b8c4da0c9ef7c5bfcb6263f47057921d5516f9ed10db70fadd1",
   "size": 1348658,
@@ -12,9 +12,172 @@
     "cover_ext": "png"
   },
   "text": {
-    "comment": "Word count for fixture.epub computed OFFLINE by scripts/gen_book_wordcount_reference.py — an independent implementation (Python html.parser + ElementTree) of what lib/books/epubText.ts does with regexes. This number is the denominator behind every page figure on the reading-stats page, so it gets a second source rather than being trusted. Regenerate only by rebuilding the fixture and re-running that script; never by copying the TS output back in.",
+    "comment": "Word count for fixture.epub computed OFFLINE by scripts/gen_book_wordcount_reference.py \u2014 an independent implementation (Python html.parser + ElementTree) of what lib/books/epubText.ts does with regexes. This number is the denominator behind every page figure on the reading-stats page, so it gets a second source rather than being trusted. Regenerate only by rebuilding the fixture and re-running that script; never by copying the TS output back in.",
     "words": 180000,
     "spine_documents": 1,
     "caveat": "This fixture has ONE spine document, so agreement here does not exercise spine ORDERING or the exclusion of manifest files outside the reading order. check:books:stats builds a second, multi-document epub in memory for that."
+  },
+  "xpointer": {
+    "comment": "CRengine-dialect x-pointers for a sample of fixture.epub's paragraphs, computed OFFLINE by scripts/gen_book_xpointer_reference.py \u2014 an independent Python implementation of lib/books/xpointer.ts's path walk, itself validated byte-exact against three real CrossPoint pointers from production. check:books-xpointer asserts the TS walk reproduces every pointer here exactly. Regenerate only by rebuilding the fixture and re-running that script; never by copying the TS output back in.",
+    "stride": 37,
+    "paragraph_count": 26,
+    "samples": [
+      {
+        "pointer": "/body/DocFragment[1]/body/p[1]",
+        "paragraph_ordinal": 0,
+        "doc_index": 1,
+        "first_words": "word0 word1 word2 word3 word4 word5 word6 word7"
+      },
+      {
+        "pointer": "/body/DocFragment[1]/body/p[38]",
+        "paragraph_ordinal": 37,
+        "doc_index": 1,
+        "first_words": "word0 word1 word2 word3 word4 word5 word6 word7"
+      },
+      {
+        "pointer": "/body/DocFragment[1]/body/p[75]",
+        "paragraph_ordinal": 74,
+        "doc_index": 1,
+        "first_words": "word0 word1 word2 word3 word4 word5 word6 word7"
+      },
+      {
+        "pointer": "/body/DocFragment[1]/body/p[112]",
+        "paragraph_ordinal": 111,
+        "doc_index": 1,
+        "first_words": "word0 word1 word2 word3 word4 word5 word6 word7"
+      },
+      {
+        "pointer": "/body/DocFragment[1]/body/p[149]",
+        "paragraph_ordinal": 148,
+        "doc_index": 1,
+        "first_words": "word0 word1 word2 word3 word4 word5 word6 word7"
+      },
+      {
+        "pointer": "/body/DocFragment[1]/body/p[186]",
+        "paragraph_ordinal": 185,
+        "doc_index": 1,
+        "first_words": "word0 word1 word2 word3 word4 word5 word6 word7"
+      },
+      {
+        "pointer": "/body/DocFragment[1]/body/p[223]",
+        "paragraph_ordinal": 222,
+        "doc_index": 1,
+        "first_words": "word0 word1 word2 word3 word4 word5 word6 word7"
+      },
+      {
+        "pointer": "/body/DocFragment[1]/body/p[260]",
+        "paragraph_ordinal": 259,
+        "doc_index": 1,
+        "first_words": "word0 word1 word2 word3 word4 word5 word6 word7"
+      },
+      {
+        "pointer": "/body/DocFragment[1]/body/p[297]",
+        "paragraph_ordinal": 296,
+        "doc_index": 1,
+        "first_words": "word0 word1 word2 word3 word4 word5 word6 word7"
+      },
+      {
+        "pointer": "/body/DocFragment[1]/body/p[334]",
+        "paragraph_ordinal": 333,
+        "doc_index": 1,
+        "first_words": "word0 word1 word2 word3 word4 word5 word6 word7"
+      },
+      {
+        "pointer": "/body/DocFragment[1]/body/p[371]",
+        "paragraph_ordinal": 370,
+        "doc_index": 1,
+        "first_words": "word0 word1 word2 word3 word4 word5 word6 word7"
+      },
+      {
+        "pointer": "/body/DocFragment[1]/body/p[408]",
+        "paragraph_ordinal": 407,
+        "doc_index": 1,
+        "first_words": "word0 word1 word2 word3 word4 word5 word6 word7"
+      },
+      {
+        "pointer": "/body/DocFragment[1]/body/p[445]",
+        "paragraph_ordinal": 444,
+        "doc_index": 1,
+        "first_words": "word0 word1 word2 word3 word4 word5 word6 word7"
+      },
+      {
+        "pointer": "/body/DocFragment[1]/body/p[482]",
+        "paragraph_ordinal": 481,
+        "doc_index": 1,
+        "first_words": "word0 word1 word2 word3 word4 word5 word6 word7"
+      },
+      {
+        "pointer": "/body/DocFragment[1]/body/p[519]",
+        "paragraph_ordinal": 518,
+        "doc_index": 1,
+        "first_words": "word0 word1 word2 word3 word4 word5 word6 word7"
+      },
+      {
+        "pointer": "/body/DocFragment[1]/body/p[556]",
+        "paragraph_ordinal": 555,
+        "doc_index": 1,
+        "first_words": "word0 word1 word2 word3 word4 word5 word6 word7"
+      },
+      {
+        "pointer": "/body/DocFragment[1]/body/p[593]",
+        "paragraph_ordinal": 592,
+        "doc_index": 1,
+        "first_words": "word0 word1 word2 word3 word4 word5 word6 word7"
+      },
+      {
+        "pointer": "/body/DocFragment[1]/body/p[630]",
+        "paragraph_ordinal": 629,
+        "doc_index": 1,
+        "first_words": "word0 word1 word2 word3 word4 word5 word6 word7"
+      },
+      {
+        "pointer": "/body/DocFragment[1]/body/p[667]",
+        "paragraph_ordinal": 666,
+        "doc_index": 1,
+        "first_words": "word0 word1 word2 word3 word4 word5 word6 word7"
+      },
+      {
+        "pointer": "/body/DocFragment[1]/body/p[704]",
+        "paragraph_ordinal": 703,
+        "doc_index": 1,
+        "first_words": "word0 word1 word2 word3 word4 word5 word6 word7"
+      },
+      {
+        "pointer": "/body/DocFragment[1]/body/p[741]",
+        "paragraph_ordinal": 740,
+        "doc_index": 1,
+        "first_words": "word0 word1 word2 word3 word4 word5 word6 word7"
+      },
+      {
+        "pointer": "/body/DocFragment[1]/body/p[778]",
+        "paragraph_ordinal": 777,
+        "doc_index": 1,
+        "first_words": "word0 word1 word2 word3 word4 word5 word6 word7"
+      },
+      {
+        "pointer": "/body/DocFragment[1]/body/p[815]",
+        "paragraph_ordinal": 814,
+        "doc_index": 1,
+        "first_words": "word0 word1 word2 word3 word4 word5 word6 word7"
+      },
+      {
+        "pointer": "/body/DocFragment[1]/body/p[852]",
+        "paragraph_ordinal": 851,
+        "doc_index": 1,
+        "first_words": "word0 word1 word2 word3 word4 word5 word6 word7"
+      },
+      {
+        "pointer": "/body/DocFragment[1]/body/p[889]",
+        "paragraph_ordinal": 888,
+        "doc_index": 1,
+        "first_words": "word0 word1 word2 word3 word4 word5 word6 word7"
+      },
+      {
+        "pointer": "/body/DocFragment[1]/body/p[900]",
+        "paragraph_ordinal": 899,
+        "doc_index": 1,
+        "first_words": "word0 word1 word2 word3 word4 word5 word6 word7"
+      }
+    ]
   }
 }

@@ -66,6 +66,19 @@ export function createUser(
   return "created";
 }
 
+/**
+ * The registered reader's username, or null before any device has registered.
+ * Single-user by design (see createUser) — the hub's own writes (catch-up
+ * positioning) go to this account, because it IS the account every device
+ * syncs against.
+ */
+export function firstUsername(): string | null {
+  const row = getDb()
+    .prepare(`SELECT username FROM kosync_users ORDER BY created_at LIMIT 1`)
+    .get() as { username: string } | undefined;
+  return row?.username ?? null;
+}
+
 /** Validate the x-auth-user / x-auth-key header pair. */
 export function authUser(username: string | null, wireKey: string | null): boolean {
   if (!username || !wireKey) return false;
