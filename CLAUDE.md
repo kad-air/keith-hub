@@ -378,8 +378,25 @@ drift on top. The gate anchors this on the real 2026 transitions (re-derived fro
 
 **Pages come from the epub's own text.** `books.word_count` (additive migration; NULL = never
 attempted, 0 = attempted and empty so a broken file isn't re-unzipped forever) is filled at ingest
-and backfilled lazily by `getReadingStats`. A page is `PAGE_WORDS = 250`, printed on screen next to
-the numbers. 🔴 **`PAGE_WORDS` lives in `lib/books/pages.ts`, which imports NOTHING** — sourcing it
+and backfilled lazily by `getReadingStats`. A page is `PAGE_WORDS = 387`, printed on screen next to
+the numbers.
+
+🔴 **`PAGE_WORDS` is MEASURED, and 250 is the trap.** 250 words/page is the *manuscript* convention
+(a double-spaced typescript page), not a printed one — it put The Two Towers at **621 pages against
+a real 352-page edition**, which is how the error surfaced: the page said "403 pages to go" on a
+book with 229 left. The real value comes from the only ground truth available: some EPUBs carry
+their print edition's own pagination as `epub:type="pagebreak"` anchors plus a nav `page-list`, and
+two books in `/Volumes/HDD/Books` have one. Pooled (total words ÷ total real pages, not a mean of
+per-book ratios): *The Two Towers* 155,347 w / 352 pp and *Call for the Dead* 47,621 w / 172 pp →
+202,968 / 524 = **387**. The derivation and its limit live in `pages.ts`'s header — those two books
+disagree by **60%** (277 vs 441 w/p), so any single book lands within roughly ±20% of its printed
+edition, and the UI says so rather than implying a count. Re-measure and move the constant if more
+page-list books arrive; `check:books:stats` pins the value and asserts it stays within 20% of the
+Two Towers ground truth, so it can't drift back to a tidy-looking number. **Deliberately NOT done:**
+paging a page-list book exactly while others are estimated — every book is measured the same way so
+totals stay comparable.
+
+🔴 **`PAGE_WORDS` lives in `lib/books/pages.ts`, which imports NOTHING** — sourcing it
 from `epubText.ts` (the tidy-looking place, next to the counting) drags AdmZip into the client
 bundle and shipped **182 kB** of zip library to `/books/stats` with everything still working
 perfectly. Only the bundle size ever said so; `check:books:stats` now pins it statically.
