@@ -83,7 +83,10 @@ export async function GET(
   }
 
   const base = `/opds/${params.key}/v1.2`;
-  const path = params.path;
+  // Empty segments filtered for the same reason as the kosync route: a base
+  // URL saved with a trailing slash must not 308 at a device that may not
+  // follow redirects.
+  const path = params.path.filter((s) => s !== "");
   const page = Math.max(0, parseInt(request.nextUrl.searchParams.get("page") ?? "0", 10) || 0);
 
   // ── catalog: the navigation root ─────────────────────────────────────────
