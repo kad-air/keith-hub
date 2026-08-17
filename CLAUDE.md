@@ -309,7 +309,47 @@ opacity is precisely what Stump got wrong from the other side (its own app wrote
 and clobbered x-pointers — `~/Stump/stump-issue-draft.md`). `kosync_progress.document` is
 deliberately NOT an FK to `books` — devices may sync sideloaded files; the UI joins to books on
 `books.partial_md5` when they match. Single-user registration: `users/create` is open only while
-`kosync_users` is empty.
+`kosync_users` is empty. **One deliberate exception to opacity — catch-up positioning, below —
+SYNTHESIZES new pointers; it never parses or rewrites a device-written one.**
+
+**Catch-up positioning ("Catch up from the audiobook", `/books/[id]`).** Listening happens on
+Audible; when it's time to hand back to the X3/Readest, you type or dictate a phrase you just
+heard, the hub finds it in the epub, and one confirmed tap writes the position — the device jumps
+forward on its next sync. Built AFTER measuring the alternative: mapping Audible's
+`position_ms`/`percent_complete` through runtime is ±4 pages at best (measured on real
+chapter-aligned books), needs Amazon device credentials on Railway, and chapter matching dies on
+epubs with no usable chapter structure (4 of the first 6 real books). A phrase is exact and needs
+no credentials.
+- 🔴 `lib/books/xpointer.ts` is the ONE place a `progress` value is ever CONSTRUCTED. The dialect
+  (`/body/DocFragment[N]/body/…/p[K]`; DocFragment 1-based over the FULL spine; element steps
+  indexed 1-based among same-TAG siblings) was validated **byte-exact against all three
+  paragraph-level pointers real devices had synced to production** before anything shipped.
+  Readest's richer `text()[i].offset` form is deliberately never synthesized — paragraph
+  resolution is what a heard phrase justifies.
+- 🔴 **The search is built for DICTATION, not copy-paste** — the phrase arrives by ear, with no
+  punctuation, approximate spelling, dropped words. Word-level fitting alignment (whole query,
+  free start/end in the book, gaps cost rather than disqualify) with lyric-follow's fuzzy tiers
+  (exact / shared-prefix ≥4 / one edit for ≥5 chars) plus diacritic folding (heard "smeagol",
+  printed "Sméagol"). Substring matching is the wrong tool; it was the first implementation and
+  was replaced.
+- Routes: `POST /api/books/[id]/find-position` `{phrase}` → candidates with snippet/percentage/
+  confidence (read-only); `POST /api/books/[id]/set-position` `{pointer, percentage}` → writes via
+  **`putProgress`, the same single write path device syncs use**, so `reading_events` records the
+  movement (device `"hub"`) and the stats try/catch protects this write too. 🔴 set-position
+  refuses anything `isSynthesizedPointer` doesn't recognise — it must never become a general
+  "write any progress string" endpoint, and specifically refuses the device's own `text()` form.
+  409 when no kosync user is registered yet (never invents the account).
+- **The gate: `npm run check:books:xpointer`** (in `prebuild`). Dialect pinned against an
+  independent Python implementation (`scripts/gen_book_xpointer_reference.py`, html.parser —
+  itself the implementation validated against the real device pointers; 26 sampled pointers in
+  `books-fixture/expected.json` under `xpointer`, byte-compared). The committed fixture is flat
+  (900 `<p>` directly under body, all identical text), so the check also builds a nested epub
+  in-memory for section/div indexing and the dictation-damage behaviour: a half-misheard phrase
+  must resolve to the same paragraph as the exact quote, and gibberish must return nothing.
+  Falsification-tested: wrong sibling indexing, 0-based DocFragment, and fuzzy tiers removed all
+  fail (the last one needed the half-misheard assertion — the milder damaged phrase passed on
+  exact words alone, which is exactly the kind of vacuous check the falsification run exists to
+  catch).
 
 **CrossPoint parser constraints** (each a silent failure; asserted by `check:books:opds`, whose
 assertions are ported from `~/Stump/healthcheck.sh` and anchored on a committed snapshot of

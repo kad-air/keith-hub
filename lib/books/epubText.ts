@@ -94,8 +94,13 @@ export function countEpubWords(bytes: Buffer): number | null {
  * The spine's document hrefs, resolved against the OPF's own directory.
  * Regex-driven for the same reason epubMeta.ts is: these are simple attributes
  * and a parse failure has to degrade, not throw.
+ *
+ * Exported for xpointer.ts, which needs the SAME spine in the SAME order —
+ * a DocFragment index is 1-based over exactly this list, so two spine
+ * implementations that could disagree would silently point at the wrong
+ * chapter.
  */
-function resolveSpine(readText: (name: string) => string | null): string[] {
+export function resolveSpine(readText: (name: string) => string | null): string[] {
   const container = readText("META-INF/container.xml");
   if (!container) return [];
   const rootMatch = container.match(/full-path=["']([^"']+)["']/i);
