@@ -116,6 +116,64 @@ export function getDb(): Database.Database {
     );
     CREATE INDEX IF NOT EXISTS idx_setlist_charts ON setlist_charts(setlist_id, sort_order);
 
+    -- ── Books ───────────────────────────────────────────────────────────────
+    -- The EPUB library + KOReader sync server (BOOKS_PLAN.md). Replaces the
+    -- Stump deployment on the Mac Mini. Files live at data/books/<id>/ on the
+    -- Railway volume; these rows are the catalog metadata.
+    --
+    -- 🔴 partial_md5 is the KOReader/kosync document key: a partial MD5 of the
+    -- FILE BYTES (offsets 1024 << 2i, i = -1..10, 1024 bytes each), computed
+    -- on-device by CrossPoint/Readest and independently at ingest here. It is
+    -- content-addressed: the stored file must never be rewritten, and the
+    -- download route must serve the bytes untouched, or every device silently
+    -- stops matching. See lib/books/partialMd5.ts and check:books:bytes.
+    CREATE TABLE IF NOT EXISTS books (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      author TEXT,
+      series TEXT,
+      series_index REAL,
+      language TEXT,
+      description TEXT,
+      file_name TEXT NOT NULL,
+      file_size INTEGER NOT NULL,
+      sha256 TEXT NOT NULL,
+      partial_md5 TEXT NOT NULL,
+      cover_name TEXT,
+      added_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    -- One book = one file, everywhere (BOOKS_PLAN §4): the same bytes uploaded
+    -- twice return the existing row instead of forking the progress hash.
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_books_sha256 ON books(sha256);
+    CREATE INDEX IF NOT EXISTS idx_books_partial_md5 ON books(partial_md5);
+
+    -- kosync users. key_hash is sha256(md5(password)) — the WIRE value is the
+    -- client-computed md5 (fixed by the KOReader protocol, do not "fix" it);
+    -- only the at-rest storage is hardened. See lib/books/kosync.ts.
+    CREATE TABLE IF NOT EXISTS kosync_users (
+      username TEXT PRIMARY KEY,
+      key_hash TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+
+    -- Reading positions, keyed by the client's document hash. Deliberately NOT
+    -- a foreign key to books: a device may sync a document this library has
+    -- never seen (a sideloaded file), and the server must accept it — this is
+    -- a key-value store for positions, not a referential model. progress is an
+    -- OPAQUE string (an EPUB x-pointer from CrossPoint/KOReader, richer with a
+    -- char offset from Readest) — stored and returned untouched, never parsed.
+    CREATE TABLE IF NOT EXISTS kosync_progress (
+      username TEXT NOT NULL,
+      document TEXT NOT NULL,
+      progress TEXT NOT NULL,
+      percentage REAL NOT NULL,
+      device TEXT,
+      device_id TEXT,
+      timestamp INTEGER NOT NULL,
+      PRIMARY KEY (username, document)
+    );
+
     -- ── Hoops ───────────────────────────────────────────────────────────────
     -- The NBA simulation section. Follows the comic_state precedent: its own
     -- tables, entirely outside items/item_state, entirely outside the poller.

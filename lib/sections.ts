@@ -44,6 +44,16 @@ const READ_SECTION: Section = {
   match: (p) => p.startsWith("/read"),
 };
 
+const BOOKS_SECTION: Section = {
+  key: "books",
+  num: "",
+  name: "Books",
+  href: "/books",
+  group: "Library",
+  desc: "EPUB library · OPDS · reading sync",
+  match: (p) => p.startsWith("/books"),
+};
+
 const COMICS_SECTION: Section = {
   key: "comics",
   num: "",
@@ -119,6 +129,7 @@ export const SECTIONS: Section[] = (() => {
     SAVED_SECTION,
     READ_SECTION,
     ...trackerSections,
+    BOOKS_SECTION,
     COMICS_SECTION,
     HOOPS_SECTION,
     PRACTICE_SECTION,

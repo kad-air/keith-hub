@@ -86,6 +86,12 @@ export const config = {
     // see app/api/hoops/import/route.ts. 🔴 That route's own check fails
     // CLOSED when its token is unset, the opposite of this middleware's
     // FEED_PASSWORD convention below — do not "fix" that to match this file.
-    "/((?!_next/static|_next/image|icons|manifest\\.webmanifest|sw\\.js|swe-worker-.*\\.js|offline\\.html|login|api/auth|api/hoops/import).*)",
+    //
+    // opds + kosync (BOOKS_PLAN §3) are exempted for the same reason as
+    // api/hoops/import: they do their OWN auth entirely (key-in-URL for OPDS,
+    // x-auth-user/x-auth-key for kosync — a reading device cannot present the
+    // hub-auth cookie or complete a challenge), and both fail CLOSED when
+    // their credentials are unset. See lib/books/apiKey.ts + lib/books/kosync.ts.
+    "/((?!_next/static|_next/image|icons|manifest\\.webmanifest|sw\\.js|swe-worker-.*\\.js|offline\\.html|login|api/auth|api/hoops/import|opds|kosync).*)",
   ],
 };

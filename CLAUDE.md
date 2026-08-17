@@ -20,6 +20,9 @@ npm run check:hoops:fixture      # Hoops cross-implementation engine fixture (sa
 npm run check:hoops:multinomial  # numpy-parity gate on the box-score allocation (same)
 npm run check:hoops:boxscore     # Box-score gate: integer identity + level anchors (same)
 npm run check:tracking-hidden    # Tracking section stays hidden (needs a running server; NOT in prebuild)
+npm run check:books:bytes        # Books byte-identity gate: partialMd5 vs offline Python reference, ingest stores untouched bytes (same)
+npm run check:books:opds         # Books OPDS device-contract gate: CrossPoint parser constraints, anchored on Stump's device-proven feed (same)
+npm run check:books:kosync       # Books kosync protocol gate: md5 wire auth, opaque progress round-trip, no-rollback import (same)
 ```
 
 No test suite. `npm run build` is the type-check gate — always run it before pushing. It is
@@ -272,6 +275,60 @@ A static catalog of Hickman-era reading orders (X-Men, Avengers/Secret Wars), ea
 
 **Important: do NOT replicate the FeedClient `target="_blank"` anchor pattern here.** The whole PWA-handoff section #2 below explicitly opens in the in-app browser — that's the wrong outcome for comics.
 
+### Books — the EPUB library + OPDS + KOReader sync server
+Serves the Xteink X3 (CrossPoint firmware) and Readest on iOS: an OPDS 1.2 catalog, the vanilla
+KOReader-sync (kosync) protocol, and an upload/manage UI at `/books`. Replaced the Stump server
+that ran on the Mac Mini (torn down per `BOOKS_PLAN.md` §11; requirements source was
+`~/Code/stump/MAC-MINI-DEPLOYMENT-PLAN.md`). Files live at `data/books/<id>/book.epub` on the
+Railway volume; `/Volumes/HDD/Books` on the Mini remains the master copy/backup.
+
+🔴 **The invariant everything rests on: byte identity** (`BOOKS_PLAN.md` §4). The kosync document
+key is a partial MD5 of the FILE BYTES (`lib/books/partialMd5.ts` — offsets `1024 << 2i`,
+i = −1..10, 1024 bytes each), computed independently by every device. Consequences: the stored
+epub is IMMUTABLE (metadata edits touch only the DB row; a changed file is a NEW book id), the
+download routes serve bytes untouched (no compression/rewrite middleware may ever wrap them), and
+a *different copy* of the same title (re-rip, Calibre re-export) silently never syncs. Breakage
+here has NO error surface — both devices keep reporting success against different keys.
+`check:books:bytes` pins it: our hash vs an offline Python reference digest
+(`books-fixture/expected.json`), verified 13/13 against Stump's Rust hashes at build-out.
+
+🔴 **Auth: key-in-URL** (`/opds/{key}/v1.2/…`, `/kosync/{key}/…`), the shape proven against
+CrossPoint by the Stump deployment — e-readers store one URL and cannot complete a challenge.
+`BOOKS_API_KEY` env var, timing-safe compare, exempted from `middleware.ts` alongside
+`api/hoops/import`, and like it **fails CLOSED when unset** (do not "fix" to match middleware's
+fail-open). kosync user auth on top: `x-auth-user` + `x-auth-key` headers where the key is
+**md5(password) computed client-side** — the wire value is fixed by the KOReader protocol and must
+never be "hardened"; only the at-rest storage is (sha256 of the wire key, `kosync_users.key_hash`).
+
+🔴 **`kosync_progress.progress` is OPAQUE** — an EPUB x-pointer from CrossPoint/KOReader (richer
+with char offset from Readest), stored and returned byte-exact, never parsed or normalized. This
+opacity is precisely what Stump got wrong from the other side (its own app wrote Readium locators
+and clobbered x-pointers — `~/Stump/stump-issue-draft.md`). `kosync_progress.document` is
+deliberately NOT an FK to `books` — devices may sync sideloaded files; the UI joins to books on
+`books.partial_md5` when they match. Single-user registration: `users/create` is open only while
+`kosync_users` is empty.
+
+**CrossPoint parser constraints** (each a silent failure; asserted by `check:books:opds`, whose
+assertions are ported from `~/Stump/healthcheck.sh` and anchored on a committed snapshot of
+Stump's device-proven feed, `books-fixture/stump-books-feed.xml`): ≤62 entries/feed page
+(`PAGE_SIZE=50`), acquisition type EXACTLY `application/epub+zip` (strcmp), rel containing
+`opds-spec.org/acquisition`, href containing `.epub`, pagination rel `previous` never `prev`.
+
+**Key files:** `lib/books/partialMd5.ts` (the hash — do not touch), `epubMeta.ts` (regex OPF
+extraction; failure falls back to filename, never fails ingest), `normalize.ts` (author/series
+rules + `SERIES_OVERRIDES`, ported from `~/Stump/organize-books.py`), `store.ts` (CRUD + ingest,
+content-addressed dedupe on sha256), `opds.ts` (pure XML emitters), `kosync.ts` (protocol
+semantics), `apiKey.ts` (the credential gate). Routes: `app/opds/[key]/v1.2/[...path]/route.ts`
+(catalog/feeds/search/file with Range support/cover), `app/kosync/[key]/[...path]/route.ts` (the
+five kosync endpoints), `app/api/books/*` (cookie-gated manage + `kosync-import` for the Stump
+migration). UI: `app/books/*`, `components/BooksClient.tsx` (grid + upload + on-screen device
+setup incl. the two silently-failing settings: CrossPoint matching=Binary / Readest checksum=File
+Content), `components/BookDetailClient.tsx`. Scripts: `push-books.mjs` (bulk upload; idempotent),
+`migrate-stump-progress.mjs` (one-time; carries `koreader_progress`+`end_percentage` only, ignores
+Readium `end_locator`, never rolls back a newer device position, ends by asserting every migrated
+hash resolves to a catalog book). Relative `.ts` imports in `lib/books/` follow the hoops
+convention so plain node runs the check scripts against the real modules.
+
 ### Hoops — the NBA simulation studio
 An NBA sim & what-if studio as its own section, built to the plan in `HOOPS_PLAN.md` (tracking epic: GitHub #63). **Shipped so far: milestone 1, the read-model spine (#64) — `/hoops/teams` and `/hoops/teams/[tri]`; milestone 2, the RNG parity + engine port (#65, #66) — `lib/hoops/{rng,philox,blake2b,engine}.ts`; the Mac Mini PUSH endpoint (#73, wire contract kad-air/hoops-sim#24) — `POST /api/hoops/import`; and milestone 3, the matchup + box score (#67) — `/hoops` and `/hoops/game/[runId]`.** The engine now runs from a screen. Next up: the studio (#69), with the design spike (#68) ahead of it.
 
@@ -423,6 +480,9 @@ The login/logout `POST` handlers (`app/api/auth/{login,logout}/route.ts`) must r
 ## Environment variables
 - `FEED_PASSWORD` — password for the login gate (unset = auth bypassed, for local dev)
 - `HOOPS_IMPORT_TOKEN` — bearer token the Mac Mini uses to `POST /api/hoops/import` (kad-air/keith-hub#73). Generate with `openssl rand -hex 32`. **Unset = the route refuses every request** — the opposite of `FEED_PASSWORD`'s unset behavior, deliberately (see "Hoops" above). Never behind `op` on the Mini side.
+- `BOOKS_API_KEY` — device credential for `/opds/{key}/…` and `/kosync/{key}/…` (Books section).
+  Generate with `openssl rand -hex 32`. **Unset = both endpoint families refuse every request**
+  (fail CLOSED, same convention as `HOOPS_IMPORT_TOKEN`, opposite of `FEED_PASSWORD`).
 - `BLUESKY_IDENTIFIER` — Bluesky handle (e.g. `keithadair.com`)
 - `BLUESKY_APP_PASSWORD` — Bluesky app password (not account password)
 - `CRAFT_API_KEY` — Craft Connect API key for tracker collections

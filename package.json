@@ -5,7 +5,10 @@
   "scripts": {
     "dev": "next dev",
     "check:hoops": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-hoops.ts",
-    "prebuild": "npm run check:hoops && npm run check:hoops:fixture && npm run check:hoops:pricing-fixture && npm run check:hoops:multinomial && npm run check:hoops:boxscore",
+    "prebuild": "npm run check:hoops && npm run check:hoops:fixture && npm run check:hoops:pricing-fixture && npm run check:hoops:multinomial && npm run check:hoops:boxscore && npm run check:books:bytes && npm run check:books:opds && npm run check:books:kosync",
+    "check:books:bytes": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-books-bytes.ts",
+    "check:books:opds": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-books-opds.ts",
+    "check:books:kosync": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-books-kosync.ts",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
@@ -19,6 +22,7 @@
     "@atproto/api": "^0.19.6",
     "@coderline/alphatab": "^1.8.2",
     "@serwist/next": "^9.5.7",
+    "adm-zip": "^0.6.0",
     "better-sqlite3": "^12.8.0",
     "js-yaml": "^4.1.0",
     "next": "^14.2.35",
@@ -30,6 +34,7 @@
   },
   "devDependencies": {
     "@coderline/alphatab-webpack": "^1.8.2",
+    "@types/adm-zip": "^0.5.8",
     "@types/better-sqlite3": "^7.6.8",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^20",

@@ -1,0 +1,14 @@
+{
+  "comment": "Reference hashes for fixture.epub, computed OFFLINE by the Python partial-MD5 reference from ~/Code/stump/MAC-MINI-DEPLOYMENT-PLAN.md — the implementation verified byte-for-byte against Stump's Rust koreader_hash values (13/13) for the real library, which CrossPoint's C++ then matched in production. Regenerate only by rebuilding the fixture and re-running that reference; never by copying the TS output back in.",
+  "partial_md5": "2d54ce2c70a99dc5b63e58ebfe69bf51",
+  "sha256": "6db30acb565a4b8c4da0c9ef7c5bfcb6263f47057921d5516f9ed10db70fadd1",
+  "size": 1348658,
+  "meta": {
+    "title": "The Fixture Book",
+    "author": "Frances Fixture",
+    "series": "Fixtures",
+    "series_index": 3,
+    "language": "en",
+    "cover_ext": "png"
+  }
+}
