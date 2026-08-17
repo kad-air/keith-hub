@@ -10,5 +10,11 @@
     "series_index": 3,
     "language": "en",
     "cover_ext": "png"
+  },
+  "text": {
+    "comment": "Word count for fixture.epub computed OFFLINE by scripts/gen_book_wordcount_reference.py — an independent implementation (Python html.parser + ElementTree) of what lib/books/epubText.ts does with regexes. This number is the denominator behind every page figure on the reading-stats page, so it gets a second source rather than being trusted. Regenerate only by rebuilding the fixture and re-running that script; never by copying the TS output back in.",
+    "words": 180000,
+    "spine_documents": 1,
+    "caveat": "This fixture has ONE spine document, so agreement here does not exercise spine ORDERING or the exclusion of manifest files outside the reading order. check:books:stats builds a second, multi-document epub in memory for that."
   }
 }

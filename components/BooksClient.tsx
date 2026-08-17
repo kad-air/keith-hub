@@ -10,16 +10,71 @@ type Item = {
   sync: { percentage: number; device: string | null; timestamp: number } | null;
 };
 
+type Summary = {
+  hasHistory: boolean;
+  streak: number;
+  bankedToday: boolean;
+  atRisk: boolean;
+  pagesToday: number;
+  pagesThisYear: number;
+  booksFinishedThisYear: number;
+};
+
 type Props = {
   items: Item[];
   unmatchedCount: number;
   apiKeyConfigured: boolean;
   opdsUrl: string | null;
   kosyncUrl: string | null;
+  summary: Summary;
 };
 
 function fmtSize(bytes: number): string {
   return bytes >= 1 << 20 ? `${(bytes / (1 << 20)).toFixed(1)} MB` : `${Math.round(bytes / 1024)} KB`;
+}
+
+/** The one-line nudge, on the page you already open. Reads as an invitation
+ *  when the streak is alive and unbanked, and as a scoreboard otherwise. */
+function StreakStrip({ summary }: { summary: Summary }) {
+  const { streak, bankedToday, atRisk, pagesToday, pagesThisYear, booksFinishedThisYear } = summary;
+
+  const headline =
+    streak === 0
+      ? "No streak going"
+      : `${streak} day${streak === 1 ? "" : "s"} running`;
+  const nudge =
+    streak === 0
+      ? "A few pages today starts one."
+      : atRisk
+        ? "Not read today yet."
+        : `${pagesToday} page${pagesToday === 1 ? "" : "s"} today.`;
+
+  return (
+    <Link
+      href="/books/stats"
+      className={`mb-6 flex items-center justify-between gap-4 border px-4 py-2.5 transition-colors ${
+        atRisk
+          ? "border-accent/50 bg-accent/[0.06] hover:border-accent"
+          : "border-rule/60 bg-ink-raised/40 hover:border-accent/60"
+      }`}
+    >
+      <div className="flex items-baseline gap-3">
+        <span
+          className={`font-display text-2xl leading-none tabular-nums ${
+            streak > 0 ? "text-accent" : "text-cream-dimmer"
+          }`}
+        >
+          {streak}
+        </span>
+        <span className="text-sm text-cream">
+          {headline} <span className="text-cream-dim">· {nudge}</span>
+        </span>
+      </div>
+      <span className="hidden shrink-0 font-mono text-[0.65rem] uppercase tracking-kicker text-cream-dimmer sm:block">
+        {pagesThisYear.toLocaleString()} pages · {booksFinishedThisYear} finished this year
+      </span>
+    </Link>
+  );
 }
 
 export default function BooksClient({
@@ -28,6 +83,7 @@ export default function BooksClient({
   apiKeyConfigured,
   opdsUrl,
   kosyncUrl,
+  summary,
 }: Props) {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -77,6 +133,12 @@ export default function BooksClient({
         <div className="flex items-baseline justify-between gap-3">
           <h1 className="mt-1 font-display text-2xl text-cream">Books</h1>
           <div className="flex items-center gap-3">
+            <Link
+              href="/books/stats"
+              className="font-mono text-[0.7rem] uppercase tracking-kicker text-cream-dim hover:text-accent"
+            >
+              Stats
+            </Link>
             <button
               onClick={() => setShowSetup((v) => !v)}
               className="font-mono text-[0.7rem] uppercase tracking-kicker text-cream-dim hover:text-accent"
@@ -113,6 +175,8 @@ export default function BooksClient({
         />
         {status && <p className="mt-2 font-mono text-[0.75rem] text-accent">{status}</p>}
       </header>
+
+      {summary.hasHistory && <StreakStrip summary={summary} />}
 
       {showSetup && (
         <section className="mb-8 border border-rule/60 bg-ink-raised/40 px-4 py-3 text-sm">

@@ -174,6 +174,50 @@ export function getDb(): Database.Database {
       PRIMARY KEY (username, document)
     );
 
+    -- Append-only reading history — the ONLY source of reading statistics.
+    --
+    -- 🔴 It exists because kosync_progress cannot answer a single historical
+    -- question: it is one UPSERTED row per document, so every sync destroys
+    -- the position it replaces. Where you were is all it has ever known; when
+    -- you read is not recoverable from it, at any later date. This table is
+    -- written alongside that upsert and never rewritten.
+    --
+    -- 🔴 It is DECORATION, and the write is wrapped accordingly (see
+    -- putProgress in lib/books/kosync.ts): a failure here must never fail a
+    -- sync. Losing a statistic costs a number on a page; failing the PUT costs
+    -- the reading position on the device, which is the entire point of the
+    -- Books section. check:books:stats asserts the PUT still succeeds with
+    -- this table dropped out from under it.
+    --
+    -- kind distinguishes the two rows that look identical but mean opposite
+    -- things:
+    --   'baseline' — the FIRST sync ever seen for a document. Its delta is
+    --                forced to 0: the device is telling us where it already
+    --                is, and crediting that as reading done today would book
+    --                weeks of past reading (or the whole Stump-era history) to
+    --                the afternoon this feature deployed.
+    --   'read'     — a real move from a known previous position. delta is
+    --                signed: negative means the reader went backwards
+    --                (re-reading, or a second device that was behind).
+    --
+    -- No FK to books, for the same reason kosync_progress has none: sideloaded
+    -- documents sync too, and the stats UI joins on books.partial_md5 when a
+    -- catalog book happens to match.
+    CREATE TABLE IF NOT EXISTS reading_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username TEXT NOT NULL,
+      document TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      percentage REAL NOT NULL,
+      delta REAL NOT NULL,
+      device TEXT,
+      device_id TEXT,
+      timestamp INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_reading_events_ts ON reading_events(timestamp);
+    CREATE INDEX IF NOT EXISTS idx_reading_events_doc
+      ON reading_events(document, timestamp);
+
     -- ── Hoops ───────────────────────────────────────────────────────────────
     -- The NBA simulation section. Follows the comic_state precedent: its own
     -- tables, entirely outside items/item_state, entirely outside the poller.
@@ -308,6 +352,22 @@ export function getDb(): Database.Database {
     // Last fetch failure message; NULL = last fetch succeeded. Read by the
     // Tune sources roster for the per-source health indicator.
     dbInstance.exec(`ALTER TABLE sources ADD COLUMN last_error TEXT`);
+  }
+
+  // books.word_count: the denominator that turns an opaque kosync percentage
+  // into a number of pages. Extracted from the epub's own text at ingest (see
+  // lib/books/epubText.ts) and backfilled lazily for books ingested before
+  // this column existed.
+  //
+  // NULL = never attempted. 0 = attempted and the epub yielded no readable
+  // text, which is stored deliberately so the backfill doesn't re-unzip a
+  // broken file on every stats page load. Reading it never touches the file's
+  // bytes — extraction is a read, and the byte-identity invariant is intact.
+  const bookCols = (
+    dbInstance.prepare(`PRAGMA table_info(books)`).all() as Array<{ name: string }>
+  ).map((c) => c.name);
+  if (!bookCols.includes("word_count")) {
+    dbInstance.exec(`ALTER TABLE books ADD COLUMN word_count INTEGER`);
   }
 
   // hoops_params: added for kad-air/keith-hub#73 (the Mac Mini push endpoint).
