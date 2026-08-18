@@ -268,7 +268,7 @@ export default function BooksClient({
               disabled={uploading}
               className="border border-accent/60 px-3 py-1 font-mono text-[0.7rem] uppercase tracking-kicker text-accent hover:bg-accent/10 disabled:opacity-50"
             >
-              + Add epubs
+              + Add books
             </button>
           </div>
         </div>
@@ -286,7 +286,7 @@ export default function BooksClient({
         <input
           ref={fileRef}
           type="file"
-          accept=".epub"
+          accept=".epub,.acsm"
           multiple
           hidden
           onChange={(e) => handleUpload(e.target.files)}
@@ -356,7 +356,7 @@ export default function BooksClient({
       )}
 
       {items.length === 0 ? (
-        <p className="text-sm text-cream-dim">No books yet — add an epub to start the library.</p>
+        <p className="text-sm text-cream-dim">No books yet — add an epub (or an Adobe .acsm) to start the library.</p>
       ) : (
         <>
           {/* The shelf, mirrored from the OPDS feed so the toggle's effect is

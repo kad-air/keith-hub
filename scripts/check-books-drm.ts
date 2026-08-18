@@ -294,10 +294,14 @@ assert(
   (await refusal(adeptBytes, "book.epub")) === "drm-failed",
   "🔴 the WRONG key fails loudly rather than producing garbage",
 );
+// An .acsm is recognised as a fulfilment token, not mistaken for a corrupt
+// zip. With no ADOBE_ADEPT_ACTIVATION configured (as here) it refuses for that
+// reason specifically — the fulfilment path itself is covered by
+// check:books:acsm, which pins the signing offline.
 assert(
   (await refusal(Buffer.from("<fulfillmentToken xmlns='http://ns.adobe.com/adept'/>"), "x.acsm")) ===
-    "acsm-unsupported",
-  "an .acsm is refused by name, not as a corrupt zip",
+    "acsm-not-activated",
+  "an .acsm is refused as un-activated, not as a corrupt zip",
 );
 assert(
   (await refusal(Buffer.from("not a zip at all"), "x.epub")) === "not-a-book",

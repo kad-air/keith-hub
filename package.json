@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "check:hoops": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-hoops.ts",
-    "prebuild": "npm run check:hoops && npm run check:hoops:fixture && npm run check:hoops:pricing-fixture && npm run check:hoops:multinomial && npm run check:hoops:boxscore && npm run check:books:bytes && npm run check:books:opds && npm run check:books:kosync && npm run check:books:metadata && npm run check:books:stats && npm run check:books:xpointer && npm run check:books:drm",
+    "prebuild": "npm run check:hoops && npm run check:hoops:fixture && npm run check:hoops:pricing-fixture && npm run check:hoops:multinomial && npm run check:hoops:boxscore && npm run check:books:bytes && npm run check:books:opds && npm run check:books:kosync && npm run check:books:metadata && npm run check:books:stats && npm run check:books:xpointer && npm run check:books:drm && npm run check:books:acsm",
     "check:books:bytes": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-books-bytes.ts",
     "check:books:opds": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-books-opds.ts",
     "check:books:kosync": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-books-kosync.ts",
@@ -20,7 +20,8 @@
     "check:books:metadata": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-books-metadata.ts",
     "check:books:stats": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-books-stats.ts",
     "check:books:xpointer": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-books-xpointer.ts",
-    "check:books:drm": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-books-drm.ts"
+    "check:books:drm": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-books-drm.ts",
+    "check:books:acsm": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-books-acsm.ts"
   },
   "dependencies": {
     "@atproto/api": "^0.19.6",

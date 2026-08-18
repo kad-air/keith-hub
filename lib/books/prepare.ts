@@ -1,5 +1,7 @@
 import { AdeptError, decryptAdept, inspectEncryption } from "./adept.ts";
 import { getAdeptKey } from "./adeptKey.ts";
+import { AcsmError, fulfillAcsm, isFulfillmentToken } from "./acsm.ts";
+import { getAdeptActivation } from "./adeptActivation.ts";
 
 // The upload boundary: whatever bytes arrive become a clean epub here, or the
 // upload is refused with a reason. Nothing downstream of this — ingestBook,
@@ -29,7 +31,8 @@ export type PrepareErrorCode =
   | "drm-no-key"
   | "drm-failed"
   | "drm-unsupported"
-  | "acsm-unsupported";
+  | "acsm-not-activated"
+  | "acsm-failed";
 
 export class PrepareError extends Error {
   // See AdeptError — no TS parameter properties, the gates run under node's
@@ -46,8 +49,7 @@ export function isAcsm(fileName: string, bytes: Buffer): boolean {
   if (/\.acsm$/i.test(fileName)) return true;
   // Content sniff, so a renamed file is still recognised for what it is
   // rather than failing later as "not a zip".
-  const head = bytes.subarray(0, 512).toString("utf8");
-  return /<fulfillmentToken\b/i.test(head);
+  return isFulfillmentToken(bytes);
 }
 
 /**
@@ -57,19 +59,24 @@ export function isAcsm(fileName: string, bytes: Buffer): boolean {
  */
 export async function prepareForIngest(bytes: Buffer, fileName: string): Promise<Prepared> {
   if (isAcsm(fileName, bytes)) {
-    // ── STEP 2 SEAM ──────────────────────────────────────────────────────
-    // Replace this throw with:
-    //   const fulfilled = await fulfillAcsm(bytes);   // lib/books/acsm.ts
-    //   return { ...(await prepareForIngest(fulfilled, fileName.replace(/\.acsm$/i, ".epub"))),
-    //            origin: "acsm" };
-    // The recursion is deliberate — a fulfilled file is an ADEPT epub, so it
-    // takes the decrypt path below rather than duplicating it. Nothing else
-    // in the codebase changes: the route already accepts these bytes and the
-    // UI already offers the file type.
-    throw new PrepareError(
-      "acsm-unsupported",
-      "Adobe .acsm fulfilment isn't wired up yet — this file is a download token, not the book",
-    );
+    // 🔴 An .acsm is a ~1 KB download token, not a book. Fulfil it into the
+    // encrypted epub it names, then fall through to the SAME decrypt path an
+    // uploaded ADEPT epub takes — the recursion is deliberate, so there is
+    // exactly one decrypt implementation and .acsm/.epub cannot diverge.
+    let fulfilled: Buffer;
+    try {
+      fulfilled = await fulfillAcsm(bytes);
+    } catch (err) {
+      if (err instanceof AcsmError) {
+        throw new PrepareError(
+          err.code === "not-activated" ? "acsm-not-activated" : "acsm-failed",
+          err.message,
+        );
+      }
+      throw new PrepareError("acsm-failed", "could not fulfil this .acsm");
+    }
+    const prepared = await prepareForIngest(fulfilled, fileName.replace(/\.acsm$/i, ".epub"));
+    return { ...prepared, origin: "acsm" };
   }
 
   // "PK" zip magic. Anything else can't be an epub, whatever it's called.
