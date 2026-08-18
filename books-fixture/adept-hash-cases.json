@@ -1,0 +1,35 @@
+{
+  "comment": "Reference values for the ADEPT canonicalisation + signature, produced by an INDEPENDENT Python implementation (Leseratte10's acsm-calibre-plugin, libadobe.hash_node_ctx + CustomRSA). lib/books/adeptXml.ts and adeptSign.ts must reproduce every sha1 here byte-for-byte, and the signature under the committed throwaway signing key. Regenerate only from that Python, never by copying TypeScript output back in.",
+  "cases": {
+    "simple": {
+      "xml": "<adept:fulfill xmlns:adept=\"http://ns.adobe.com/adept\"><adept:user>abc</adept:user></adept:fulfill>",
+      "sha1": "ac4fb1fd79454efe50ee7bf0d5667b30f033cc00"
+    },
+    "attrs_sorted": {
+      "xml": "<r xmlns=\"http://x/\" b=\"2\" a=\"1\" c=\"3\"><k v=\"9\"/></r>",
+      "sha1": "a2e834ae292ff5b4d7d3fc51aff9291efe3d7779"
+    },
+    "nested_text": {
+      "xml": "<a xmlns=\"http://n/\"><b>  spaced  </b><c><d>deep</d></c></a>",
+      "sha1": "c4dcf50fa0b1d3054dfbdc29af0680346a8d9a2f"
+    },
+    "no_ns": {
+      "xml": "<plain><child attr=\"v\">text</child></plain>",
+      "sha1": "484c880857569b3d0139c8618f76791148b7a782"
+    },
+    "skip_signature": {
+      "xml": "<adept:x xmlns:adept=\"http://ns.adobe.com/adept\"><adept:a>keep</adept:a><adept:signature>DROPME</adept:signature><adept:hmac>DROPTOO</adept:hmac></adept:x>",
+      "sha1": "d7962f792f6befcd0148a6d8a30b885db5a34d02"
+    },
+    "utf8_text": {
+      "xml": "<a xmlns=\"http://n/\"><b>caf\u00e9 \u2014 \u00fcber</b></a>",
+      "sha1": "1a47d0a497d3e8372cfd217c42b5d39d882ab228"
+    },
+    "synthetic_fulfill_request": {
+      "xml": "<?xml version=\"1.0\"?><adept:fulfill xmlns:adept=\"http://ns.adobe.com/adept\"><adept:user>urn:uuid:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee</adept:user><adept:device>urn:uuid:99999999-8888-7777-6666-555555555555</adept:device><adept:deviceType>standalone</adept:deviceType><fulfillmentToken fulfillmentType=\"buy\" xmlns=\"http://ns.adobe.com/adept\">\n  <distributor>urn:uuid:00000000-0000-0000-0000-000000000001</distributor>\n  <operatorURL>http://example.invalid/acs4/fulfillment</operatorURL>\n  <expiration>2026-01-01T00:00:00-07:00</expiration>\n  <transaction>ge:11111111-2222-3333-4444-555555555555:1</transaction>\n  <userId>00000000000000000000</userId>\n  <resourceItemInfo>\n    <resource>urn:uuid:11111111-2222-3333-4444-555555555555</resource>\n    <resourceItem>1</resourceItem>\n    <src>https://example.invalid/download/Fixture.epub?acsid=urn:uuid:1111&amp;output=acs4_book_bytes</src>\n    <downloadType>simple</downloadType>\n  </resourceItemInfo>\n  <hmac>AAAAAAAAAAAAAAAAAAAAAAAAAAA=</hmac>\n</fulfillmentToken>\n<adept:targetDevice><adept:softwareVersion>10.0.85385</adept:softwareVersion><adept:clientOS>Windows 8</adept:clientOS><adept:clientLocale>en</adept:clientLocale><adept:clientVersion>3.0.1.91394</adept:clientVersion><adept:deviceType>standalone</adept:deviceType><adept:productName>ADOBE Digitial Editions</adept:productName><adept:fingerprint>AAAAAAAAAAAAAAAAAAAAAAAAAAA=</adept:fingerprint><adept:activationToken><adept:user>urn:uuid:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee</adept:user><adept:device>urn:uuid:99999999-8888-7777-6666-555555555555</adept:device></adept:activationToken></adept:targetDevice></adept:fulfill>",
+      "sha1": "a08c8c6e395e1b201f178da3a4c921d553c7130b",
+      "signature_b64": "Duk3xCz0VuyCpuM7h1q+enj5FfK9oQSOY7ob7kaF55nTKBeMaW/oHV1wpuPzWk4Zk9w19CSaLweTaYOJLIhJ+K2M49vEGsmodn+xgNiCimQ3v0CUo5aELzjZkwFHIL07TaOLe5Yjln/MDGelWKsjnEz8yKOplO7yFh/aVf6ZJ5736WHtaE625s60XKygHQwAL3uKLsSiTm/IN8kot01vyp7W9PZyA9RLaUsLIIiw8+OIQr78JtMBSXLdMZx4wRIGI6fscjl0fa3Dtfd2br27T9Vx4mlD2C4fMimc7RQYS//USCbjHjjOozNTXzBWoMuojAtr3H8kalkl9ugMrkOcPg==",
+      "note": "Same structure as a real Google fulfil request (embedded ACSM, targetDevice block, the genuine 'Digitial' typo), with fabricated identity. Signed with books-fixture/adept-test-keys.json."
+    }
+  }
+}

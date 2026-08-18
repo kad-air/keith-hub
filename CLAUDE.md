@@ -25,6 +25,8 @@ npm run check:books:opds         # Books OPDS device-contract gate: CrossPoint p
 npm run check:books:kosync       # Books kosync protocol gate: md5 wire auth, opaque progress round-trip, no-rollback import (same)
 npm run check:books:metadata     # Books metadata gate: an edit never touches the file/sha256/partial_md5 (same)
 npm run check:books:stats        # Books reading-stats gate: word count vs. Python, real DST calendar, sync survives a stats failure (same)
+npm run check:books:drm          # Books DRM gate: an ADEPT epub is decrypted-or-refused (never the 34-page ghost); a clean epub passes through byte-identical (same)
+npm run check:books:acsm         # Books ACSM gate: the ADEPT canonicalisation + signature match an independent Python implementation byte-for-byte (same)
 ```
 
 No test suite. `npm run build` is the type-check gate — always run it before pushing. It is
@@ -384,12 +386,145 @@ you're currently reading cannot lose your place. (Falsification-tested by making
 touch the file.) `SERIES_OVERRIDES` in `normalize.ts` handles the case where a re-ingested file
 should get its series back automatically; one-off corrections belong in the UI, not in that table.
 
+**DRM: every upload is brought into the clear before it is ingested, or it is refused.** The
+upload route runs `prepareForIngest` (`lib/books/prepare.ts`) on the raw bytes FIRST; nothing
+downstream — `ingestBook`, OPDS, kosync, stats — ever sees an encrypted file. This is the seam
+that will make an `.acsm` upload identical to an `.epub` upload from the user's side: the route
+does not branch on file type beyond the accept filter, and the `.acsm` fulfilment step (not yet
+built — step 2) slots in as a single call inside `prepareForIngest`, which then recurses through
+the same decrypt path. 🔴 **It exists first as a guard against a silent failure with no error
+surface**: measured on a real Adobe-DRM (ADEPT) epub, the old ingest path accepted it happily and
+produced a "34-page" edition of a 400-page book — 13k words against a true 155k, a cover that was
+139 KB of ciphertext stored as `cover.jpg`, and a catch-up phrase search that found nothing, with
+every layer reporting success. Refusing is strictly better than ingesting broken, so a file that
+can't be brought into the clear never reaches `ingestBook`.
+- 🔴 **A DRM-free epub passes through BYTE-IDENTICAL** — no repack, no re-hash, so `partial_md5`
+  is untouched (BOOKS_PLAN §4). Only an ADEPT file is rebuilt, and font-obfuscated epubs (which
+  reuse `encryption.xml` with a different algorithm and carry no `rights.xml`) are *not* DRM and
+  pass through untouched too.
+- `lib/books/adept.ts` — detect (`inspectEncryption`) + strip (`decryptAdept`). ADEPT = content
+  entries AES-128-CBC encrypted (deflated first, IV = first 16 bytes), the AES key RSA/PKCS#1-v1.5
+  wrapped in `rights.xml` with the account key. 🔴 The decrypt logic is a faithful port of DeDRM's
+  `ineptepub.py`, **corrected against a real Google Play Books fulfilment** (see the validation note
+  below) — three things the port got from reality that a synthetic fixture would not have: (1) real
+  Adobe `encryption.xml` carries **no `<Compression>` element** (an earlier version invented one);
+  compression is implicit, so every entry is try-inflate-then-fall-back-to-raw. (2) The content key
+  is **PKCS#1 unwrap then take the LAST 16 bytes** (`bookkey[-16:]`), not "exactly 16" — real keys
+  can unwrap to a longer payload. (3) A separate `aes128-cbc-uncompressed` algorithm marks
+  already-compressed payloads (video) that must NOT be inflated. 🔴 Unlike `epubMeta.ts`/
+  `epubText.ts`, failure here is NOT benign — a half-decrypt would ingest as readable-looking
+  garbage — so every failure throws `AdeptError` and the upload refuses. 🔴 **Wrong-key defence is
+  inflate-based, and this is load-bearing**: Node's `privateDecrypt` does not reliably throw on a
+  wrong key, and the naive "decrypted markup contains a `<`" backstop is far too weak (random bytes
+  carry a `<` within 1 KB ~98% of the time — and a real CSS file legitimately has none, which
+  false-*rejected* a perfect decryption). The strong signal is that a content document's AES
+  plaintext is a valid DEFLATE stream (noise never is); the decryption is CONFIRMED only when at
+  least one XHTML/OPF/NCX/SVG entry both inflates and reads as markup, and is refused otherwise. The
+  deliberate cost: an all-STORED epub (which real producers never emit — content XHTML is always
+  deflated) is refused even with the right key. Safe failure over shipping unverified bytes.
+- `lib/books/zip.ts` — a minimal deterministic ZIP writer, because `adm-zip` (the reader) **cannot
+  emit a conforming EPUB**: measured, it sorts entries alphabetically (so `mimetype` stops being
+  first) and ignores a per-entry STORED override. `writeEpub` forces `mimetype` first + STORED and
+  uses fixed 1980 timestamps, so a re-decrypt is byte-identical and can never mint a new
+  `partial_md5` for an already-synced book.
+- `lib/books/adeptKey.ts` — `ADOBE_ADEPT_KEY` env var (PKCS#8 DER, base64). Fail-CLOSED when
+  unset, same convention as `BOOKS_API_KEY`/`HOOPS_IMPORT_TOKEN`: no key → DRM'ed uploads refused,
+  DRM-free unaffected. 🔴 Becomes mostly vestigial once `.acsm` fulfilment lands (the hub will mint
+  its own **anonymous** Adobe activation into the `kv` table — no account, no secret to rotate);
+  structured now so the call sites never change.
+- **The gate: `npm run check:books:drm`** (in `prebuild`). Builds an ADEPT fixture in-memory from
+  `fixture.epub` — shaped like the real Google file (no `<Compression>`, `<ResourceSize>` instead,
+  a deflated-XHTML body plus one `aes128-cbc-uncompressed` clip, and a 20-byte wrapped payload so
+  last-16 is load-bearing) — and asserts decrypt-or-refuse: right key → word count matches the
+  offline Python reference and every spine doc + the cover is byte-identical; the uncompressed clip
+  decrypts without inflating; wrong key / no key / AES-256 / `.acsm` / non-zip → refused with a
+  typed code and nothing left on the volume; clean + font-obf epubs pass through byte-identical.
+  🔴 **What it cannot see, stated in the script header**: the fixture is self-built, so the gate
+  proves the decryptor inverts our encryptor and loses nothing — it does NOT prove the on-disk-layout
+  reading is right. No real ADEPT file can live in the repo (it would be a DRM'd book). Committed
+  throwaway keys (`books-fixture/adept-test-keys.json`, not secrets) because a randomly generated
+  "wrong" key made the wrong-key refusal probabilistic. Falsification-tested: **11/11** perturbations
+  caught (guard removed, font-obf as DRM, inflate-confirmation removed, weak `<`-only canary,
+  first-16 vs last-16, wrong IV, uncompressed force-inflated, AES-256 un-rejected, clock timestamps,
+  mimetype not first/STORED, rights.xml retained).
+- 🔴 **Real-file validation (the anchor the gate can't be, done once, 2026-08-18).** A real Google
+  Play Books purchase was fulfilled to an encrypted epub (anonymous Adobe activation via
+  Leseratte10's `acsm-calibre-plugin` standalone scripts, in a scratchpad venv — the `.acsm` token
+  lives ~15 min, so fulfil within minutes of download), and `decryptAdept` produced a correct,
+  readable book (right title/author, valid JPEG cover, plausible word count). The decisive check:
+  its decrypted spine is **byte-for-byte identical** (same SHA-256) to an independent Python +
+  pycryptodome reference decryptor over the same file — two implementations, different languages
+  and crypto libraries, agreeing on real bytes. That confirms the layout reading; the gate then
+  guards against regressions. This is exactly what surfaced the three corrections above.
+
+##### ACSM fulfilment — uploading a `.acsm` is uploading a book
+
+🔴 **The whole point: from the user's side there is ONE gesture.** Drop an `.epub` or an `.acsm`
+on `/books` and a book appears. `prepareForIngest` resolves the difference — it fulfils the token
+into the encrypted epub it names, then **recurses into its own decrypt path**, so there is exactly
+one decrypt implementation and the two upload types cannot drift apart. The route branches only on
+the accept filter.
+
+An `.acsm` is a ~1 KB XML *download token*, not a book, and it **expires in about 15 minutes**
+(Google Play Books). So fulfil promptly after downloading; an expired token is refused with a
+message saying to download it again, because that is the actual fix.
+
+- `lib/books/acsm.ts` — the protocol: (1) once per operator, POST credentials to `<operator>/Auth`
+  then register via `<activationURL>/InitLicenseService`; (2) POST a SIGNED `<adept:fulfill>` to
+  `<operator>/Fulfill`; (3) fetch and cache the licence service certificate; (4) download the epub
+  and **inject `META-INF/rights.xml`** built from the reply's `licenseToken`. 🔴 Step 4 is what
+  makes the file decryptable — the download carries no `rights.xml`, so without it `decryptAdept`
+  would correctly refuse it as malformed. Deliberately does NOT notify the distributor: that only
+  matters for returnable loans, and these are purchases, so a notify failure would be a confusing
+  way to lose a book. 🔴 `ADOBE Digitial Editions` is a genuine typo **in ADE itself** and must be
+  reproduced in the request — do not correct that spelling.
+- `lib/books/adeptXml.ts` + `adeptSign.ts` — 🔴 **the crux, and the reason this is portable at
+  all.** Adobe only answers a request signed over a byte-exact CANONICAL serialisation of the
+  request tree: namespace URI + local name per element, attributes sorted, strings length-prefixed
+  as **UTF-8 byte** counts, text trimmed and chunked at 0x7fff, each part preceded by a type tag,
+  with `adept:signature`/`adept:hmac` excluded. One wrong byte and every fulfilment fails with an
+  opaque server error naming nothing. That is why a real XML parser lives here while the rest of
+  `lib/books/` reads XML with regexes. 🔴 The signature is **not** a standard RSA signature:
+  textbook RSA over `00 01 FF..FF 00 <sha1>` with **no DigestInfo prefix**, so `crypto.sign()`
+  cannot produce it (it is the obvious "cleanup" and it is wrong — the gate asserts the mismatch).
+  The raw operation is `privateDecrypt` with `RSA_NO_PADDING`.
+- `lib/books/adeptActivation.ts` — 🔴 **activation is PROVISIONING, not part of the loop.**
+  Registering the (anonymous) Adobe account is one-time and needs PKCS#12 parsing Node has no
+  native support for, so it is done once out of band and pasted in as `ADOBE_ADEPT_ACTIVATION`.
+  That keeps ~900 lines of account protocol and a PKCS#12 implementation out of this codebase while
+  the ongoing path stays entirely in the hub. 🔴 The blob holds **two unrelated RSA keys** —
+  `signingKey` signs requests, `licenseKey` decrypts book content keys; swapping them fails
+  confusingly. Operator/licence-service state accumulates in the `kv` table (key
+  `adept_operator_state`), seeded from the blob's own lists.
+- **The gate: `npm run check:books:acsm`** (in `prebuild`). Pins the canonicalisation and the
+  signature against reference values from an INDEPENDENT Python implementation
+  (`books-fixture/adept-hash-cases.json`, regenerated only by
+  `scripts/gen_adept_hash_reference.py`, never by copying TypeScript output back in), plus the
+  structural rules a rewrite would plausibly break and the parser behaviours the signature depends
+  on. Falsification-tested **10/10** (signature not excluded, attributes unsorted, character-count
+  length prefixes, untrimmed text, missing ASN_CHILD, namespace not hashed, unprefixed attribute
+  taking the default namespace, wrong RSA padding byte, `crypto.sign`, serialiser dropping
+  namespace declarations — the last one found a genuine coverage gap in the gate itself).
+  🔴 **What it cannot cover: the live HTTP exchange.** Auth/InitLicenseService/Fulfill/download
+  need an unexpired token and a network, so no build can replay them. Verified once by hand
+  (below).
+- 🔴 **Offline cross-check against a real request (2026-08-18).** Before any live call, the port
+  was validated against the Python reference on the REAL Google ACSM: identical canonical SHA-1
+  **and** a byte-identical signature — including when built by this codebase's own request builder,
+  re-serialised ACSM and all. The riskiest part of the port was therefore confirmed **without
+  spending a fulfilment token**, which is the technique to reuse if this ever needs reworking.
+
 **Key files:** `lib/books/partialMd5.ts` (the hash — do not touch), `epubMeta.ts` (regex OPF
 extraction; failure falls back to filename, never fails ingest), `normalize.ts` (author/series
 rules + `SERIES_OVERRIDES`, ported from `~/Stump/organize-books.py`), `store.ts` (CRUD + ingest,
 content-addressed dedupe on sha256), `opds.ts` (pure XML emitters), `kosync.ts` (protocol
 semantics), `apiKey.ts` (the credential gate); `store.ts` also carries `listToRead`/`setToRead` for
-the To Read shelf. Routes: `app/opds/[key]/v1.2/[...path]/route.ts`
+the To Read shelf. DRM path: `prepare.ts` (the upload boundary — `prepareForIngest`, the ONE place
+`.acsm`/`.epub` converge and the ghost-book guard lives), `adept.ts` (detect + strip ADEPT),
+`zip.ts` (deterministic OCF-conforming writer, since `adm-zip` can't emit one), `adeptKey.ts`
+(which key decrypts, activation-over-env), `acsm.ts` (ADEPT fulfilment over the network),
+`adeptXml.ts` + `adeptSign.ts` (the canonicalisation and signature the whole exchange rests on),
+`adeptActivation.ts` (the provisioning blob + operator state). Routes: `app/opds/[key]/v1.2/[...path]/route.ts`
 (catalog/feeds/search/file with Range support/cover), `app/kosync/[key]/[...path]/route.ts` (the
 five kosync endpoints), `app/api/books/*` (cookie-gated manage + `kosync-import` for the Stump
 migration). UI: `app/books/*`, `components/BooksClient.tsx` (grid + upload + on-screen device
@@ -678,6 +813,15 @@ The login/logout `POST` handlers (`app/api/auth/{login,logout}/route.ts`) must r
 - `BOOKS_API_KEY` — device credential for `/opds/{key}/…` and `/kosync/{key}/…` (Books section).
   Generate with `openssl rand -hex 32`. **Unset = both endpoint families refuse every request**
   (fail CLOSED, same convention as `HOOPS_IMPORT_TOKEN`, opposite of `FEED_PASSWORD`).
+- `ADOBE_ADEPT_KEY` — Adobe account RSA private key (PKCS#8 DER, base64) used to strip ADEPT DRM
+  from an uploaded epub (see the Books "DRM" section). **Unset = DRM'ed uploads are refused with a
+  reason, never ingested broken** (fail CLOSED); a DRM-free library needs nothing here. Optional
+  today, and slated to become mostly vestigial once `.acsm` fulfilment lands (anonymous activation
+  stored in the `kv` table).
+- `ADOBE_ADEPT_ACTIVATION` — base64 JSON of an anonymous Adobe ADEPT activation; lets the hub
+  fulfil an uploaded `.acsm` (see the Books "ACSM fulfilment" section). **Unset = `.acsm` uploads
+  are refused with a reason**; `.epub` uploads are unaffected. 🔴 Carries the licence key that
+  decrypts books fulfilled by this activation and therefore **wins over `ADOBE_ADEPT_KEY`**.
 - `BLUESKY_IDENTIFIER` — Bluesky handle (e.g. `keithadair.com`)
 - `BLUESKY_APP_PASSWORD` — Bluesky app password (not account password)
 - `CRAFT_API_KEY` — Craft Connect API key for tracker collections

@@ -188,9 +188,20 @@ export default function BooksClient({
       const res = await fetch("/api/books/upload", { method: "POST", body: form });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
-      const created = body.results.filter((r: { created?: boolean }) => r.created).length;
-      const dup = body.results.length - created;
-      setStatus(`Added ${created}${dup ? `, ${dup} already in library` : ""}`);
+      type UploadResult = { created?: boolean; error?: string; fileName?: string };
+      const rows: UploadResult[] = body.results;
+      const failed = rows.filter((r) => r.error);
+      const created = rows.filter((r) => r.created).length;
+      const dup = rows.length - created - failed.length;
+      // A refused file used to be counted as a duplicate, which is exactly
+      // backwards for the DRM guard — the whole point is that the user is
+      // told why nothing was added.
+      const parts = [];
+      if (created) parts.push(`Added ${created}`);
+      if (dup) parts.push(`${dup} already in library`);
+      if (failed.length === 1) parts.push(`couldn't add ${failed[0].fileName}: ${failed[0].error}`);
+      else if (failed.length > 1) parts.push(`${failed.length} couldn't be added: ${failed[0].error}`);
+      setStatus(parts.length ? parts.join(" · ") : "Nothing to add");
       router.refresh();
     } catch (err) {
       setStatus(`Upload failed: ${err instanceof Error ? err.message : String(err)}`);
@@ -257,7 +268,7 @@ export default function BooksClient({
               disabled={uploading}
               className="border border-accent/60 px-3 py-1 font-mono text-[0.7rem] uppercase tracking-kicker text-accent hover:bg-accent/10 disabled:opacity-50"
             >
-              + Add epubs
+              + Add books
             </button>
           </div>
         </div>
@@ -275,7 +286,7 @@ export default function BooksClient({
         <input
           ref={fileRef}
           type="file"
-          accept=".epub"
+          accept=".epub,.acsm"
           multiple
           hidden
           onChange={(e) => handleUpload(e.target.files)}
@@ -345,7 +356,7 @@ export default function BooksClient({
       )}
 
       {items.length === 0 ? (
-        <p className="text-sm text-cream-dim">No books yet — add an epub to start the library.</p>
+        <p className="text-sm text-cream-dim">No books yet — add an epub (or an Adobe .acsm) to start the library.</p>
       ) : (
         <>
           {/* The shelf, mirrored from the OPDS feed so the toggle's effect is
