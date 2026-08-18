@@ -64,9 +64,21 @@ const expected = JSON.parse(
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "books-drm-check-"));
 process.chdir(tmp);
 
+// 🔴 HERMETIC. This gate drives the decrypt key itself, so it must not see the
+// AMBIENT Adobe env. On Railway the service's real ADOBE_ADEPT_ACTIVATION is
+// present during the build, and getAdeptKey() prefers an activation's licence
+// key over ADOBE_ADEPT_KEY — so without clearing it here, the gate's test key
+// is ignored, its fixture can't be decrypted, and the whole deploy fails on a
+// green-locally build. (That is exactly how this was found.) Clear both and
+// reset the caches before importing anything that reads them.
+delete process.env.ADOBE_ADEPT_ACTIVATION;
+delete process.env.ADOBE_ADEPT_KEY;
+
 const { inspectEncryption } = await import("../lib/books/adept.ts");
 const { prepareForIngest, PrepareError } = await import("../lib/books/prepare.ts");
 const { resetAdeptKeyCache } = await import("../lib/books/adeptKey.ts");
+const { resetAdeptActivationCache } = await import("../lib/books/adeptActivation.ts");
+resetAdeptActivationCache();
 const { countEpubWords, resolveSpine } = await import("../lib/books/epubText.ts");
 const { extractEpubMeta } = await import("../lib/books/epubMeta.ts");
 const { ingestBook } = await import("../lib/books/store.ts");
@@ -84,6 +96,9 @@ function assert(cond: boolean, label: string): void {
 function useKey(der: Buffer | null): void {
   if (der) process.env.ADOBE_ADEPT_KEY = der.toString("base64");
   else delete process.env.ADOBE_ADEPT_KEY;
+  // Reset BOTH caches: getAdeptKey() consults the activation first, so a stale
+  // activation cache would shadow the key we're setting here.
+  resetAdeptActivationCache();
   resetAdeptKeyCache();
 }
 

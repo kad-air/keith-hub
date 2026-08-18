@@ -39,6 +39,13 @@ const testKeys = JSON.parse(
   fs.readFileSync(path.resolve(repoRoot, "books-fixture/adept-test-keys.json"), "utf8"),
 );
 
+// Hermetic against the ambient Adobe env — this gate signs with its own
+// committed test key and must never depend on a real activation being present
+// (or absent). See the same guard, and the deploy failure that motivated it,
+// in check-books-drm.ts.
+delete process.env.ADOBE_ADEPT_ACTIVATION;
+delete process.env.ADOBE_ADEPT_KEY;
+
 const { parseXml, canonicalBytes, serializeXml } = await import("../lib/books/adeptXml.ts");
 const { hashNode, signNode } = await import("../lib/books/adeptSign.ts");
 const { isFulfillmentToken } = await import("../lib/books/acsm.ts");
