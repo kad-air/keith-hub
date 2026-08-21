@@ -143,6 +143,21 @@ export interface RawPlayer {
   per36: RawPlayerPer36 | null;
   /** production_net_value_per36 (the B4c flagship). Null for no-history. */
   value_per36: number | null;
+  /**
+   * The genuine offence/defence split of `value_per36`, from hoops-sim's
+   * split-RAPM `production_value_snapshot`.
+   *
+   * 🔴 `value_off_per36 + value_def_per36 === value_per36` — an ADDITION, and
+   * a positive `value_def_per36` is GOOD defence. That is the opposite of the
+   * TEAM convention on `RawTeam` (`off - def`, positive def = points allowed).
+   * See lib/hoops/playervalue.ts for the measurement and the reasoning; it is
+   * asserted every build by scripts/check-hoops-players.ts.
+   *
+   * Optional because they arrived after the first exporter version: an older
+   * bundle simply has neither, and everything that reads them handles null.
+   */
+  value_off_per36?: number | null;
+  value_def_per36?: number | null;
 }
 
 export interface RawPlayersFile {
@@ -266,6 +281,9 @@ export interface PlayerRow {
   name: string;
   minutes: number;
   value_per36: number | null;
+  /** See RawPlayer — additive split, positive def is GOOD defence. */
+  value_off_per36: number | null;
+  value_def_per36: number | null;
   game_rates: RawPlayerGameRates | null;
   per36: RawPlayerPer36 | null;
 }

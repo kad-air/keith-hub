@@ -22,6 +22,7 @@ export interface HoopsTab {
 export const HOOPS_TABS: HoopsTab[] = [
   { key: "matchup", label: "Matchup", href: "/hoops" },
   { key: "teams", label: "Teams", href: "/hoops/teams" },
+  { key: "players", label: "Players", href: "/hoops/players" },
 ];
 
 export default function HoopsNav({ active }: { active: string }) {

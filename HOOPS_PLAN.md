@@ -250,6 +250,7 @@ UI is trusted.
 | **Result** | `/hoops/game/[runId]` | One sampled game — final score, OT count, integer box lines that sum exactly, shareable `run_id` deep link. Reproducible. |
 | **Season** | `/hoops/season` | Pick a team (or league) → 82-game win-total quantiles, playoff odds, seed distribution, an interactive bracket. Runs on edited rosters too. |
 | **Teams** | `/hoops/teams`, `/hoops/teams/[tri]` | 30 teams ranked (results/roster/blend toggle); tap for roster + per-player value, editable into the studio. |
+| **Players** | `/hoops/players` | Every rostered player ranked by value per 36, with the offence/defence split, a team filter and a net/off/def sort. Not in the original sitemap — added once the bundle's split turned out to be shipping and reaching nothing. |
 | **Tonight** | `/hoops/tonight` | Tonight's real slate: the sim's read vs the market — framed as **curiosity, not an edge** (M1: market MAE 10.8 beats the sim's 11.4). |
 
 ### Non-negotiable UX carries (correctness, not polish)

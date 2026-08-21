@@ -34,6 +34,7 @@ import type Database from "better-sqlite3";
 import { getDb } from "@/lib/db";
 import { bundleHash, loadBundle, readParamsBlobText } from "./data";
 import { decodeParams } from "./params";
+import { playerRowsFromBundle } from "./playervalue.ts";
 import type { HoopsBundle } from "./types";
 
 export type ImportSource = "seed" | "push";
@@ -62,6 +63,11 @@ interface StoredState {
   /** false for a row written before kad-air/keith-hub#73's migration added
    *  hca_pts/replacement_per36/value_as_of — see the no-op check below. */
   hasScalars: boolean;
+  /** false when no player row carries value_off_per36 — i.e. this read model
+   *  was written by the importer as it stood before /hoops/players, which
+   *  dropped the split. Same purpose as hasScalars: force one rewrite so an
+   *  existing volume backfills instead of serving null forever. */
+  hasPlayerSplit: boolean;
 }
 
 function currentState(db: Database.Database): StoredState | null {
@@ -74,12 +80,18 @@ function currentState(db: Database.Database): StoredState | null {
   const count = (
     db.prepare(`SELECT COUNT(*) AS n FROM hoops_teams`).get() as { n: number }
   ).n;
+  const split = (
+    db
+      .prepare(`SELECT COUNT(*) AS n FROM hoops_players WHERE value_off_per36 IS NOT NULL`)
+      .get() as { n: number }
+  ).n;
   return {
     hash: row.content_hash,
     generatedAt: row.generated_at,
     count,
     importSource: row.import_source,
     hasScalars: row.hca_pts !== null,
+    hasPlayerSplit: split > 0,
   };
 }
 
@@ -153,19 +165,28 @@ function writeBundle(db: Database.Database, bundle: HoopsBundle, meta: WriteMeta
       );
     }
 
+    // 🔴 The projection lives in playervalue.ts, not inline here, so the build
+    // gate can drive the REAL one over the REAL bundle. It is what decides
+    // whether the offence/defence value split survives the trip from JSON into
+    // SQLite — and before /hoops/players it silently did not: the exporter had
+    // been shipping value_off_per36/value_def_per36 for months and this loop
+    // dropped both on the floor.
     const insPlayer = db.prepare(
       `INSERT INTO hoops_players
-         (athlete_id, nba_player_id, tri, name, minutes, value_per36, game_rates, per36)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+         (athlete_id, nba_player_id, tri, name, minutes,
+          value_per36, value_off_per36, value_def_per36, game_rates, per36)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     );
-    for (const p of bundle.players.players) {
+    for (const p of playerRowsFromBundle(bundle.players)) {
       insPlayer.run(
         p.athlete_id,
-        p.nba_player_id ?? null,
-        p.team,
+        p.nba_player_id,
+        p.tri,
         p.name,
         p.minutes,
-        p.value_per36 ?? null,
+        p.value_per36,
+        p.value_off_per36,
+        p.value_def_per36,
         p.game_rates ? JSON.stringify(p.game_rates) : null,
         p.per36 ? JSON.stringify(p.per36) : null,
       );
@@ -290,7 +311,17 @@ export function importHoopsData(force = false): ImportSummary {
   // existing prod DB backfills those columns on its next boot instead of
   // reading meta.replacementPer36 as null forever (getHoopsMeta no longer
   // has a disk fallback for it — see queries.ts).
-  if (!force && state && state.hash === hash && state.count > 0 && state.hasScalars) {
+  //
+  // The same trick, for the same reason, on the offence/defence value split:
+  // a read model written before /hoops/players has the columns (the migration
+  // in lib/db.ts adds them) but every value is NULL, and an unchanged content
+  // hash would otherwise keep it that way forever. Only demanded when THIS
+  // bundle actually carries a split, so an older bundle that genuinely has
+  // none doesn't trigger a pointless rewrite on every boot.
+  const bundleHasSplit = bundle.players.players.some((p) => p.value_off_per36 != null);
+  const splitSettled = !bundleHasSplit || state?.hasPlayerSplit === true;
+
+  if (!force && state && state.hash === hash && state.count > 0 && state.hasScalars && splitSettled) {
     return {
       imported: false,
       reason: "unchanged",

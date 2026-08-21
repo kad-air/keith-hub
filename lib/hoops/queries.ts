@@ -54,6 +54,8 @@ interface PlayerDbRow {
   name: string;
   minutes: number;
   value_per36: number | null;
+  value_off_per36: number | null;
+  value_def_per36: number | null;
   game_rates: string | null;
   per36: string | null;
 }
@@ -66,9 +68,31 @@ function hydratePlayer(r: PlayerDbRow): PlayerRow {
     name: r.name,
     minutes: r.minutes,
     value_per36: r.value_per36,
+    // 🔴 net = off + def, and a positive def is GOOD defence — the opposite of
+    // the team convention two functions up. See lib/hoops/playervalue.ts.
+    // `?? null` because a DB row written before this column existed reads
+    // undefined rather than null once the migration adds it.
+    value_off_per36: r.value_off_per36 ?? null,
+    value_def_per36: r.value_def_per36 ?? null,
     game_rates: r.game_rates ? (JSON.parse(r.game_rates) as RawPlayerGameRates) : null,
     per36: r.per36 ? (JSON.parse(r.per36) as RawPlayerPer36) : null,
   };
+}
+
+/**
+ * Every rostered player in the league, for /hoops/players.
+ *
+ * Deliberately unordered-by-value: the ranking is done by the pure
+ * lib/hoops/playervalue.ts so the client can re-sort net/off/def without a
+ * round trip, exactly as TeamsClient re-ranks the three rating modes. The
+ * `name` order here just makes the payload deterministic.
+ */
+export function getAllPlayers(): PlayerRow[] {
+  ensureHoopsImport();
+  const rows = getDb()
+    .prepare(`SELECT * FROM hoops_players ORDER BY name ASC`)
+    .all() as PlayerDbRow[];
+  return rows.map(hydratePlayer);
 }
 
 /** One team's roster, heaviest minutes first. */
@@ -141,6 +165,15 @@ export interface HoopsMeta {
   /** Value per 36 of a replacement-level player — the zero line for value. */
   replacementPer36: number;
   valueAsOf: string;
+  /**
+   * hoops-sim's own `absorption_rotation_floor_minutes` — the minutes at which
+   * that project stops treating a player as a rotation piece. Read by name off
+   * the blob's constants block, never hardcoded (lib/hoops/pricing.ts's rule),
+   * and null if a bundle somehow doesn't carry it — in which case
+   * /hoops/players simply doesn't offer the rotation lens rather than inventing
+   * a threshold of its own.
+   */
+  rotationFloorMinutes: number | null;
   /** 'seed' = the committed hoops-data/*.json fallback; 'push' = a real Mac
    *  Mini push (kad-air/keith-hub#73). See lib/hoops/import.ts. */
   importSource: ImportSource;
@@ -188,7 +221,9 @@ export function getHoopsMeta(): HoopsMeta {
 
   const blob = JSON.parse(row.blob) as {
     parameter_set: { data_as_of: string; fitted_at: string; avg_poss_per_team_game: number };
+    constants?: { absorption_rotation_floor_minutes?: number };
   };
+  const rotationFloor = blob.constants?.absorption_rotation_floor_minutes;
 
   const count = (table: string): number =>
     (db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get() as { n: number }).n;
@@ -203,6 +238,9 @@ export function getHoopsMeta(): HoopsMeta {
     avgPossPerTeamGame: blob.parameter_set.avg_poss_per_team_game,
     replacementPer36: row.replacement_per36,
     valueAsOf: row.value_as_of,
+    rotationFloorMinutes: typeof rotationFloor === "number" && Number.isFinite(rotationFloor)
+      ? rotationFloor
+      : null,
     importSource: row.import_source,
     teams: count("hoops_teams"),
     players: count("hoops_players"),

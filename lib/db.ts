@@ -272,6 +272,10 @@ export function getDb(): Database.Database {
       blend_def REAL NOT NULL
     );
 
+    -- value_off_per36/value_def_per36 are the genuine offence/defence split of
+    -- value_per36. 🔴 They ADD to it (net = off + def) and a positive def is
+    -- GOOD defence -- the OPPOSITE of hoops_teams above, where net = off - def
+    -- and a positive def means points ALLOWED. See lib/hoops/playervalue.ts.
     CREATE TABLE IF NOT EXISTS hoops_players (
       athlete_id INTEGER PRIMARY KEY,
       nba_player_id INTEGER,
@@ -279,6 +283,8 @@ export function getDb(): Database.Database {
       name TEXT NOT NULL,
       minutes REAL NOT NULL,
       value_per36 REAL,
+      value_off_per36 REAL,
+      value_def_per36 REAL,
       game_rates TEXT,
       per36 TEXT
     );
@@ -402,6 +408,21 @@ export function getDb(): Database.Database {
   addHoopsParamsCol("pricing_version", `pricing_version INTEGER`);
   addHoopsParamsCol("features_json", `features_json TEXT`);
   addHoopsParamsCol("constants_json", `constants_json TEXT`);
+
+  // hoops_players: the offence/defence value split, added for /hoops/players.
+  // The exporter has shipped these two fields all along — the importer used to
+  // drop them on the floor — so a pre-existing DB has the table WITHOUT the
+  // columns and CREATE TABLE IF NOT EXISTS above will never add them. Same
+  // additive shape as hoops_params. Nullable on purpose: an older bundle
+  // carries no split at all, and a no-history player has no value of any kind.
+  const hoopsPlayerCols = (
+    dbInstance.prepare(`PRAGMA table_info(hoops_players)`).all() as Array<{ name: string }>
+  ).map((c) => c.name);
+  for (const col of ["value_off_per36", "value_def_per36"]) {
+    if (!hoopsPlayerCols.includes(col)) {
+      dbInstance.exec(`ALTER TABLE hoops_players ADD COLUMN ${col} REAL`);
+    }
+  }
 
   return dbInstance;
 }

@@ -19,6 +19,9 @@ npm run check:hoops              # Hoops read-model gate (runs automatically as 
 npm run check:hoops:fixture      # Hoops cross-implementation engine fixture (same)
 npm run check:hoops:multinomial  # numpy-parity gate on the box-score allocation (same)
 npm run check:hoops:boxscore     # Box-score gate: integer identity + level anchors (same)
+npm run check:hoops:players      # Player-rankings gate: the off/def sign convention (both ways),
+                                 #   real-NBA anchors, the read-model round trip, the ranking
+                                 #   itself, and the pricing scope boundary (same)
 npm run check:tracking-hidden    # Tracking section stays hidden (needs a running server; NOT in prebuild)
 npm run check:books:bytes        # Books byte-identity gate: partialMd5 vs offline Python reference, ingest stores untouched bytes (same)
 npm run check:books:opds         # Books OPDS device-contract gate: CrossPoint parser constraints + the To Read shelf, anchored on Stump's device-proven feed (same)
@@ -30,10 +33,10 @@ npm run check:books:acsm         # Books ACSM gate: the ADEPT canonicalisation +
 ```
 
 No test suite. `npm run build` is the type-check gate — always run it before pushing. It is
-**also** the data and engine gate: `prebuild` runs all five `check:hoops*` scripts, so a stale
-blob, a TypeScript engine that disagrees with Python, a multinomial that disagrees with numpy, or
-a box score whose player lines stop adding up fails the build (and the Railway deploy) rather than
-shipping. See "Hoops" below.
+**also** the data and engine gate: `prebuild` runs every `check:hoops*` script, so a stale
+blob, a TypeScript engine that disagrees with Python, a multinomial that disagrees with numpy, a
+box score whose player lines stop adding up, or a player-value split whose defence sign has
+inverted fails the build (and the Railway deploy) rather than shipping. See "Hoops" below.
 **Requires Node >= 24** (`engines` + `.nvmrc`) — those gates execute TypeScript directly.
 
 ## Runtime debugging — `scripts/inspect.mjs`
@@ -660,7 +663,7 @@ word count), `pages.ts` (the page convention, dependency-free). UI: `app/books/s
 by copying the TS output back in).
 
 ### Hoops — the NBA simulation studio
-An NBA sim & what-if studio as its own section, built to the plan in `HOOPS_PLAN.md` (tracking epic: GitHub #63). **Shipped so far: milestone 1, the read-model spine (#64) — `/hoops/teams` and `/hoops/teams/[tri]`; milestone 2, the RNG parity + engine port (#65, #66) — `lib/hoops/{rng,philox,blake2b,engine}.ts`; the Mac Mini PUSH endpoint (#73, wire contract kad-air/hoops-sim#24) — `POST /api/hoops/import`; and milestone 3, the matchup + box score (#67) — `/hoops` and `/hoops/game/[runId]`.** The engine now runs from a screen. Next up: the studio (#69), with the design spike (#68) ahead of it.
+An NBA sim & what-if studio as its own section, built to the plan in `HOOPS_PLAN.md` (tracking epic: GitHub #63). **Shipped so far: milestone 1, the read-model spine (#64) — `/hoops/teams` and `/hoops/teams/[tri]`; milestone 2, the RNG parity + engine port (#65, #66) — `lib/hoops/{rng,philox,blake2b,engine}.ts`; the Mac Mini PUSH endpoint (#73, wire contract kad-air/hoops-sim#24) — `POST /api/hoops/import`; milestone 3, the matchup + box score (#67) — `/hoops` and `/hoops/game/[runId]`; and the player rankings — `/hoops/players`, which is also what finally carried the bundle's offence/defence value split into the read model.** The engine now runs from a screen. Next up: the studio (#69), with the design spike (#68) ahead of it.
 
 **Zero runtime dependency on the Mac Mini for READS.** Same shape as `/comics`, scaled up: heavy work (fitting a possession model against a 20GB DuckDB over 8TB of parquet) runs offline in `~/Code/hoops-sim`; what ships here is a bundle plus a TypeScript port of the engine. The Mini reaches OUT to push that bundle (below) — the hub never calls back to the Mini.
 
@@ -707,6 +710,64 @@ An NBA sim & what-if studio as its own section, built to the plan in `HOOPS_PLAN
 **Honesty carries that render, not tooltips:** the variance note and the "how these lines were built" caveats on every box score (`VarianceNote` / `BoxScoreCaveats`), the `run_id` + fit version + data-as-of on every result (`RunProvenance` — the fit is printed *next to* the id because a Mini push can replace the model under an old link), the ratings-mode blurb, the participant basis and omitted-player count per team, and the histogram's "the answer is a distribution" paragraph naming the actual cloud width and quartiles.
 
 **Key files:** `lib/hoops/types.ts` (the export's shapes), `blob-contract.ts` (what the engine expects the blob to be — the stale-blob guard's source of truth), `params.ts` (decode into flat `Float64Array` + stride, throws `StaleBlobError`; `expectVersion: null` is the fixture-only escape hatch), `data.ts` (read + hash the COMMITTED disk bundle — cold-start seed only, see above), `import.ts` (project either byte source into SQLite; `ensureHoopsImport`/`importHoopsData` = the disk-seed path, `importPushedBundle` = the push path), `contract.ts` (the wire-contract capability negotiation), `bundleValidation.ts` (the structural completeness gate on a pushed bundle), `pricing.ts` (the pure roster-pricing formula port, for the not-yet-assertable pricing fixture), `queries.ts` (server reads, all off the DB, never disk), `rating.ts` (**pure** — no fs/db, so the client can re-rank all three modes without a round trip), `nba-franchises.ts` (the 30 real franchises, as an external fact), `blake2b.ts` (hand-rolled because the engine runs in the browser too and Web Crypto has no blake2b; matches node:crypto on 510 inputs), `philox.ts` (Philox4x64 + numpy's `random`/`standard_normal`), `ziggurat.ts` (generated tables), `rng.ts` (coordinate-keyed streams), `engine.ts` (the possession loop), `binomial.ts` (numpy's multinomial/binomial, for the box-score allocation), `boxscore.ts` (**pure** — the two-mode box score; the studio re-runs it in the browser), `matchup.ts` (**pure** — the run_id encoding + the distribution summary), `run.ts` (the server glue: DB + engine + box score in ONE place so the routes and the SSR pages cannot drift into simulating different games). API: `app/api/hoops/import/route.ts` (the push endpoint), `app/api/hoops/teams/route.ts`, `app/api/hoops/sim/route.ts`, `app/api/hoops/boxscore/route.ts`. UI: `components/hoops/HoopsNav.tsx` (the section self-hosts its in-page nav — there is no global sub-tab bar to extend; #68's first question is answered in favour of SIBLING PAGES with an in-section switcher, so every result is linkable and server-renderable), `components/hoops/MatchupClient.tsx`, `components/hoops/BoxScoreTable.tsx` (the shared table + the three honesty blocks), `components/hoops/MarginHistogram.tsx`, `components/hoops/TeamsClient.tsx`, `app/hoops/page.tsx`, `app/hoops/game/[runId]/page.tsx`, `app/hoops/teams/*`.
+
+#### The player rankings (`/hoops/players`)
+
+Every rostered player ranked by the value model, with the offence/defence split that had been
+shipping in the bundle and reaching nothing. Three controls, all client-side over a payload that
+already contains the whole league: a Net/Offence/Defence sort, a team `<select>`, and a
+rotation-only toggle. A row links to that player's team — there is deliberately no player-detail
+page in this round.
+
+🔴 **The sign convention is the OPPOSITE of the team one, and both are right.** A player's value
+splits **additively** — `value_off_per36 + value_def_per36 === value_per36` — and a **positive
+defence is GOOD defence**, points prevented. `netOf()` in `rating.ts` is `off − def` for a TEAM,
+where a positive def means points ALLOWED. Two conventions in one bundle is a standing invitation
+to "fix" the plus into a minus, so `lib/hoops/playervalue.ts` carries the reasoning and
+`check:hoops:players` asserts **both directions**: that the plus form reconciles (524/524 players
+on the committed bundle) **and that the minus form still does not** (0/524). Asserting only the
+first would pass happily on a bundle whose defence sign had been inverted upstream. Backed by
+real-NBA anchors rather than internal agreement — Rudy Gobert (four DPOYs) and Wembanyama must
+read def > off; Curry and Trae Young must read off > def. If one of those names leaves the league
+the check fails and says the anchor list is stale, which is the loud failure that matters.
+
+🔴 **The importer used to drop the split on the floor.** `hoops_players.json` has carried
+`value_off_per36`/`value_def_per36` all along — the exporter even ships a `value_off_def_note`
+about them — and `writeBundle`'s INSERT simply never wrote them, so the read model did not have
+them and nothing noticed. The insert now goes through `playerRowsFromBundle` (in the pure module)
+so the build gate can drive the REAL projection, and the gate cross-checks the INSERT's column
+list against the REAL DDL from `lib/db.ts` in a throwaway cwd, then round-trips 25 real players
+through both. 🔴 **An existing read model needs one forced rewrite to backfill**: the columns
+arrive by additive migration but every value is NULL, and an unchanged content hash would keep it
+that way forever — so `StoredState.hasPlayerSplit` joins `hasScalars` in the no-op condition,
+same trick as #73 and for the same reason. **A PUSH-sourced volume cannot backfill from disk at
+all** (a push is authoritative by design and the players file is not retained), so it needs a
+fresh `hoops publish-hub` from the Mini; until then the page drops the two sorts that would rank
+nobody and says why, rather than rendering a column of dashes.
+
+🔴 **Display only — pricing stays on the net.** The wire contract declares `symmetric_off_def`,
+and the exporter's own note says these fields are unused until a v2 `split_off_def` flip on BOTH
+sides. `check:hoops:players` asserts `pricing.ts` and `boxscore.ts` have not learned the field
+names.
+
+**Honesty carries, on screen and not in tooltips:** what the number means in one line, the
+bundle's `value_as_of` date, replacement level (so a bench player sitting below zero reads as
+intended), the count of players with no value estimate at all, and the rate caveat — this ranks by
+a per-36 *rate*, so a deep-bench name can out-rank a star. Two halves to that: a `!` flag on
+anyone under hoops-sim's own `absorption_rotation_floor_minutes` (read by name off the blob's
+constants, never hardcoded — the page simply drops the lens if a bundle lacks the constant), and
+the games-played count on every row, because a big number off a three-game season is mostly the
+model's prior talking. 🔴 **A team filter never renumbers.** Ranks are LEAGUE ranks computed
+before any filter runs, so LAL reads Luka #11 and Austin Reaves #91 rather than #1 and #4 — the
+page is a league ranking and a filter is a lens on it. Asserted, because re-ranking after
+filtering is the obvious "tidy-up".
+
+**Key files:** `lib/hoops/playervalue.ts` (**pure** — the sign convention, `rankPlayers`,
+`filterPlayers`, `playerRowsFromBundle`), `components/hoops/PlayersClient.tsx`,
+`app/hoops/players/page.tsx`, `scripts/check-hoops-players.ts`. Falsification at merge: defence
+sign inverted, off/def swapped, a half-split player, the importer dropping `value_off_per36`
+again, the schema losing `value_def_per36`, `filterPlayers` renumbering, `pricing.ts` reaching for
+the split, and `rankPlayers` dropping unvalued players — 8 probes, all 8 broke the check.
 
 #### The engine port (milestone 2)
 
