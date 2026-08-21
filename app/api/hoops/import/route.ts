@@ -170,7 +170,23 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     .prepare(`SELECT content_hash, generated_at FROM hoops_params WHERE id = 1`)
     .get() as { content_hash: string; generated_at: string } | undefined;
 
-  if (existing && existing.content_hash === contentHash) {
+  // Rule 6's no-op has ONE exception, mirroring lib/hoops/import.ts's seed-path
+  // `splitSettled` guard (added with /hoops/players): if the stored read model
+  // predates the off/def split columns (every value NULL) but this bundle
+  // carries them, an unchanged content hash must NOT freeze the columns NULL
+  // forever -- fall through to the real write exactly once. Found live
+  // 2026-08-21: the guard existed only on the seed path, and the push route's
+  // rule-6 short-circuit ran first, so a same-hash re-POST could never
+  // populate the split.
+  const storedSplit = (
+    db.prepare(`SELECT COUNT(*) AS n FROM hoops_players WHERE value_off_per36 IS NOT NULL`).get() as { n: number }
+  ).n;
+  const bundleCarriesSplit = (
+    (files["hoops_players.json"] as RawPlayersFile | undefined)?.players ?? []
+  ).some((p) => p.value_off_per36 != null);
+  const splitSettled = !bundleCarriesSplit || storedSplit > 0;
+
+  if (existing && existing.content_hash === contentHash && splitSettled) {
     return NextResponse.json({
       imported: false,
       reason: "unchanged",
