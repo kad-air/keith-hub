@@ -2,10 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import HoopsNav from "@/components/hoops/HoopsNav";
 import PlayersClient from "@/components/hoops/PlayersClient";
-import {
-  DEFAULT_PLAYER_SORT,
-  isPlayerSort,
-} from "@/lib/hoops/playervalue";
+import { defaultSortFor, isPlayerSort } from "@/lib/hoops/playervalue";
 import { getAllPlayers, getHoopsMeta, getTeamRows } from "@/lib/hoops/queries";
 
 export const dynamic = "force-dynamic";
@@ -21,7 +18,10 @@ export default function HoopsPlayersPage({
   const meta = getHoopsMeta();
   const tris = getTeamRows().map((t) => t.tri);
 
-  const initialSort = isPlayerSort(searchParams.sort) ? searchParams.sort : DEFAULT_PLAYER_SORT;
+  // An explicit ?sort= always wins; absent one, default to "value" when the
+  // bundle actually carries value_pg reads, "net" otherwise — see
+  // defaultSortFor's own docstring.
+  const initialSort = isPlayerSort(searchParams.sort) ? searchParams.sort : defaultSortFor(rows);
   // A ?team= naming a franchise this bundle doesn't carry falls back to the
   // whole league rather than rendering an empty ranking.
   const wanted = searchParams.team?.toUpperCase();

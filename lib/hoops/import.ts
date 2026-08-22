@@ -68,6 +68,11 @@ interface StoredState {
    *  dropped the split. Same purpose as hasScalars: force one rewrite so an
    *  existing volume backfills instead of serving null forever. */
   hasPlayerSplit: boolean;
+  /** Same trick again, for the stack rating / value-per-game fields: false
+   *  when no player row carries value_pg, i.e. this read model predates that
+   *  milestone. Marker column is value_pg (not stack_net_per36) so a bundle
+   *  that ships the stack rate without a minutes read still forces a rewrite. */
+  hasStackFields: boolean;
 }
 
 function currentState(db: Database.Database): StoredState | null {
@@ -85,6 +90,11 @@ function currentState(db: Database.Database): StoredState | null {
       .prepare(`SELECT COUNT(*) AS n FROM hoops_players WHERE value_off_per36 IS NOT NULL`)
       .get() as { n: number }
   ).n;
+  const stack = (
+    db
+      .prepare(`SELECT COUNT(*) AS n FROM hoops_players WHERE value_pg IS NOT NULL`)
+      .get() as { n: number }
+  ).n;
   return {
     hash: row.content_hash,
     generatedAt: row.generated_at,
@@ -92,6 +102,7 @@ function currentState(db: Database.Database): StoredState | null {
     importSource: row.import_source,
     hasScalars: row.hca_pts !== null,
     hasPlayerSplit: split > 0,
+    hasStackFields: stack > 0,
   };
 }
 
@@ -174,8 +185,9 @@ function writeBundle(db: Database.Database, bundle: HoopsBundle, meta: WriteMeta
     const insPlayer = db.prepare(
       `INSERT INTO hoops_players
          (athlete_id, nba_player_id, tri, name, minutes,
-          value_per36, value_off_per36, value_def_per36, game_rates, per36)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          value_per36, value_off_per36, value_def_per36, game_rates, per36,
+          stack_net_per36, stack_off_per36, stack_def_per36, expected_minutes, value_pg, evidence)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     );
     for (const p of playerRowsFromBundle(bundle.players)) {
       insPlayer.run(
@@ -189,6 +201,12 @@ function writeBundle(db: Database.Database, bundle: HoopsBundle, meta: WriteMeta
         p.value_def_per36,
         p.game_rates ? JSON.stringify(p.game_rates) : null,
         p.per36 ? JSON.stringify(p.per36) : null,
+        p.stack_net_per36,
+        p.stack_off_per36,
+        p.stack_def_per36,
+        p.expected_minutes,
+        p.value_pg,
+        p.evidence,
       );
     }
 
@@ -321,7 +339,20 @@ export function importHoopsData(force = false): ImportSummary {
   const bundleHasSplit = bundle.players.players.some((p) => p.value_off_per36 != null);
   const splitSettled = !bundleHasSplit || state?.hasPlayerSplit === true;
 
-  if (!force && state && state.hash === hash && state.count > 0 && state.hasScalars && splitSettled) {
+  // Same trick a third time, for the stack rating / value-per-game fields
+  // this milestone adds.
+  const bundleHasStack = bundle.players.players.some((p) => p.value_pg != null);
+  const stackSettled = !bundleHasStack || state?.hasStackFields === true;
+
+  if (
+    !force &&
+    state &&
+    state.hash === hash &&
+    state.count > 0 &&
+    state.hasScalars &&
+    splitSettled &&
+    stackSettled
+  ) {
     return {
       imported: false,
       reason: "unchanged",

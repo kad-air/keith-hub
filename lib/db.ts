@@ -424,6 +424,28 @@ export function getDb(): Database.Database {
     }
   }
 
+  // stack_net_per36/stack_off_per36/stack_def_per36/expected_minutes/value_pg/
+  // evidence: the promoted 7-season "stack" rating and its value/game inputs,
+  // added the same way the flagship split was — additive, nullable, optional
+  // on the wire. A pre-existing DB has the table without these columns and
+  // CREATE TABLE IF NOT EXISTS above never adds them.
+  const hoopsPlayerColsRefreshed = (
+    dbInstance.prepare(`PRAGMA table_info(hoops_players)`).all() as Array<{ name: string }>
+  ).map((c) => c.name);
+  for (const col of [
+    "stack_net_per36 REAL",
+    "stack_off_per36 REAL",
+    "stack_def_per36 REAL",
+    "expected_minutes REAL",
+    "value_pg REAL",
+    "evidence TEXT",
+  ]) {
+    const name = col.split(" ")[0];
+    if (!hoopsPlayerColsRefreshed.includes(name)) {
+      dbInstance.exec(`ALTER TABLE hoops_players ADD COLUMN ${col}`);
+    }
+  }
+
   return dbInstance;
 }
 

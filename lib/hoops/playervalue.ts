@@ -42,15 +42,32 @@
 
 import type { PlayerRow, RawPlayer, RawPlayersFile } from "./types.ts";
 
-export type PlayerSort = "net" | "off" | "def";
+export type PlayerSort = "net" | "off" | "def" | "value";
 
-export const PLAYER_SORTS: PlayerSort[] = ["net", "off", "def"];
+export const PLAYER_SORTS: PlayerSort[] = ["value", "net", "off", "def"];
 
 export function isPlayerSort(v: string | null | undefined): v is PlayerSort {
   return !!v && (PLAYER_SORTS as string[]).includes(v);
 }
 
+/** The ultimate fallback when a bundle carries no `value_pg` at all. See
+ *  `defaultSortFor` for the coverage-aware default the page actually uses. */
 export const DEFAULT_PLAYER_SORT: PlayerSort = "net";
+
+/**
+ * The sort the page should open on, absent an explicit `?sort=`.
+ *
+ * `value` (points of team margin per game — the stack rating times expected
+ * minutes) is the more useful ranking whenever the bundle carries it, because
+ * it is what a roster decision actually turns on; `net` (a rate) stays the
+ * fallback for a bundle that predates the stack rating. Coverage-gated the
+ * same way `hasSplit` gates the off/def sorts in PlayersClient — an explicit
+ * `?sort=` from the URL always wins over this, this only fills in when none
+ * was given.
+ */
+export function defaultSortFor(rows: PlayerRow[]): PlayerSort {
+  return rows.some((r) => r.value_pg != null) ? "value" : DEFAULT_PLAYER_SORT;
+}
 
 /** A player's net value per 36 minutes = his offence plus his defence. */
 export function netOf(off: number, def: number): number {
@@ -71,8 +88,25 @@ export interface RankedPlayer {
   apg: number | null;
   gp: number | null;
   /**
+   * `value_pg` — points of team margin per game vs. an average player
+   * (`stack_net_per36 * expected_minutes / 36`, shipped pre-computed). Null
+   * for a bundle that predates the stack rating, or a player it has no read
+   * on.
+   */
+  valuePg: number | null;
+  /** hoops-sim's own expected-minutes-per-game input to `valuePg`. */
+  expectedMinutes: number | null;
+  /** e.g. "27719 poss (7yr)" or "prior only" — what the stack rating rests on. */
+  evidence: string | null;
+  /** The promoted 7-season stack rating, per-36 — same additive PLAYER sign
+   *  convention as `off`/`def`/`net`, but a SEPARATE model. */
+  stackNet: number | null;
+  stackOff: number | null;
+  stackDef: number | null;
+  /**
    * League rank under the active sort, 1-based. 0 means UNRANKED — either no
-   * value estimate at all, or (under an off/def sort) no split to sort on.
+   * value estimate at all, or (under an off/def/value sort) no read to sort
+   * on.
    *
    * 🔴 This is a LEAGUE rank and it is computed before any filter runs, so
    * narrowing to one team shows that team's players at their real league
@@ -87,6 +121,7 @@ export interface RankedPlayer {
 function sortKey(p: RankedPlayer, sort: PlayerSort): number | null {
   if (sort === "off") return p.off;
   if (sort === "def") return p.def;
+  if (sort === "value") return p.valuePg;
   return p.net;
 }
 
@@ -120,6 +155,12 @@ export function rankPlayers(
     rpg: r.game_rates?.reb ?? null,
     apg: r.game_rates?.ast ?? null,
     gp: r.game_rates?.gp ?? null,
+    valuePg: r.value_pg,
+    expectedMinutes: r.expected_minutes,
+    evidence: r.evidence,
+    stackNet: r.stack_net_per36,
+    stackOff: r.stack_off_per36,
+    stackDef: r.stack_def_per36,
     rank: 0,
     thinMinutes: rotationFloorMinutes != null && r.minutes < rotationFloorMinutes,
   }));
@@ -186,6 +227,12 @@ export function playerRowOf(p: RawPlayer): PlayerRow {
     value_def_per36: p.value_def_per36 ?? null,
     game_rates: p.game_rates ?? null,
     per36: p.per36 ?? null,
+    stack_net_per36: p.stack_net_per36 ?? null,
+    stack_off_per36: p.stack_off_per36 ?? null,
+    stack_def_per36: p.stack_def_per36 ?? null,
+    expected_minutes: p.expected_minutes ?? null,
+    value_pg: p.value_pg ?? null,
+    evidence: p.evidence ?? null,
   };
 }
 
@@ -195,6 +242,9 @@ export interface ValueCoverage {
   valued: number;
   split: number;
   thin: number;
+  /** Players carrying a `value_pg` read — the stack rating's own coverage,
+   *  independent of `valued`/`split` (the pre-existing flagship model). */
+  valuePg: number;
 }
 
 export function valueCoverage(ranked: RankedPlayer[]): ValueCoverage {
@@ -203,11 +253,17 @@ export function valueCoverage(ranked: RankedPlayer[]): ValueCoverage {
     valued: ranked.filter((p) => p.net != null).length,
     split: ranked.filter((p) => p.off != null && p.def != null).length,
     thin: ranked.filter((p) => p.thinMinutes).length,
+    valuePg: ranked.filter((p) => p.valuePg != null).length,
   };
 }
 
 /** The sort control's labels and their on-screen explanations. */
 export const SORT_COPY: Record<PlayerSort, { label: string; blurb: string }> = {
+  value: {
+    label: "Value/G",
+    blurb:
+      "Points of team margin per game vs. an average player — the stack rating times how many minutes he's expected to play, divided by 36. This is what a roster decision actually turns on.",
+  },
   net: {
     label: "Net",
     blurb:
