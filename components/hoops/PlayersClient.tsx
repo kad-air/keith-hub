@@ -47,8 +47,16 @@ export default function PlayersClient({ rows, tris, meta, initialSort, initialTe
     () => rows.some((r) => r.value_off_per36 != null && r.value_def_per36 != null),
     [rows],
   );
-  const sorts = hasSplit ? PLAYER_SORTS : PLAYER_SORTS.filter((s) => s === "net");
-  const activeSort: PlayerSort = hasSplit ? sort : "net";
+  // Same shape, for the promoted stack rating's value_pg field. Independent
+  // of hasSplit — the two milestones shipped separately and a bundle could in
+  // principle carry one without the other.
+  const hasValue = useMemo(() => rows.some((r) => r.value_pg != null), [rows]);
+  const sorts = PLAYER_SORTS.filter((s) => {
+    if (s === "value") return hasValue;
+    if (s === "off" || s === "def") return hasSplit;
+    return true; // "net" is always available
+  });
+  const activeSort: PlayerSort = sorts.includes(sort) ? sort : "net";
 
   const ranked = useMemo(() => rankPlayers(rows, activeSort, floor), [rows, activeSort, floor]);
   const shown = useMemo(
@@ -230,6 +238,14 @@ export default function PlayersClient({ rows, tris, meta, initialSort, initialTe
         , where a positive defence means points allowed. Both conventions come straight from
         hoops-sim and both are carried through unchanged. Minutes are the raw expected-minutes
         estimate before normalisation to a 240-minute team game.
+        {hasValue && (
+          <>
+            {" "}
+            <em>Val/g</em> is a separate model — the stack rating times how many minutes he&rsquo;s
+            expected to play that game, divided by 36 — not derived from the net/off/def figures
+            above it.
+          </>
+        )}
       </p>
 
       <dl className="mt-6 grid grid-cols-2 gap-x-4 gap-y-1 border-t border-rule/60 pt-3 font-mono text-[0.65rem] text-cream-dimmer">
@@ -242,6 +258,7 @@ export default function PlayersClient({ rows, tris, meta, initialSort, initialTe
         <dt>Rows</dt>
         <dd className="text-right text-cream-dim">
           {coverage.total} players · {coverage.split} with an off/def split
+          {hasValue && <> · {coverage.valuePg} with a value/g read</>}
         </dd>
       </dl>
     </>
@@ -251,13 +268,15 @@ export default function PlayersClient({ rows, tris, meta, initialSort, initialTe
 /**
  * One ranked player.
  *
- * Two lines, at every breakpoint — the offence/defence split is the reason
- * this page exists, so it renders on a phone rather than hiding behind `sm:`.
- * The second line is the split and the per-game counting line, in mono, under
- * the name: The Feed's own stacked-meta shape.
+ * Two or three lines, at every breakpoint — the offence/defence split is the
+ * reason this page exists, so it renders on a phone rather than hiding behind
+ * `sm:`. The second line is the split and the per-game counting line; a third
+ * (value/g, expected minutes, evidence) appears only for a bundle carrying
+ * the stack rating. In mono, under the name: The Feed's own stacked-meta
+ * shape.
  */
 function PlayerLine({ p, sort }: { p: RankedPlayer; sort: PlayerSort }) {
-  const primary = sort === "off" ? p.off : sort === "def" ? p.def : p.net;
+  const primary = sort === "off" ? p.off : sort === "def" ? p.def : sort === "value" ? p.valuePg : p.net;
   return (
     <li>
       <Link
@@ -302,6 +321,17 @@ function PlayerLine({ p, sort }: { p: RankedPlayer; sort: PlayerSort }) {
               p.apg != null &&
               ` · ${p.ppg.toFixed(1)}/${p.rpg.toFixed(1)}/${p.apg.toFixed(1)} in ${p.gp ?? 0} gp`}
           </span>
+          {(p.valuePg != null || p.evidence != null) && (
+            <span className="mt-0.5 block truncate font-mono text-[0.62rem] text-cream-dimmer">
+              {p.valuePg != null && (
+                <span className={sort === "value" ? "text-cream-dim" : undefined}>
+                  val/g {fmtSigned(p.valuePg, 2)}
+                </span>
+              )}
+              {p.expectedMinutes != null && ` (${p.expectedMinutes.toFixed(1)} exp min)`}
+              {p.evidence != null && ` · ${p.evidence}`}
+            </span>
+          )}
         </span>
 
         <span className="w-11 shrink-0 text-right font-mono text-[0.72rem] text-cream-dim">

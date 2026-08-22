@@ -158,6 +158,27 @@ export interface RawPlayer {
    */
   value_off_per36?: number | null;
   value_def_per36?: number | null;
+  /**
+   * The promoted 7-season "stack" rating (Seven Seasons of Tape), per-36 —
+   * a SEPARATE model from `value_per36`/`value_off_per36`/`value_def_per36`
+   * above, not a replacement for them. Same PLAYER sign convention as the
+   * flagship split: `stack_off_per36 + stack_def_per36 === stack_net_per36`,
+   * positive defence is GOOD defence.
+   *
+   * All six fields on this line are optional and travel together: the
+   * currently-committed bundle carries none of them, and everything that
+   * reads them must behave exactly as before when they're absent.
+   */
+  stack_net_per36?: number | null;
+  stack_off_per36?: number | null;
+  stack_def_per36?: number | null;
+  /** Expected minutes per game — the sender's own input to `value_pg`. */
+  expected_minutes?: number | null;
+  /** `stack_net_per36 * expected_minutes / 36` — points of team margin per
+   *  game vs. an average player. Shipped pre-computed, never derived here. */
+  value_pg?: number | null;
+  /** e.g. "27719 poss (7yr)" or "prior only" — what the stack rating rests on. */
+  evidence?: string | null;
 }
 
 export interface RawPlayersFile {
@@ -286,4 +307,12 @@ export interface PlayerRow {
   value_def_per36: number | null;
   game_rates: RawPlayerGameRates | null;
   per36: RawPlayerPer36 | null;
+  /** See RawPlayer — the promoted 7-season "stack" rating and its inputs.
+   *  All six null on a bundle that predates this milestone. */
+  stack_net_per36: number | null;
+  stack_off_per36: number | null;
+  stack_def_per36: number | null;
+  expected_minutes: number | null;
+  value_pg: number | null;
+  evidence: string | null;
 }

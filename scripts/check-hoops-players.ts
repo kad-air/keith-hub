@@ -40,7 +40,22 @@
 //      and def sorts actually disagree — the M4a "measured at 1/30th of
 //      physical scale" failure, where a channel looks tested and is inert.
 //
-//   5. THE SCOPE BOUNDARY. The wire contract declares `symmetric_off_def`,
+//   5. ABSENCE TOLERANCE. The stack rating (stack_net_per36/stack_off_per36/
+//      stack_def_per36/expected_minutes/value_pg/evidence) is SIX MORE
+//      optional per-player fields, following the exact precedent of
+//      value_off_per36/value_def_per36. The currently-committed bundle
+//      carries none of them — this pins that AND asserts defaultSortFor/
+//      rankPlayers behave exactly as they did before this milestone when
+//      they're absent.
+//
+//   6. THE SYNTHETIC STACK FIXTURE. The committed bundle has no stack data to
+//      test against yet, so a small hand-built fixture stands in: value_pg
+//      must equal stack_net_per36 * expected_minutes / 36 within 1e-6, the
+//      new "value" sort must order by it descending with nulls unranked at
+//      the tail, and the six fields must round-trip through the SAME real
+//      INSERT/schema check 3 already drives (extended, not duplicated).
+//
+//   7. THE SCOPE BOUNDARY. The wire contract declares `symmetric_off_def`,
 //      and the exporter ships its own note saying these two fields are for
 //      display only until a v2 `split_off_def` flip on BOTH sides. So
 //      pricing.ts and boxscore.ts must not have learned the field names.
@@ -50,12 +65,13 @@ import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
 import {
+  defaultSortFor,
   filterPlayers,
   playerRowsFromBundle,
   rankPlayers,
 } from "../lib/hoops/playervalue.ts";
 import type { RankedPlayer } from "../lib/hoops/playervalue.ts";
-import type { RawPlayersFile } from "../lib/hoops/types.ts";
+import type { PlayerRow, RawPlayersFile } from "../lib/hoops/types.ts";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const DATA = path.join(ROOT, "hoops-data");
@@ -228,8 +244,20 @@ function checkExternalAnchors(rows: ReturnType<typeof playerRowsFromBundle>): vo
 
 // ──────────────────────────────── 3. the split survives the trip to SQLite ──
 
+// Columns the six new stack-rating fields live under, everywhere they're
+// checked below — the real INSERT, the real DDL, and the round trip.
+const STACK_COLS = [
+  "stack_net_per36",
+  "stack_off_per36",
+  "stack_def_per36",
+  "expected_minutes",
+  "value_pg",
+  "evidence",
+] as const;
+
 async function checkReadModelRoundTrip(
   rows: ReturnType<typeof playerRowsFromBundle>,
+  syntheticStackRows: PlayerRow[],
 ): Promise<void> {
   const problemsAtEntry = problems.length;
 
@@ -250,11 +278,11 @@ async function checkReadModelRoundTrip(
     `lib/hoops/import.ts: the hoops_players INSERT names ${cols.length} columns but binds ` +
       `${placeholders.length} placeholders`,
   );
-  for (const c of ["value_off_per36", "value_def_per36"]) {
+  for (const c of ["value_off_per36", "value_def_per36", ...STACK_COLS]) {
     check(
       cols.includes(c),
-      `lib/hoops/import.ts: the hoops_players INSERT does not write ${c} — the off/def split ` +
-        `would be dropped on import again, which is the exact bug /hoops/players fixed.`,
+      `lib/hoops/import.ts: the hoops_players INSERT does not write ${c} — that field ` +
+        `would be dropped on import, the exact bug /hoops/players fixed for the off/def split.`,
     );
   }
 
@@ -272,7 +300,7 @@ async function checkReadModelRoundTrip(
     const schemaCols = (
       db.prepare(`PRAGMA table_info(hoops_players)`).all() as Array<{ name: string }>
     ).map((c) => c.name);
-    for (const c of ["value_off_per36", "value_def_per36"]) {
+    for (const c of ["value_off_per36", "value_def_per36", ...STACK_COLS]) {
       check(
         schemaCols.includes(c),
         `lib/db.ts: hoops_players has no ${c} column — the importer writes a column the schema ` +
@@ -293,23 +321,23 @@ async function checkReadModelRoundTrip(
     // stack trace. Stop here and let the reported problem be the output.
     if (problems.length > problemsAtEntry) return;
 
+    const ins = db.prepare(
+      `INSERT INTO hoops_players (${cols.join(", ")}) VALUES (${placeholders.join(", ")})`,
+    );
+    const bindValues = (p: PlayerRow): unknown[] =>
+      cols.map((c) => {
+        if (c === "tri") return p.tri;
+        if (c === "game_rates") return p.game_rates ? JSON.stringify(p.game_rates) : null;
+        if (c === "per36") return p.per36 ? JSON.stringify(p.per36) : null;
+        return (p as unknown as Record<string, unknown>)[c] ?? null;
+      });
+
     // Round-trip a real sample through the real projection and the real SQL.
     const sample = rows
       .filter((r) => r.value_off_per36 != null && r.value_def_per36 != null)
       .slice(0, 25);
-    const ins = db.prepare(
-      `INSERT INTO hoops_players (${cols.join(", ")}) VALUES (${placeholders.join(", ")})`,
-    );
-    for (const p of sample) {
-      ins.run(
-        ...cols.map((c) => {
-          if (c === "tri") return p.tri;
-          if (c === "game_rates") return p.game_rates ? JSON.stringify(p.game_rates) : null;
-          if (c === "per36") return p.per36 ? JSON.stringify(p.per36) : null;
-          return (p as unknown as Record<string, unknown>)[c] ?? null;
-        }),
-      );
-    }
+    for (const p of sample) ins.run(...bindValues(p));
+
     const back = db
       .prepare(
         `SELECT athlete_id, value_per36, value_off_per36, value_def_per36 FROM hoops_players`,
@@ -345,6 +373,45 @@ async function checkReadModelRoundTrip(
     notes.push(
       `read model: ${cols.length}-column INSERT agrees with the real DDL; ` +
         `${sample.length} players round-tripped with their split intact`,
+    );
+
+    // 🔴 The committed bundle carries none of the six stack fields yet, so the
+    // sample above round-trips them as uniformly null — which proves nothing
+    // about whether a REAL value survives the trip. Round-trip a synthetic
+    // fixture (built by checkStackFieldsSynthetic below) through this SAME
+    // real INSERT/schema instead, in the same DB session, so this is exactly
+    // the code path production runs rather than a copy of it.
+    check(syntheticStackRows.length > 0, "checkReadModelRoundTrip: no synthetic stack rows supplied");
+    for (const p of syntheticStackRows) ins.run(...bindValues(p));
+    const stackBack = db
+      .prepare(
+        `SELECT athlete_id, stack_net_per36, stack_off_per36, stack_def_per36, ` +
+          `expected_minutes, value_pg, evidence FROM hoops_players WHERE athlete_id >= 900000000`,
+      )
+      .all() as Array<
+      { athlete_id: number } & Record<(typeof STACK_COLS)[number], number | string | null>
+    >;
+    check(
+      stackBack.length === syntheticStackRows.length,
+      `stack round trip: wrote ${syntheticStackRows.length} synthetic players, read back ` +
+        `${stackBack.length}`,
+    );
+    const stackById = new Map(stackBack.map((r) => [r.athlete_id, r]));
+    let stackMismatched = 0;
+    for (const p of syntheticStackRows) {
+      const r = stackById.get(p.athlete_id);
+      if (!r || STACK_COLS.some((c) => r[c] !== (p as unknown as Record<string, unknown>)[c])) {
+        stackMismatched += 1;
+      }
+    }
+    check(
+      stackMismatched === 0,
+      `stack round trip: ${stackMismatched} of ${syntheticStackRows.length} synthetic players ` +
+        `came back with a different stack field than went in`,
+    );
+    notes.push(
+      `stack round trip: ${syntheticStackRows.length} synthetic players round-tripped all six ` +
+        `stack fields intact through the real INSERT and schema`,
     );
   } finally {
     try {
@@ -465,7 +532,183 @@ function checkRanking(rows: ReturnType<typeof playerRowsFromBundle>): void {
   notes.push(`net #1 ${named(rankable[0])} · #2 ${named(rankable[1])} · #3 ${named(rankable[2])}`);
 }
 
-// ────────────────────────────────────────────────── 5. the scope boundary ──
+// ─────────────────────────────────────── 5. absence tolerance (committed) ──
+
+/**
+ * The committed bundle predates the stack rating entirely. Everything that
+ * reads value_pg/expected_minutes/stack_*_per36/evidence must behave EXACTLY
+ * as it did before this milestone when a bundle carries none of them —
+ * defaultSortFor must still resolve to "net", and rankPlayers must still
+ * report every stack field as null rather than, say, coercing an absent
+ * number to 0 and silently ranking on it.
+ */
+function checkAbsenceTolerance(rows: ReturnType<typeof playerRowsFromBundle>): void {
+  const anyStack = rows.some(
+    (r) =>
+      r.stack_net_per36 != null ||
+      r.stack_off_per36 != null ||
+      r.stack_def_per36 != null ||
+      r.expected_minutes != null ||
+      r.value_pg != null ||
+      r.evidence != null,
+  );
+  check(
+    !anyStack,
+    "hoops_players.json: this committed bundle unexpectedly carries a stack-rating field — the " +
+      "absence-tolerance check no longer exercises the branch it's meant to. If the exporter now " +
+      "ships these fields for real, that's the milestone landing — update this check to assert " +
+      "coverage instead of absence.",
+  );
+
+  const fallback = defaultSortFor(rows);
+  check(
+    fallback === "net",
+    `defaultSortFor: a bundle with no value_pg reads should still default to "net", got "${fallback}"`,
+  );
+
+  const floor = paramsConstants?.absorption_rotation_floor_minutes ?? null;
+  const ranked = rankPlayers(rows, fallback, floor);
+  check(
+    ranked.every((p) => p.valuePg == null && p.expectedMinutes == null && p.evidence == null),
+    "rankPlayers: a player came back with a non-null stack field from a bundle that carries none",
+  );
+  notes.push(
+    `absence tolerance: committed bundle carries no stack fields, defaultSortFor -> "${fallback}", ` +
+      "ranking unchanged",
+  );
+}
+
+// ──────────────────────────────────── 6. the synthetic stack-rating fixture ──
+
+/**
+ * A tiny, self-contained fixture standing in for what hoops-sim's exporter
+ * will eventually ship. The committed bundle carries none of the six stack
+ * fields yet (checkAbsenceTolerance pins that), so this is the only way to
+ * exercise the "value" sort, the value_pg arithmetic contract, and the SQLite
+ * round trip before the real export lands. Reuses every other PlayerRow
+ * field from a real row as a base so this stays a minimal, realistic diff
+ * from a genuine player rather than a hand-rolled object missing fields a
+ * future PlayerRow addition would silently leave undefined here.
+ */
+function buildSyntheticStackRows(base: PlayerRow): PlayerRow[] {
+  const row = (over: Partial<PlayerRow>): PlayerRow => ({ ...base, ...over });
+  return [
+    row({
+      athlete_id: 900000001,
+      nba_player_id: null,
+      tri: "ATL",
+      name: "Synthetic Stack Alpha",
+      minutes: 30.0,
+      stack_net_per36: 6.0,
+      stack_off_per36: 4.5,
+      stack_def_per36: 1.5,
+      expected_minutes: 30.0,
+      value_pg: (6.0 * 30.0) / 36, // 5.0 — the top of the value sort
+      evidence: "27719 poss (7yr)",
+    }),
+    row({
+      athlete_id: 900000002,
+      nba_player_id: null,
+      tri: "ATL",
+      name: "Synthetic Stack Bravo",
+      minutes: 18.0,
+      stack_net_per36: 2.0,
+      stack_off_per36: -1.0,
+      stack_def_per36: 3.0,
+      expected_minutes: 18.0,
+      value_pg: (2.0 * 18.0) / 36, // 1.0
+      evidence: "prior only",
+    }),
+    row({
+      athlete_id: 900000003,
+      nba_player_id: null,
+      tri: "ATL",
+      name: "Synthetic Stack Charlie",
+      minutes: 12.0,
+      stack_net_per36: -4.0,
+      stack_off_per36: -3.0,
+      stack_def_per36: -1.0,
+      expected_minutes: 12.0,
+      value_pg: (-4.0 * 12.0) / 36, // -1.333... — negative but still ranked
+      evidence: "prior only",
+    }),
+    // No stack read at all, mixed into the same bundle as the three above —
+    // must sort last (unranked, rank 0) under "value", exactly like a
+    // no-history player already does under "net".
+    row({
+      athlete_id: 900000004,
+      nba_player_id: null,
+      tri: "ATL",
+      name: "Synthetic No Stack",
+      minutes: 8.0,
+      stack_net_per36: null,
+      stack_off_per36: null,
+      stack_def_per36: null,
+      expected_minutes: null,
+      value_pg: null,
+      evidence: null,
+    }),
+  ];
+}
+
+function checkStackFieldsSynthetic(fixture: PlayerRow[]): void {
+  // The arithmetic contract: value_pg == stack_net_per36 * expected_minutes / 36.
+  // Shipped pre-computed by hoops-sim, never derived on this side — this is
+  // what catches the sender's arithmetic drifting from what it's documented
+  // to be, the same "assert the contract, don't trust it" shape as
+  // checkSplitIdentity above.
+  const withInputs = fixture.filter(
+    (r) => r.stack_net_per36 != null && r.expected_minutes != null && r.value_pg != null,
+  );
+  check(
+    withInputs.length >= 3,
+    `synthetic stack fixture: expected at least 3 fully-populated rows, got ${withInputs.length}`,
+  );
+  for (const r of withInputs) {
+    const expected = ((r.stack_net_per36 as number) * (r.expected_minutes as number)) / 36;
+    check(
+      Math.abs(expected - (r.value_pg as number)) <= 1e-6,
+      `${r.name}: value_pg ${r.value_pg} does not equal stack_net_per36 * expected_minutes / 36 ` +
+        `(${expected}) within 1e-6`,
+    );
+  }
+
+  // The "value" sort orders by value_pg desc, with nulls unranked at the
+  // tail — the exact rankPlayers/sortKey mechanism the page uses, driven
+  // live rather than re-implemented here.
+  const ranked = rankPlayers(fixture, "value", null);
+  const rankable = ranked.filter((p) => p.rank > 0);
+  const unranked = ranked.filter((p) => p.rank === 0);
+  check(
+    rankable.length === withInputs.length,
+    `rankPlayers("value"): expected ${withInputs.length} rankable players, got ${rankable.length}`,
+  );
+  const descending = rankable.every(
+    (p, i) => i === 0 || (rankable[i - 1].valuePg as number) >= (p.valuePg as number),
+  );
+  check(descending, 'rankPlayers("value"): not in descending value_pg order');
+  check(
+    unranked.every((p) => p.valuePg == null),
+    'rankPlayers("value"): an unranked player has a non-null value_pg',
+  );
+  const firstUnranked = ranked.findIndex((p) => p.rank === 0);
+  check(
+    firstUnranked === -1 || firstUnranked === rankable.length,
+    'rankPlayers("value"): unranked players are not all at the tail',
+  );
+  check(
+    rankable[0]?.name === "Synthetic Stack Alpha",
+    `rankPlayers("value"): expected Synthetic Stack Alpha (value_pg 5.0) first, got ` +
+      `${rankable[0]?.name ?? "—"}`,
+  );
+
+  notes.push(
+    `stack fixture: value_pg arithmetic holds for ${withInputs.length} synthetic rows; ` +
+      `"value" sort orders them correctly with the no-read row unranked`,
+  );
+}
+
+// ────────────────────────────────────────────────── 7. the scope boundary ──
 
 function checkScopeBoundary(): void {
   // The wire contract declares `symmetric_off_def`, and hoops_players.json
@@ -492,7 +735,10 @@ async function main(): Promise<void> {
     const rows = playerRowsFromBundle(players);
     checkSplitIdentity(rows);
     checkExternalAnchors(rows);
-    await checkReadModelRoundTrip(rows);
+    checkAbsenceTolerance(rows);
+    const syntheticStackRows = buildSyntheticStackRows(rows[0]);
+    checkStackFieldsSynthetic(syntheticStackRows);
+    await checkReadModelRoundTrip(rows, syntheticStackRows);
     checkRanking(rows);
   }
   checkScopeBoundary();

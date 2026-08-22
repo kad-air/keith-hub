@@ -58,6 +58,12 @@ interface PlayerDbRow {
   value_def_per36: number | null;
   game_rates: string | null;
   per36: string | null;
+  stack_net_per36: number | null;
+  stack_off_per36: number | null;
+  stack_def_per36: number | null;
+  expected_minutes: number | null;
+  value_pg: number | null;
+  evidence: string | null;
 }
 
 function hydratePlayer(r: PlayerDbRow): PlayerRow {
@@ -76,6 +82,14 @@ function hydratePlayer(r: PlayerDbRow): PlayerRow {
     value_def_per36: r.value_def_per36 ?? null,
     game_rates: r.game_rates ? (JSON.parse(r.game_rates) as RawPlayerGameRates) : null,
     per36: r.per36 ? (JSON.parse(r.per36) as RawPlayerPer36) : null,
+    // Same `?? null` reasoning: a DB row written before the stack-rating
+    // migration reads undefined for all six until the ALTER TABLE lands.
+    stack_net_per36: r.stack_net_per36 ?? null,
+    stack_off_per36: r.stack_off_per36 ?? null,
+    stack_def_per36: r.stack_def_per36 ?? null,
+    expected_minutes: r.expected_minutes ?? null,
+    value_pg: r.value_pg ?? null,
+    evidence: r.evidence ?? null,
   };
 }
 
