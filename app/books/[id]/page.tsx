@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getBook } from "@/lib/books/store";
 import { listProgress } from "@/lib/books/kosync";
 import { getBookHistory } from "@/lib/books/statsData";
+import { getBookHealth } from "@/lib/books/healthData";
 import BookDetailClient from "@/components/BookDetailClient";
 
 export const dynamic = "force-dynamic";
@@ -33,6 +34,7 @@ export default function BookDetailPage({ params }: { params: { id: string } }) {
           : null
       }
       history={getBookHistory(book.partialMd5)}
+      health={getBookHealth(book.id)}
     />
   );
 }

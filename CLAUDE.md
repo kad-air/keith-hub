@@ -30,6 +30,7 @@ npm run check:books:metadata     # Books metadata gate: an edit never touches th
 npm run check:books:stats        # Books reading-stats gate: word count vs. Python, real DST calendar, sync survives a stats failure (same)
 npm run check:books:drm          # Books DRM gate: an ADEPT epub is decrypted-or-refused (never the 34-page ghost); a clean epub passes through byte-identical (same)
 npm run check:books:acsm         # Books ACSM gate: the ADEPT canonicalisation + signature match an independent Python implementation byte-for-byte (same)
+npm run check:books:health       # Books file-health gate: clean epub → zero findings, each damage pattern → exactly its finding, health caching never touches the file (same)
 ```
 
 No test suite. `npm run build` is the type-check gate — always run it before pushing. It is
@@ -517,12 +518,44 @@ message saying to download it again, because that is the actual fix.
   re-serialised ACSM and all. The riskiest part of the port was therefore confirmed **without
   spending a fulfilment token**, which is the technique to reuse if this ever needs reworking.
 
+**File health — the checker card on `/books/[id]`.** A pure read over the stored bytes
+(`lib/books/health.ts`) that answers "is this file actually a working book?": leftover DRM
+(reuses `adept.ts`'s `inspectEncryption`, so font obfuscation is never flagged — the two can't
+disagree), ciphertext spine documents (🔴 the retroactive sweep for ghosts ingested BEFORE the
+upload-time DRM gate existed — the "34-page" failure with no error surface), no/sparse text,
+mojibake (UTF-8 read as Latin-1), artifact characters (U+FFFD / controls / private-use),
+OCR damage (digit-in-word, split hyphens, scanno tokens — the English-only signals are gated on
+`dc:language`), and a missing/sparse TOC (flagged only on books ≥10k words; a short story doesn't
+need chapters). Findings are red/amber/info, each a MEASUREMENT with its number, and one red
+cause suppresses the downstream noise (a ciphertext book doesn't also nag about covers). Healthy
+renders as one quiet line, deliberately — no dashboard. 🔴 **Diagnoses, never repairs**: the only
+remedy the card ever offers is "replace the file, which is a new book with a fresh sync
+identity" (byte identity, §4). The report is cached in `books.health_json` — computed at ingest,
+lazily backfilled on the next detail-page open (the `word_count` pattern), and the JSON carries
+its own `version` so a `HEALTH_VERSION` bump re-checks every book instead of trusting stale
+verdicts. A **Re-check** button on the card (`POST /api/books/[id]/health` →
+`recheckBookHealth`) recomputes on demand over a current cache — already-uploaded books need no
+button for their FIRST check (the lazy backfill covers it); this is for re-running at will, and
+it goes through the same single write path so every guarantee below holds. 🔴 `getBookHealth`
+(`healthData.ts`) is a THIRD write path into `books` (after
+`updateBook` and `setToRead`) and carries the same guarantee: one DB column, file/sha256/
+partial_md5 untouched, `updated_at` not bumped; a missing file reports red but is NEVER cached
+(a volume restore could bring the bytes back). **The gate: `npm run check:books:health`** (in
+`prebuild`): a clean in-memory multi-chapter book must produce ZERO findings, each damage
+perturbation exactly its finding and nothing else, plus the read-only persistence assertions in
+the `check:books:metadata` mold. Stated limit (in the script header): fixtures are self-built —
+no real OCR-mangled or DRM'd book can live in the repo — and the thresholds are judgment calls
+pinned only at their boundaries. Falsification-tested **8/8** (ADEPT suppression removed,
+font-obf flagged as DRM, markup test weakened to the `<` canary, language gate removed, TOC
+length gate removed, health check rewriting the file, stale version served, file-missing cached).
+
 **Key files:** `lib/books/partialMd5.ts` (the hash — do not touch), `epubMeta.ts` (regex OPF
 extraction; failure falls back to filename, never fails ingest), `normalize.ts` (author/series
 rules + `SERIES_OVERRIDES`, ported from `~/Stump/organize-books.py`), `store.ts` (CRUD + ingest,
 content-addressed dedupe on sha256), `opds.ts` (pure XML emitters), `kosync.ts` (protocol
 semantics), `apiKey.ts` (the credential gate); `store.ts` also carries `listToRead`/`setToRead` for
-the To Read shelf. DRM path: `prepare.ts` (the upload boundary — `prepareForIngest`, the ONE place
+the To Read shelf. File health: `health.ts` (**pure** — the checker) + `healthData.ts` (the cached
+read / lazy-backfill edge). DRM path: `prepare.ts` (the upload boundary — `prepareForIngest`, the ONE place
 `.acsm`/`.epub` converge and the ghost-book guard lives), `adept.ts` (detect + strip ADEPT),
 `zip.ts` (deterministic OCF-conforming writer, since `adm-zip` can't emit one), `adeptKey.ts`
 (which key decrypts, activation-over-env), `acsm.ts` (ADEPT fulfilment over the network),

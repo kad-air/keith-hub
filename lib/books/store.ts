@@ -9,6 +9,7 @@ import { partialMd5 } from "./partialMd5.ts";
 import { extractEpubMeta } from "./epubMeta.ts";
 import { countEpubWords } from "./epubText.ts";
 import { normalizeMeta } from "./normalize.ts";
+import { checkEpubHealth } from "./health.ts";
 
 // File storage: data/books/<id>/book.epub (+ cover.<ext>). One directory per
 // book id — ids are stable under metadata edits, unlike titles.
@@ -168,12 +169,23 @@ export function ingestBook(bytes: Buffer, fileName: string): IngestResult {
   // ingest (BOOKS_PLAN §8).
   const wordCount = countEpubWords(bytes) ?? 0;
 
+  // File health at ingest, while the bytes are already in hand. Failure is
+  // benign like metadata and word count — healthData.ts rebuilds a missing
+  // report lazily from the stored file, so nothing here may fail the ingest
+  // (BOOKS_PLAN §8).
+  let healthJson: string | null = null;
+  try {
+    healthJson = JSON.stringify({ ...checkEpubHealth(bytes), checkedAt: now });
+  } catch {
+    healthJson = null;
+  }
+
   try {
     db.prepare(
       `INSERT INTO books (id, title, author, series, series_index, language, description,
                           file_name, file_size, sha256, partial_md5, cover_name, word_count,
-                          added_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                          health_json, added_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
       id,
       meta.title,
@@ -188,6 +200,7 @@ export function ingestBook(bytes: Buffer, fileName: string): IngestResult {
       partialMd5(bytes),
       coverName,
       wordCount,
+      healthJson,
       now,
       now,
     );

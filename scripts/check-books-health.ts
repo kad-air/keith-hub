@@ -1,0 +1,541 @@
+#!/usr/bin/env node
+//
+// 🔴 THE EPUB HEALTH-CHECKER GATE.
+//
+//   npm run check:books:health   (standalone)
+//   npm run build                (via prebuild)
+//
+// Two halves:
+//
+//  A. The pure checker (lib/books/health.ts) over in-memory fixture epubs —
+//     a clean multi-chapter book must produce ZERO findings, and each
+//     perturbation (mojibake, replacement characters, ciphertext spine docs,
+//     leftover ADEPT encryption, missing TOC, OCR damage, no text, broken
+//     structure, not-a-zip) must produce EXACTLY its finding and nothing
+//     else. Exactness matters both ways: a check that stays silent on damage
+//     is vacuous, and a checker that piles extra findings onto one cause
+//     would train the reader to ignore the section. The font-obfuscation
+//     case is here as the standing false-positive invitation: it reuses
+//     encryption.xml and is NOT DRM (adept.ts's line, which health.ts
+//     reuses rather than reimplements).
+//
+//  B. The persistence path (lib/books/healthData.ts + ingest) in a temp cwd:
+//     🔴 computing and caching a report writes ONE DB column and never
+//     touches the stored file, its sha256 or its partial_md5 — the same
+//     guarantee check:books:metadata pins for updateBook, asserted here
+//     because getBookHealth is a THIRD write path into the books table and
+//     the other gates say nothing about it. Plus: ingest stamps a report,
+//     a HEALTH_VERSION mismatch recomputes, and a missing file reports red
+//     WITHOUT being cached (a restore could bring the bytes back).
+//
+// 🔴 What this gate cannot see, stated plainly: the fixtures are self-built,
+// so it proves the checker recognises the damage patterns as CONSTRUCTED
+// here — no real OCR-mangled or DRM-ghosted book can live in the repo (the
+// one would be junk to ship, the other a rights problem). The thresholds
+// (TOC_MATTERS_WORDS, the amber floors) are judgment calls pinned only at
+// the boundaries exercised below; recalibrating them against the real
+// library is legitimate and means updating both sides.
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { createHash } from "node:crypto";
+import AdmZip from "adm-zip";
+
+import { checkEpubHealth, HEALTH_VERSION, type EpubHealth } from "../lib/books/health.ts";
+
+let failures = 0;
+function assert(cond: boolean, label: string): void {
+  if (cond) console.log(`  ✓ ${label}`);
+  else {
+    failures++;
+    console.error(`  ✗ ${label}`);
+  }
+}
+
+const chr = String.fromCharCode;
+const codesOf = (r: EpubHealth) => r.findings.map((f) => f.code).sort();
+const eq = (a: string[], b: string[]) =>
+  a.length === b.length && a.every((v, i) => v === b[i]);
+
+function assertCodes(r: EpubHealth, want: string[], label: string): void {
+  const got = codesOf(r);
+  assert(eq(got, [...want].sort()), `${label} (got: [${got.join(", ")}])`);
+}
+
+// Deterministic high-entropy bytes — Math.random is banned from gates for the
+// same reason it's banned from workflows: a probabilistic assertion isn't one.
+function noiseBytes(seed: string, size: number): Buffer {
+  const out = Buffer.allocUnsafe(size);
+  let block = createHash("sha256").update(seed).digest();
+  let off = 0;
+  while (off < size) {
+    block = createHash("sha256").update(block).digest();
+    block.copy(out, off, 0, Math.min(32, size - off));
+    off += 32;
+  }
+  return out;
+}
+
+// --- fixture builder ------------------------------------------------------
+
+// 17 words, chosen to trip nothing: no digits, no hyphens, no scanno tokens,
+// no single letters outside a/I.
+const SENTENCE =
+  "The keeper counted the gulls along the harbour wall and wrote the number in the ledger before breakfast.";
+const prose = (reps: number) => (SENTENCE + " ").repeat(reps);
+const stdBody = (i: number) => `<h1>Chapter ${i}</h1><p>${prose(120)}</p>`;
+
+type BuildOpts = {
+  chapterBodies?: string[];
+  language?: string | null;
+  cover?: boolean;
+  /** navPoint count for toc.ncx; null = no NCX. */
+  ncxPoints?: number | null;
+  /** anchor count for an EPUB3 nav doc; null = no nav doc. */
+  navPoints?: number | null;
+  encryptionXml?: string | null;
+  rightsXml?: string | null;
+  extraEntries?: Array<{ name: string; data: Buffer }>;
+  /** 1-based chapter index → raw bytes stored under that chapter's name. */
+  rawChapterBytes?: Map<number, Buffer>;
+};
+
+function buildEpub(opts: BuildOpts = {}): Buffer {
+  const bodies = opts.chapterBodies ?? [1, 2, 3, 4, 5, 6].map(stdBody);
+  const language = opts.language === undefined ? "en" : opts.language;
+  const cover = opts.cover ?? true;
+  const ncxPoints = opts.ncxPoints === undefined ? bodies.length : opts.ncxPoints;
+  const navPoints = opts.navPoints ?? null;
+
+  const zip = new AdmZip();
+  zip.addFile("mimetype", Buffer.from("application/epub+zip"));
+  zip.addFile(
+    "META-INF/container.xml",
+    Buffer.from(`<?xml version="1.0"?>
+<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+  <rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles>
+</container>`),
+  );
+
+  const manifest: string[] = [];
+  const spine: string[] = [];
+  bodies.forEach((_, i) => {
+    manifest.push(
+      `<item id="ch${i + 1}" href="ch${i + 1}.xhtml" media-type="application/xhtml+xml"/>`,
+    );
+    spine.push(`<itemref idref="ch${i + 1}"/>`);
+  });
+  if (ncxPoints != null) {
+    manifest.push(`<item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>`);
+  }
+  if (navPoints != null) {
+    manifest.push(
+      `<item id="nav" href="nav.xhtml" properties="nav" media-type="application/xhtml+xml"/>`,
+    );
+  }
+  if (cover) {
+    manifest.push(
+      `<item id="cover-img" href="cover.jpg" media-type="image/jpeg" properties="cover-image"/>`,
+    );
+  }
+
+  const opf = `<?xml version="1.0"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="id">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:title>Health Check Fixture</dc:title>
+    <dc:creator>Nobody</dc:creator>
+    ${language != null ? `<dc:language>${language}</dc:language>` : ""}
+    <dc:identifier id="id">health-check</dc:identifier>
+  </metadata>
+  <manifest>${manifest.join("\n    ")}</manifest>
+  <spine${ncxPoints != null ? ` toc="ncx"` : ""}>${spine.join("")}</spine>
+</package>`;
+  zip.addFile("OEBPS/content.opf", Buffer.from(opf));
+
+  bodies.forEach((body, i) => {
+    const raw = opts.rawChapterBytes?.get(i + 1);
+    const data =
+      raw ??
+      Buffer.from(
+        `<html xmlns="http://www.w3.org/1999/xhtml"><head><title>c</title></head><body>${body}</body></html>`,
+      );
+    zip.addFile(`OEBPS/ch${i + 1}.xhtml`, data);
+  });
+
+  if (ncxPoints != null) {
+    const points = Array.from(
+      { length: ncxPoints },
+      (_, i) =>
+        `<navPoint id="n${i + 1}" playOrder="${i + 1}"><navLabel><text>Chapter ${i + 1}</text></navLabel><content src="ch${Math.min(i + 1, bodies.length)}.xhtml"/></navPoint>`,
+    ).join("");
+    zip.addFile(
+      "OEBPS/toc.ncx",
+      Buffer.from(
+        `<?xml version="1.0"?><ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1"><navMap>${points}</navMap></ncx>`,
+      ),
+    );
+  }
+  if (navPoints != null) {
+    const anchors = Array.from(
+      { length: navPoints },
+      (_, i) => `<li><a href="ch${Math.min(i + 1, bodies.length)}.xhtml">Chapter ${i + 1}</a></li>`,
+    ).join("");
+    zip.addFile(
+      "OEBPS/nav.xhtml",
+      Buffer.from(
+        `<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops"><head><title>n</title></head><body><nav epub:type="toc"><ol>${anchors}</ol></nav></body></html>`,
+      ),
+    );
+  }
+  if (cover) {
+    zip.addFile("OEBPS/cover.jpg", Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), noiseBytes("cover", 256)]));
+  }
+  if (opts.encryptionXml) {
+    zip.addFile("META-INF/encryption.xml", Buffer.from(opts.encryptionXml));
+  }
+  if (opts.rightsXml) {
+    zip.addFile("META-INF/rights.xml", Buffer.from(opts.rightsXml));
+  }
+  for (const e of opts.extraEntries ?? []) zip.addFile(e.name, e.data);
+  return zip.toBuffer();
+}
+
+const ADEPT_ENC_XML = (uri: string) => `<?xml version="1.0"?>
+<encryption xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+  <EncryptedData xmlns="http://www.w3.org/2001/04/xmlenc#">
+    <EncryptionMethod Algorithm="http://www.w3.org/2001/04/xmlenc#aes128-cbc"/>
+    <CipherData><CipherReference URI="${uri}"/></CipherData>
+  </EncryptedData>
+</encryption>`;
+const RIGHTS_XML = `<adept:rights xmlns:adept="http://ns.adobe.com/adept"><licenseToken><encryptedKey>QUJDREVGRw==</encryptedKey></licenseToken></adept:rights>`;
+const FONT_ENC_XML = `<?xml version="1.0"?>
+<encryption xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+  <EncryptedData xmlns="http://www.w3.org/2001/04/xmlenc#">
+    <EncryptionMethod Algorithm="http://www.idpf.org/2008/embedding"/>
+    <CipherData><CipherReference URI="OEBPS/fonts/f.otf"/></CipherData>
+  </EncryptedData>
+</encryption>`;
+const UNKNOWN_ENC_XML = `<?xml version="1.0"?>
+<encryption xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+  <EncryptedData xmlns="http://www.w3.org/2001/04/xmlenc#">
+    <EncryptionMethod Algorithm="http://example.org/private-scheme"/>
+    <CipherData><CipherReference URI="OEBPS/ch1.xhtml"/></CipherData>
+  </EncryptedData>
+</encryption>`;
+
+console.log("check:books:health — the epub health checker\n");
+
+// ---------------------------------------------------------------------------
+// A. The pure checker
+// ---------------------------------------------------------------------------
+console.log("clean book:");
+{
+  const r = checkEpubHealth(buildEpub());
+  assertCodes(r, [], "🔴 a clean multi-chapter book produces ZERO findings");
+  assert(r.stats.spineDocs === 6, `spine documents counted (got ${r.stats.spineDocs})`);
+  assert(r.stats.tocEntries === 6, `NCX TOC entries counted (got ${r.stats.tocEntries})`);
+  assert(
+    r.stats.words > 12000 && r.stats.words < 13000,
+    `word count in range (got ${r.stats.words})`,
+  );
+  assert(r.version === HEALTH_VERSION, "report carries HEALTH_VERSION");
+}
+{
+  const r = checkEpubHealth(buildEpub({ ncxPoints: null, navPoints: 6 }));
+  assertCodes(r, [], "EPUB3 nav-only book is clean too");
+  assert(r.stats.tocEntries === 6, `nav TOC entries counted (got ${r.stats.tocEntries})`);
+}
+
+console.log("\nencryption (the ghost's cause):");
+{
+  const r = checkEpubHealth(
+    buildEpub({ encryptionXml: ADEPT_ENC_XML("OEBPS/ch1.xhtml"), rightsXml: RIGHTS_XML }),
+  );
+  assertCodes(r, ["encrypted-content"], "🔴 leftover ADEPT encryption is a red finding");
+  assert(r.findings[0].severity === "red", "…at red severity");
+}
+{
+  const cipher = new Map([[1, noiseBytes("adept-ciphertext", 8192)]]);
+  const r = checkEpubHealth(
+    buildEpub({
+      encryptionXml: ADEPT_ENC_XML("OEBPS/ch1.xhtml"),
+      rightsXml: RIGHTS_XML,
+      rawChapterBytes: cipher,
+    }),
+  );
+  assertCodes(
+    r,
+    ["encrypted-content"],
+    "🔴 ADEPT + actual ciphertext is ONE finding — the unreadable docs are the same fact, not a second problem",
+  );
+}
+{
+  const r = checkEpubHealth(buildEpub({ encryptionXml: UNKNOWN_ENC_XML }));
+  assertCodes(r, ["encrypted-content"], "an unrecognised encryption scheme is red too");
+}
+{
+  const r = checkEpubHealth(
+    buildEpub({
+      encryptionXml: FONT_ENC_XML,
+      extraEntries: [{ name: "OEBPS/fonts/f.otf", data: noiseBytes("font", 2048) }],
+    }),
+  );
+  assertCodes(r, [], "🔴 font obfuscation is NOT flagged — it is not DRM (adept.ts's line)");
+}
+
+console.log("\nciphertext without encryption.xml (the pre-gate ghost):");
+{
+  const cipher = new Map([[2, noiseBytes("bare-ciphertext", 8192)]]);
+  const r = checkEpubHealth(buildEpub({ rawChapterBytes: cipher }));
+  assertCodes(r, ["unreadable-spine-docs"], "🔴 a ciphertext spine doc is a red finding");
+  assert(
+    /spine documents? 2\b/.test(r.findings[0].detail ?? ""),
+    "…and the detail names the affected document",
+  );
+}
+
+console.log("\ntext volume:");
+{
+  const bodies = Array.from({ length: 6 }, () => "<p></p>");
+  const r = checkEpubHealth(buildEpub({ chapterBodies: bodies }));
+  assertCodes(r, ["no-text"], "🔴 no prose at all is red — and suppresses the info-tier noise");
+}
+{
+  const r = checkEpubHealth(buildEpub({ chapterBodies: [`<p>${prose(20)}</p>`], ncxPoints: 1 }));
+  assertCodes(r, ["sparse-text"], "a few hundred words is amber sparse-text");
+}
+
+console.log("\ncharacter damage:");
+const MOJI_RSQUO = chr(0xe2) + chr(0x20ac) + chr(0x2122); // "â€™"
+const MOJI_EACUTE = chr(0xc3) + chr(0xa9); // "Ã©"
+{
+  const bodies = [1, 2, 3, 4, 5, 6].map(stdBody);
+  bodies[1] += `<p>${(MOJI_RSQUO + " ").repeat(12)}${(MOJI_EACUTE + " ").repeat(8)}</p>`;
+  const r = checkEpubHealth(buildEpub({ chapterBodies: bodies }));
+  assertCodes(r, ["mojibake"], "🔴 mojibake (UTF-8 read as Latin-1) is caught");
+  assert(r.findings[0].severity === "amber", "…20 occurrences is amber");
+  assert(/20 mojibake/.test(r.findings[0].summary), "…and the summary carries the count");
+}
+const FFFD = chr(0xfffd);
+{
+  const bodies = [1, 2, 3, 4, 5, 6].map(stdBody);
+  bodies[2] += `<p>${(FFFD + "word ").repeat(12)}</p>`;
+  const r = checkEpubHealth(buildEpub({ chapterBodies: bodies }));
+  assertCodes(r, ["artifact-characters"], "🔴 replacement characters are caught");
+  assert(r.findings[0].severity === "amber", "…12 of them is amber");
+  assert(
+    /spine document 3/.test(r.findings[0].detail ?? ""),
+    "…and the detail localises the worst document",
+  );
+}
+{
+  const bodies = [1, 2, 3, 4, 5, 6].map(stdBody);
+  bodies[0] += `<p>${(FFFD + "word ").repeat(3)}</p>`;
+  const r = checkEpubHealth(buildEpub({ chapterBodies: bodies }));
+  assertCodes(r, ["artifact-characters"], "a handful of artifacts still reports");
+  assert(r.findings[0].severity === "info", "…but only at info severity");
+}
+
+console.log("\nOCR damage:");
+{
+  const bodies = [1, 2, 3, 4, 5, 6].map(stdBody);
+  bodies[3] += `<p>${"tbe ".repeat(20)}${"h0use ".repeat(15)}${"ex- ample ".repeat(20)}</p>`;
+  const r = checkEpubHealth(buildEpub({ chapterBodies: bodies }));
+  assertCodes(r, ["ocr-artifacts"], "🔴 scannos + digit-in-word + split hyphens are caught");
+  assert(r.findings[0].severity === "amber", "…at amber severity for this density");
+}
+{
+  const bodies = [1, 2, 3, 4, 5, 6].map(stdBody);
+  bodies[0] += `<p>${"tbe ".repeat(30)}</p>`;
+  const en = checkEpubHealth(buildEpub({ chapterBodies: bodies, language: "en" }));
+  const fr = checkEpubHealth(buildEpub({ chapterBodies: bodies, language: "fr" }));
+  assertCodes(en, ["ocr-artifacts"], "English scannos fire on an English book");
+  assertCodes(fr, [], "🔴 …and are language-gated: the same tokens on a French book do not");
+}
+
+console.log("\nchapters:");
+{
+  const r = checkEpubHealth(buildEpub({ ncxPoints: null }));
+  assertCodes(r, ["no-toc"], "🔴 a full-length book with no TOC is flagged");
+}
+{
+  const one = [`<h1>All of it</h1><p>${prose(700)}</p>`];
+  const r = checkEpubHealth(buildEpub({ chapterBodies: one, ncxPoints: null }));
+  assertCodes(r, ["no-toc"], "single-file spine with no TOC is flagged");
+  assert(
+    /single file/i.test(r.findings[0].detail ?? ""),
+    "…and the detail says the whole book is one file",
+  );
+}
+{
+  const r = checkEpubHealth(buildEpub({ ncxPoints: 2 }));
+  assertCodes(r, ["sparse-toc"], "a 2-entry TOC on a 12k-word book is flagged");
+}
+{
+  const short = [1, 2].map((i) => `<h1>Chapter ${i}</h1><p>${prose(90)}</p>`);
+  const r = checkEpubHealth(buildEpub({ chapterBodies: short, ncxPoints: null }));
+  assertCodes(r, [], "🔴 a short book with no TOC is NOT nagged — chapters matter at length");
+}
+
+console.log("\ninfo tier:");
+{
+  const r = checkEpubHealth(buildEpub({ cover: false }));
+  assertCodes(r, ["no-cover"], "missing cover is an info line");
+  assert(r.findings[0].severity === "info", "…at info severity");
+}
+{
+  const r = checkEpubHealth(buildEpub({ language: null }));
+  assertCodes(r, ["no-language"], "missing dc:language is an info line");
+}
+{
+  const r = checkEpubHealth(
+    buildEpub({ extraEntries: [{ name: "OEBPS/big.jpg", data: noiseBytes("big", 6 * 1024 * 1024) }] }),
+  );
+  assertCodes(r, ["image-heavy"], "a 6MB file for 12k words is an info line");
+}
+
+console.log("\nbroken containers:");
+{
+  const r = checkEpubHealth(Buffer.from("this is not a zip archive at all"));
+  assertCodes(r, ["unreadable-zip"], "🔴 a non-zip is one red finding");
+}
+{
+  const zip = new AdmZip();
+  zip.addFile("mimetype", Buffer.from("application/epub+zip"));
+  zip.addFile(
+    "loose.xhtml",
+    Buffer.from(
+      `<html xmlns="http://www.w3.org/1999/xhtml"><head><title>c</title></head><body><p>${prose(120)}</p></body></html>`,
+    ),
+  );
+  const r = checkEpubHealth(zip.toBuffer());
+  assertCodes(
+    r,
+    ["unreadable-structure"],
+    "🔴 a missing container/OPF is ONE red finding, not a pile of downstream noise",
+  );
+}
+
+// ---------------------------------------------------------------------------
+// B. The persistence path — temp cwd, real modules, real DB
+// ---------------------------------------------------------------------------
+console.log("\npersistence (temp cwd):");
+
+const repoRoot = path.dirname(new URL(import.meta.url).pathname) + "/..";
+const fixtureBytes = fs.readFileSync(path.resolve(repoRoot, "books-fixture/fixture.epub"));
+
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "books-health-check-"));
+process.chdir(tmp);
+
+const { ingestBook, bookFilePath } = await import("../lib/books/store.ts");
+const { getBookHealth, recheckBookHealth } = await import("../lib/books/healthData.ts");
+const { getDb } = await import("../lib/db.ts");
+
+const sha256 = (b: Buffer) => createHash("sha256").update(b).digest("hex");
+const db = getDb();
+const rowOf = (id: string) =>
+  db
+    .prepare(`SELECT health_json, sha256, partial_md5, updated_at FROM books WHERE id = ?`)
+    .get(id) as { health_json: string | null; sha256: string; partial_md5: string; updated_at: string };
+
+const { book } = ingestBook(fixtureBytes, "The Fixture Book.epub");
+{
+  const row = rowOf(book.id);
+  assert(row.health_json != null, "ingest stamps a health report at insert time");
+  assert(
+    row.health_json != null && (JSON.parse(row.health_json) as EpubHealth).version === HEALTH_VERSION,
+    "…carrying HEALTH_VERSION",
+  );
+}
+
+// The read-only guarantee, against a forced recompute.
+db.prepare(`UPDATE books SET health_json = NULL WHERE id = ?`).run(book.id);
+const fileBefore = sha256(fs.readFileSync(bookFilePath(book)));
+const mtimeBefore = fs.statSync(bookFilePath(book)).mtimeMs;
+const rowBefore = rowOf(book.id);
+
+const recomputed = getBookHealth(book.id);
+{
+  assert(recomputed != null && recomputed.version === HEALTH_VERSION, "a NULL cache recomputes");
+  const row = rowOf(book.id);
+  assert(row.health_json != null, "…and caches the result");
+  assert(
+    sha256(fs.readFileSync(bookFilePath(book))) === fileBefore,
+    "🔴 the stored epub is byte-identical after a health check",
+  );
+  assert(
+    fs.statSync(bookFilePath(book)).mtimeMs === mtimeBefore,
+    "the file was not even rewritten",
+  );
+  assert(row.sha256 === rowBefore.sha256, "🔴 books.sha256 unchanged");
+  assert(row.partial_md5 === rowBefore.partial_md5, "🔴 books.partial_md5 (the sync key) unchanged");
+  assert(row.updated_at === rowBefore.updated_at, "updated_at not bumped — a cache fill is not an edit");
+}
+
+// A stale version is not trusted.
+db.prepare(`UPDATE books SET health_json = ? WHERE id = ?`).run(
+  JSON.stringify({ version: 0, checkedAt: "2020-01-01T00:00:00Z", findings: [], stats: { spineDocs: 0, words: 0, tocEntries: null } }),
+  book.id,
+);
+{
+  const r = getBookHealth(book.id);
+  assert(
+    r != null && r.version === HEALTH_VERSION,
+    "🔴 a cached report from an older HEALTH_VERSION is recomputed, not served",
+  );
+}
+
+// The Re-check button's path recomputes even over a fresh-version cache —
+// getBookHealth serving the cache and recheckBookHealth replacing it are the
+// two halves that make the button meaningful.
+db.prepare(`UPDATE books SET health_json = ? WHERE id = ?`).run(
+  JSON.stringify({
+    version: HEALTH_VERSION,
+    checkedAt: "1999-01-01T00:00:00Z",
+    findings: [],
+    stats: { spineDocs: 0, words: 0, tocEntries: null },
+  }),
+  book.id,
+);
+{
+  const served = getBookHealth(book.id);
+  assert(
+    served != null && served.checkedAt === "1999-01-01T00:00:00Z",
+    "a current-version cache is served by the normal read",
+  );
+  const r = recheckBookHealth(book.id);
+  assert(
+    r != null && r.checkedAt !== "1999-01-01T00:00:00Z",
+    "🔴 recheckBookHealth recomputes over a fresh-version cache — the Re-check button is not a no-op",
+  );
+  const row = rowOf(book.id);
+  assert(
+    row.health_json != null &&
+      (JSON.parse(row.health_json) as { checkedAt: string }).checkedAt !== "1999-01-01T00:00:00Z",
+    "…and stores the new report",
+  );
+}
+
+// A missing file reports red but is never cached.
+db.prepare(`UPDATE books SET health_json = NULL WHERE id = ?`).run(book.id);
+fs.rmSync(bookFilePath(book));
+{
+  const r = getBookHealth(book.id);
+  assert(
+    r != null && r.findings.length === 1 && r.findings[0].code === "file-missing",
+    "a missing file reports file-missing",
+  );
+  assert(
+    rowOf(book.id).health_json == null,
+    "🔴 …and is NOT cached — a volume restore must not be outlived by a stale verdict",
+  );
+}
+
+process.chdir(os.tmpdir());
+fs.rmSync(tmp, { recursive: true, force: true });
+
+if (failures > 0) {
+  console.error(`\ncheck:books:health FAILED — ${failures} assertion(s)`);
+  process.exit(1);
+}
+console.log("\ncheck:books:health OK");

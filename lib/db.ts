@@ -390,6 +390,17 @@ export function getDb(): Database.Database {
   addBookCol("to_read", `to_read INTEGER NOT NULL DEFAULT 0`);
   addBookCol("to_read_at", `to_read_at TEXT`);
 
+  // books.health_json: the file-health report rendered on /books/[id] — a
+  // pure read over the stored bytes (lib/books/health.ts), cached here so the
+  // detail page doesn't re-unzip the epub on every open. Computed at ingest
+  // for new uploads, lazily on the next detail-page open for existing books
+  // (the word_count backfill pattern). NULL = never checked. The JSON carries
+  // its own `version`; a HEALTH_VERSION bump invalidates every cached report
+  // so improved checks re-run instead of trusting a stale verdict forever.
+  // Writing it never touches the file, its sha256 or its partial_md5 — same
+  // guarantee as a metadata edit, asserted by check:books:health.
+  addBookCol("health_json", `health_json TEXT`);
+
   // hoops_params: added for kad-air/keith-hub#73 (the Mac Mini push endpoint).
   // A pre-existing prod DB has hoops_params from before these columns existed
   // — CREATE TABLE IF NOT EXISTS above never alters it, so bolt them on here.
