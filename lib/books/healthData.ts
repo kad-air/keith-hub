@@ -28,9 +28,6 @@ export type BookHealth = EpubHealth & { checkedAt: string };
  *
  * `updated_at` is deliberately not bumped — that column means "the metadata
  * was edited", and a cache fill is invisible housekeeping.
- *
- * A missing file reports red but is NEVER cached: a volume restore could
- * bring the bytes back, and a cached "file missing" would outlive the repair.
  */
 export function getBookHealth(bookId: string): BookHealth | null {
   const db = getDb();
@@ -47,7 +44,26 @@ export function getBookHealth(bookId: string): BookHealth | null {
       // Unparseable cache — fall through and recompute.
     }
   }
+  return computeAndStore(bookId);
+}
 
+/**
+ * The Re-check button's path: compute fresh from the stored bytes even when
+ * a current-version report is already cached. Same single write path as the
+ * lazy fill (computeAndStore), so every guarantee above holds here too —
+ * the button can be pressed on a book mid-read without consequence.
+ */
+export function recheckBookHealth(bookId: string): BookHealth | null {
+  const exists = getDb().prepare(`SELECT id FROM books WHERE id = ?`).get(bookId);
+  if (!exists) return null;
+  return computeAndStore(bookId);
+}
+
+/**
+ * A missing file reports red but is NEVER cached: a volume restore could
+ * bring the bytes back, and a cached "file missing" would outlive the repair.
+ */
+function computeAndStore(bookId: string): BookHealth {
   let bytes: Buffer;
   try {
     bytes = fs.readFileSync(bookFilePath({ id: bookId }));
@@ -67,6 +83,8 @@ export function getBookHealth(bookId: string): BookHealth | null {
   }
 
   const report: BookHealth = { ...checkEpubHealth(bytes), checkedAt: new Date().toISOString() };
-  db.prepare(`UPDATE books SET health_json = ? WHERE id = ?`).run(JSON.stringify(report), bookId);
+  getDb()
+    .prepare(`UPDATE books SET health_json = ? WHERE id = ?`)
+    .run(JSON.stringify(report), bookId);
   return report;
 }

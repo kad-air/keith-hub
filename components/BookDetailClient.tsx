@@ -92,6 +92,30 @@ export default function BookDetailClient({ book, sync, history, health }: Props)
     }
   }
 
+  // --- File health ---
+  // Rendered from local state so the Re-check button can swap in the fresh
+  // report without a round trip through router.refresh().
+  const [healthState, setHealthState] = useState(health);
+  const [checking, setChecking] = useState(false);
+  const [healthError, setHealthError] = useState<string | null>(null);
+
+  async function recheckHealth() {
+    setChecking(true);
+    setHealthError(null);
+    try {
+      const res = await fetch(`/api/books/${book.id}/health`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? `HTTP ${res.status}`);
+      setHealthState(data.health);
+    } catch (err) {
+      setHealthError(
+        `Health check failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    } finally {
+      setChecking(false);
+    }
+  }
+
   // --- Catch up (audiobook → device position) ---
   const [phrase, setPhrase] = useState("");
   const [searching, setSearching] = useState(false);
@@ -446,30 +470,40 @@ export default function BookDetailClient({ book, sync, history, health }: Props)
         </section>
       )}
 
-      {health && (
+      {healthState && (
         <section className="mt-4 border border-rule/60 bg-ink-raised/40 px-4 py-3 text-sm">
           <div className="flex items-baseline justify-between gap-3">
             <h2 className="font-mono text-[0.7rem] uppercase tracking-kicker text-cream-dimmer">
               File health
             </h2>
-            <span className="font-mono text-[0.65rem] text-cream-dimmer">
-              checked {new Date(health.checkedAt).toLocaleDateString()}
+            <span className="flex items-baseline gap-3 font-mono text-[0.65rem]">
+              <span className="text-cream-dimmer">
+                checked {new Date(healthState.checkedAt).toLocaleDateString()}
+              </span>
+              <button
+                onClick={recheckHealth}
+                disabled={checking}
+                className="uppercase tracking-kicker text-cream-dim hover:text-accent disabled:opacity-50"
+              >
+                {checking ? "Checking…" : "Re-check"}
+              </button>
             </span>
           </div>
 
-          {health.findings.length === 0 ? (
+          {healthState.findings.length === 0 ? (
             // Healthy stays quiet: one line, no dashboard.
             <p className="mt-2 text-cream-dim">
-              No issues found — {health.stats.spineDocs.toLocaleString()} spine document
-              {health.stats.spineDocs === 1 ? "" : "s"},{" "}
-              {health.stats.words.toLocaleString()} words
-              {health.stats.tocEntries != null && `, ${health.stats.tocEntries} chapters in the TOC`}
+              No issues found — {healthState.stats.spineDocs.toLocaleString()} spine document
+              {healthState.stats.spineDocs === 1 ? "" : "s"},{" "}
+              {healthState.stats.words.toLocaleString()} words
+              {healthState.stats.tocEntries != null &&
+                `, ${healthState.stats.tocEntries} chapters in the TOC`}
               .
             </p>
           ) : (
             <>
               <ul className="mt-2 space-y-2">
-                {health.findings.map((f) => (
+                {healthState.findings.map((f) => (
                   <li key={f.code}>
                     <p className="text-[0.8rem] leading-relaxed text-cream-dim">
                       <span
@@ -487,7 +521,7 @@ export default function BookDetailClient({ book, sync, history, health }: Props)
                   </li>
                 ))}
               </ul>
-              {health.findings.some((f) => f.severity !== "info") && (
+              {healthState.findings.some((f) => f.severity !== "info") && (
                 <p className="mt-3 border-t border-rule/40 pt-2 text-[0.7rem] leading-relaxed text-cream-dimmer">
                   Fixing any of this means replacing the file with a better copy — which is a new
                   book with a fresh sync identity, because devices identify a book by its exact
@@ -495,6 +529,9 @@ export default function BookDetailClient({ book, sync, history, health }: Props)
                 </p>
               )}
             </>
+          )}
+          {healthError && (
+            <p className="mt-2 font-mono text-[0.7rem] text-red-400">{healthError}</p>
           )}
         </section>
       )}

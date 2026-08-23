@@ -428,7 +428,7 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "books-health-check-"));
 process.chdir(tmp);
 
 const { ingestBook, bookFilePath } = await import("../lib/books/store.ts");
-const { getBookHealth } = await import("../lib/books/healthData.ts");
+const { getBookHealth, recheckBookHealth } = await import("../lib/books/healthData.ts");
 const { getDb } = await import("../lib/db.ts");
 
 const sha256 = (b: Buffer) => createHash("sha256").update(b).digest("hex");
@@ -482,6 +482,37 @@ db.prepare(`UPDATE books SET health_json = ? WHERE id = ?`).run(
   assert(
     r != null && r.version === HEALTH_VERSION,
     "🔴 a cached report from an older HEALTH_VERSION is recomputed, not served",
+  );
+}
+
+// The Re-check button's path recomputes even over a fresh-version cache —
+// getBookHealth serving the cache and recheckBookHealth replacing it are the
+// two halves that make the button meaningful.
+db.prepare(`UPDATE books SET health_json = ? WHERE id = ?`).run(
+  JSON.stringify({
+    version: HEALTH_VERSION,
+    checkedAt: "1999-01-01T00:00:00Z",
+    findings: [],
+    stats: { spineDocs: 0, words: 0, tocEntries: null },
+  }),
+  book.id,
+);
+{
+  const served = getBookHealth(book.id);
+  assert(
+    served != null && served.checkedAt === "1999-01-01T00:00:00Z",
+    "a current-version cache is served by the normal read",
+  );
+  const r = recheckBookHealth(book.id);
+  assert(
+    r != null && r.checkedAt !== "1999-01-01T00:00:00Z",
+    "🔴 recheckBookHealth recomputes over a fresh-version cache — the Re-check button is not a no-op",
+  );
+  const row = rowOf(book.id);
+  assert(
+    row.health_json != null &&
+      (JSON.parse(row.health_json) as { checkedAt: string }).checkedAt !== "1999-01-01T00:00:00Z",
+    "…and stores the new report",
   );
 }
 

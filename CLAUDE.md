@@ -533,7 +533,11 @@ remedy the card ever offers is "replace the file, which is a new book with a fre
 identity" (byte identity, §4). The report is cached in `books.health_json` — computed at ingest,
 lazily backfilled on the next detail-page open (the `word_count` pattern), and the JSON carries
 its own `version` so a `HEALTH_VERSION` bump re-checks every book instead of trusting stale
-verdicts. 🔴 `getBookHealth` (`healthData.ts`) is a THIRD write path into `books` (after
+verdicts. A **Re-check** button on the card (`POST /api/books/[id]/health` →
+`recheckBookHealth`) recomputes on demand over a current cache — already-uploaded books need no
+button for their FIRST check (the lazy backfill covers it); this is for re-running at will, and
+it goes through the same single write path so every guarantee below holds. 🔴 `getBookHealth`
+(`healthData.ts`) is a THIRD write path into `books` (after
 `updateBook` and `setToRead`) and carries the same guarantee: one DB column, file/sha256/
 partial_md5 untouched, `updated_at` not bumped; a missing file reports red but is NEVER cached
 (a volume restore could bring the bytes back). **The gate: `npm run check:books:health`** (in
