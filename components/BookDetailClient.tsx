@@ -5,10 +5,18 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Book } from "@/lib/books/store";
 import type { BookHistory } from "@/lib/books/statsData";
+import type { BookHealth } from "@/lib/books/healthData";
+import type { HealthSeverity } from "@/lib/books/health";
 import type { PhraseSearchResult, PositionCandidate } from "@/lib/books/xpointer";
 import { finishLabel } from "@/lib/books/stats";
 
 const finishDate = (days: number) => finishLabel(days, Date.now());
+
+const SEVERITY_STYLE: Record<HealthSeverity, { label: string; className: string }> = {
+  red: { label: "broken", className: "text-red-400" },
+  amber: { label: "degraded", className: "text-amber-400" },
+  info: { label: "note", className: "text-cream-dim" },
+};
 
 type Props = {
   book: Book;
@@ -19,9 +27,10 @@ type Props = {
     timestamp: number;
   } | null;
   history: BookHistory | null;
+  health: BookHealth | null;
 };
 
-export default function BookDetailClient({ book, sync, history }: Props) {
+export default function BookDetailClient({ book, sync, history, health }: Props) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -433,6 +442,59 @@ export default function BookDetailClient({ book, sync, history }: Props) {
                 ? `${history.pagesLeft.toLocaleString()} pages to go`
                 : "No page count for this file"}
             </p>
+          )}
+        </section>
+      )}
+
+      {health && (
+        <section className="mt-4 border border-rule/60 bg-ink-raised/40 px-4 py-3 text-sm">
+          <div className="flex items-baseline justify-between gap-3">
+            <h2 className="font-mono text-[0.7rem] uppercase tracking-kicker text-cream-dimmer">
+              File health
+            </h2>
+            <span className="font-mono text-[0.65rem] text-cream-dimmer">
+              checked {new Date(health.checkedAt).toLocaleDateString()}
+            </span>
+          </div>
+
+          {health.findings.length === 0 ? (
+            // Healthy stays quiet: one line, no dashboard.
+            <p className="mt-2 text-cream-dim">
+              No issues found — {health.stats.spineDocs.toLocaleString()} spine document
+              {health.stats.spineDocs === 1 ? "" : "s"},{" "}
+              {health.stats.words.toLocaleString()} words
+              {health.stats.tocEntries != null && `, ${health.stats.tocEntries} chapters in the TOC`}
+              .
+            </p>
+          ) : (
+            <>
+              <ul className="mt-2 space-y-2">
+                {health.findings.map((f) => (
+                  <li key={f.code}>
+                    <p className="text-[0.8rem] leading-relaxed text-cream-dim">
+                      <span
+                        className={`mr-2 font-mono text-[0.6rem] uppercase tracking-kicker ${SEVERITY_STYLE[f.severity].className}`}
+                      >
+                        {SEVERITY_STYLE[f.severity].label}
+                      </span>
+                      {f.summary}
+                    </p>
+                    {f.detail && (
+                      <p className="mt-0.5 pl-4 text-[0.7rem] leading-relaxed text-cream-dimmer">
+                        {f.detail}
+                      </p>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              {health.findings.some((f) => f.severity !== "info") && (
+                <p className="mt-3 border-t border-rule/40 pt-2 text-[0.7rem] leading-relaxed text-cream-dimmer">
+                  Fixing any of this means replacing the file with a better copy — which is a new
+                  book with a fresh sync identity, because devices identify a book by its exact
+                  bytes.
+                </p>
+              )}
+            </>
           )}
         </section>
       )}
