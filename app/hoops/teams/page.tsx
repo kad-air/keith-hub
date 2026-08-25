@@ -5,6 +5,8 @@ import TeamsClient from "@/components/hoops/TeamsClient";
 import {
   DEFAULT_RATING_MODE,
   getHoopsMeta,
+  getLeagueFormSummaries,
+  getResultsWindow,
   getRosterSizes,
   getTeamRows,
   isRatingMode,
@@ -31,6 +33,8 @@ export default function HoopsTeamsPage({
         <TeamsClient
           rows={rows}
           rosterSizes={sizes}
+          form={getLeagueFormSummaries()}
+          resultsWindow={getResultsWindow()}
           meta={meta}
           initialMode={initialMode}
         />

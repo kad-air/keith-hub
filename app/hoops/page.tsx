@@ -4,6 +4,7 @@ import MatchupClient from "@/components/hoops/MatchupClient";
 import {
   DEFAULT_RATING_MODE,
   getHoopsMeta,
+  getLeagueFormSummaries,
   getTeamRows,
   isRatingMode,
 } from "@/lib/hoops/queries";
@@ -47,6 +48,7 @@ export default function HoopsMatchupPage({
       <HoopsNav active="matchup" />
       <MatchupClient
         teams={rows}
+        form={getLeagueFormSummaries()}
         meta={meta}
         defaultHome={defaultHome}
         defaultAway={defaultAway === defaultHome ? (ranked[2]?.tri ?? "BOS") : defaultAway}
