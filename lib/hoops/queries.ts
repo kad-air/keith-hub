@@ -160,6 +160,153 @@ export function getDecodedParams(): DecodedParams {
   return params;
 }
 
+// ---------------------------------------------------------------------------
+// Recent results + closing lines
+//
+// 🔴 hoops_results is a WINDOW, not a season: the exporter ships the most
+// recent 200 completed regular-season games league-wide (~13 per team), so
+// nothing derived from it may be labelled a "record" — it is recent FORM, and
+// the UI says which dates the window covers. hoops_lines DOES cover the whole
+// season (closing market lines keyed by game_id), so a game inside the window
+// can be joined to its line; a null just means no line survived for that game.
+// ---------------------------------------------------------------------------
+
+interface ResultDbRow {
+  game_id: string;
+  date: string;
+  home: string;
+  away: string;
+  home_score: number;
+  away_score: number;
+  neutral_site: number;
+  home_spread: number | null;
+}
+
+/** One completed game from THIS team's point of view. */
+export interface TeamFormGame {
+  gameId: string;
+  date: string;
+  opp: string;
+  /** True when the team was at home (a neutral-site game reads as neither —
+   *  see `neutral`). */
+  home: boolean;
+  neutral: boolean;
+  teamScore: number;
+  oppScore: number;
+  won: boolean;
+  /** teamScore − oppScore, so a win is positive. */
+  margin: number;
+  /** Closing spread from THIS team's side (negative = this team favoured).
+   *  Null when no line is stored for the game. */
+  closingSpread: number | null;
+  /** Against that line: did the team cover it? Null when there is no line. */
+  ats: "covered" | "missed" | "push" | null;
+}
+
+export interface TeamForm {
+  /** Newest first. */
+  games: TeamFormGame[];
+  wins: number;
+  losses: number;
+  /** The results window's own date span — the honesty label for "recent". */
+  windowFrom: string | null;
+  windowTo: string | null;
+}
+
+function toFormGame(r: ResultDbRow, tri: string): TeamFormGame {
+  const home = r.home === tri;
+  const teamScore = home ? r.home_score : r.away_score;
+  const oppScore = home ? r.away_score : r.home_score;
+  const margin = teamScore - oppScore;
+  const closingSpread =
+    r.home_spread == null ? null : home ? r.home_spread : -r.home_spread;
+  let ats: TeamFormGame["ats"] = null;
+  if (closingSpread != null) {
+    const vsLine = margin + closingSpread;
+    ats = vsLine > 0 ? "covered" : vsLine < 0 ? "missed" : "push";
+  }
+  return {
+    gameId: r.game_id,
+    date: r.date,
+    opp: home ? r.away : r.home,
+    home,
+    neutral: r.neutral_site === 1,
+    teamScore,
+    oppScore,
+    won: margin > 0,
+    margin,
+    closingSpread,
+    ats,
+  };
+}
+
+/** Every game in the results window involving one team, with its closing line. */
+export function getTeamForm(tri: string): TeamForm {
+  ensureHoopsImport();
+  const t = tri.toUpperCase();
+  const rows = getDb()
+    .prepare(
+      `SELECT r.game_id, r.date, r.home, r.away, r.home_score, r.away_score,
+              r.neutral_site, l.home_spread
+       FROM hoops_results r
+       LEFT JOIN hoops_lines l ON l.game_id = r.game_id
+       WHERE r.home = ? OR r.away = ?
+       ORDER BY r.date DESC, r.game_id DESC`,
+    )
+    .all(t, t) as ResultDbRow[];
+  const games = rows.map((r) => toFormGame(r, t));
+  const window = getResultsWindow();
+  return {
+    games,
+    wins: games.filter((g) => g.won).length,
+    losses: games.filter((g) => !g.won).length,
+    windowFrom: window?.from ?? null,
+    windowTo: window?.to ?? null,
+  };
+}
+
+/** The results window's date span — the label that keeps "recent form"
+ *  honest wherever it renders. */
+export function getResultsWindow(): { from: string; to: string } | null {
+  ensureHoopsImport();
+  const row = getDb()
+    .prepare(`SELECT MIN(date) AS lo, MAX(date) AS hi FROM hoops_results`)
+    .get() as { lo: string | null; hi: string | null };
+  return row.lo && row.hi ? { from: row.lo, to: row.hi } : null;
+}
+
+/** Wins–losses over each team's most recent games in the window (up to `lastN`).
+ *  A plain Record so it serialises cleanly into client-component props. */
+export interface FormSummary {
+  wins: number;
+  losses: number;
+  /** How many games the summary actually covers — the window can hold fewer
+   *  than `lastN` for a team, and the label must not pretend otherwise. */
+  n: number;
+}
+
+export function getLeagueFormSummaries(lastN = 10): Record<string, FormSummary> {
+  ensureHoopsImport();
+  const rows = getDb()
+    .prepare(
+      `SELECT game_id, date, home, away, home_score, away_score, neutral_site,
+              NULL AS home_spread
+       FROM hoops_results ORDER BY date DESC, game_id DESC`,
+    )
+    .all() as ResultDbRow[];
+  const out: Record<string, FormSummary> = {};
+  for (const r of rows) {
+    for (const tri of [r.home, r.away]) {
+      const s = (out[tri] ??= { wins: 0, losses: 0, n: 0 });
+      if (s.n >= lastN) continue;
+      s.n += 1;
+      if (toFormGame(r, tri).won) s.wins += 1;
+      else s.losses += 1;
+    }
+  }
+  return out;
+}
+
 export function getRosterSizes(): Map<string, number> {
   ensureHoopsImport();
   const rows = getDb()

@@ -11,13 +11,15 @@ import {
 import MarginHistogram from "@/components/hoops/MarginHistogram";
 import type { BoxscoreResult } from "@/lib/hoops/boxscore";
 import type { SimSummary } from "@/lib/hoops/matchup";
-import type { HoopsMeta } from "@/lib/hoops/queries";
-import { MODE_COPY, fmtSigned, teamName } from "@/lib/hoops/rating";
-import type { RatingMode, TeamRow } from "@/lib/hoops/types";
+import type { FormSummary, HoopsMeta } from "@/lib/hoops/queries";
+import { MODE_COPY, fmtSigned, rankTeams, teamName } from "@/lib/hoops/rating";
+import type { RankedTeam, RatingMode, TeamRow } from "@/lib/hoops/types";
 import { RATING_MODES } from "@/lib/hoops/types";
 
 interface Props {
   teams: TeamRow[];
+  /** Recent form per team (up to last 10 in the results window). */
+  form: Record<string, FormSummary>;
   meta: HoopsMeta;
   defaultHome: string;
   defaultAway: string;
@@ -34,6 +36,7 @@ const N_SIMS = 1000;
 
 export default function MatchupClient({
   teams,
+  form,
   meta,
   defaultHome,
   defaultAway,
@@ -49,6 +52,13 @@ export default function MatchupClient({
   const seq = useRef(0);
 
   const tris = useMemo(() => teams.map((t) => t.tri).sort(), [teams]);
+  // Rank + net under the CURRENT rating mode, so the context line under each
+  // picker answers "who did I just pick?" before anything is simulated.
+  const rankedByTri = useMemo(() => {
+    const map: Record<string, RankedTeam> = {};
+    for (const t of rankTeams(teams, mode)) map[t.tri] = t;
+    return map;
+  }, [teams, mode]);
   const sameTeam = home === away;
 
   const sim = useCallback(async () => {
@@ -86,6 +96,14 @@ export default function MatchupClient({
           {neutral ? "vs" : "@"}
         </span>
         <TeamPicker label="Home" value={home} onChange={setHome} options={tris} />
+      </div>
+
+      {/* Who did I just pick? Rank, net, and recent form under the current
+          rating mode — the context the sim's answer gets read against. */}
+      <div className="mt-1.5 grid grid-cols-[1fr_auto_1fr] gap-2">
+        <TeamContext team={rankedByTri[away]} form={form[away]} />
+        <span />
+        <TeamContext team={rankedByTri[home]} form={form[home]} align="right" />
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -162,6 +180,20 @@ export default function MatchupClient({
               <p className="font-mono text-sm text-cream-dim">
                 {summary.away} {((1 - summary.homeWinProb) * 100).toFixed(1)}%
               </p>
+            </div>
+
+            {/* The same number as a length. The labels above carry identity;
+                the tick is the coin-flip line, so lopsidedness reads at a
+                glance. Home is the accented side, matching the histogram. */}
+            <div className="relative mt-2" aria-hidden>
+              <div className="flex h-2 gap-0.5">
+                <div
+                  className="bg-cat-hoops/70"
+                  style={{ width: `${(summary.homeWinProb * 100).toFixed(2)}%` }}
+                />
+                <div className="flex-1 bg-cream-dimmer/40" />
+              </div>
+              <span className="absolute -top-0.5 left-1/2 h-3 w-px -translate-x-1/2 bg-cream-dimmer" />
             </div>
 
             <dl className="mt-4 grid grid-cols-3 gap-2 border-y border-rule/60 py-3">
@@ -278,6 +310,33 @@ function TeamPicker({
         ))}
       </select>
     </label>
+  );
+}
+
+function TeamContext({
+  team,
+  form,
+  align,
+}: {
+  team: RankedTeam | undefined;
+  form: FormSummary | undefined;
+  align?: "right";
+}) {
+  if (!team) return <span />;
+  return (
+    <p
+      className={`truncate font-mono text-[0.62rem] uppercase tracking-kicker text-cream-dimmer ${
+        align === "right" ? "text-right" : ""
+      }`}
+    >
+      #{team.rank} · <span className="text-cream-dim">{fmtSigned(team.net)}</span> net
+      {form && form.n > 0 && (
+        <>
+          {" · "}
+          {form.wins}–{form.losses} last {form.n}
+        </>
+      )}
+    </p>
   );
 }
 

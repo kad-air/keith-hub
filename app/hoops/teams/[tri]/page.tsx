@@ -6,9 +6,11 @@ import {
   DEFAULT_RATING_MODE,
   getHoopsMeta,
   getRoster,
+  getTeamForm,
   getTeamRows,
   isRatingMode,
 } from "@/lib/hoops/queries";
+import type { TeamFormGame } from "@/lib/hoops/queries";
 import { MODE_COPY, fmtSigned, rankTeams, teamName } from "@/lib/hoops/rating";
 import { RATING_MODES } from "@/lib/hoops/types";
 
@@ -36,6 +38,7 @@ export default function HoopsTeamPage({
   );
   const team = byMode[mode];
   const roster = getRoster(tri);
+  const form = getTeamForm(tri);
   const meta = getHoopsMeta();
 
   const totalMinutes = roster.reduce((s, p) => s + p.minutes, 0);
@@ -104,6 +107,67 @@ export default function HoopsTeamPage({
         </p>
       )}
 
+      {/* ── Recent games ── the results window, previously imported and never
+          rendered anywhere. Form, finals, and the closing market line each
+          game actually closed at. */}
+      {form.games.length > 0 && (
+        <section className="mt-8">
+          <h3 className="font-display text-lg text-cream">Recent games</h3>
+          <p className="mt-1 text-xs text-cream-dimmer">
+            <span className="font-mono text-cream-dim">
+              {form.wins}–{form.losses}
+            </span>{" "}
+            over the bundle&rsquo;s results window ({form.windowFrom} to {form.windowTo} — the last
+            200 completed games league-wide, not the full season) · scoring{" "}
+            <span className="font-mono text-cream-dim">
+              {avg(form.games.map((g) => g.teamScore))}
+            </span>{" "}
+            and allowing{" "}
+            <span className="font-mono text-cream-dim">
+              {avg(form.games.map((g) => g.oppScore))}
+            </span>{" "}
+            a game.
+          </p>
+
+          {/* Oldest → newest, so the strip reads left-to-right like a season.
+              The letter carries the outcome; color only reinforces it. */}
+          <div className="mt-3 flex flex-wrap gap-1" aria-label="Recent form, oldest to newest">
+            {[...form.games].reverse().map((g) => (
+              <span
+                key={g.gameId}
+                title={`${fmtDate(g.date)} ${g.home ? "vs" : "at"} ${g.opp} ${g.teamScore}–${g.oppScore}`}
+                className={`flex h-6 w-6 items-center justify-center border font-mono text-[0.65rem] ${
+                  g.won
+                    ? "border-cat-hoops/70 bg-cat-hoops/10 text-cat-hoops"
+                    : "border-rule/60 text-cream-dimmer"
+                }`}
+              >
+                {g.won ? "W" : "L"}
+              </span>
+            ))}
+          </div>
+
+          <ol className="mt-4">
+            {form.games.map((g) => (
+              <GameRow key={g.gameId} g={g} />
+            ))}
+          </ol>
+
+          <p className="mt-3 text-xs text-cream-dimmer">
+            <em>Line</em> is the closing market spread from {tri}&rsquo;s side — negative means the
+            market had {tri} favoured. <em>Covered</em> / <em>missed</em> is the final margin
+            against that number, which is a check on the market, not on this model.
+          </p>
+        </section>
+      )}
+
+      <Link
+        href={`/hoops?home=${tri}`}
+        className="mt-6 block border border-cat-hoops/60 px-4 py-3 text-center font-mono text-[0.68rem] uppercase tracking-kicker text-cat-hoops transition-colors hover:bg-cat-hoops/10"
+      >
+        Sim a matchup with {tri} →
+      </Link>
+
       <h3 className="mt-8 font-display text-lg text-cream">Roster</h3>
       <p className="mt-1 text-xs text-cream-dimmer">
         {roster.length} players · {totalMinutes.toFixed(0)} raw expected minutes. Value is
@@ -120,29 +184,35 @@ export default function HoopsTeamPage({
           <span className="w-24 text-right max-sm:hidden">Pts/Reb/Ast</span>
         </li>
         {roster.map((p) => (
-          <li
-            key={p.athlete_id}
-            className="flex items-baseline gap-2 border-b border-rule/40 py-2"
-          >
-            <span className="flex-1 truncate font-display text-cream">{p.name}</span>
-            <span className="w-12 text-right font-mono text-[0.72rem] text-cream-dim">
-              {p.minutes.toFixed(1)}
+          <li key={p.athlete_id} className="border-b border-rule/40 py-2">
+            <span className="flex items-baseline gap-2">
+              <span className="min-w-0 flex-1 truncate font-display text-cream">{p.name}</span>
+              <span className="w-12 shrink-0 text-right font-mono text-[0.72rem] text-cream-dim">
+                {p.minutes.toFixed(1)}
+              </span>
+              <span
+                className={`w-14 shrink-0 text-right font-mono text-sm ${
+                  p.value_per36 == null
+                    ? "text-cream-dimmer"
+                    : p.value_per36 >= 0
+                      ? "text-cream"
+                      : "text-cream-dim"
+                }`}
+              >
+                {p.value_per36 == null ? "—" : fmtSigned(p.value_per36, 2)}
+              </span>
+              <span className="w-24 shrink-0 text-right font-mono text-[0.68rem] text-cream-dimmer max-sm:hidden">
+                {p.game_rates
+                  ? `${p.game_rates.pts.toFixed(1)}/${p.game_rates.reb.toFixed(1)}/${p.game_rates.ast.toFixed(1)}`
+                  : "no games"}
+              </span>
             </span>
-            <span
-              className={`w-14 text-right font-mono text-sm ${
-                p.value_per36 == null
-                  ? "text-cream-dimmer"
-                  : p.value_per36 >= 0
-                    ? "text-cream"
-                    : "text-cream-dim"
-              }`}
-            >
-              {p.value_per36 == null ? "—" : fmtSigned(p.value_per36, 2)}
-            </span>
-            <span className="w-24 text-right font-mono text-[0.68rem] text-cream-dimmer max-sm:hidden">
+            {/* Same counting line, folded under the name on a phone rather
+                than dropped — nothing renders on desktop that a phone hides. */}
+            <span className="mt-0.5 block truncate font-mono text-[0.62rem] text-cream-dimmer sm:hidden">
               {p.game_rates
-                ? `${p.game_rates.pts.toFixed(1)}/${p.game_rates.reb.toFixed(1)}/${p.game_rates.ast.toFixed(1)}`
-                : "no games"}
+                ? `${p.game_rates.pts.toFixed(1)}/${p.game_rates.reb.toFixed(1)}/${p.game_rates.ast.toFixed(1)} in ${p.game_rates.gp} gp`
+                : "no games this season"}
             </span>
           </li>
         ))}
@@ -153,5 +223,48 @@ export default function HoopsTeamPage({
         game — the simulator renormalises at allocation time, so these will not sum to 240.
       </p>
     </article>
+  );
+}
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** "2026-04-12" → "Apr 12". String maths on purpose — a Date round-trip
+ *  through the server's timezone can shift the calendar day. */
+function fmtDate(iso: string): string {
+  const [, m, d] = iso.split("-").map(Number);
+  return `${MONTHS[(m ?? 1) - 1]} ${d}`;
+}
+
+function avg(xs: number[]): string {
+  return (xs.reduce((s, x) => s + x, 0) / Math.max(1, xs.length)).toFixed(1);
+}
+
+/** One completed game: result on the left, the market's number on the right. */
+function GameRow({ g }: { g: TeamFormGame }) {
+  return (
+    <li className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 border-b border-rule/40 py-1.5">
+      <span className="w-12 shrink-0 font-mono text-[0.65rem] text-cream-dimmer">
+        {fmtDate(g.date)}
+      </span>
+      <span className="min-w-0 flex-1 truncate">
+        <span className="font-mono text-[0.62rem] uppercase tracking-kicker text-cream-dimmer">
+          {g.neutral ? "n" : g.home ? "vs" : "at"}
+        </span>{" "}
+        <span className="font-mono text-[0.72rem] text-cat-hoops">{g.opp}</span>{" "}
+        <span className={`font-mono text-[0.72rem] ${g.won ? "text-cream" : "text-cream-dim"}`}>
+          {g.won ? "W" : "L"} {g.teamScore}–{g.oppScore}
+        </span>
+      </span>
+      <span className="shrink-0 text-right font-mono text-[0.65rem] text-cream-dimmer">
+        {fmtSigned(g.margin, 0)}
+        {g.closingSpread != null && (
+          <>
+            {" · line "}
+            {fmtSigned(g.closingSpread, 1)}{" "}
+            <span className={g.ats === "covered" ? "text-cat-hoops" : undefined}>{g.ats}</span>
+          </>
+        )}
+      </span>
+    </li>
   );
 }
