@@ -736,7 +736,13 @@ lives in the pure module beside the coordinates **so the gate can assert things 
 picture** — no two coins overlapping (a coin under another can never be tapped, so it can never be
 ticked), no sequence label written across the row it names (the bug the first draft shipped with:
 "RINCEWIND NOVELS" straight through The Colour of Magic — invisible to every other assertion and
-caught only by a screenshot), nothing off-canvas at Fit.
+caught only by a screenshot), nothing off-canvas at Fit, **every arrowhead landing outside the coin
+it points at**, and **every margin label keeping room for its arrow into the row** (`seqShift`'s
+whole purpose — shrink it and no collision assertion notices, but the renderer silently stops
+drawing all nine arrows). 🔴 `labelCharWidth` is MEASURED in the browser and rounded up to the worst
+case: Almendra SC runs 16.1 units/char on "Civilizations" and 21.8 on "Novels", so character count
+is a poor proxy for proportional type and the bound has to hold for the widest ratio — the canvas
+carries the extra left margin that costs.
 
 **The gate: `npm run check:books:discworld`** (in `prebuild`). Anchored on things true
 independently of the code: publication order and years written down a second time in the check
@@ -748,12 +754,63 @@ order, a 42nd novel, the sync overwriting a less-advanced mark, a cleared mark p
 the match keys reordered, an unplaceable book silently dropped, stacked coins, an absent book
 reading as finished, 0% counted as reading, a re-opened book un-reading itself, the threshold
 re-declared, a dangling edge, the module losing its purity, companions counted as novels) plus the
-two geometric ones. 🔴 The 15th probe — **reordering the match keys — initially went UNDETECTED**,
+two geometric ones. Re-run after the parchment restyle at **18/18**, and two of the three new
+geometric assertions FAILED that run and had to be strengthened: the arrow check recomputed the
+renderer's formula (so it verified itself, and its shaft-length assertion was true by construction
+of the clamp), and `seqShift: 0` is not a collision at all. The fixes are `trimEdge()` moving into
+the shared pure module, an assertion about arrowheads landing outside their target coin, and one
+about the label arrows still being drawn. 🔴 The 15th probe — **reordering the match keys — initially went UNDETECTED**,
 because the mangled title matches nothing and falls through to the index either way; only a row
 whose two keys point at *different* nodes pins the choice. It also surfaced an overclaim in the
 source comment, since what is load-bearing is having both keys, not their order.
 
-**Key files:** `lib/books/discworld.ts` (**pure** — the graph, `LAYOUT`, `matchLibrary`,
+##### The parchment restyle
+
+Styled to a Claude Design handoff (`Discworld Map.dc.html`, project *Discworld design improvements*)
+after the printed guide's own look: glossy rimmed coins with a hand-pinned wobble, red arrows
+trimmed to the rims with arrowheads, wax-seal read badges, gold studs for hand marks, Almendra /
+Almendra SC display type, and a shield-swatch key. Two variants — **parchment** (light) and
+**parchment at night** (dark: candlelit vellum, gold ink, coins that glow once read).
+
+🔴 **The two variants are ONE implementation.** Every colour and opacity that differs is a
+`--dw-*` CSS variable defined per theme in `globals.css` (three blocks: `:root` dark,
+`[data-theme="light"]`, and the `prefers-color-scheme` copy for `auto` — emitted from one string so
+the two light copies can't drift). There is **no theme branch in the component**, so Auto works with
+no JS and nothing can hydrate wrong. Fonts are loaded in `app/layout.tsx` via `next/font` but
+referenced only by this section.
+
+🔴 **The pan/zoom transform moved from an SVG `<g>` to an HTML layer** wrapping both the SVG and a
+positioned text overlay, so coin titles are real HTML and get `text-wrap: balance` and the browser's
+own line breaking instead of hand-broken `<tspan>`s. Consequence: `tx`/`ty` are now plain screen
+pixels (no viewBox conversion), and `baseScale` is measured from the box with a `ResizeObserver`
+rather than hardcoded — "Fit" means the same framing on a phone and a desktop.
+
+🔴 **Trimming the arrows to the coin rims does not fit the poster.** The two trims sum to 132 units
+and the closest pair of coins is 129 apart, so eight edges must be clamped or their arrows point
+BACKWARDS down the reading order. `trimEdge()` lives in the pure module — shared by the renderer and
+the gate, because a copy of the arithmetic in the check would only ever verify itself. It reserves
+the minimum visible shaft FIRST; scaling both trims by `len/need` (the obvious version) still leaves
+every short edge too short, which the gate caught on all eight.
+
+**Deviations from the handoff, all deliberate:** the design's spinning ring replaced the old
+progress arc, but the percentage is measured data off the device sync and the map is the only place
+it appears — so the arc is **layered under the dashes at the same radius**, and a book part-read
+shows a solid gold band for the read part and dashes for the rest (tried inside the ring at r+5
+first; same colour 5px apart is invisible, which only a screenshot showed). The `owned` coin keeps
+its **dashed rim** — the design separates "in your library, unread" from "not in your library" by rim
+opacity alone, which isn't legible at Fit across 55 coins. `--dw-label-faded` is `#c9b58f` rather
+than the design's `#a08a6c`, which measures ~3.5:1 on the night vellum. And the sheet keeps the
+richer honesty content (the sync/mark disagreement line, the absent-book explanation, the library
+link) over the design's single status line.
+
+Animations (`dw-pop-in`, `dw-spin-ring`, `dw-seal-in`, `dw-burst-out`, `dw-bob`) live in
+`globals.css` because each coin needs its own stagger delay, which a Tailwind utility can't carry.
+🔴 All of it is decoration — the map is fully legible and usable with none of it running — so a
+`prefers-reduced-motion` block disables them, scoped to `dw-*` so it can't silence the rest of the
+hub. Verified both ways (0 running under reduce, 2 running normally).
+
+**Key files:** `lib/books/discworld.ts` (**pure** — the graph, `LAYOUT`, `trimEdge`, `seqArrowSpan`,
+`matchLibrary`,
 `autoStatus`, `resolveStatus`, `computeDiscworldProgress`; imports NOTHING, asserted, so the gate
 drives the real module and the client bundle stays small — the `pages.ts` lesson),
 `discworldData.ts` (the only impure edge), `components/DiscworldMap.tsx` (the SVG map; zoom/pan is

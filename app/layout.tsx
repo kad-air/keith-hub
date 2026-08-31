@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Newsreader, JetBrains_Mono } from "next/font/google";
+import { Newsreader, JetBrains_Mono, Almendra, Almendra_SC } from "next/font/google";
 import "./globals.css";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 import OfflineWarm from "@/components/OfflineWarm";
@@ -20,6 +20,28 @@ const monoFont = JetBrains_Mono({
   weight: ["400", "500"],
   variable: "--font-mono",
   display: "swap",
+});
+
+// The Discworld map's poster type (/books/discworld only). Almendra is the
+// closest free face to the printed guide's hand-lettered fantasy display;
+// Almendra SC supplies the small-caps used for the series labels and the
+// map's own controls. Loaded here rather than in the page so next/font can
+// hash and self-host them like the other two — but they are referenced ONLY
+// by that section, so nothing else on the hub changes weight.
+const fantasyFont = Almendra({
+  subsets: ["latin"],
+  weight: ["400", "700"],
+  variable: "--font-fantasy",
+  display: "swap",
+  adjustFontFallback: false,
+});
+
+const fantasySmallCaps = Almendra_SC({
+  subsets: ["latin"],
+  weight: ["400"],
+  variable: "--font-fantasy-sc",
+  display: "swap",
+  adjustFontFallback: false,
 });
 
 export const metadata: Metadata = {
@@ -65,7 +87,7 @@ export default function RootLayout({
     <html
       lang="en"
       data-theme="auto"
-      className={`${displayFont.variable} ${monoFont.variable}`}
+      className={`${displayFont.variable} ${monoFont.variable} ${fantasyFont.variable} ${fantasySmallCaps.variable}`}
       suppressHydrationWarning
     >
       <head>

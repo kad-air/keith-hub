@@ -46,6 +46,8 @@ const config: Config = {
       },
       fontFamily: {
         display: ["var(--font-display)", "Georgia", "Cambria", "serif"],
+        fantasy: ["var(--font-fantasy)", "var(--font-display)", "Georgia", "serif"],
+        "fantasy-sc": ["var(--font-fantasy-sc)", "var(--font-display)", "Georgia", "serif"],
         mono: [
           "var(--font-mono)",
           "ui-monospace",
