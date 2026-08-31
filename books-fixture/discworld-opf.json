@@ -1,0 +1,20 @@
+{
+  "_provenance": "Metadata read straight out of the reader's OWN epub files on /Volumes/HDD/Books/Terry Pratchett, by scripts/gen_discworld_opf_reference.py (Python zipfile + ElementTree). It is the PUBLISHER'S metadata, not a row this codebase wrote — which is the whole point: check:books:discworld asserts the matcher resolves what the files themselves say.",
+  "_note": "Men at Arms is the case that justifies the design. Its dc:title is 'Pratchett, Terry - Discworld 15 - Men at Arms' — a title match alone would miss it, and only calibre:series_index carries it to the right node. Any future rewrite that demotes series_index below the title has to break this.",
+  "books": [
+    {
+      "sourceFile": "04 - Mort.epub",
+      "opfTitle": "Mort",
+      "opfCreator": "Pratchett, Terry",
+      "opfSeries": "Discworld",
+      "opfSeriesIndex": 4.0
+    },
+    {
+      "sourceFile": "15 - Men at Arms.epub",
+      "opfTitle": "Pratchett, Terry - Discworld 15 - Men at Arms",
+      "opfCreator": "Pratchett, Terry",
+      "opfSeries": "Discworld",
+      "opfSeriesIndex": 15.0
+    }
+  ]
+}

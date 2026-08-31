@@ -78,6 +78,27 @@ export function getDb(): Database.Database {
     );
     CREATE INDEX IF NOT EXISTS idx_practice_progress_done_at ON practice_progress(done_at);
 
+    -- The Discworld reading-order map (/books/discworld) — the reader's OWN
+    -- marks, and nothing else. Follows the comic_state precedent: the catalog
+    -- is static (lib/books/discworld.ts), the DB holds only state.
+    --
+    -- 🔴 This table is an OVERRIDE, not the map's state. Every node's status is
+    -- derived fresh from the library + the kosync log on each render; a row
+    -- here exists only where the reader has said something the sync cannot
+    -- know. That is why there is no "unread" status and no row per node: the
+    -- absence of a row IS "ask the sync", so clearing a mark is a DELETE and
+    -- can never leave a stale verdict behind.
+    --
+    -- 🔴 It must never be written by the sync path. reading_events already
+    -- records what the devices report; if putProgress also stamped rows here,
+    -- a re-read that dipped below the finish threshold would erase a mark the
+    -- reader made by hand. check:books:discworld pins the manual-wins rule.
+    CREATE TABLE IF NOT EXISTS discworld_state (
+      node_id TEXT PRIMARY KEY,
+      status TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
     -- Setlist: uploaded guitar chord charts displayed as clean mono text with
     -- a configurable-speed autoscroll viewer. content is the raw chart text,
     -- preserved verbatim (chord-over-lyric alignment matters). sort_order is

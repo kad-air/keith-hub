@@ -31,6 +31,7 @@ npm run check:books:stats        # Books reading-stats gate: word count vs. Pyth
 npm run check:books:drm          # Books DRM gate: an ADEPT epub is decrypted-or-refused (never the 34-page ghost); a clean epub passes through byte-identical (same)
 npm run check:books:acsm         # Books ACSM gate: the ADEPT canonicalisation + signature match an independent Python implementation byte-for-byte (same)
 npm run check:books:health       # Books file-health gate: clean epub → zero findings, each damage pattern → exactly its finding, health caching never touches the file (same)
+npm run check:books:discworld    # Discworld map gate: the closed canon + publication order, the library match anchored on the real epubs' OPF, manual-mark precedence, map geometry (same)
 ```
 
 No test suite. `npm run build` is the type-check gate — always run it before pushing. It is
@@ -694,6 +695,72 @@ word count), `pages.ts` (the page convention, dependency-free). UI: `app/books/s
 (Python `html.parser` + `ElementTree` — an independent implementation whose answer is committed to
 `books-fixture/expected.json` under `text`; regenerate only when the fixture epub is rebuilt, never
 by copying the TS output back in).
+
+#### The Discworld reading map (`/books/discworld`)
+
+The printed "Discworld Reading Order Guide 3.0" as a pan-and-zoom map, filling in with colour as
+the library is read. Its own section (Contents / ⌘K read "Discworld"), also linked from the `/books`
+header. Drag to pan, pinch or ctrl-scroll to zoom, `+`/`-`/`0` on a keyboard, tap a coin for a
+sheet with the book's status and the mark buttons.
+
+**Two sources of truth, and the manual one outranks the sync.** Every node's status is DERIVED on
+each render — from the library (`books`), the sync positions (`kosync_progress`) and the finish
+crossings the reading-events model already computes. `discworld_state` stores only what the reader
+has said BY HAND, and only where they have said it.
+🔴 **A hand mark wins in both directions, including when it is *less* advanced than the sync.** The
+event log only began the day it shipped (see `lib/db.ts` on `reading_events`), so most of a
+lifetime of Discworld is invisible to it and has to be assertable by hand; a mark a later sync could
+overwrite would make the map lie about the one thing the reader stated directly. Clearing a mark is
+a **DELETE**, so the node goes back to being answered by the sync rather than pinned to the old
+verdict. 🔴 The sync path must never write this table — `check:books:discworld` asserts `kosync.ts`
+and `readingEvents.ts` don't know it exists.
+
+🔴 **`series_index` is the primary match key, not the title, and that came from a measurement.**
+The reader's real *Men at Arms* epub carries the `dc:title` `"Pratchett, Terry - Discworld 15 - Men
+at Arms"` — it matches no node at all, and only its index places it. Titles are the fallback (plus
+per-node `aliases`, e.g. the US "The Color of Magic"), used when a row has no series data. When a
+Discworld-flagged row's two keys disagree the index wins, as a deliberate tie-break. A Discworld
+book that matches nothing is **reported on screen**, never dropped — a book the map can't see is
+otherwise indistinguishable from one you haven't read.
+
+**Finishing is the same crossing the stats use** (`FINISH_THRESHOLD`, 0.97), imported rather than
+re-declared — 🔴 the gate asserts `discworld.ts` contains no threshold of its own, because a second
+copy of 0.97 can drift away from the one the streak and the heatmap share. A synced 0% is `owned`,
+not `reading`: opening a book once on the X3 is not reading it. A finished book re-opened at 3%
+stays finished, because the events log remembers the crossing where the upserted percentage cannot.
+
+**`pubOrder` is an external fact and the poster's layout is not.** The graph, node positions and
+solid/dotted connections are a hand transcription of the poster and are meant to be edited; the 41
+canon novels, their order and their years are not. 🔴 `LAYOUT` (cell size, coin radius, viewBox)
+lives in the pure module beside the coordinates **so the gate can assert things about the
+picture** — no two coins overlapping (a coin under another can never be tapped, so it can never be
+ticked), no sequence label written across the row it names (the bug the first draft shipped with:
+"RINCEWIND NOVELS" straight through The Colour of Magic — invisible to every other assertion and
+caught only by a screenshot), nothing off-canvas at Fit.
+
+**The gate: `npm run check:books:discworld`** (in `prebuild`). Anchored on things true
+independently of the code: publication order and years written down a second time in the check
+itself; the canon being CLOSED (Pratchett died in 2015, so nothing may postdate The Shepherd's
+Crown); geometry; and `books-fixture/discworld-opf.json` — metadata read out of the reader's own
+epub files by Python (`scripts/gen_discworld_opf_reference.py`, zipfile + ElementTree), never by
+this codebase. Falsification at merge: **14/14** perturbations caught (transposed publication
+order, a 42nd novel, the sync overwriting a less-advanced mark, a cleared mark pinning its verdict,
+the match keys reordered, an unplaceable book silently dropped, stacked coins, an absent book
+reading as finished, 0% counted as reading, a re-opened book un-reading itself, the threshold
+re-declared, a dangling edge, the module losing its purity, companions counted as novels) plus the
+two geometric ones. 🔴 The 15th probe — **reordering the match keys — initially went UNDETECTED**,
+because the mangled title matches nothing and falls through to the index either way; only a row
+whose two keys point at *different* nodes pins the choice. It also surfaced an overclaim in the
+source comment, since what is load-bearing is having both keys, not their order.
+
+**Key files:** `lib/books/discworld.ts` (**pure** — the graph, `LAYOUT`, `matchLibrary`,
+`autoStatus`, `resolveStatus`, `computeDiscworldProgress`; imports NOTHING, asserted, so the gate
+drives the real module and the client bundle stays small — the `pages.ts` lesson),
+`discworldData.ts` (the only impure edge), `components/DiscworldMap.tsx` (the SVG map; zoom/pan is
+hand-rolled, no dependency. 🔴 Node selection is a **hit test on `pointerup`**, NOT an `onClick` on
+the coin: panning needs `setPointerCapture`, and capture retargets the synthesised click to the
+capture element, so a click handler on the `<g>` fires unreliably). `app/books/discworld/page.tsx`,
+`app/api/books/discworld/[nodeId]/route.ts` (POST a mark, DELETE to clear).
 
 ### Hoops — the NBA simulation studio
 An NBA sim & what-if studio as its own section, built to the plan in `HOOPS_PLAN.md` (tracking epic: GitHub #63). **Shipped so far: milestone 1, the read-model spine (#64) — `/hoops/teams` and `/hoops/teams/[tri]`; milestone 2, the RNG parity + engine port (#65, #66) — `lib/hoops/{rng,philox,blake2b,engine}.ts`; the Mac Mini PUSH endpoint (#73, wire contract kad-air/hoops-sim#24) — `POST /api/hoops/import`; milestone 3, the matchup + box score (#67) — `/hoops` and `/hoops/game/[runId]`; and the player rankings — `/hoops/players`, which is also what finally carried the bundle's offence/defence value split into the read model.** The engine now runs from a screen. Next up: the studio (#69), with the design spike (#68) ahead of it.
