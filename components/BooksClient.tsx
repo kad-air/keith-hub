@@ -257,6 +257,12 @@ export default function BooksClient({
             >
               Stats
             </Link>
+            <Link
+              href="/books/discworld"
+              className="font-mono text-[0.7rem] uppercase tracking-kicker text-cream-dim hover:text-accent"
+            >
+              Discworld
+            </Link>
             <button
               onClick={() => setShowSetup((v) => !v)}
               className="font-mono text-[0.7rem] uppercase tracking-kicker text-cream-dim hover:text-accent"

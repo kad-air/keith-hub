@@ -54,6 +54,19 @@ const BOOKS_SECTION: Section = {
   match: (p) => p.startsWith("/books"),
 };
 
+// 🔴 Must come BEFORE BOOKS_SECTION in the SECTIONS array: getCurrentSection
+// returns the FIRST match, and BOOKS_SECTION matches every /books* path — so
+// listed after it, the masthead would read "Books" on the map.
+const DISCWORLD_SECTION: Section = {
+  key: "discworld",
+  num: "",
+  name: "Discworld",
+  href: "/books/discworld",
+  group: "Library",
+  desc: "Reading order map · synced progress",
+  match: (p) => p.startsWith("/books/discworld"),
+};
+
 const COMICS_SECTION: Section = {
   key: "comics",
   num: "",
@@ -129,6 +142,7 @@ export const SECTIONS: Section[] = (() => {
     SAVED_SECTION,
     READ_SECTION,
     ...trackerSections,
+    DISCWORLD_SECTION,
     BOOKS_SECTION,
     COMICS_SECTION,
     HOOPS_SECTION,
