@@ -17,7 +17,12 @@ export default function DiscworldPage() {
           Books · Reading order
         </p>
         <div className="flex items-baseline justify-between gap-3">
-          <h1 className="mt-1 font-display text-2xl text-cream">Discworld</h1>
+          <h1
+            className="mt-1 font-fantasy text-[2.4rem] font-bold leading-none tracking-[0.01em]"
+            style={{ color: "var(--dw-heading)" }}
+          >
+            Discworld
+          </h1>
           <Link
             href="/books"
             className="font-mono text-[0.7rem] uppercase tracking-kicker text-cream-dim hover:text-accent"
@@ -25,7 +30,7 @@ export default function DiscworldPage() {
             ← Library
           </Link>
         </div>
-        <p className="mt-1 text-sm text-cream-dim">
+        <p className="mt-2 max-w-[76ch] text-[0.95rem] leading-relaxed text-cream-dim [text-wrap:pretty]">
           The reading order guide, tracked. Books you finish on the X3 or in Readest fill in on
           their own; anything you read before the hub existed — or on paper — you mark yourself.
         </p>

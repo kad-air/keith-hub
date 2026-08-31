@@ -66,6 +66,8 @@ const {
   DISCWORLD_EDGES,
   DISCWORLD_SEQUENCES,
   LAYOUT,
+  seqArrowSpan,
+  trimEdge,
   autoStatus,
   computeDiscworldProgress,
   matchLibrary,
@@ -230,10 +232,14 @@ const labelBoxes = DISCWORLD_SEQUENCES.map((seq) => {
   const widest = Math.max(...seq.lines.map((l) => l.length));
   const w = (widest * LAYOUT.labelCharWidth) / LAYOUT.cellX;
   const h = (seq.lines.length * LAYOUT.labelLineHeight) / LAYOUT.cellY;
+  // An "end" label is pinned by its RIGHT edge, seqShift further out from the
+  // row than the poster's own x, leaving room for the arrow that points in.
+  const shift = LAYOUT.seqShift / LAYOUT.cellX;
+  const right = seq.anchor === "end" ? seq.x - shift : seq.x + w;
   return {
     key: seq.key,
-    x0: seq.anchor === "end" ? seq.x - w : seq.x,
-    x1: seq.anchor === "end" ? seq.x : seq.x + w,
+    x0: right - w,
+    x1: right,
     y0: seq.y - h / 2,
     y1: seq.y + h / 2,
   };
@@ -270,9 +276,80 @@ const outside = [
     )
     .map((b) => b.key),
 ];
+const leftMargin = Math.min(...labelBoxes.map((b) => b.x0 * LAYOUT.cellX - view.x));
 assert(
   outside.length === 0,
-  `🔴 everything is inside the canvas at Fit${outside.length ? ` — off-canvas: ${outside.join(", ")}` : ""}`,
+  `🔴 everything is inside the canvas at Fit${
+    outside.length
+      ? ` — off-canvas: ${outside.join(", ")}`
+      : ` (tightest label clears the left edge by ${leftMargin.toFixed(0)}u)`
+  }`,
+);
+
+// 🔴 Connection arrows are trimmed back to the coin rims so the arrowhead
+// lands on the edge. The two trims sum to 132 units and the closest pair of
+// coins on the poster is 129 apart, so on eight edges they do not fit and the
+// renderer has to clamp them.
+//
+// Both assertions run the REAL trimEdge() from the pure module rather than a
+// copy of its arithmetic — a second implementation here would only ever verify
+// itself, and would not notice the renderer changing. The SECOND assertion is
+// the load-bearing one: "the shaft is at least arrowMinVisible" is true BY
+// CONSTRUCTION of the clamp, so it cannot fail on a bad constant (falsification
+// caught that). "The arrowhead still lands outside the coin it points at" is a
+// fact about the poster's spacing, and it breaks as soon as the trims are
+// clamped hard enough to drag the head inside the target.
+const backwards: string[] = [];
+const buried: string[] = [];
+let shortest = { key: "", len: Infinity };
+for (const e of DISCWORLD_EDGES) {
+  const a = DISCWORLD_NODES.find((n) => n.id === e.from)!;
+  const b = DISCWORLD_NODES.find((n) => n.id === e.to)!;
+  const t = trimEdge(
+    a.x * LAYOUT.cellX,
+    a.y * LAYOUT.cellY,
+    b.x * LAYOUT.cellX,
+    b.y * LAYOUT.cellY,
+  );
+  const label = `${e.from}\u2192${e.to}`;
+  if (t.visible < LAYOUT.arrowMinVisible - 1e-6) backwards.push(label);
+  if (t.endTrim < LAYOUT.r) buried.push(label);
+  if (t.visible < shortest.len) shortest = { key: label, len: t.visible };
+}
+assert(
+  backwards.length === 0,
+  `no connection arrow is trimmed past its own length${
+    backwards.length
+      ? ` \u2014 reversed: ${backwards.join(", ")}`
+      : ` (shortest shaft ${shortest.len.toFixed(1)}u on ${shortest.key})`
+  }`,
+);
+assert(
+  buried.length === 0,
+  `\u{1F534} every arrowhead lands OUTSIDE the coin it points at${
+    buried.length ? ` \u2014 buried: ${buried.join(", ")}` : ""
+  }`,
+);
+
+// 🔴 seqShift exists so the red arrow between a margin label and its row has
+// somewhere to live. Shrink it and nothing above notices — the label just sits
+// closer to the coin, which is not a collision — but the renderer quietly
+// stops drawing every one of those arrows. Pin the purpose, not the number.
+const arrowless = DISCWORLD_SEQUENCES.filter((seq) => {
+  if (seq.anchor !== "end") return false;
+  const row = DISCWORLD_NODES.filter(
+    (n) =>
+      Math.abs(n.y - seq.y) < 0.02 &&
+      n.x * LAYOUT.cellX > seq.x * LAYOUT.cellX - LAYOUT.seqShift,
+  );
+  if (!row.length) return false;
+  return !seqArrowSpan(seq, Math.min(...row.map((n) => n.x))).drawn;
+}).map((seq) => seq.key);
+assert(
+  arrowless.length === 0,
+  `\u{1F534} every margin label keeps room for its arrow into the row${
+    arrowless.length ? ` \u2014 none drawn for: ${arrowless.join(", ")}` : ""
+  }`,
 );
 
 // ── 3. The library match, against the epubs' own metadata ────────────────────

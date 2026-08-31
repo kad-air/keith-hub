@@ -86,15 +86,50 @@ export const LAYOUT = {
   /** Coin radius, in viewBox units. */
   r: 58,
   /** Sequence-label type size and line spacing, in viewBox units. */
-  labelSize: 26,
-  labelLineHeight: 31,
-  /** Generous per-character width for a tracked uppercase serif, used only to
-   *  bound a label's footprint for the collision assertion. Over-estimating
-   *  makes the check stricter, which is the safe direction. */
-  labelCharWidth: 19.5,
+  labelSize: 34,
+  labelLineHeight: 37,
+  /**
+   * Per-character width used to bound a sequence label's footprint for the
+   * collision and containment assertions.
+   *
+   * 🔴 MEASURED in the browser across all nine labels at labelSize, then
+   * rounded UP to the worst case: Almendra SC ranges from 16.1 units/char on
+   * "Civilizations" to 21.8 on "Novels", because character count is a poor
+   * proxy for the width of proportional type. The bound has to hold for the
+   * WIDEST ratio or the assertion can pass on a label that actually overflows,
+   * so 22 it is — deliberately loose on long words, and the canvas carries the
+   * extra margin that costs (see `view`). Re-measure if the face or the size
+   * changes; the check prints the margin it had, so drift surfaces early.
+   */
+  labelCharWidth: 22,
+  /**
+   * How far a margin label is pushed away from its row's first coin, leaving
+   * room for the red arrow that points from the label into the row.
+   * 🔴 Counted in the collision AND containment assertions — pushing "end"
+   * labels further left is what can walk them off the left edge of the canvas.
+   */
+  seqShift: 80,
+  /**
+   * Connection arrows are trimmed back to the coin rims so the arrowhead
+   * lands on the edge rather than under the next coin.
+   *
+   * 🔴 The two trims sum to more than the closest pair of coins are apart
+   * (theatre-of-cruelty / guards-guards sit 129 units apart against a 132-unit
+   * total trim), so an untreated trim makes that arrow point BACKWARDS. The
+   * renderer scales both trims down when an edge is too short to afford them;
+   * arrowMinVisible is the length that must survive. Asserted.
+   */
+  arrowTrimStart: 62,
+  arrowTrimEnd: 70,
+  arrowMinVisible: 8,
   /** The whole poster, with margin for the labels. Fixed rather than computed
-   *  so "Fit" frames the same thing every time. */
-  view: { x: -400, y: -110, w: 1900, h: 1440 },
+   *  so "Fit" frames the same thing every time.
+   *  🔴 The left edge is -470, not the -400 the layout would otherwise need:
+   *  the margin labels are pinned seqShift further out and bounded by the
+   *  conservative labelCharWidth above, and "Ancient / Civilizations" is the
+   *  one that needs the room. Narrowing this without re-measuring walks that
+   *  label off the canvas — which is why the gate asserts containment. */
+  view: { x: -470, y: -110, w: 1970, h: 1440 },
 } as const;
 
 // ── Nodes ────────────────────────────────────────────────────────────────────
@@ -264,6 +299,60 @@ export const DISCWORLD_SEQUENCES: DiscworldSequence[] = [
   { key: "tiffany", lines: ["Tiffany", "Aching"], anchor: "end", x: 4.42, y: 6.2 },
   { key: "witches", lines: ["Witches", "Novels"], anchor: "end", x: -0.55, y: 7.3 },
 ];
+
+/**
+ * A connection, trimmed back to the two coin rims so its arrowhead lands on
+ * the target's edge rather than under it.
+ *
+ * 🔴 Lives here, in the pure module, so the renderer and the gate run the SAME
+ * arithmetic — a copy of it in the check would verify the check, not the map.
+ *
+ * 🔴 The two trims sum to 132 units and the closest pair of coins on the
+ * poster is 129 apart, so on eight of the edges they do not fit. The minimum
+ * visible shaft is reserved FIRST and the trims share what is left; scaling
+ * both by len/need (the obvious version) still leaves a shaft shorter than the
+ * minimum on every short edge, and past that the shaft inverts and the arrow
+ * points backwards down the reading order.
+ */
+export function trimEdge(
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+): { sx: number; sy: number; ex: number; ey: number; visible: number; endTrim: number } {
+  const len = Math.hypot(bx - ax, by - ay) || 1;
+  const ux = (bx - ax) / len;
+  const uy = (by - ay) / len;
+  const totalTrim = LAYOUT.arrowTrimStart + LAYOUT.arrowTrimEnd;
+  const avail = Math.max(0, len - LAYOUT.arrowMinVisible);
+  const k = avail < totalTrim ? avail / totalTrim : 1;
+  const startTrim = LAYOUT.arrowTrimStart * k;
+  const endTrim = LAYOUT.arrowTrimEnd * k;
+  return {
+    sx: ax + ux * startTrim,
+    sy: ay + uy * startTrim,
+    ex: bx - ux * endTrim,
+    ey: by - uy * endTrim,
+    visible: len - startTrim - endTrim,
+    endTrim,
+  };
+}
+
+/**
+ * Does this margin label have room for the red arrow that points from it into
+ * the row it names? Mirrors the renderer exactly.
+ * 🔴 The answer is what `seqShift` is FOR: with no shift the label sits close
+ * enough to the row's first coin that the arrow is silently dropped, which
+ * looks like a styling choice rather than a regression.
+ */
+export function seqArrowSpan(
+  seq: DiscworldSequence,
+  firstCoinX: number,
+): { x1: number; x2: number; drawn: boolean } {
+  const x1 = seq.x * LAYOUT.cellX - LAYOUT.seqShift + 12;
+  const x2 = firstCoinX * LAYOUT.cellX - LAYOUT.r - 10;
+  return { x1, x2, drawn: x2 - x1 >= 26 };
+}
 
 // ── The library match ────────────────────────────────────────────────────────
 
