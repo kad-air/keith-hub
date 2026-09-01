@@ -96,13 +96,13 @@ const GLOW_VAR: Record<NodeStatus, string> = {
 const px = (n: number, cell: number): number => n * cell;
 
 // ── Ageing ───────────────────────────────────────────────────────────────────
-// The overlay that makes the sheet read as OLD rather than merely beige. It
+// The layer that makes the sheet read as OLD rather than merely beige. It
 // lives INSIDE the pan/zoom layer (unlike the candle wash, which is a viewport
-// effect) and multiplies over the finished drawing, so the stains move with
-// the paper and tint the coins and the ink — the map reads as printed on an
-// aged sheet instead of floating above a tinted rectangle. Colours are
-// deliberately theme-independent: multiply darkens correctly on both
-// parchments, and only the layer's opacity differs (--dw-age-op).
+// effect) so the stains move with the paper — but it paints UNDER the drawing,
+// not over it: the first version multiplied over everything and the stains
+// tinting the coins and seals read as transparent objects, not aged paper.
+// Paper foxes; enamel and wax on top of it do not. Colours are deliberately
+// theme-independent, and only the layer's opacity differs (--dw-age-op).
 
 /** Three stacked turbulence passes in one tile: broad mottling of the vellum
  *  tone, sparse foxing blotches (high-contrast alpha threshold, so they come
@@ -551,6 +551,41 @@ export default function DiscworldMap({ states, novels, all, unmatched }: Props) 
               transformOrigin: "0 0",
             }}
           >
+            {/* The ageing sheet — FIRST child of the pan/zoom layer, so the
+                mottling, foxing and water rings sit on the paper UNDER the
+                coins, ink and titles (see the Ageing comment above for why
+                under, not over) while still travelling with the paper when
+                you pan. 🔴 It overhangs the poster by AGE_OVERHANG on every
+                side: sized exactly to VIEW it leaves a visible seam at Fit
+                where the aged rectangle meets clean surface (measured on a
+                screenshot — the texture ended in a hard edge either side of
+                the poster). The overhang covers the whole container even at
+                MIN_SCALE, so the sheet reads as one continuous piece of
+                parchment. The one-off stains are positioned in px relative
+                to the enlarged box so they still land ON the poster. */}
+            <div
+              className="pointer-events-none absolute"
+              style={{
+                left: `${-AGE_OVERHANG}px`,
+                top: `${-AGE_OVERHANG}px`,
+                width: `${VIEW.w + 2 * AGE_OVERHANG}px`,
+                height: `${VIEW.h + 2 * AGE_OVERHANG}px`,
+                opacity: "var(--dw-age-op)" as unknown as number,
+                backgroundImage: `${AGE_TEXTURE}, ${AGE_STAINS}`,
+                backgroundRepeat: "repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat",
+                backgroundSize:
+                  "640px 640px, 360px 320px, 300px 270px, 460px 340px, 380px 300px, 520px 420px",
+                backgroundPosition: [
+                  "0 0",
+                  `${AGE_OVERHANG + 190}px ${AGE_OVERHANG + 200}px`,
+                  `${AGE_OVERHANG + 1360}px ${AGE_OVERHANG + 940}px`,
+                  `${AGE_OVERHANG + 1520}px ${AGE_OVERHANG + 60}px`,
+                  `${AGE_OVERHANG + 40}px ${AGE_OVERHANG + 1120}px`,
+                  `${AGE_OVERHANG + 960}px ${AGE_OVERHANG + 520}px`,
+                ].join(", "),
+              }}
+            />
+
             <svg
               width={VIEW.w}
               height={VIEW.h}
@@ -698,40 +733,6 @@ export default function DiscworldMap({ states, novels, all, unmatched }: Props) 
               ))}
             </div>
 
-            {/* The ageing sheet — topmost child of the pan/zoom layer, so the
-                mottling, foxing and water rings multiply over EVERYTHING
-                (coins, ink, titles) and travel with the paper when you pan.
-                🔴 It overhangs the poster by AGE_OVERHANG on every side: sized
-                exactly to VIEW it leaves a visible seam at Fit where the aged
-                rectangle meets clean surface (measured on a screenshot — the
-                texture ended in a hard edge either side of the poster). The
-                overhang covers the whole container even at MIN_SCALE, so the
-                sheet reads as one continuous piece of parchment. The one-off
-                stains are positioned in px relative to the enlarged box so
-                they still land ON the poster. See AGE_TEXTURE / AGE_STAINS. */}
-            <div
-              className="pointer-events-none absolute"
-              style={{
-                left: `${-AGE_OVERHANG}px`,
-                top: `${-AGE_OVERHANG}px`,
-                width: `${VIEW.w + 2 * AGE_OVERHANG}px`,
-                height: `${VIEW.h + 2 * AGE_OVERHANG}px`,
-                mixBlendMode: "multiply",
-                opacity: "var(--dw-age-op)" as unknown as number,
-                backgroundImage: `${AGE_TEXTURE}, ${AGE_STAINS}`,
-                backgroundRepeat: "repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat",
-                backgroundSize:
-                  "640px 640px, 360px 320px, 300px 270px, 460px 340px, 380px 300px, 520px 420px",
-                backgroundPosition: [
-                  "0 0",
-                  `${AGE_OVERHANG + 190}px ${AGE_OVERHANG + 200}px`,
-                  `${AGE_OVERHANG + 1360}px ${AGE_OVERHANG + 940}px`,
-                  `${AGE_OVERHANG + 1520}px ${AGE_OVERHANG + 60}px`,
-                  `${AGE_OVERHANG + 40}px ${AGE_OVERHANG + 1120}px`,
-                  `${AGE_OVERHANG + 960}px ${AGE_OVERHANG + 520}px`,
-                ].join(", "),
-              }}
-            />
           </div>
         </div>
 

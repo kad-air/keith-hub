@@ -810,11 +810,12 @@ link) over the design's single status line.
 
 **The ageing pass (a later deepening of the same restyle):** `AGE_TEXTURE`/`AGE_STAINS` in
 `DiscworldMap.tsx` are a turbulence tile (vellum mottle + thresholded foxing blotches +
-anisotropic fibre grain) plus fixed water rings and blots, painted as the TOPMOST child of the
-pan/zoom layer with `mix-blend-mode: multiply` — inside the layer so the stains travel with the
-sheet and tint the coins, ink and titles rather than floating as a viewport wash. Stain colours
-are deliberately theme-independent (multiply darkens correctly on both parchments); only
-`--dw-age-op` differs per theme. Wax seals are built like the object: a deterministic lumpy blob
+anisotropic fibre grain) plus fixed water rings and blots, painted as the FIRST child of the
+pan/zoom layer — inside the layer so the stains travel with the sheet rather than floating as a
+viewport wash, but UNDER the drawing: the first version multiplied over everything, and stains
+tinting the coins and seals read as transparent objects rather than aged paper (user-reported).
+Paper foxes; enamel and wax on top of it do not. Stain colours are deliberately
+theme-independent; only `--dw-age-op` differs per theme. Wax seals are built like the object: a deterministic lumpy blob
 (`waxBlobPath`) with gravity-obeying drips (`waxDrips`), the `dw-seal-grad` radial wax gradient
 (`--dw-seal-hi`/`--dw-seal-lo`), a pressed matrix impression (offset dark/light rings), an
 embossed check, and a per-coin tilt — all seeded from the node's index, never random, so SSR and
