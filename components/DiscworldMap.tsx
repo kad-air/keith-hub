@@ -604,7 +604,7 @@ export default function DiscworldMap({ states, novels, all, unmatched }: Props) 
                     strokeWidth={e.w * 0.55}
                     strokeLinecap="round"
                     strokeDasharray={e.dash}
-                    opacity={e.op * 0.4}
+                    opacity={e.op * 0.28}
                   />
                 ))}
                 {edges.map((e) => (
@@ -635,7 +635,7 @@ export default function DiscworldMap({ states, novels, all, unmatched }: Props) 
                     style={{ stroke: "var(--dw-arrow)" }}
                     strokeWidth={2.2}
                     strokeLinecap="round"
-                    opacity={0.35}
+                    opacity={0.25}
                   />
                 ))}
                 {seqArrows.map((a) => (
