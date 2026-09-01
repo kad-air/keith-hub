@@ -794,9 +794,14 @@ every short edge too short, which the gate caught on all eight.
 
 **Deviations from the handoff, all deliberate:** the design's spinning ring replaced the old
 progress arc, but the percentage is measured data off the device sync and the map is the only place
-it appears — so the arc is **layered under the dashes at the same radius**, and a book part-read
-shows a solid gold band for the read part and dashes for the rest (tried inside the ring at r+5
-first; same colour 5px apart is invisible, which only a screenshot showed). The `owned` coin keeps
+it appears — so it is kept as a **second circle at a deliberately different circumference**: the
+dashed ring orbits at r = 71 and the progress arc rides the coin's own **rim** (r = 58, the coin
+radius), so a part-read book visibly fills in with gold from the top. Layering them at the SAME
+radius was tried first and is the version to not go back to — a small percentage just hides beneath
+a dash, and at any percentage the two read as one ring to decode. Nor can the second band go
+*outside* the dashes: the closest pair of coins is 129 units apart against a 58-unit radius, so
+anything past r ≈ 71 crosses into the neighbouring coin. Two bands 5 units apart are invisible
+(measured, on a screenshot); rim-to-ring is 7 apart edge to edge at different stroke weights. The `owned` coin keeps
 its **dashed rim** — the design separates "in your library, unread" from "not in your library" by rim
 opacity alone, which isn't legible at Fit across 55 coins. `--dw-label-faded` is `#c9b58f` rather
 than the design's `#a08a6c`, which measures ~3.5:1 on the night vellum. And the sheet keeps the
