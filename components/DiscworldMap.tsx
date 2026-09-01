@@ -95,6 +95,38 @@ const GLOW_VAR: Record<NodeStatus, string> = {
 
 const px = (n: number, cell: number): number => n * cell;
 
+// ── Ageing ───────────────────────────────────────────────────────────────────
+// The layer that makes the sheet read as OLD rather than merely beige. It
+// lives INSIDE the pan/zoom layer (unlike the candle wash, which is a viewport
+// effect) so the stains move with the paper — but it paints UNDER the drawing,
+// not over it: the first version multiplied over everything and the stains
+// tinting the coins and seals read as transparent objects, not aged paper.
+// Paper foxes; enamel and wax on top of it do not. Colours are deliberately
+// theme-independent, and only the layer's opacity differs (--dw-age-op).
+
+/** Three stacked turbulence passes in one tile: broad mottling of the vellum
+ *  tone, sparse foxing blotches (high-contrast alpha threshold, so they come
+ *  out as organic spots rather than fog), and a faint directional fibre grain
+ *  (anisotropic base frequency — parchment has a grain direction). */
+const AGE_TEXTURE = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='640' height='640'%3E%3Cfilter id='m'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.006 0.008' numOctaves='5' seed='9' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.33 0 0 0 0 0.22 0 0 0 0 0.10 0 0 0 0.55 -0.12'/%3E%3C/filter%3E%3Cfilter id='x'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.016 0.02' numOctaves='4' seed='4' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.45 0 0 0 0 0.26 0 0 0 0 0.08 0 0 0 1.7 -0.95'/%3E%3C/filter%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9 0.28' numOctaves='2' seed='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.36 0 0 0 0 0.26 0 0 0 0 0.13 0 0 0 0.26 -0.06'/%3E%3C/filter%3E%3Crect width='640' height='640' filter='url(%23m)'/%3E%3Crect width='640' height='640' filter='url(%23x)'/%3E%3Crect width='640' height='640' filter='url(%23g)'/%3E%3C/svg%3E")`;
+
+/** Fixed one-off stains — two water rings (the tell-tale dried-tide edge, dark
+ *  rim around a paler centre), two soft blots, one faint third ring. Placed by
+ *  hand at spots that avoid sitting dead-centre on any coin cluster. */
+const AGE_STAINS = [
+  "radial-gradient(closest-side, transparent 55%, rgba(101,66,24,0.20) 62%, rgba(101,66,24,0.08) 66%, transparent 72%)",
+  "radial-gradient(closest-side, transparent 58%, rgba(101,66,24,0.16) 65%, transparent 71%)",
+  "radial-gradient(closest-side, rgba(94,58,20,0.13), rgba(94,58,20,0.05) 55%, transparent 75%)",
+  "radial-gradient(closest-side, rgba(94,58,20,0.11), transparent 70%)",
+  "radial-gradient(closest-side, transparent 60%, rgba(101,66,24,0.10) 68%, transparent 74%)",
+].join(", ");
+
+/** How far the ageing layer extends past the poster on every side, in layer
+ *  px. Must cover the container at MIN_SCALE: the widest visible span is
+ *  container / (base × MIN_SCALE) ≈ 1280 / 0.26 ≈ 4900 layer px against the
+ *  poster's 1900, i.e. ~1500 px of backdrop each side. 2400 leaves margin. */
+const AGE_OVERHANG = 2400;
+
 // ── Label layout ─────────────────────────────────────────────────────────────
 
 function wrap(text: string, maxChars: number): string[] {
@@ -372,12 +404,24 @@ export default function DiscworldMap({ states, novels, all, unmatched }: Props) 
         const bow = e.kind === "direct" ? 0 : (i % 2 ? 1 : -1) * 16;
         const mx = (sx + ex) / 2 - uy * bow;
         const my = (sy + ey) / 2 + ux * bow;
+        // A second, fainter pass of the same stroke on a slightly different
+        // bow — the pen retracing its line. This is the hand-inked look done
+        // CHEAPLY: an feTurbulence+feDisplacementMap roughen was considered
+        // and rejected, because a displacement filter over the whole edge
+        // layer re-rasterises ~1900×1440 units on paint and janks pinch-zoom
+        // on the phone, which is the primary device.
+        const bow2 = bow + (i % 2 ? -7 : 7);
+        const mx2 = (sx + ex) / 2 - uy * bow2;
+        const my2 = (sy + ey) / 2 + ux * bow2;
         const both =
           byId.get(e.from)?.status === "finished" && byId.get(e.to)?.status === "finished";
         return {
           key: `${e.from}-${e.to}`,
           d: `M ${sx.toFixed(1)} ${sy.toFixed(1)} Q ${mx.toFixed(1)} ${my.toFixed(1)} ${ex.toFixed(1)} ${ey.toFixed(1)}`,
-          w: e.kind === "direct" ? 5.5 : 4.5,
+          d2: `M ${sx.toFixed(1)} ${sy.toFixed(1)} Q ${mx2.toFixed(1)} ${my2.toFixed(1)} ${ex.toFixed(1)} ${ey.toFixed(1)}`,
+          // Deterministic per-edge width jitter — an inked line is never one
+          // uniform weight across a whole sheet.
+          w: (e.kind === "direct" ? 5.5 : 4.5) + (((i * 13) % 3) - 1) * 0.4,
           dash: e.kind === "direct" ? undefined : "0.1 15",
           op: both ? 1 : e.kind === "direct" ? 0.78 : 0.62,
         };
@@ -469,12 +513,16 @@ export default function DiscworldMap({ states, novels, all, unmatched }: Props) 
           boxShadow: "var(--dw-surface-inset)",
         }}
       >
-        {/* Candle-light / foxing. Purely a wash, never intercepts a tap. */}
+        {/* Candle-light / edge burn. Purely a wash, never intercepts a tap.
+            dw-flicker breathes its opacity like a real flame — the amplitude
+            vars are 1 in the light theme, so daylight parchment stays still
+            with no theme branch here. */}
         <div
           className="pointer-events-none absolute inset-0"
           style={{
             backgroundImage: "var(--dw-surface-wash)",
             opacity: "var(--dw-surface-wash-op)" as unknown as number,
+            animation: "dw-flicker 6.8s ease-in-out infinite",
           }}
         />
 
@@ -503,6 +551,41 @@ export default function DiscworldMap({ states, novels, all, unmatched }: Props) 
               transformOrigin: "0 0",
             }}
           >
+            {/* The ageing sheet — FIRST child of the pan/zoom layer, so the
+                mottling, foxing and water rings sit on the paper UNDER the
+                coins, ink and titles (see the Ageing comment above for why
+                under, not over) while still travelling with the paper when
+                you pan. 🔴 It overhangs the poster by AGE_OVERHANG on every
+                side: sized exactly to VIEW it leaves a visible seam at Fit
+                where the aged rectangle meets clean surface (measured on a
+                screenshot — the texture ended in a hard edge either side of
+                the poster). The overhang covers the whole container even at
+                MIN_SCALE, so the sheet reads as one continuous piece of
+                parchment. The one-off stains are positioned in px relative
+                to the enlarged box so they still land ON the poster. */}
+            <div
+              className="pointer-events-none absolute"
+              style={{
+                left: `${-AGE_OVERHANG}px`,
+                top: `${-AGE_OVERHANG}px`,
+                width: `${VIEW.w + 2 * AGE_OVERHANG}px`,
+                height: `${VIEW.h + 2 * AGE_OVERHANG}px`,
+                opacity: "var(--dw-age-op)" as unknown as number,
+                backgroundImage: `${AGE_TEXTURE}, ${AGE_STAINS}`,
+                backgroundRepeat: "repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat",
+                backgroundSize:
+                  "640px 640px, 360px 320px, 300px 270px, 460px 340px, 380px 300px, 520px 420px",
+                backgroundPosition: [
+                  "0 0",
+                  `${AGE_OVERHANG + 190}px ${AGE_OVERHANG + 200}px`,
+                  `${AGE_OVERHANG + 1360}px ${AGE_OVERHANG + 940}px`,
+                  `${AGE_OVERHANG + 1520}px ${AGE_OVERHANG + 60}px`,
+                  `${AGE_OVERHANG + 40}px ${AGE_OVERHANG + 1120}px`,
+                  `${AGE_OVERHANG + 960}px ${AGE_OVERHANG + 520}px`,
+                ].join(", "),
+              }}
+            />
+
             <svg
               width={VIEW.w}
               height={VIEW.h}
@@ -523,10 +606,42 @@ export default function DiscworldMap({ states, novels, all, unmatched }: Props) 
                 >
                   <path d="M 0.5 1.2 L 9 5 L 0.5 8.8 z" style={{ fill: "var(--dw-arrow)" }} />
                 </marker>
+                {/* Wax shading: a lit crown falling away to a dark edge. The
+                    stops read theme vars, so night wax and day wax stay one
+                    implementation. objectBoundingBox units, so the same
+                    gradient shades the blob and each drip independently. */}
+                <radialGradient id="dw-seal-grad" cx="0.36" cy="0.3" r="0.75">
+                  <stop offset="0" style={{ stopColor: "var(--dw-seal-hi)" }} />
+                  <stop offset="0.55" style={{ stopColor: "var(--dw-seal-fill)" }} />
+                  <stop offset="1" style={{ stopColor: "var(--dw-seal-lo)" }} />
+                </radialGradient>
+                {/* Coin curvature: one gradient does the dome — a soft light
+                    on the crown, a falling-away darkening at the edge. Stop
+                    colours are theme-independent; only the overlay's opacity
+                    differs per theme (--dw-dome-op). */}
+                <radialGradient id="dw-coin-dome" cx="0.38" cy="0.3" r="0.85">
+                  <stop offset="0" stopColor="#fffbe8" stopOpacity="0.3" />
+                  <stop offset="0.42" stopColor="#fffbe8" stopOpacity="0" />
+                  <stop offset="0.78" stopColor="#2b1608" stopOpacity="0" />
+                  <stop offset="1" stopColor="#2b1608" stopOpacity="0.38" />
+                </radialGradient>
               </defs>
 
-              {/* Connections, under the coins. */}
+              {/* Connections, under the coins. Each is two passes: the faint
+                  retrace first, then the main stroke with the arrowhead. */}
               <g>
+                {edges.map((e) => (
+                  <path
+                    key={`${e.key}-re`}
+                    d={e.d2}
+                    fill="none"
+                    style={{ stroke: "var(--dw-arrow)" }}
+                    strokeWidth={e.w * 0.55}
+                    strokeLinecap="round"
+                    strokeDasharray={e.dash}
+                    opacity={e.op * 0.28}
+                  />
+                ))}
                 {edges.map((e) => (
                   <path
                     key={e.key}
@@ -542,8 +657,22 @@ export default function DiscworldMap({ states, novels, all, unmatched }: Props) 
                 ))}
               </g>
 
-              {/* Arrows from each margin label into its row. */}
+              {/* Arrows from each margin label into its row — same two-pass
+                  ink as the connections. */}
               <g>
+                {seqArrows.map((a) => (
+                  <line
+                    key={`${a.key}-re`}
+                    x1={a.x1}
+                    y1={a.y1 + 1.5}
+                    x2={a.x2 - 4}
+                    y2={a.y2 + 1.5}
+                    style={{ stroke: "var(--dw-arrow)" }}
+                    strokeWidth={2.2}
+                    strokeLinecap="round"
+                    opacity={0.25}
+                  />
+                ))}
                 {seqArrows.map((a) => (
                   <line
                     key={a.key}
@@ -603,6 +732,7 @@ export default function DiscworldMap({ states, novels, all, unmatched }: Props) 
                 </div>
               ))}
             </div>
+
           </div>
         </div>
 
@@ -688,6 +818,51 @@ function MapButton({
  *  page. Derived from the index so the server and the client always agree. */
 const wobbleOf = (i: number): number => ((((i * 97) % 13) - 6) / 6) * WOBBLE;
 
+/** A lumpy closed blob for the wax seal — ten radius-perturbed points smoothed
+ *  with Catmull-Rom, so no two seals share an outline. Perturbations come from
+ *  the node's index (same rule as wobbleOf): deterministic, so the server and
+ *  the client render the identical blob. */
+function waxBlobPath(cx: number, cy: number, r: number, seed: number): string {
+  const N = 10;
+  const pts: Array<[number, number]> = Array.from({ length: N }, (_, i) => {
+    const a = (i / N) * Math.PI * 2;
+    const wob = 1 + (((((seed + 1) * 89 + i * 37) % 11) - 5) / 5) * 0.09;
+    return [cx + Math.cos(a) * r * wob, cy + Math.sin(a) * r * wob];
+  });
+  let d = `M ${pts[0][0].toFixed(1)} ${pts[0][1].toFixed(1)}`;
+  for (let i = 0; i < N; i++) {
+    const p0 = pts[(i - 1 + N) % N];
+    const p1 = pts[i];
+    const p2 = pts[(i + 1) % N];
+    const p3 = pts[(i + 2) % N];
+    const c1x = p1[0] + (p2[0] - p0[0]) / 6;
+    const c1y = p1[1] + (p2[1] - p0[1]) / 6;
+    const c2x = p2[0] - (p3[0] - p1[0]) / 6;
+    const c2y = p2[1] - (p3[1] - p1[1]) / 6;
+    d += ` C ${c1x.toFixed(1)} ${c1y.toFixed(1)} ${c2x.toFixed(1)} ${c2y.toFixed(1)} ${p2[0].toFixed(1)} ${p2[1].toFixed(1)}`;
+  }
+  return d + " Z";
+}
+
+/** Where the wax ran when the seal was pressed: one drip always, a second
+ *  smaller one on every third coin. Angles are confined to the lower half so
+ *  the run-out obeys gravity; distances keep the drip's inner edge under the
+ *  blob so the join never shows a seam. */
+function waxDrips(
+  cx: number,
+  cy: number,
+  r: number,
+  seed: number,
+): Array<{ x: number; y: number; r: number }> {
+  const a1 = ((40 + ((seed * 67) % 100)) * Math.PI) / 180;
+  const drips = [{ x: cx + Math.cos(a1) * (r + 2), y: cy + Math.sin(a1) * (r + 2), r: 4.6 }];
+  if (seed % 3 === 0) {
+    const a2 = ((100 + ((seed * 31) % 55)) * Math.PI) / 180;
+    drips.push({ x: cx + Math.cos(a2) * (r + 4), y: cy + Math.sin(a2) * (r + 4), r: 2.8 });
+  }
+  return drips;
+}
+
 function Coin({
   state,
   index,
@@ -763,6 +938,19 @@ function Coin({
           // at a glance. The design distinguishes them by rim opacity alone,
           // which is not legible at Fit across 55 coins.
           strokeDasharray={status === "owned" ? "9 6" : undefined}
+        />
+        {/* Dome shading — see the dw-coin-dome gradient in defs. Sits under
+            the gloss ellipse, which stays the specular hit. */}
+        <circle
+          cx={cx}
+          cy={cy}
+          r={R}
+          fill="url(#dw-coin-dome)"
+          style={{
+            opacity: (faded
+              ? "var(--dw-dome-op-faded)"
+              : "var(--dw-dome-op)") as unknown as number,
+          }}
         />
         <ellipse
           cx={cx}
@@ -841,30 +1029,85 @@ function Coin({
               pointerEvents: "none",
             }}
           >
-            <circle
-              cx={bx}
-              cy={by}
-              r={21}
-              style={{ fill: "var(--dw-seal-fill)", stroke: "var(--dw-seal-stroke)" }}
-              strokeWidth={2.5}
-            />
-            <circle
-              cx={bx}
-              cy={by}
-              r={15}
-              fill="none"
-              style={{ stroke: "var(--dw-seal-inner)", strokeOpacity: 0.55 }}
-              strokeWidth={1.6}
-              strokeDasharray="4 4"
-            />
-            <path
-              d={`M ${bx - 8} ${by} l 6 6 l 10 -12`}
-              fill="none"
-              style={{ stroke: "var(--dw-seal-check)" }}
-              strokeWidth={4.5}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
+            {/* The seal is built like the object: a shadow on the page, wax
+                that ran where it was pressed (the drips, under the blob so the
+                join never shows), the lumpy blob itself under the dw-seal-grad
+                wax gradient, the pressed matrix impression (dark upper ring,
+                lit lower ring — a depression lit from above), a specular gleam
+                on the crown, and the check pressed IN (its lit lower edge
+                drawn first). Blob, drips and tilt are all deterministic from
+                the node's index, so no two seals match and the server and the
+                client agree. */}
+            <g transform={`rotate(${((index * 47) % 25) - 12} ${bx} ${by})`}>
+              <ellipse
+                cx={bx + 1.5}
+                cy={by + 3.5}
+                rx={23}
+                ry={21}
+                style={{ fill: "var(--dw-shadow)" }}
+              />
+              {waxDrips(bx, by, 21, index).map((d, k) => (
+                <circle
+                  key={k}
+                  cx={d.x}
+                  cy={d.y}
+                  r={d.r}
+                  fill="url(#dw-seal-grad)"
+                  style={{ stroke: "var(--dw-seal-stroke)", strokeOpacity: 0.4 }}
+                  strokeWidth={1}
+                />
+              ))}
+              <path
+                d={waxBlobPath(bx, by, 21, index)}
+                fill="url(#dw-seal-grad)"
+                style={{ stroke: "var(--dw-seal-stroke)", strokeOpacity: 0.5 }}
+                strokeWidth={1.5}
+              />
+              <circle
+                cx={bx}
+                cy={by - 0.9}
+                r={14}
+                fill="none"
+                style={{ stroke: "var(--dw-seal-lo)" }}
+                strokeOpacity={0.65}
+                strokeWidth={2}
+              />
+              <circle
+                cx={bx}
+                cy={by + 1}
+                r={14}
+                fill="none"
+                style={{ stroke: "var(--dw-seal-hi)" }}
+                strokeOpacity={0.4}
+                strokeWidth={1.2}
+              />
+              <ellipse
+                cx={bx - 7}
+                cy={by - 9}
+                rx={7.5}
+                ry={4.5}
+                transform={`rotate(-28 ${bx - 7} ${by - 9})`}
+                style={{ fill: "var(--dw-seal-inner)" }}
+                opacity={0.5}
+              />
+              <path
+                d={`M ${bx - 8} ${by + 1.2} l 6 6 l 10 -12`}
+                fill="none"
+                style={{ stroke: "var(--dw-seal-hi)" }}
+                strokeOpacity={0.45}
+                strokeWidth={4.5}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path
+                d={`M ${bx - 8} ${by} l 6 6 l 10 -12`}
+                fill="none"
+                style={{ stroke: "var(--dw-seal-check)" }}
+                strokeWidth={4.5}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </g>
           </g>
         )}
 

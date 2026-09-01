@@ -43,8 +43,11 @@
     --dw-surface-bg: #2b2015;
     --dw-surface-border: #3a2f1e;
     --dw-surface-inset: inset 0 0 90px rgba(0, 0, 0, 0.75), 0 10px 30px -18px rgba(0, 0, 0, 0.9);
-    --dw-surface-wash: radial-gradient(ellipse at 12% 6%, rgba(255, 206, 122, 0.22) 0%, transparent 52%), radial-gradient(ellipse at 88% 96%, rgba(255, 206, 122, 0.12) 0%, transparent 48%), radial-gradient(ellipse at 50% 50%, transparent 40%, rgba(0, 0, 0, 0.5) 100%);
+    --dw-surface-wash: radial-gradient(ellipse at 12% 6%, rgba(255, 206, 122, 0.22) 0%, transparent 52%), radial-gradient(ellipse at 88% 96%, rgba(255, 206, 122, 0.12) 0%, transparent 48%), radial-gradient(ellipse at 50% 50%, transparent 40%, rgba(0, 0, 0, 0.5) 100%), linear-gradient(to right, rgba(0, 0, 0, 0.35), transparent 2.6%), linear-gradient(to left, rgba(0, 0, 0, 0.32), transparent 2.1%), linear-gradient(to bottom, rgba(0, 0, 0, 0.32), transparent 3.4%), linear-gradient(to top, rgba(0, 0, 0, 0.35), transparent 2.8%);
     --dw-surface-wash-op: 1;
+    --dw-flicker-a: 0.82;
+    --dw-flicker-b: 0.93;
+    --dw-age-op: 0.2;
     --dw-arrow: #d44a3f;
     --dw-rim: #0f0803;
     --dw-rim-op: 0.9;
@@ -63,7 +66,11 @@
     --dw-glow-finished: 0.3;
     --dw-glow-reading: 0.22;
     --dw-ring: #e0b25a;
+    --dw-dome-op: 0.4;
+    --dw-dome-op-faded: 0.12;
     --dw-seal-fill: #d44a3f;
+    --dw-seal-hi: #e96a52;
+    --dw-seal-lo: #5f130d;
     --dw-seal-stroke: #3d1310;
     --dw-seal-inner: #ffd8b0;
     --dw-seal-check: #17130f;
@@ -154,8 +161,11 @@
     --dw-surface-bg: #ecdcb6;
     --dw-surface-border: #b79a63;
     --dw-surface-inset: inset 0 0 60px rgba(120, 84, 40, 0.35), inset 0 0 14px rgba(90, 60, 24, 0.4), 0 10px 26px -18px rgba(60, 40, 20, 0.6);
-    --dw-surface-wash: radial-gradient(ellipse at 18% 12%, rgba(255, 246, 220, 0.85) 0%, transparent 46%), radial-gradient(ellipse at 82% 78%, rgba(255, 246, 220, 0.7) 0%, transparent 44%), radial-gradient(ellipse at 60% 30%, rgba(150, 108, 52, 0.22) 0%, transparent 38%), radial-gradient(ellipse at 25% 82%, rgba(150, 108, 52, 0.2) 0%, transparent 40%);
+    --dw-surface-wash: radial-gradient(ellipse at 18% 12%, rgba(255, 246, 220, 0.85) 0%, transparent 46%), radial-gradient(ellipse at 82% 78%, rgba(255, 246, 220, 0.7) 0%, transparent 44%), radial-gradient(ellipse at 60% 30%, rgba(150, 108, 52, 0.22) 0%, transparent 38%), radial-gradient(ellipse at 25% 82%, rgba(150, 108, 52, 0.2) 0%, transparent 40%), linear-gradient(to right, rgba(88, 56, 20, 0.26), transparent 2.4%), linear-gradient(to left, rgba(88, 56, 20, 0.22), transparent 2%), linear-gradient(to bottom, rgba(88, 56, 20, 0.2), transparent 3.2%), linear-gradient(to top, rgba(88, 56, 20, 0.24), transparent 2.6%);
     --dw-surface-wash-op: 0.5;
+    --dw-flicker-a: 1;
+    --dw-flicker-b: 1;
+    --dw-age-op: 0.55;
     --dw-arrow: #a52a1f;
     --dw-rim: #4b2b12;
     --dw-rim-op: 0.85;
@@ -174,7 +184,11 @@
     --dw-glow-finished: 0;
     --dw-glow-reading: 0;
     --dw-ring: #d9a021;
+    --dw-dome-op: 0.38;
+    --dw-dome-op-faded: 0.2;
     --dw-seal-fill: #a52a1f;
+    --dw-seal-hi: #c8503c;
+    --dw-seal-lo: #571109;
     --dw-seal-stroke: #6d1d13;
     --dw-seal-inner: #e8b98f;
     --dw-seal-check: #f7ebd2;
@@ -266,8 +280,11 @@
     --dw-surface-bg: #ecdcb6;
     --dw-surface-border: #b79a63;
     --dw-surface-inset: inset 0 0 60px rgba(120, 84, 40, 0.35), inset 0 0 14px rgba(90, 60, 24, 0.4), 0 10px 26px -18px rgba(60, 40, 20, 0.6);
-    --dw-surface-wash: radial-gradient(ellipse at 18% 12%, rgba(255, 246, 220, 0.85) 0%, transparent 46%), radial-gradient(ellipse at 82% 78%, rgba(255, 246, 220, 0.7) 0%, transparent 44%), radial-gradient(ellipse at 60% 30%, rgba(150, 108, 52, 0.22) 0%, transparent 38%), radial-gradient(ellipse at 25% 82%, rgba(150, 108, 52, 0.2) 0%, transparent 40%);
+    --dw-surface-wash: radial-gradient(ellipse at 18% 12%, rgba(255, 246, 220, 0.85) 0%, transparent 46%), radial-gradient(ellipse at 82% 78%, rgba(255, 246, 220, 0.7) 0%, transparent 44%), radial-gradient(ellipse at 60% 30%, rgba(150, 108, 52, 0.22) 0%, transparent 38%), radial-gradient(ellipse at 25% 82%, rgba(150, 108, 52, 0.2) 0%, transparent 40%), linear-gradient(to right, rgba(88, 56, 20, 0.26), transparent 2.4%), linear-gradient(to left, rgba(88, 56, 20, 0.22), transparent 2%), linear-gradient(to bottom, rgba(88, 56, 20, 0.2), transparent 3.2%), linear-gradient(to top, rgba(88, 56, 20, 0.24), transparent 2.6%);
     --dw-surface-wash-op: 0.5;
+    --dw-flicker-a: 1;
+    --dw-flicker-b: 1;
+    --dw-age-op: 0.55;
     --dw-arrow: #a52a1f;
     --dw-rim: #4b2b12;
     --dw-rim-op: 0.85;
@@ -286,7 +303,11 @@
     --dw-glow-finished: 0;
     --dw-glow-reading: 0;
     --dw-ring: #d9a021;
+    --dw-dome-op: 0.38;
+    --dw-dome-op-faded: 0.2;
     --dw-seal-fill: #a52a1f;
+    --dw-seal-hi: #c8503c;
+    --dw-seal-lo: #571109;
     --dw-seal-stroke: #6d1d13;
     --dw-seal-inner: #e8b98f;
     --dw-seal-check: #f7ebd2;
@@ -511,6 +532,29 @@
     transform: translateY(-3px);
   }
 }
+/* Candle flicker on the surface wash. The dips are theme vars: the night
+   theme sets real amplitudes, the light theme sets both to 1, so daylight
+   parchment sits still without a theme branch in the component. Deliberately
+   irregular keyframe spacing — an even pulse reads as a screensaver, not a
+   flame. Opacity only, so the compositor carries it. */
+@keyframes dw-flicker {
+  0%,
+  100% {
+    opacity: var(--dw-surface-wash-op);
+  }
+  37% {
+    opacity: calc(var(--dw-surface-wash-op) * var(--dw-flicker-a));
+  }
+  45% {
+    opacity: var(--dw-surface-wash-op);
+  }
+  58% {
+    opacity: calc(var(--dw-surface-wash-op) * var(--dw-flicker-b));
+  }
+  72% {
+    opacity: calc(var(--dw-surface-wash-op) * var(--dw-flicker-a));
+  }
+}
 
 /* 🔴 The map is the most animated surface on the hub — 55 coins popping in, a
    ring spinning on every book in progress, a seal stamping on every mark. All
@@ -523,7 +567,8 @@
   [style*="dw-spin-ring"],
   [style*="dw-seal-in"],
   [style*="dw-burst-out"],
-  [style*="dw-bob"] {
+  [style*="dw-bob"],
+  [style*="dw-flicker"] {
     animation: none !important;
   }
 }

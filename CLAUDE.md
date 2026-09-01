@@ -808,11 +808,31 @@ than the design's `#a08a6c`, which measures ~3.5:1 on the night vellum. And the 
 richer honesty content (the sync/mark disagreement line, the absent-book explanation, the library
 link) over the design's single status line.
 
-Animations (`dw-pop-in`, `dw-spin-ring`, `dw-seal-in`, `dw-burst-out`, `dw-bob`) live in
+**The ageing pass (a later deepening of the same restyle):** `AGE_TEXTURE`/`AGE_STAINS` in
+`DiscworldMap.tsx` are a turbulence tile (vellum mottle + thresholded foxing blotches +
+anisotropic fibre grain) plus fixed water rings and blots, painted as the FIRST child of the
+pan/zoom layer — inside the layer so the stains travel with the sheet rather than floating as a
+viewport wash, but UNDER the drawing: the first version multiplied over everything, and stains
+tinting the coins and seals read as transparent objects rather than aged paper (user-reported).
+Paper foxes; enamel and wax on top of it do not. Stain colours are deliberately
+theme-independent; only `--dw-age-op` differs per theme. Wax seals are built like the object: a deterministic lumpy blob
+(`waxBlobPath`) with gravity-obeying drips (`waxDrips`), the `dw-seal-grad` radial wax gradient
+(`--dw-seal-hi`/`--dw-seal-lo`), a pressed matrix impression (offset dark/light rings), an
+embossed check, and a per-coin tilt — all seeded from the node's index, never random, so SSR and
+client agree. Coins get `dw-coin-dome` curvature shading (`--dw-dome-op`). 🔴 The hand-inked
+arrow look is a second fainter "retrace" stroke on a different bow plus per-edge width jitter —
+an feTurbulence+feDisplacementMap roughen was considered and REJECTED because a displacement
+filter over the whole edge layer re-rasterises ~1900×1440 units on paint and janks pinch-zoom on
+the phone, the primary device. The candle wash flickers at night via `dw-flicker` (opacity-only,
+compositor-cheap); its amplitude vars are 1 in the light theme so daylight stays still with no
+theme branch in the component.
+
+Animations (`dw-pop-in`, `dw-spin-ring`, `dw-seal-in`, `dw-burst-out`, `dw-bob`, `dw-flicker`)
+live in
 `globals.css` because each coin needs its own stagger delay, which a Tailwind utility can't carry.
 🔴 All of it is decoration — the map is fully legible and usable with none of it running — so a
 `prefers-reduced-motion` block disables them, scoped to `dw-*` so it can't silence the rest of the
-hub. Verified both ways (0 running under reduce, 2 running normally).
+hub. Verified both ways (0 running under reduce, 2 running normally, before `dw-flicker` joined).
 
 **Key files:** `lib/books/discworld.ts` (**pure** — the graph, `LAYOUT`, `trimEdge`, `seqArrowSpan`,
 `matchLibrary`,
