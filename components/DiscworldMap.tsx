@@ -708,8 +708,11 @@ function Coin({
   const faded = status === "absent" || status === "skipped";
   const bx = cx + R * 0.72;
   const by = cy - R * 0.72;
+  // Two concentric circles, at deliberately different circumferences: the
+  // orbiting dashed ring says "in progress", the arc on the coin's own rim
+  // says how far.
   const ringR = 71;
-  const circumference = 2 * Math.PI * ringR;
+  const rimLength = 2 * Math.PI * R;
 
   return (
     <g
@@ -785,26 +788,31 @@ function Coin({
 
         {status === "reading" && (
           <>
-            {/* 🔴 The progress arc sits at the SAME radius as the dashed ring,
-                underneath it — so the part of the book that is read reads as a
-                continuous gold band and the rest shows only the dashes. The
-                design replaced the old arc with a plain spinning ring, but the
-                percentage is measured data off the device sync and this is the
-                only place on the map it appears; layering the two keeps both
-                the "in progress" identity and the quantity, with no second
-                ring to decode. Tried inside the ring first at r+5 — same
-                colour 5px apart is invisible, which a screenshot showed. */}
+            {/* 🔴 The two circles are deliberately DIFFERENT sizes. They used
+                to share a radius — the arc under the dashes — so that the read
+                part read as a continuous gold band. It doesn't: at a small
+                percentage the arc simply hides beneath a dash, and at any
+                percentage the two are one ring you have to decode. The arc now
+                rides the coin's own RIM (r = R, against the ring's 71), so the
+                book visibly fills in with gold from the top as it is read,
+                while the orbiting dashes stay the "in progress" identity.
+                The rim was chosen over a second ring outside the dashes
+                because the closest pair of coins is 129 units apart against a
+                58-unit radius — anything beyond r ≈ 71 crosses into the
+                neighbour. Two bands 5 units apart are invisible (measured);
+                these are 7 apart edge to edge, at different weights. */}
             {state.percentage != null && (
               <circle
                 cx={cx}
                 cy={cy}
-                r={ringR}
+                r={R}
                 fill="none"
                 style={{ stroke: "var(--dw-ring)" }}
-                strokeWidth={7}
-                strokeDasharray={`${circumference * Math.max(0.02, state.percentage)} ${circumference}`}
+                strokeWidth={5}
+                strokeDasharray={`${rimLength * Math.max(0.02, state.percentage)} ${rimLength}`}
                 transform={`rotate(-90 ${cx} ${cy})`}
-                opacity={0.55}
+                opacity={0.95}
+                pointerEvents="none"
               />
             )}
             <g className="dw-spin" style={{ animation: "dw-spin-ring 10s linear infinite" }}>
@@ -1047,7 +1055,7 @@ function Legend() {
           style={{ color: "var(--dw-panel-prose)" }}
         >
           A full-gloss coin is read and a wax seal marks it; a gold ring means in progress, and the
-          arc inside it is how far. A dashed rim means the book is in your library but unread, a
+          gold filling the coin’s own rim is how far. A dashed rim means the book is in your library but unread, a
           pale coin that it isn&apos;t there yet, and a gold stud that you marked it by hand. Drag
           to pan, pinch or ctrl-scroll to zoom, tap a coin to mark it.
         </p>
