@@ -6,22 +6,31 @@
         "ghost_minutes": 0.0,
         "net": 5.873015873,
         "off": 2.936507937,
-        "raw_strength": 10.873015873
+        "raw_strength": 10.873015873,
+        "tilt": 0.0
       },
+      "features": [
+        "symmetric_off_def",
+        "absorption",
+        "fictional_values"
+      ],
       "name": "ordinary full roster: every player has known raw minutes and a known value",
       "players": [
         {
           "athlete_id": 101,
+          "has_history": true,
           "raw_minutes": 34.0,
           "value_per36": 3.0
         },
         {
           "athlete_id": 102,
+          "has_history": true,
           "raw_minutes": 30.0,
           "value_per36": 1.5
         },
         {
           "athlete_id": 103,
+          "has_history": true,
           "raw_minutes": 20.0,
           "value_per36": -0.5
         }
@@ -33,22 +42,31 @@
         "ghost_minutes": 0.0,
         "net": 6.842105263,
         "off": 3.421052632,
-        "raw_strength": 11.842105263
+        "raw_strength": 11.842105263,
+        "tilt": 0.0
       },
+      "features": [
+        "symmetric_off_def",
+        "absorption",
+        "fictional_values"
+      ],
       "name": "bench-default-minutes and replacement-value fallback: athlete_id 104 has neither raw_minutes nor value_per36 on record",
       "players": [
         {
           "athlete_id": 101,
+          "has_history": true,
           "raw_minutes": 34.0,
           "value_per36": 3.0
         },
         {
           "athlete_id": 102,
+          "has_history": true,
           "raw_minutes": 30.0,
           "value_per36": 1.5
         },
         {
           "athlete_id": 104,
+          "has_history": false,
           "raw_minutes": null,
           "value_per36": null
         }
@@ -60,22 +78,31 @@
         "ghost_minutes": 0.0,
         "net": 9.715447154,
         "off": 4.857723577,
-        "raw_strength": 14.715447154
+        "raw_strength": 14.715447154,
+        "tilt": 0.0
       },
+      "features": [
+        "symmetric_off_def",
+        "absorption",
+        "fictional_values"
+      ],
       "name": "absorption_off: the SAME 3 remaining players as absorption_on, no absent player supplied at all (plain allocate_minutes, ghost_minutes must read 0)",
       "players": [
         {
           "athlete_id": 201,
+          "has_history": true,
           "raw_minutes": 36.0,
           "value_per36": 5.0
         },
         {
           "athlete_id": 202,
+          "has_history": true,
           "raw_minutes": 28.0,
           "value_per36": 1.0
         },
         {
           "athlete_id": 203,
+          "has_history": true,
           "raw_minutes": 18.0,
           "value_per36": -1.5
         }
@@ -94,22 +121,31 @@
         "ghost_minutes": 7.933584906,
         "net": 9.00862709,
         "off": 4.504313545,
-        "raw_strength": 14.00862709
+        "raw_strength": 14.00862709,
+        "tilt": 0.0
       },
+      "features": [
+        "symmetric_off_def",
+        "absorption",
+        "fictional_values"
+      ],
       "name": "absorption_on: same 3 remaining players as absorption_off, athlete_id 204 removed and supplied as absent with his own (no-hindsight) raw minutes -- absorption_phi of his minutes must land on the ghost slot, the rest spread proportionally across the 3 remaining players",
       "players": [
         {
           "athlete_id": 201,
+          "has_history": true,
           "raw_minutes": 36.0,
           "value_per36": 5.0
         },
         {
           "athlete_id": 202,
+          "has_history": true,
           "raw_minutes": 28.0,
           "value_per36": 1.0
         },
         {
           "athlete_id": 203,
+          "has_history": true,
           "raw_minutes": 18.0,
           "value_per36": -1.5
         }
@@ -121,17 +157,25 @@
         "ghost_minutes": 0.0,
         "net": 14.444444444,
         "off": 7.222222222,
-        "raw_strength": 19.444444444
+        "raw_strength": 19.444444444,
+        "tilt": 0.0
       },
+      "features": [
+        "symmetric_off_def",
+        "absorption",
+        "fictional_values"
+      ],
       "name": "fictional player with a declared per-36 value -- ARITHMETIC IDENTITY ONLY: a directly-supplied value_per36 is honored exactly, with no lookup. The unconverted-units/DB-resolution semantics that make a value 'fictional' in the first place are outside this ported function set -- see the section docstring above",
       "players": [
         {
           "athlete_id": 301,
+          "has_history": true,
           "raw_minutes": 32.0,
           "value_per36": 2.0
         },
         {
           "athlete_id": 9001,
+          "has_history": true,
           "raw_minutes": 22.0,
           "value_per36": 4.25
         }
@@ -143,17 +187,25 @@
         "ghost_minutes": 0.0,
         "net": 4.333333333,
         "off": 2.166666667,
-        "raw_strength": 9.333333333
+        "raw_strength": 9.333333333,
+        "tilt": 0.0
       },
+      "features": [
+        "symmetric_off_def",
+        "absorption",
+        "fictional_values"
+      ],
       "name": "delta identity, part 1: team A's full roster (2 players)",
       "players": [
         {
           "athlete_id": 401,
+          "has_history": true,
           "raw_minutes": 34.0,
           "value_per36": 4.0
         },
         {
           "athlete_id": 402,
+          "has_history": true,
           "raw_minutes": 26.0,
           "value_per36": -2.0
         }
@@ -165,12 +217,19 @@
         "ghost_minutes": 0.0,
         "net": 21.666666667,
         "off": 10.833333333,
-        "raw_strength": 26.666666667
+        "raw_strength": 26.666666667,
+        "tilt": 0.0
       },
+      "features": [
+        "symmetric_off_def",
+        "absorption",
+        "fictional_values"
+      ],
       "name": "delta identity, part 2: team A with athlete_id 402 removed (only team A's OWN raw_strength/off/def/net may differ from part 1 -- team B, part 3, must be unaffected)",
       "players": [
         {
           "athlete_id": 401,
+          "has_history": true,
           "raw_minutes": 34.0,
           "value_per36": 4.0
         }
@@ -182,19 +241,884 @@
         "ghost_minutes": 0.0,
         "net": -1.666666667,
         "off": -0.833333333,
-        "raw_strength": 3.333333333
+        "raw_strength": 3.333333333,
+        "tilt": 0.0
       },
+      "features": [
+        "symmetric_off_def",
+        "absorption",
+        "fictional_values"
+      ],
       "name": "delta identity, part 3: team B, computed under the SAME top-level league_recenter as parts 1-2 -- there is no per-case recenter for team A's edit to disturb, which is what makes 'editing one team moves every other team's rating' structurally impossible here",
       "players": [
         {
           "athlete_id": 501,
+          "has_history": true,
           "raw_minutes": 30.0,
           "value_per36": 0.5
         },
         {
           "athlete_id": 502,
+          "has_history": true,
           "raw_minutes": 30.0,
           "value_per36": 0.5
+        }
+      ]
+    },
+    {
+      "expected": {
+        "def": -0.65981241,
+        "ghost_minutes": 0.0,
+        "net": 2.828282828,
+        "off": 2.168470418,
+        "raw_strength": 7.828282828,
+        "tilt": 1.508658009
+      },
+      "features": [
+        "split_off_def",
+        "absorption",
+        "fictional_values"
+      ],
+      "name": "v2 split only: eleven men with genuine per-side values, plain proportional minutes -- off/def stop being +net/2 and -net/2, tilt is non-zero, net is unchanged",
+      "players": [
+        {
+          "athlete_id": 1101,
+          "has_history": true,
+          "raw_minutes": 35.5,
+          "value_def_per36": 1.1,
+          "value_off_per36": 4.1,
+          "value_per36": 5.2
+        },
+        {
+          "athlete_id": 1102,
+          "has_history": true,
+          "raw_minutes": 33.0,
+          "value_def_per36": 2.3,
+          "value_off_per36": 0.8,
+          "value_per36": 3.1
+        },
+        {
+          "athlete_id": 1103,
+          "has_history": true,
+          "raw_minutes": 30.5,
+          "value_def_per36": 0.3,
+          "value_off_per36": 1.1,
+          "value_per36": 1.4
+        },
+        {
+          "athlete_id": 1104,
+          "has_history": true,
+          "raw_minutes": 28.0,
+          "value_def_per36": -0.8,
+          "value_off_per36": 1.4,
+          "value_per36": 0.6
+        },
+        {
+          "athlete_id": 1105,
+          "has_history": true,
+          "raw_minutes": 24.5,
+          "value_def_per36": 0.35,
+          "value_off_per36": -0.55,
+          "value_per36": -0.2
+        },
+        {
+          "athlete_id": 1106,
+          "has_history": true,
+          "raw_minutes": 21.0,
+          "value_def_per36": -0.1,
+          "value_off_per36": 1.0,
+          "value_per36": 0.9
+        },
+        {
+          "athlete_id": 1107,
+          "has_history": true,
+          "raw_minutes": 18.5,
+          "value_def_per36": 0.65,
+          "value_off_per36": -1.75,
+          "value_per36": -1.1
+        },
+        {
+          "athlete_id": 1108,
+          "has_history": true,
+          "raw_minutes": 15.0,
+          "value_def_per36": -0.5,
+          "value_off_per36": -0.2,
+          "value_per36": -0.7
+        },
+        {
+          "athlete_id": 1109,
+          "has_history": true,
+          "raw_minutes": 11.5,
+          "value_def_per36": -0.6,
+          "value_off_per36": -1.2,
+          "value_per36": -1.8
+        },
+        {
+          "athlete_id": 1110,
+          "has_history": true,
+          "raw_minutes": 8.0,
+          "value_def_per36": -2.1,
+          "value_off_per36": -0.4,
+          "value_per36": -2.5
+        },
+        {
+          "athlete_id": 1111,
+          "has_history": true,
+          "raw_minutes": 5.5,
+          "value_def_per36": -1.0,
+          "value_off_per36": -2.2,
+          "value_per36": -3.2
+        }
+      ]
+    },
+    {
+      "expected": {
+        "def": -1.114122388,
+        "ghost_minutes": 0.0,
+        "net": 2.228244776,
+        "off": 1.114122388,
+        "raw_strength": 7.228244776,
+        "tilt": 0.0
+      },
+      "features": [
+        "depth_chart_minutes",
+        "absorption",
+        "fictional_values"
+      ],
+      "name": "v2 depth chart only: the SAME eleven men, no per-side values -- the rotation curve makes the top of the rotation heavier and the bench lighter, which moves raw_strength",
+      "players": [
+        {
+          "athlete_id": 1101,
+          "has_history": true,
+          "raw_minutes": 35.5,
+          "value_def_per36": 1.1,
+          "value_off_per36": 4.1,
+          "value_per36": 5.2
+        },
+        {
+          "athlete_id": 1102,
+          "has_history": true,
+          "raw_minutes": 33.0,
+          "value_def_per36": 2.3,
+          "value_off_per36": 0.8,
+          "value_per36": 3.1
+        },
+        {
+          "athlete_id": 1103,
+          "has_history": true,
+          "raw_minutes": 30.5,
+          "value_def_per36": 0.3,
+          "value_off_per36": 1.1,
+          "value_per36": 1.4
+        },
+        {
+          "athlete_id": 1104,
+          "has_history": true,
+          "raw_minutes": 28.0,
+          "value_def_per36": -0.8,
+          "value_off_per36": 1.4,
+          "value_per36": 0.6
+        },
+        {
+          "athlete_id": 1105,
+          "has_history": true,
+          "raw_minutes": 24.5,
+          "value_def_per36": 0.35,
+          "value_off_per36": -0.55,
+          "value_per36": -0.2
+        },
+        {
+          "athlete_id": 1106,
+          "has_history": true,
+          "raw_minutes": 21.0,
+          "value_def_per36": -0.1,
+          "value_off_per36": 1.0,
+          "value_per36": 0.9
+        },
+        {
+          "athlete_id": 1107,
+          "has_history": true,
+          "raw_minutes": 18.5,
+          "value_def_per36": 0.65,
+          "value_off_per36": -1.75,
+          "value_per36": -1.1
+        },
+        {
+          "athlete_id": 1108,
+          "has_history": true,
+          "raw_minutes": 15.0,
+          "value_def_per36": -0.5,
+          "value_off_per36": -0.2,
+          "value_per36": -0.7
+        },
+        {
+          "athlete_id": 1109,
+          "has_history": true,
+          "raw_minutes": 11.5,
+          "value_def_per36": -0.6,
+          "value_off_per36": -1.2,
+          "value_per36": -1.8
+        },
+        {
+          "athlete_id": 1110,
+          "has_history": true,
+          "raw_minutes": 8.0,
+          "value_def_per36": -2.1,
+          "value_off_per36": -0.4,
+          "value_per36": -2.5
+        },
+        {
+          "athlete_id": 1111,
+          "has_history": true,
+          "raw_minutes": 5.5,
+          "value_def_per36": -1.0,
+          "value_off_per36": -2.2,
+          "value_per36": -3.2
+        }
+      ]
+    },
+    {
+      "expected": {
+        "def": 0.582222786,
+        "ghost_minutes": 0.0,
+        "net": -1.164445572,
+        "off": -0.582222786,
+        "raw_strength": 3.835554428,
+        "tilt": 0.0
+      },
+      "features": [
+        "depth_chart_minutes",
+        "absorption",
+        "fictional_values"
+      ],
+      "name": "v2 depth chart deep bench: seventeen men, so ranks 16 and 17 both fall past the curve's last entry and must SHARE that value -- the branch an off-by-one port breaks",
+      "players": [
+        {
+          "athlete_id": 1101,
+          "has_history": true,
+          "raw_minutes": 35.5,
+          "value_def_per36": 1.1,
+          "value_off_per36": 4.1,
+          "value_per36": 5.2
+        },
+        {
+          "athlete_id": 1102,
+          "has_history": true,
+          "raw_minutes": 33.0,
+          "value_def_per36": 2.3,
+          "value_off_per36": 0.8,
+          "value_per36": 3.1
+        },
+        {
+          "athlete_id": 1103,
+          "has_history": true,
+          "raw_minutes": 30.5,
+          "value_def_per36": 0.3,
+          "value_off_per36": 1.1,
+          "value_per36": 1.4
+        },
+        {
+          "athlete_id": 1104,
+          "has_history": true,
+          "raw_minutes": 28.0,
+          "value_def_per36": -0.8,
+          "value_off_per36": 1.4,
+          "value_per36": 0.6
+        },
+        {
+          "athlete_id": 1105,
+          "has_history": true,
+          "raw_minutes": 24.5,
+          "value_def_per36": 0.35,
+          "value_off_per36": -0.55,
+          "value_per36": -0.2
+        },
+        {
+          "athlete_id": 1106,
+          "has_history": true,
+          "raw_minutes": 21.0,
+          "value_def_per36": -0.1,
+          "value_off_per36": 1.0,
+          "value_per36": 0.9
+        },
+        {
+          "athlete_id": 1107,
+          "has_history": true,
+          "raw_minutes": 18.5,
+          "value_def_per36": 0.65,
+          "value_off_per36": -1.75,
+          "value_per36": -1.1
+        },
+        {
+          "athlete_id": 1108,
+          "has_history": true,
+          "raw_minutes": 15.0,
+          "value_def_per36": -0.5,
+          "value_off_per36": -0.2,
+          "value_per36": -0.7
+        },
+        {
+          "athlete_id": 1109,
+          "has_history": true,
+          "raw_minutes": 11.5,
+          "value_def_per36": -0.6,
+          "value_off_per36": -1.2,
+          "value_per36": -1.8
+        },
+        {
+          "athlete_id": 1110,
+          "has_history": true,
+          "raw_minutes": 8.0,
+          "value_def_per36": -2.1,
+          "value_off_per36": -0.4,
+          "value_per36": -2.5
+        },
+        {
+          "athlete_id": 1111,
+          "has_history": true,
+          "raw_minutes": 5.5,
+          "value_def_per36": -1.0,
+          "value_off_per36": -2.2,
+          "value_per36": -3.2
+        },
+        {
+          "athlete_id": 1112,
+          "has_history": true,
+          "raw_minutes": 4.5,
+          "value_def_per36": -2.0,
+          "value_off_per36": -1.6,
+          "value_per36": -3.6
+        },
+        {
+          "athlete_id": 1113,
+          "has_history": true,
+          "raw_minutes": 4.0,
+          "value_def_per36": -1.55,
+          "value_off_per36": -2.35,
+          "value_per36": -3.9
+        },
+        {
+          "athlete_id": 1114,
+          "has_history": true,
+          "raw_minutes": 3.5,
+          "value_def_per36": -2.7,
+          "value_off_per36": -1.4,
+          "value_per36": -4.1
+        },
+        {
+          "athlete_id": 1115,
+          "has_history": true,
+          "raw_minutes": 3.0,
+          "value_def_per36": -2.1,
+          "value_off_per36": -2.3,
+          "value_per36": -4.4
+        },
+        {
+          "athlete_id": 1116,
+          "has_history": true,
+          "raw_minutes": 2.5,
+          "value_def_per36": -2.8,
+          "value_off_per36": -1.9,
+          "value_per36": -4.7
+        },
+        {
+          "athlete_id": 1117,
+          "has_history": true,
+          "raw_minutes": 2.0,
+          "value_def_per36": -1.7,
+          "value_off_per36": -3.3,
+          "value_per36": -5.0
+        }
+      ]
+    },
+    {
+      "expected": {
+        "def": -3.207763598,
+        "ghost_minutes": 0.0,
+        "net": 11.665230251,
+        "off": 8.457466653,
+        "raw_strength": 16.665230251,
+        "tilt": 5.249703055
+      },
+      "features": [
+        "split_off_def",
+        "depth_chart_minutes",
+        "absorption",
+        "fictional_values"
+      ],
+      "name": "v2 rank key by value: a fictional add (9101) and a no-history man (9102), neither with a minutes history, are slotted by interpolating their own value against their history-having teammates' (minutes, value) pairs -- the trade-arrival branch",
+      "players": [
+        {
+          "athlete_id": 1101,
+          "has_history": true,
+          "raw_minutes": 35.5,
+          "value_def_per36": 1.1,
+          "value_off_per36": 4.1,
+          "value_per36": 5.2
+        },
+        {
+          "athlete_id": 1102,
+          "has_history": true,
+          "raw_minutes": 33.0,
+          "value_def_per36": 2.3,
+          "value_off_per36": 0.8,
+          "value_per36": 3.1
+        },
+        {
+          "athlete_id": 1103,
+          "has_history": true,
+          "raw_minutes": 30.5,
+          "value_def_per36": 0.3,
+          "value_off_per36": 1.1,
+          "value_per36": 1.4
+        },
+        {
+          "athlete_id": 1104,
+          "has_history": true,
+          "raw_minutes": 28.0,
+          "value_def_per36": -0.8,
+          "value_off_per36": 1.4,
+          "value_per36": 0.6
+        },
+        {
+          "athlete_id": 1105,
+          "has_history": true,
+          "raw_minutes": 24.5,
+          "value_def_per36": 0.35,
+          "value_off_per36": -0.55,
+          "value_per36": -0.2
+        },
+        {
+          "athlete_id": 1106,
+          "has_history": true,
+          "raw_minutes": 21.0,
+          "value_def_per36": -0.1,
+          "value_off_per36": 1.0,
+          "value_per36": 0.9
+        },
+        {
+          "athlete_id": 9101,
+          "has_history": false,
+          "raw_minutes": 26.0,
+          "value_def_per36": 1.2,
+          "value_off_per36": 3.2,
+          "value_per36": 4.4
+        },
+        {
+          "athlete_id": 9102,
+          "has_history": false,
+          "raw_minutes": null,
+          "value_def_per36": 0.9,
+          "value_off_per36": 1.9,
+          "value_per36": 2.8
+        }
+      ]
+    },
+    {
+      "expected": {
+        "def": -2.804091069,
+        "ghost_minutes": 0.0,
+        "net": 9.900360955,
+        "off": 7.096269885,
+        "raw_strength": 14.900360955,
+        "tilt": 4.292178816
+      },
+      "features": [
+        "split_off_def",
+        "depth_chart_minutes",
+        "absorption",
+        "fictional_values"
+      ],
+      "name": "v2 rank key clamped both ends: a superstar arrival (9104, better than anyone already here) and a minimum-salary arrival (9105, worse than anyone already here) -- neither value falls INSIDE his teammates' range, so both must be held flat at the top and bottom of the chart rather than extrapolated off the end of it",
+      "players": [
+        {
+          "athlete_id": 1101,
+          "has_history": true,
+          "raw_minutes": 35.5,
+          "value_def_per36": 1.1,
+          "value_off_per36": 4.1,
+          "value_per36": 5.2
+        },
+        {
+          "athlete_id": 1102,
+          "has_history": true,
+          "raw_minutes": 33.0,
+          "value_def_per36": 2.3,
+          "value_off_per36": 0.8,
+          "value_per36": 3.1
+        },
+        {
+          "athlete_id": 1103,
+          "has_history": true,
+          "raw_minutes": 30.5,
+          "value_def_per36": 0.3,
+          "value_off_per36": 1.1,
+          "value_per36": 1.4
+        },
+        {
+          "athlete_id": 1104,
+          "has_history": true,
+          "raw_minutes": 28.0,
+          "value_def_per36": -0.8,
+          "value_off_per36": 1.4,
+          "value_per36": 0.6
+        },
+        {
+          "athlete_id": 1105,
+          "has_history": true,
+          "raw_minutes": 24.5,
+          "value_def_per36": 0.35,
+          "value_off_per36": -0.55,
+          "value_per36": -0.2
+        },
+        {
+          "athlete_id": 1106,
+          "has_history": true,
+          "raw_minutes": 21.0,
+          "value_def_per36": -0.1,
+          "value_off_per36": 1.0,
+          "value_per36": 0.9
+        },
+        {
+          "athlete_id": 9104,
+          "has_history": false,
+          "raw_minutes": null,
+          "value_def_per36": 3.5,
+          "value_off_per36": 6.4,
+          "value_per36": 9.9
+        },
+        {
+          "athlete_id": 9105,
+          "has_history": false,
+          "raw_minutes": null,
+          "value_def_per36": -2.5,
+          "value_off_per36": -4.0,
+          "value_per36": -6.5
+        }
+      ]
+    },
+    {
+      "expected": {
+        "def": -0.421851655,
+        "ghost_minutes": 0.0,
+        "net": 2.228244776,
+        "off": 1.806393121,
+        "raw_strength": 7.228244776,
+        "tilt": 1.384541465
+      },
+      "features": [
+        "split_off_def",
+        "depth_chart_minutes",
+        "absorption",
+        "fictional_values"
+      ],
+      "name": "v2 absorption baseline: the eleven-man rotation under the v2 formula with nobody absent -- the A side of the pair, so ghost_minutes must read 0",
+      "players": [
+        {
+          "athlete_id": 1101,
+          "has_history": true,
+          "raw_minutes": 35.5,
+          "value_def_per36": 1.1,
+          "value_off_per36": 4.1,
+          "value_per36": 5.2
+        },
+        {
+          "athlete_id": 1102,
+          "has_history": true,
+          "raw_minutes": 33.0,
+          "value_def_per36": 2.3,
+          "value_off_per36": 0.8,
+          "value_per36": 3.1
+        },
+        {
+          "athlete_id": 1103,
+          "has_history": true,
+          "raw_minutes": 30.5,
+          "value_def_per36": 0.3,
+          "value_off_per36": 1.1,
+          "value_per36": 1.4
+        },
+        {
+          "athlete_id": 1104,
+          "has_history": true,
+          "raw_minutes": 28.0,
+          "value_def_per36": -0.8,
+          "value_off_per36": 1.4,
+          "value_per36": 0.6
+        },
+        {
+          "athlete_id": 1105,
+          "has_history": true,
+          "raw_minutes": 24.5,
+          "value_def_per36": 0.35,
+          "value_off_per36": -0.55,
+          "value_per36": -0.2
+        },
+        {
+          "athlete_id": 1106,
+          "has_history": true,
+          "raw_minutes": 21.0,
+          "value_def_per36": -0.1,
+          "value_off_per36": 1.0,
+          "value_per36": 0.9
+        },
+        {
+          "athlete_id": 1107,
+          "has_history": true,
+          "raw_minutes": 18.5,
+          "value_def_per36": 0.65,
+          "value_off_per36": -1.75,
+          "value_per36": -1.1
+        },
+        {
+          "athlete_id": 1108,
+          "has_history": true,
+          "raw_minutes": 15.0,
+          "value_def_per36": -0.5,
+          "value_off_per36": -0.2,
+          "value_per36": -0.7
+        },
+        {
+          "athlete_id": 1109,
+          "has_history": true,
+          "raw_minutes": 11.5,
+          "value_def_per36": -0.6,
+          "value_off_per36": -1.2,
+          "value_per36": -1.8
+        },
+        {
+          "athlete_id": 1110,
+          "has_history": true,
+          "raw_minutes": 8.0,
+          "value_def_per36": -2.1,
+          "value_off_per36": -0.4,
+          "value_per36": -2.5
+        },
+        {
+          "athlete_id": 1111,
+          "has_history": true,
+          "raw_minutes": 5.5,
+          "value_def_per36": -1.0,
+          "value_off_per36": -2.2,
+          "value_per36": -3.2
+        }
+      ]
+    },
+    {
+      "absent": [
+        {
+          "athlete_id": 1112,
+          "raw_minutes": 24.0,
+          "value_per36": null
+        }
+      ],
+      "expected": {
+        "def": -0.330427055,
+        "ghost_minutes": 3.208575737,
+        "net": 2.042482794,
+        "off": 1.712055738,
+        "raw_strength": 7.042482794,
+        "tilt": 1.381628683
+      },
+      "features": [
+        "split_off_def",
+        "depth_chart_minutes",
+        "absorption",
+        "fictional_values"
+      ],
+      "name": "v2 absorption: the SAME eleven men, with 1112 (24.0 raw minutes) removed and supplied as absent -- the rotation curve is blended into the REMAINING men only, then the untouched absorption formula sends absorption_phi of his minutes to the ghost",
+      "players": [
+        {
+          "athlete_id": 1101,
+          "has_history": true,
+          "raw_minutes": 35.5,
+          "value_def_per36": 1.1,
+          "value_off_per36": 4.1,
+          "value_per36": 5.2
+        },
+        {
+          "athlete_id": 1102,
+          "has_history": true,
+          "raw_minutes": 33.0,
+          "value_def_per36": 2.3,
+          "value_off_per36": 0.8,
+          "value_per36": 3.1
+        },
+        {
+          "athlete_id": 1103,
+          "has_history": true,
+          "raw_minutes": 30.5,
+          "value_def_per36": 0.3,
+          "value_off_per36": 1.1,
+          "value_per36": 1.4
+        },
+        {
+          "athlete_id": 1104,
+          "has_history": true,
+          "raw_minutes": 28.0,
+          "value_def_per36": -0.8,
+          "value_off_per36": 1.4,
+          "value_per36": 0.6
+        },
+        {
+          "athlete_id": 1105,
+          "has_history": true,
+          "raw_minutes": 24.5,
+          "value_def_per36": 0.35,
+          "value_off_per36": -0.55,
+          "value_per36": -0.2
+        },
+        {
+          "athlete_id": 1106,
+          "has_history": true,
+          "raw_minutes": 21.0,
+          "value_def_per36": -0.1,
+          "value_off_per36": 1.0,
+          "value_per36": 0.9
+        },
+        {
+          "athlete_id": 1107,
+          "has_history": true,
+          "raw_minutes": 18.5,
+          "value_def_per36": 0.65,
+          "value_off_per36": -1.75,
+          "value_per36": -1.1
+        },
+        {
+          "athlete_id": 1108,
+          "has_history": true,
+          "raw_minutes": 15.0,
+          "value_def_per36": -0.5,
+          "value_off_per36": -0.2,
+          "value_per36": -0.7
+        },
+        {
+          "athlete_id": 1109,
+          "has_history": true,
+          "raw_minutes": 11.5,
+          "value_def_per36": -0.6,
+          "value_off_per36": -1.2,
+          "value_per36": -1.8
+        },
+        {
+          "athlete_id": 1110,
+          "has_history": true,
+          "raw_minutes": 8.0,
+          "value_def_per36": -2.1,
+          "value_off_per36": -0.4,
+          "value_per36": -2.5
+        },
+        {
+          "athlete_id": 1111,
+          "has_history": true,
+          "raw_minutes": 5.5,
+          "value_def_per36": -1.0,
+          "value_off_per36": -2.2,
+          "value_per36": -3.2
+        }
+      ]
+    },
+    {
+      "absent": [
+        {
+          "athlete_id": 1109,
+          "raw_minutes": 11.5,
+          "value_per36": null
+        }
+      ],
+      "expected": {
+        "def": -1.93643054,
+        "ghost_minutes": 1.586676579,
+        "net": 6.905214314,
+        "off": 4.968783775,
+        "raw_strength": 11.905214314,
+        "tilt": 3.032353235
+      },
+      "features": [
+        "split_off_def",
+        "depth_chart_minutes",
+        "absorption",
+        "fictional_values"
+      ],
+      "name": "v2 full: the Split, the Depth Chart, a fictional add, an absent man, and 9103 with neither minutes nor value on record so both fallbacks fire inside the composed path",
+      "players": [
+        {
+          "athlete_id": 1101,
+          "has_history": true,
+          "raw_minutes": 35.5,
+          "value_def_per36": 1.1,
+          "value_off_per36": 4.1,
+          "value_per36": 5.2
+        },
+        {
+          "athlete_id": 1102,
+          "has_history": true,
+          "raw_minutes": 33.0,
+          "value_def_per36": 2.3,
+          "value_off_per36": 0.8,
+          "value_per36": 3.1
+        },
+        {
+          "athlete_id": 1103,
+          "has_history": true,
+          "raw_minutes": 30.5,
+          "value_def_per36": 0.3,
+          "value_off_per36": 1.1,
+          "value_per36": 1.4
+        },
+        {
+          "athlete_id": 1104,
+          "has_history": true,
+          "raw_minutes": 28.0,
+          "value_def_per36": -0.8,
+          "value_off_per36": 1.4,
+          "value_per36": 0.6
+        },
+        {
+          "athlete_id": 1105,
+          "has_history": true,
+          "raw_minutes": 24.5,
+          "value_def_per36": 0.35,
+          "value_off_per36": -0.55,
+          "value_per36": -0.2
+        },
+        {
+          "athlete_id": 1106,
+          "has_history": true,
+          "raw_minutes": 21.0,
+          "value_def_per36": -0.1,
+          "value_off_per36": 1.0,
+          "value_per36": 0.9
+        },
+        {
+          "athlete_id": 1107,
+          "has_history": true,
+          "raw_minutes": 18.5,
+          "value_def_per36": 0.65,
+          "value_off_per36": -1.75,
+          "value_per36": -1.1
+        },
+        {
+          "athlete_id": 1108,
+          "has_history": true,
+          "raw_minutes": 15.0,
+          "value_def_per36": -0.5,
+          "value_off_per36": -0.2,
+          "value_per36": -0.7
+        },
+        {
+          "athlete_id": 9101,
+          "has_history": false,
+          "raw_minutes": 26.0,
+          "value_def_per36": 1.2,
+          "value_off_per36": 3.2,
+          "value_per36": 4.4
+        },
+        {
+          "athlete_id": 9103,
+          "has_history": false,
+          "raw_minutes": null,
+          "value_per36": null
         }
       ]
     }
@@ -202,10 +1126,31 @@
   "constants": {
     "absorption_phi": 0.146,
     "bench_default_minutes": 12.0,
+    "depth_chart_curve": {
+      "1": 34.257,
+      "10": 11.757,
+      "11": 8.582,
+      "12": 6.484,
+      "13": 5.593,
+      "14": 5.211,
+      "15": 5.559,
+      "2": 32.832,
+      "3": 30.85,
+      "4": 28.775,
+      "5": 26.28,
+      "6": 23.224,
+      "7": 20.161,
+      "8": 17.43,
+      "9": 14.596
+    },
+    "depth_chart_max_rank": 15,
+    "depth_chart_w": 0.4,
     "ghost_athlete_id": -1,
     "replacement_per36": -1.0,
+    "replacement_tilt_per36": 0.4,
     "total_team_minutes": 240.0
   },
-  "description": "The pricing-layer cross-implementation fixture (GitHub issue #24) -- a FIXED, SYNTHETIC roster + values feeding the REAL hoops.rosterratings.raw_team_strength/team_net_rating -> known raw_strength/off/def/net per case. Schema matches keith-hub's own lib/hoops/pricing.ts + scripts/check-hoops-pricing-fixture.ts exactly (the receiver shipped first; its shape is authoritative per the issue #24 amendment, 2026-08-05). Port teamNetRating/rawTeamStrength/allocateMinutes/allocateMinutesWithAbsorption against THIS and reproduce every case's `expected` block to 1e-6 before trusting a roster edit's priced effect.",
-  "league_recenter": 5.0
+  "description": "The pricing-layer cross-implementation fixture (GitHub issue #24) -- a FIXED, SYNTHETIC roster + values feeding the REAL hoops.rosterratings.raw_team_strength/team_net_rating -> known raw_strength/off/def/net/tilt per case. Schema matches keith-hub's own lib/hoops/pricing.ts + scripts/check-hoops-pricing-fixture.ts exactly (the receiver shipped first; its shape is authoritative per the issue #24 amendment, 2026-08-05). EVERY case carries its own `features` list and must be priced under THAT list, not under the bundle's contract.features -- the v1 family (symmetric_off_def, plain proportional minutes) is a permanent backward-compatibility regression set, and the v2 family (split_off_def + depth_chart_minutes) is the hub-v2 formula. Port teamNetRating/rawTeamStrength/allocateMinutes/allocateMinutesWithAbsorption/allocateMinutesDepthChart against THIS and reproduce every case's `expected` block to 1e-6 before trusting a roster edit's priced effect.",
+  "league_recenter": 5.0,
+  "league_recenter_tilt": 1.5
 }

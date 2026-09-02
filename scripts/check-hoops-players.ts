@@ -71,6 +71,8 @@ import {
   rankPlayers,
 } from "../lib/hoops/playervalue.ts";
 import type { RankedPlayer } from "../lib/hoops/playervalue.ts";
+import { teamNetRating } from "../lib/hoops/pricing.ts";
+import type { PricingConstants, PricingPlayer } from "../lib/hoops/pricing.ts";
 import type { PlayerRow, RawPlayersFile } from "../lib/hoops/types.ts";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -711,21 +713,80 @@ function checkStackFieldsSynthetic(fixture: PlayerRow[]): void {
 // ────────────────────────────────────────────────── 7. the scope boundary ──
 
 function checkScopeBoundary(): void {
-  // The wire contract declares `symmetric_off_def`, and hoops_players.json
-  // ships its own note: these fields are display-only until a v2
-  // `split_off_def` flip on BOTH sides. Pricing must stay on the net.
-  for (const rel of ["lib/hoops/pricing.ts", "lib/hoops/boxscore.ts"]) {
-    const src = fs.readFileSync(path.join(ROOT, rel), "utf-8");
-    for (const field of ["value_off_per36", "value_def_per36"]) {
-      check(
-        !src.includes(field),
-        `${rel} reads ${field}. The bundle arrives under a symmetric_off_def contract — pricing ` +
-          `uses value_per36 (net) only, with off=net/2, def=-net/2. Wiring the real split into ` +
-          `pricing needs a v2 split_off_def feature flip on BOTH sides first.`,
-      );
-    }
+  // 🔴 RE-DECIDED 2026-09-02 (hub-v2). This used to GREP pricing.ts and
+  // boxscore.ts for the strings "value_off_per36"/"value_def_per36" and fail if
+  // either appeared — a "nobody reaches this yet" scan, which is a decision
+  // pin: it fails the build on the day the receiver is legitimately taught the
+  // split, which is exactly what happened. Deleting it would lose a real
+  // guarantee, so it is REPLACED by the behavioural form of the same claim,
+  // which survives the flip and is strictly stronger (a grep never proved any
+  // arithmetic, only the absence of a substring):
+  //
+  //   1. A bundle that does NOT declare split_off_def must be priced
+  //      symmetrically — off = net/2 exactly, tilt exactly 0 — EVEN WHEN every
+  //      player on it carries a real offence/defence split. That is the honest
+  //      version of "pricing must stay on the net", and it is what protects an
+  //      old bundle from being silently re-priced by a newer receiver.
+  //   2. The split must be REACHABLE: the same roster under split_off_def must
+  //      produce a non-zero tilt. A guard that only ever proves something is
+  //      switched off cannot tell "correctly gated" from "not implemented".
+  //   3. The split must not move the NET, ever — that is the structural reason
+  //      it cannot change a margin or a win probability.
+  //   4. boxscore.ts genuinely does still price off the net — it allocates
+  //      minutes and shares counting stats and has no per-side concept at all —
+  //      so the grep is kept for that file alone, where it is still a true
+  //      statement about scope rather than a pin on a migration.
+  const constants: PricingConstants = {
+    total_team_minutes: 240,
+    bench_default_minutes: 12,
+    absorption_phi: 0.146,
+    ghost_athlete_id: -1,
+    replacement_per36: -1,
+    replacement_tilt_per36: 0.4,
+  };
+  const roster: PricingPlayer[] = [
+    { athlete_id: 1, raw_minutes: 34, value_per36: 4, value_off_per36: 3.5, value_def_per36: 0.5 },
+    { athlete_id: 2, raw_minutes: 28, value_per36: 1, value_off_per36: -0.5, value_def_per36: 1.5 },
+    { athlete_id: 3, raw_minutes: 18, value_per36: -1, value_off_per36: 0.5, value_def_per36: -1.5 },
+  ];
+  const symmetric = teamNetRating(roster, constants, 0);
+  check(
+    symmetric.tilt === 0,
+    `a bundle without split_off_def priced with tilt ${symmetric.tilt}, must be exactly 0 — ` +
+      `the per-side values must not leak into a symmetric bundle's pricing`,
+  );
+  check(
+    symmetric.off === symmetric.net / 2 && symmetric.def === -symmetric.net / 2,
+    `a bundle without split_off_def priced off=${symmetric.off}, def=${symmetric.def}, ` +
+      `net=${symmetric.net} — must be exactly net/2 and -net/2`,
+  );
+  const split = teamNetRating(roster, constants, 0, undefined, { split: true });
+  check(
+    Math.abs(split.tilt) > 1e-9,
+    `the same roster under split_off_def gave tilt ${split.tilt} — the per-side path is gated ` +
+      `off or unimplemented, and a guard that only proves "switched off" cannot tell those apart`,
+  );
+  check(
+    Math.abs(split.net - symmetric.net) < 1e-9,
+    `split_off_def moved the NET from ${symmetric.net} to ${split.net}. It must not: the net is ` +
+      `computed by the untouched lines and never derived from the two sides, which is what makes ` +
+      `it impossible for the split to move a margin or a win probability`,
+  );
+
+  const boxSrc = fs.readFileSync(path.join(ROOT, "lib/hoops/boxscore.ts"), "utf-8");
+  for (const field of ["value_off_per36", "value_def_per36"]) {
+    check(
+      !boxSrc.includes(field),
+      `lib/hoops/boxscore.ts reads ${field}. The box-score simulator allocates minutes and ` +
+        `shares counting stats; it has no per-side concept, and giving it one is a separate ` +
+        `milestone with its own measurement, not a side effect of the hub-v2 contract.`,
+    );
   }
-  notes.push("scope: pricing.ts and boxscore.ts still price off the net, as the contract requires");
+  notes.push(
+    `scope: a symmetric bundle prices tilt exactly 0 and off=net/2 even with per-side values ` +
+      `present; the same roster under split_off_def prices tilt ${split.tilt.toFixed(4)} with ` +
+      `the net unmoved; boxscore.ts still prices off the net`,
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────── run ──
