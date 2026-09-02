@@ -5,9 +5,19 @@
 // #21 there). These types describe that file format exactly — if the exporter
 // changes shape, this file and lib/hoops/blob-contract.json change with it.
 
-export type RatingMode = "results" | "roster" | "blend";
+export type RatingMode = "results" | "roster" | "blend" | "nightly";
 
+/** The three modes every bundle has always carried. */
 export const RATING_MODES: RatingMode[] = ["results", "roster", "blend"];
+
+/**
+ * `nightly` — "who has actually been on the floor, last ten games". A fourth
+ * mode, and OPTIONAL: it is present only in a bundle carrying the nightly
+ * block, so nothing may assume it exists. `availableRatingModes()` in
+ * queries.ts is the one place that decides whether to offer it.
+ */
+export const NIGHTLY_MODE: RatingMode = "nightly";
+export const ALL_RATING_MODES: RatingMode[] = [...RATING_MODES, NIGHTLY_MODE];
 
 export type Conference = "East" | "West";
 
@@ -89,18 +99,47 @@ export interface RawTeamRatings {
   def: number;
 }
 
+/**
+ * One team's nightly read — "who has actually been on the floor, last ten
+ * games". Same team convention as the three above (`off - def` is the margin
+ * rating, a positive `def` means points allowed).
+ *
+ * 🔴 `abstained` is not decoration. A team too early in its season, or one
+ * nobody could be priced for, keeps its RESULTS rating exactly, and the site
+ * must say so rather than present a computed-looking number nobody computed.
+ */
+export interface RawNightlyRating extends RawTeamRatings {
+  net: number;
+  /** How much of this number is still the season-long results rating. */
+  results_w: number;
+  n_basis_games: number;
+  games_played: number;
+  abstained: boolean;
+}
+
 export interface RawTeam {
   conference: Conference;
   division: string;
   results: RawTeamRatings;
   roster: RawTeamRatings;
   blend: RawTeamRatings;
+  /** Optional — present only in a bundle carrying the nightly block. */
+  nightly?: RawNightlyRating;
 }
 
 export interface RawTeamsFile {
   generated_at: string;
   hca_pts: number;
   avg_poss_per_team_game: number;
+  /** Nightly-block provenance, all optional and travelling together. */
+  nightly_as_of?: string | null;
+  nightly_value_source?: string | null;
+  nightly_last_n_games?: number | null;
+  nightly_season_start_year?: number | null;
+  /** True when the sender declared `nightly_strength`, i.e. this read is fit
+   *  to PRICE a game with and not merely to display. */
+  nightly_priced?: boolean | null;
+  nightly_note?: string | null;
   teams: Record<string, RawTeam>;
 }
 
@@ -274,6 +313,13 @@ export interface TeamRow {
   roster_def: number;
   blend_off: number;
   blend_def: number;
+  /** Nightly, all nullable together — a bundle without the block leaves every
+   *  one of these NULL and the nightly lens is simply not offered. */
+  nightly_off?: number | null;
+  nightly_def?: number | null;
+  nightly_results_w?: number | null;
+  nightly_n_basis_games?: number | null;
+  nightly_abstained?: number | null;
 }
 
 /** A team with one rating mode resolved, plus derived net/rank. */

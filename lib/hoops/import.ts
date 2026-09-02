@@ -73,6 +73,12 @@ interface StoredState {
    *  milestone. Marker column is value_pg (not stack_net_per36) so a bundle
    *  that ships the stack rate without a minutes read still forces a rewrite. */
   hasStackFields: boolean;
+  /** And a fourth time, for the nightly team read (hub-v2). Same reason: the
+   *  migration in lib/db.ts adds the columns but leaves every value NULL, and
+   *  an unchanged content hash would otherwise keep them that way forever, so
+   *  an existing volume would show three rating lenses when the bundle carries
+   *  four. */
+  hasNightly: boolean;
 }
 
 function currentState(db: Database.Database): StoredState | null {
@@ -95,6 +101,11 @@ function currentState(db: Database.Database): StoredState | null {
       .prepare(`SELECT COUNT(*) AS n FROM hoops_players WHERE value_pg IS NOT NULL`)
       .get() as { n: number }
   ).n;
+  const nightly = (
+    db
+      .prepare(`SELECT COUNT(*) AS n FROM hoops_teams WHERE nightly_off IS NOT NULL`)
+      .get() as { n: number }
+  ).n;
   return {
     hash: row.content_hash,
     generatedAt: row.generated_at,
@@ -103,6 +114,7 @@ function currentState(db: Database.Database): StoredState | null {
     hasScalars: row.hca_pts !== null,
     hasPlayerSplit: split > 0,
     hasStackFields: stack > 0,
+    hasNightly: nightly > 0,
   };
 }
 
@@ -140,8 +152,9 @@ function writeBundle(db: Database.Database, bundle: HoopsBundle, meta: WriteMeta
     db.prepare(
       `INSERT INTO hoops_params
          (id, param_version, blob, generated_at, imported_at, content_hash, import_source,
-          hca_pts, replacement_per36, value_as_of, pricing_version, features_json, constants_json)
-       VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          hca_pts, replacement_per36, value_as_of, pricing_version, features_json, constants_json,
+          nightly_as_of, nightly_value_source, nightly_last_n_games, nightly_priced)
+       VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
       bundle.params.parameter_set.param_version,
       meta.paramsBlobText,
@@ -155,12 +168,23 @@ function writeBundle(db: Database.Database, bundle: HoopsBundle, meta: WriteMeta
       meta.pricingVersion,
       meta.features ? JSON.stringify(meta.features) : null,
       meta.constants ? JSON.stringify(meta.constants) : null,
+      bundle.teams.nightly_as_of ?? null,
+      bundle.teams.nightly_value_source ?? null,
+      bundle.teams.nightly_last_n_games ?? null,
+      // 🔴 The sender says whether its nightly read is fit to PRICE with (it
+      // declares `nightly_strength`) as distinct from merely being present. The
+      // block ships either way, so the site can show the number before it is
+      // allowed to bet on it. NULL when the sender said nothing, which the
+      // reader treats as "display only".
+      bundle.teams.nightly_priced == null ? null : bundle.teams.nightly_priced ? 1 : 0,
     );
 
     const insTeam = db.prepare(
       `INSERT INTO hoops_teams
-         (tri, conference, division, results_off, results_def, roster_off, roster_def, blend_off, blend_def)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (tri, conference, division, results_off, results_def, roster_off, roster_def,
+          blend_off, blend_def,
+          nightly_off, nightly_def, nightly_results_w, nightly_n_basis_games, nightly_abstained)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     );
     for (const [tri, t] of Object.entries(bundle.teams.teams)) {
       insTeam.run(
@@ -173,6 +197,14 @@ function writeBundle(db: Database.Database, bundle: HoopsBundle, meta: WriteMeta
         t.roster.def,
         t.blend.off,
         t.blend.def,
+        // 🔴 NULL, never 0, when this bundle carries no nightly read for this
+        // team — all-NULL is what tells the UI it has nothing to show, and a 0
+        // would read on screen as "exactly average lately".
+        t.nightly?.off ?? null,
+        t.nightly?.def ?? null,
+        t.nightly?.results_w ?? null,
+        t.nightly?.n_basis_games ?? null,
+        t.nightly ? (t.nightly.abstained ? 1 : 0) : null,
       );
     }
 
@@ -344,6 +376,10 @@ export function importHoopsData(force = false): ImportSummary {
   const bundleHasStack = bundle.players.players.some((p) => p.value_pg != null);
   const stackSettled = !bundleHasStack || state?.hasStackFields === true;
 
+  // A fourth time, for the nightly team read (hub-v2).
+  const bundleHasNightly = Object.values(bundle.teams.teams).some((t) => t.nightly != null);
+  const nightlySettled = !bundleHasNightly || state?.hasNightly === true;
+
   if (
     !force &&
     state &&
@@ -351,7 +387,8 @@ export function importHoopsData(force = false): ImportSummary {
     state.count > 0 &&
     state.hasScalars &&
     splitSettled &&
-    stackSettled
+    stackSettled &&
+    nightlySettled
   ) {
     return {
       imported: false,

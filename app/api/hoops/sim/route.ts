@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { N_SIMS_MAX, N_SIMS_EXPECTED_DEFAULT } from "@/lib/hoops/boxscore";
 import { runMatchup, UnknownTeamError } from "@/lib/hoops/run";
-import { isRatingMode, DEFAULT_RATING_MODE } from "@/lib/hoops/queries";
+import { isRatingMode } from "@/lib/hoops/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -49,7 +49,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       home,
       away,
       neutralSite: body.neutral === true,
-      ratingMode: isRatingMode(rawMode) ? rawMode : DEFAULT_RATING_MODE,
+      // Undefined lets runMatchup pick the best read available tonight — the
+      // nightly one where this bundle carries a complete set and the sender
+      // vouched for it, otherwise the blend, which is what it always was. The
+      // choice comes back in `summary.ratingMode` and is printed on the page.
+      ratingMode: isRatingMode(rawMode) ? rawMode : undefined,
       nSims,
       runId: typeof body.runId === "string" ? body.runId : undefined,
       nonce: typeof body.nonce === "string" ? body.nonce : undefined,

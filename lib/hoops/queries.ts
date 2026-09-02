@@ -9,7 +9,7 @@ import { ensureHoopsImport } from "./import";
 import type { ImportSource } from "./import";
 import { decodeParams } from "./params";
 import type { DecodedParams } from "./params";
-import { modeDisagreement, rankTeams } from "./rating";
+import { availableRatingModes as availableModesOf, modeDisagreement, rankTeams } from "./rating";
 import type { ModeDisagreement } from "./rating";
 import type {
   PlayerRow,
@@ -20,12 +20,15 @@ import type {
   RawPlayerPer36,
   TeamRow,
 } from "./types";
-import { RATING_MODES } from "./types";
+import { ALL_RATING_MODES } from "./types";
 
 export function isRatingMode(v: string | null | undefined): v is RatingMode {
-  return !!v && (RATING_MODES as string[]).includes(v);
+  return !!v && (ALL_RATING_MODES as string[]).includes(v);
 }
 
+/** The mode chosen when nothing else says otherwise, for a bundle that has no
+ *  nightly read. `resolveRatingMode` upgrades this to `nightly` where one
+ *  exists and the sender declared it fit to price with. */
 export const DEFAULT_RATING_MODE: RatingMode = "blend";
 
 /** Every team row, straight off the read model. The ranking maths lives in
@@ -35,12 +38,87 @@ export function getTeamRows(): TeamRow[] {
   return getDb().prepare(`SELECT * FROM hoops_teams ORDER BY tri`).all() as TeamRow[];
 }
 
+/** Which rating lenses this bundle can offer. The decision itself is pure and
+ *  lives in rating.ts (so the client and the build check can both reach it);
+ *  this is the DB-backed convenience wrapper. */
+export function availableRatingModes(rows?: TeamRow[]): RatingMode[] {
+  return availableModesOf(rows ?? getTeamRows());
+}
+
+/**
+ * The mode to price a game with when the caller has not chosen one.
+ *
+ * Prefers the nightly read — "who has actually been on the floor, last ten
+ * games", the one game-level channel hoops-sim has measured a held-out gain
+ * for — but ONLY when the bundle carries a complete one AND the sender
+ * declared `nightly_strength`, meaning it vouches for it as a pricing input
+ * rather than a display. Falls back to the blend, which is what every page did
+ * before. Whatever it picks is disclosed on the page; nothing here is silent.
+ */
+export function resolveRatingMode(rows?: TeamRow[]): RatingMode {
+  const teams = rows ?? getTeamRows();
+  if (!availableRatingModes(teams).includes("nightly")) return DEFAULT_RATING_MODE;
+  return getNightlyMeta().priced ? "nightly" : DEFAULT_RATING_MODE;
+}
+
 export function getRankedTeams(mode: RatingMode = DEFAULT_RATING_MODE): RankedTeam[] {
   return rankTeams(getTeamRows(), mode);
 }
 
 export function getTeam(tri: string, mode: RatingMode = DEFAULT_RATING_MODE): RankedTeam | null {
   return rankTeams(getTeamRows(), mode).find((t) => t.tri === tri.toUpperCase()) ?? null;
+}
+
+export interface NightlyMeta {
+  /** Present at all? False for every bundle published before hub-v2. */
+  present: boolean;
+  /** The sender declared `nightly_strength` — fit to price a game with. */
+  priced: boolean;
+  /** The as-of date of the player values the read was built from. */
+  asOf: string | null;
+  /** e.g. "stack_nightly" — which player-rating model priced the minutes. */
+  valueSource: string | null;
+  /** How many recent games per team the read looks at. */
+  lastNGames: number | null;
+  /** Teams the read abstained on: too early in their season, or nobody could
+   *  be priced. They keep their results rating exactly, and the page says so. */
+  abstained: string[];
+}
+
+export function getNightlyMeta(): NightlyMeta {
+  ensureHoopsImport();
+  const db = getDb();
+  const row = db
+    .prepare(
+      `SELECT nightly_as_of, nightly_value_source, nightly_last_n_games, nightly_priced
+       FROM hoops_params WHERE id = 1`,
+    )
+    .get() as
+    | {
+        nightly_as_of: string | null;
+        nightly_value_source: string | null;
+        nightly_last_n_games: number | null;
+        nightly_priced: number | null;
+      }
+    | undefined;
+  const abstained = (
+    db
+      .prepare(`SELECT tri FROM hoops_teams WHERE nightly_abstained = 1 ORDER BY tri`)
+      .all() as Array<{ tri: string }>
+  ).map((r) => r.tri);
+  const present = (
+    db.prepare(`SELECT COUNT(*) AS n FROM hoops_teams WHERE nightly_off IS NOT NULL`).get() as {
+      n: number;
+    }
+  ).n > 0;
+  return {
+    present,
+    priced: present && row?.nightly_priced === 1,
+    asOf: row?.nightly_as_of ?? null,
+    valueSource: row?.nightly_value_source ?? null,
+    lastNGames: row?.nightly_last_n_games ?? null,
+    abstained,
+  };
 }
 
 export function getModeDisagreement(): ModeDisagreement {

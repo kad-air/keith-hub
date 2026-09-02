@@ -537,46 +537,84 @@ function checkRanking(rows: ReturnType<typeof playerRowsFromBundle>): void {
 // ─────────────────────────────────────── 5. absence tolerance (committed) ──
 
 /**
- * The committed bundle predates the stack rating entirely. Everything that
- * reads value_pg/expected_minutes/stack_*_per36/evidence must behave EXACTLY
- * as it did before this milestone when a bundle carries none of them —
- * defaultSortFor must still resolve to "net", and rankPlayers must still
- * report every stack field as null rather than, say, coercing an absent
- * number to 0 and silently ranking on it.
+ * Two branches, and which one the committed bundle exercises depends on
+ * whether the machine that exported it had a tape-stack snapshot to read.
+ *
+ * 🔴 UPDATED 2026-09-02 (hub-v2). This used to assert the committed bundle
+ * carried NO stack field, and instructed its own successor: "if the exporter
+ * now ships these fields for real, that's the milestone landing — update this
+ * check to assert coverage instead of absence." It has landed, so it does.
+ * Both branches are still real and both still have to work:
+ *
+ *   PRESENT — most rostered players carry the six fields, defaultSortFor
+ *   resolves to "value" (points of team margin per game, which is the
+ *   question a reader actually asks), and every carrier's value_pg is
+ *   internally consistent with its rate and minutes.
+ *
+ *   ABSENT — a publish from a machine with no snapshot must produce exactly
+ *   the pre-stack bundle. That path is now exercised by STRIPPING the fields
+ *   from real rows rather than by hoping the committed file lacks them, which
+ *   is strictly better: the branch is tested on every build instead of only
+ *   while the exporter happened not to ship it.
  */
 function checkAbsenceTolerance(rows: ReturnType<typeof playerRowsFromBundle>): void {
-  const anyStack = rows.some(
-    (r) =>
-      r.stack_net_per36 != null ||
-      r.stack_off_per36 != null ||
-      r.stack_def_per36 != null ||
-      r.expected_minutes != null ||
-      r.value_pg != null ||
-      r.evidence != null,
-  );
-  check(
-    !anyStack,
-    "hoops_players.json: this committed bundle unexpectedly carries a stack-rating field — the " +
-      "absence-tolerance check no longer exercises the branch it's meant to. If the exporter now " +
-      "ships these fields for real, that's the milestone landing — update this check to assert " +
-      "coverage instead of absence.",
-  );
+  const carriers = rows.filter((r) => r.value_pg != null);
+  const floor = paramsConstants?.absorption_rotation_floor_minutes ?? null;
 
-  const fallback = defaultSortFor(rows);
+  // ── the ABSENT branch, forced rather than assumed ──
+  const stripped = rows.map((r) => ({
+    ...r,
+    stack_net_per36: null,
+    stack_off_per36: null,
+    stack_def_per36: null,
+    expected_minutes: null,
+    value_pg: null,
+    evidence: null,
+  }));
+  const fallback = defaultSortFor(stripped);
   check(
     fallback === "net",
-    `defaultSortFor: a bundle with no value_pg reads should still default to "net", got "${fallback}"`,
+    `defaultSortFor: a bundle with no value_pg reads must default to "net", got "${fallback}"`,
+  );
+  check(
+    rankPlayers(stripped, fallback, floor).every(
+      (p) => p.valuePg == null && p.expectedMinutes == null && p.evidence == null,
+    ),
+    "rankPlayers: a player came back with a non-null stack field from a bundle that carries none " +
+      "— an absent number must stay absent, never be coerced to 0 and silently ranked on",
   );
 
-  const floor = paramsConstants?.absorption_rotation_floor_minutes ?? null;
-  const ranked = rankPlayers(rows, fallback, floor);
+  // ── the PRESENT branch, on whatever the committed bundle actually is ──
+  if (carriers.length === 0) {
+    notes.push(
+      "stack fields: this committed bundle carries none (exported from a machine with no " +
+        "tape-stack snapshot) — the absent branch is the live one, and the present branch is " +
+        "covered by the synthetic fixture below",
+    );
+    return;
+  }
   check(
-    ranked.every((p) => p.valuePg == null && p.expectedMinutes == null && p.evidence == null),
-    "rankPlayers: a player came back with a non-null stack field from a bundle that carries none",
+    defaultSortFor(rows) === "value",
+    `defaultSortFor: a bundle that DOES carry value_pg should lead with "value", got ` +
+      `"${defaultSortFor(rows)}"`,
+  );
+  const badArithmetic = carriers.filter((r) => {
+    if (r.stack_net_per36 == null || r.expected_minutes == null) return true;
+    return Math.abs(r.value_pg! - (r.stack_net_per36 * r.expected_minutes) / 36) > 5e-4;
+  });
+  check(
+    badArithmetic.length === 0,
+    `stack fields: ${badArithmetic.length} player(s) whose value per game does not equal their ` +
+      `rate times their minutes (e.g. ${badArithmetic[0]?.name}) — the sender ships this ` +
+      `pre-computed, so a mismatch means the two travelled apart`,
+  );
+  check(
+    carriers.every((r) => (r.evidence ?? "").length > 0),
+    "stack fields: a player carries a rating with no note saying what it rests on",
   );
   notes.push(
-    `absence tolerance: committed bundle carries no stack fields, defaultSortFor -> "${fallback}", ` +
-      "ranking unchanged",
+    `stack fields: ${carriers.length} of ${rows.length} players carry a stack rating, value per ` +
+      `game reconciles for all of them, and the no-snapshot branch still defaults to "net"`,
   );
 }
 

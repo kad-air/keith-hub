@@ -28,9 +28,23 @@ import type { RatingMode } from "./types.ts";
 // different game. That is why every result surface prints param_version and
 // data_as_of next to the run_id rather than the run_id alone.
 
+// 🔴 The court code and the mode code sit in FIXED positions ("hb" = home
+// court, blend rating), so `n` meaning "neutral" in the first slot and
+// "nightly" in the second can never collide. Every code here is permanent: a
+// link shared at any point in this site's history has to keep resolving.
 const COURT_CODE = { home: "h", neutral: "n" } as const;
-const MODE_CODE: Record<RatingMode, string> = { results: "r", roster: "o", blend: "b" };
-const MODE_OF_CODE: Record<string, RatingMode> = { r: "results", o: "roster", b: "blend" };
+const MODE_CODE: Record<RatingMode, string> = {
+  results: "r",
+  roster: "o",
+  blend: "b",
+  nightly: "n",
+};
+const MODE_OF_CODE: Record<string, RatingMode> = {
+  r: "results",
+  o: "roster",
+  b: "blend",
+  n: "nightly",
+};
 
 export interface RunCoordinates {
   home: string;
@@ -54,7 +68,7 @@ export function parseRunId(runId: string): RunCoordinates | null {
   const [home, away, flags, hex] = parts;
   if (!/^[A-Z]{2,4}$/.test(home) || !/^[A-Z]{2,4}$/.test(away)) return null;
   if (home === away) return null;
-  if (!/^[hn][rob]$/.test(flags)) return null;
+  if (!/^[hn][robn]$/.test(flags)) return null;
   if (!/^[0-9a-f]{16}$/.test(hex)) return null;
   return {
     home,

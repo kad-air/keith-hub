@@ -15,11 +15,11 @@ import { encodeRunId, summarizeSim } from "./matchup";
 import type { RunCoordinates, SimSummary } from "./matchup";
 import { offDefOf } from "./rating";
 import {
-  DEFAULT_RATING_MODE,
   getBoxRoster,
   getDecodedParams,
   getHoopsMeta,
   getTeamRows,
+  resolveRatingMode,
 } from "./queries";
 import type { HoopsMeta } from "./queries";
 import type { RatingMode, TeamRow } from "./types";
@@ -71,7 +71,12 @@ function resolve(input: MatchupInput): Resolved {
   if (!homeRow) throw new UnknownTeamError(home);
   if (!awayRow) throw new UnknownTeamError(away);
 
-  const ratingMode = input.ratingMode ?? DEFAULT_RATING_MODE;
+  // 🔴 With no mode asked for, take the best read available tonight: the
+  // nightly one where the bundle carries a complete set and the sender vouched
+  // for it, otherwise the blend — which is what every caller got before hub-v2.
+  // The chosen mode is baked into the run_id and printed on every result
+  // surface, so this is never a silent substitution.
+  const ratingMode = input.ratingMode ?? resolveRatingMode(rows);
   const neutralSite = input.neutralSite ?? false;
   const coords: RunCoordinates = { home, away, neutralSite, ratingMode };
 

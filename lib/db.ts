@@ -275,12 +275,21 @@ export function getDb(): Database.Database {
       value_as_of TEXT,
       pricing_version INTEGER,
       features_json TEXT,
-      constants_json TEXT
+      constants_json TEXT,
+      nightly_as_of TEXT,
+      nightly_value_source TEXT,
+      nightly_last_n_games INTEGER,
+      nightly_priced INTEGER
     );
 
-    -- Wide, not long: one row per team with all three rating modes as
-    -- columns, so tri stays a real primary key and the mode is chosen at
-    -- query time rather than filtered for on every read.
+    -- Wide, not long: one row per team with every rating mode as columns, so
+    -- tri stays a real primary key and the mode is chosen at query time rather
+    -- than filtered for on every read.
+    --
+    -- The nightly_* columns are the fourth mode ("who has actually been on the
+    -- floor, last ten games") and are NULLABLE on purpose: an older bundle
+    -- carries no nightly block, and all-NULL is what tells the UI not to offer
+    -- the lens at all. A zero would read as "exactly average lately".
     CREATE TABLE IF NOT EXISTS hoops_teams (
       tri TEXT PRIMARY KEY,
       conference TEXT NOT NULL,
@@ -290,7 +299,12 @@ export function getDb(): Database.Database {
       roster_off REAL NOT NULL,
       roster_def REAL NOT NULL,
       blend_off REAL NOT NULL,
-      blend_def REAL NOT NULL
+      blend_def REAL NOT NULL,
+      nightly_off REAL,
+      nightly_def REAL,
+      nightly_results_w REAL,
+      nightly_n_basis_games INTEGER,
+      nightly_abstained INTEGER
     );
 
     -- value_off_per36/value_def_per36 are the genuine offence/defence split of
@@ -475,6 +489,48 @@ export function getDb(): Database.Database {
     const name = col.split(" ")[0];
     if (!hoopsPlayerColsRefreshed.includes(name)) {
       dbInstance.exec(`ALTER TABLE hoops_players ADD COLUMN ${col}`);
+    }
+  }
+
+  // hoops_teams + hoops_params: NIGHTLY STRENGTH (hub-v2) — a fourth team
+  // rating, "who has actually been on the floor, last ten games", plus the
+  // provenance the page has to print alongside it. Additive and nullable in
+  // exactly the same shape as the two migrations above, for the same reason: a
+  // pre-existing prod DB has both tables from before these columns, and
+  // CREATE TABLE IF NOT EXISTS never alters an existing table.
+  //
+  // 🔴 Every column here is NULL for a bundle without the nightly block, and
+  // ALL-NULL is the signal that the nightly lens must not be offered at all —
+  // never a zero, which would read on screen as "this team is exactly average
+  // lately" when the truth is "we have no read".
+  const hoopsTeamCols = (
+    dbInstance.prepare(`PRAGMA table_info(hoops_teams)`).all() as Array<{ name: string }>
+  ).map((c) => c.name);
+  for (const col of [
+    "nightly_off REAL",
+    "nightly_def REAL",
+    "nightly_results_w REAL",
+    "nightly_n_basis_games INTEGER",
+    "nightly_abstained INTEGER",
+  ]) {
+    const name = col.split(" ")[0];
+    if (!hoopsTeamCols.includes(name)) {
+      dbInstance.exec(`ALTER TABLE hoops_teams ADD COLUMN ${col}`);
+    }
+  }
+
+  const hoopsParamsNightlyCols = (
+    dbInstance.prepare(`PRAGMA table_info(hoops_params)`).all() as Array<{ name: string }>
+  ).map((c) => c.name);
+  for (const col of [
+    "nightly_as_of TEXT",
+    "nightly_value_source TEXT",
+    "nightly_last_n_games INTEGER",
+    "nightly_priced INTEGER",
+  ]) {
+    const name = col.split(" ")[0];
+    if (!hoopsParamsNightlyCols.includes(name)) {
+      dbInstance.exec(`ALTER TABLE hoops_params ADD COLUMN ${col}`);
     }
   }
 

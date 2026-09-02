@@ -191,7 +191,21 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   ).some((p) => p.value_off_per36 != null);
   const splitSettled = !bundleCarriesSplit || storedSplit > 0;
 
-  if (existing && existing.content_hash === contentHash && splitSettled) {
+  // The same exception again for the nightly team read (hub-v2): the migration
+  // adds the columns but leaves them NULL, and a same-hash re-POST would
+  // otherwise freeze them that way, so the site would show three rating lenses
+  // when the bundle carries four. Falls through to one real write, once.
+  const storedNightly = (
+    db.prepare(`SELECT COUNT(*) AS n FROM hoops_teams WHERE nightly_off IS NOT NULL`).get() as {
+      n: number;
+    }
+  ).n;
+  const bundleCarriesNightly = Object.values(
+    (files["hoops_teams.json"] as RawTeamsFile | undefined)?.teams ?? {},
+  ).some((t) => t.nightly != null);
+  const nightlySettled = !bundleCarriesNightly || storedNightly > 0;
+
+  if (existing && existing.content_hash === contentHash && splitSettled && nightlySettled) {
     return NextResponse.json({
       imported: false,
       reason: "unchanged",

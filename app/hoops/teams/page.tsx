@@ -3,13 +3,15 @@ import { Suspense } from "react";
 import HoopsNav from "@/components/hoops/HoopsNav";
 import TeamsClient from "@/components/hoops/TeamsClient";
 import {
-  DEFAULT_RATING_MODE,
+  availableRatingModes,
   getHoopsMeta,
   getLeagueFormSummaries,
+  getNightlyMeta,
   getResultsWindow,
   getRosterSizes,
   getTeamRows,
   isRatingMode,
+  resolveRatingMode,
 } from "@/lib/hoops/queries";
 
 export const dynamic = "force-dynamic";
@@ -24,7 +26,12 @@ export default function HoopsTeamsPage({
   const rows = getTeamRows();
   const meta = getHoopsMeta();
   const sizes = Object.fromEntries(getRosterSizes());
-  const initialMode = isRatingMode(searchParams.mode) ? searchParams.mode : DEFAULT_RATING_MODE;
+  const modes = availableRatingModes(rows);
+  const nightly = getNightlyMeta();
+  // A ?mode= a bundle cannot honour (a shared link to the nightly lens landing
+  // on an older bundle) falls back rather than 404s or shows an empty column.
+  const asked = isRatingMode(searchParams.mode) ? searchParams.mode : null;
+  const initialMode = asked && modes.includes(asked) ? asked : resolveRatingMode(rows);
 
   return (
     <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6">
@@ -36,6 +43,8 @@ export default function HoopsTeamsPage({
           form={getLeagueFormSummaries()}
           resultsWindow={getResultsWindow()}
           meta={meta}
+          modes={modes}
+          nightly={nightly}
           initialMode={initialMode}
         />
       </Suspense>

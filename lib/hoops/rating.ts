@@ -1,11 +1,13 @@
 // Pure rating helpers — no fs, no SQLite, no server-only imports.
 //
-// Deliberately separate from queries.ts so the teams client can re-rank all
-// three modes in the browser without a round trip (30 teams × 3 modes is 90
-// numbers; there is no reason to ask the server).
+// Deliberately separate from queries.ts so the teams client can re-rank every
+// mode in the browser without a round trip (30 teams × up to 4 lenses is 240
+// numbers; there is no reason to ask the server), and so a plain-node build
+// check can drive these without a bundler to resolve the "@/" alias.
 
 import { FRANCHISES } from "./nba-franchises.ts";
 import type { RankedTeam, RatingMode, TeamRow } from "./types";
+import { RATING_MODES } from "./types.ts";
 
 export const FRANCHISE = FRANCHISES;
 
@@ -23,15 +25,46 @@ export function teamName(tri: string): string {
  * Don't "fix" the minus sign.
  */
 export function netOf(row: TeamRow, mode: RatingMode): number {
-  if (mode === "results") return row.results_off - row.results_def;
-  if (mode === "roster") return row.roster_off - row.roster_def;
-  return row.blend_off - row.blend_def;
+  const { off, def } = offDefOf(row, mode);
+  return off - def;
 }
 
+/**
+ * 🔴 `nightly` FALLS BACK TO THE BLEND when this bundle carries no nightly
+ * read, rather than returning zeros. Every bundle published before hub-v2 has
+ * none, and a team read as exactly 0/0 would rank mid-table and look like a
+ * claim we made. The UI does not offer the lens in that case
+ * (`availableRatingModes`), so this is belt and braces — but a shared link
+ * carrying `?mode=nightly` can still reach it and must show something honest.
+ */
 export function offDefOf(row: TeamRow, mode: RatingMode): { off: number; def: number } {
   if (mode === "results") return { off: row.results_off, def: row.results_def };
   if (mode === "roster") return { off: row.roster_off, def: row.roster_def };
+  if (mode === "nightly") {
+    if (row.nightly_off == null || row.nightly_def == null) {
+      return { off: row.blend_off, def: row.blend_def };
+    }
+    return { off: row.nightly_off, def: row.nightly_def };
+  }
   return { off: row.blend_off, def: row.blend_def };
+}
+
+/**
+ * Which rating lenses a given set of team rows can actually offer.
+ *
+ * 🔴 `nightly` is offered only when EVERY team has a read. A league table where
+ * some teams are rated on the last ten games and others are not is not a
+ * ranking of anything — it is two different questions in one column, and the
+ * comparison a visitor makes between two rows would be meaningless.
+ *
+ * Pure, and here rather than in queries.ts, so the client can decide which
+ * buttons to draw without a round trip and the build check can drive it
+ * without a bundler.
+ */
+export function availableRatingModes(rows: TeamRow[]): RatingMode[] {
+  const complete =
+    rows.length > 0 && rows.every((t) => t.nightly_off != null && t.nightly_def != null);
+  return complete ? [...RATING_MODES, "nightly"] : [...RATING_MODES];
 }
 
 /** Rank 30 teams by net strength under one rating mode. */
@@ -96,6 +129,11 @@ export const MODE_COPY: Record<RatingMode, { label: string; blurb: string }> = {
   blend: {
     label: "Blend",
     blurb: "The fitted combination of the two, and the sane default.",
+  },
+  nightly: {
+    label: "Nightly",
+    blurb:
+      "Who has actually been on the floor. Re-prices each team from the men who played its last ten games — so a star who has been out, or a rotation that has changed shape, shows up here before it shows up anywhere else — then mixes that with the season-long results rating at the weight five earlier seasons say works best. It is the only one of these four that has been measured to predict real game margins better than the rating it is built from.",
   },
 };
 

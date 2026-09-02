@@ -10,9 +10,8 @@ import {
   rankTeams,
   teamName,
 } from "@/lib/hoops/rating";
-import type { FormSummary, HoopsMeta } from "@/lib/hoops/queries";
+import type { FormSummary, HoopsMeta, NightlyMeta } from "@/lib/hoops/queries";
 import type { RatingMode, TeamRow } from "@/lib/hoops/types";
-import { RATING_MODES } from "@/lib/hoops/types";
 
 interface Props {
   rows: TeamRow[];
@@ -22,6 +21,11 @@ interface Props {
   /** The results window's date span, for the form footnote. */
   resultsWindow: { from: string; to: string } | null;
   meta: HoopsMeta;
+  /** Which lenses THIS bundle can offer — three, or four with `nightly`. Not a
+   *  constant: an older bundle carries no nightly read and must not show the
+   *  button at all. */
+  modes: RatingMode[];
+  nightly: NightlyMeta;
   initialMode: RatingMode;
 }
 
@@ -38,14 +42,16 @@ export default function TeamsClient({
   form,
   resultsWindow,
   meta,
+  modes,
+  nightly,
   initialMode,
 }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [mode, setMode] = useState<RatingMode>(initialMode);
 
-  // All three modes ship in the payload (90 numbers), so switching is instant
-  // and offline-safe. ?mode= is kept in sync for deep links.
+  // Every mode ships in the payload (30 teams x up to 4 lenses), so switching
+  // is instant and offline-safe. ?mode= is kept in sync for deep links.
   const teams = useMemo(() => rankTeams(rows, mode), [rows, mode]);
   const spread = useMemo(() => modeDisagreement(rows), [rows]);
 
@@ -64,7 +70,7 @@ export default function TeamsClient({
   return (
     <>
       <div className="flex gap-2">
-        {RATING_MODES.map((m) => (
+        {modes.map((m) => (
           <button
             key={m}
             type="button"
@@ -85,6 +91,38 @@ export default function TeamsClient({
       <p className="mt-3 border-l-2 border-cat-hoops/50 pl-3 text-sm text-cream-dim">
         {MODE_COPY[mode].blurb}
       </p>
+
+      {/* Nightly's own provenance and its caveats — on screen, in the language
+          of the sport, and only when the lens is actually selected. */}
+      {mode === "nightly" && nightly.present && (
+        <p className="mt-2 border-l-2 border-cat-hoops/30 pl-3 text-sm text-cream-dimmer">
+          Built from each team&rsquo;s last{" "}
+          <span className="font-mono text-cream-dim">{nightly.lastNGames ?? 10}</span> games, with
+          player ratings as of{" "}
+          <span className="font-mono text-cream-dim">{nightly.asOf ?? "—"}</span>. It is a{" "}
+          <em>margin</em> read only: a team&rsquo;s contribution to a game&rsquo;s total points is
+          carried straight over from the Results rating, so switching to this lens never changes
+          how high-scoring we expect a game to be, only who we expect to win it.
+          {nightly.priced ? (
+            <> This is also the rating a simulated game is priced with unless you pick another.</>
+          ) : (
+            <>
+              {" "}
+              It is shown here but <em>not</em> used to price a simulated game — the model has not
+              yet vouched for this read as a pricing input.
+            </>
+          )}
+          {nightly.abstained.length > 0 && (
+            <>
+              {" "}
+              No read yet for{" "}
+              <span className="font-mono">{nightly.abstained.join(" ")}</span> — too few games so
+              far, so they keep their Results rating unchanged rather than showing a number we
+              did not work out.
+            </>
+          )}
+        </p>
+      )}
       <p className="mt-2 border-l-2 border-rule/60 pl-3 text-sm text-cream-dimmer">
         Results and roster ratings currently disagree by{" "}
         <span className="font-mono text-cream-dim">{spread.median.toFixed(1)}</span> points for the
