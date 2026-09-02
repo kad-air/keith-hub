@@ -19,19 +19,85 @@
 import crypto from "crypto";
 
 /** This receiver's own wire/pricing versions. Bump only after confirming the
- *  receiver actually understands the new shape — never pre-emptively. */
+ *  receiver actually understands the new shape — never pre-emptively.
+ *
+ *  🔴 PRICING_VERSION 2 (hub-v2): lib/hoops/pricing.ts gained two things that
+ *  change the arithmetic, which is exactly what this field is for — a per-SIDE
+ *  path (a player's offence lands on his new team's offence and his defence on
+ *  its defence, instead of half his net landing on each) and the Depth Chart
+ *  minutes allocator (a real rotation is top-heavy; plain proportional shares
+ *  are not). Rule 4 is one-directional: a bundle at pricing_version 1 still
+ *  imports and is still priced by the v1 formula, unchanged. */
 export const SUPPORTED_WIRE_VERSION = 1;
-export const SUPPORTED_PRICING_VERSION = 1;
+export const SUPPORTED_PRICING_VERSION = 2;
 
-/** Features (#24 "Features v1"). `split_off_def` is the anticipated v2
- *  feature — deliberately NOT in this set, so a sender that flips it on
- *  before this receiver understands it gets a loud REJECT naming it, not a
- *  silent wrong computation. */
+/**
+ * Every feature token this receiver implements. 🔴 The spelling is a
+ * CROSS-REPO CONTRACT — hoops-sim's `src/hoops/exporthub.py` declares from the
+ * same six literals, and rule 1 makes an unknown token reject the whole
+ * publish. This set must therefore be a SUPERSET of whatever the sender can
+ * declare, and DEPLOYED FIRST. That ordering is the whole reason these tokens
+ * land here before hoops-sim flips its own `FEATURES` to v2.
+ *
+ *   symmetric_off_def   v1 — price a roster edit as off = net/2, def = -net/2
+ *   split_off_def       v2 — price it per side, from value_off/def_per36
+ *   depth_chart_minutes v2 — allocate minutes off the fitted rotation curve
+ *   nightly_strength    v2 — prefer the last-ten-games team read for pricing
+ *   absorption          a departed man's minutes partly go to a replacement
+ *   fictional_values    a declared per-36 value is honoured unconverted
+ */
 export const SUPPORTED_FEATURES: ReadonlySet<string> = new Set([
   "symmetric_off_def",
+  "split_off_def",
+  "depth_chart_minutes",
+  "nightly_strength",
   "absorption",
   "fictional_values",
 ]);
+
+/**
+ * Constants a declared feature CANNOT be honoured without.
+ *
+ * Rule 3 says a required constant that is missing must reject, naming it — but
+ * what is "required" depends on what the bundle declares. Demanding
+ * `depth_chart_w` of every bundle would reject every v1 bundle that exists
+ * today, which rule 2 explicitly forbids. So REQUIRED_CONSTANTS below stays
+ * exactly as it was (the v1 floor, demanded of everything), and this table
+ * adds to it only for the features actually on the wire.
+ */
+export const FEATURE_CONSTANTS: Readonly<Record<string, readonly string[]>> = {
+  split_off_def: ["replacement_tilt_per36"],
+  depth_chart_minutes: ["depth_chart_w", "depth_chart_curve"],
+};
+
+/**
+ * Pairs of tokens that contradict each other about the SAME formula. A bundle
+ * declaring both `symmetric_off_def` and `split_off_def` is telling this
+ * receiver to halve a net and not to halve it; there is no defensible way to
+ * pick one, and silently picking is how a wrong number ships looking right.
+ */
+const MUTUALLY_EXCLUSIVE: ReadonlyArray<readonly [string, string]> = [
+  ["symmetric_off_def", "split_off_def"],
+];
+
+/** What the declared features mean for the pricing formula, resolved once so no
+ *  call site re-derives it from raw string comparisons. */
+export interface PricingMode {
+  /** Price a roster edit per side, not by halving a net. */
+  split: boolean;
+  /** Allocate minutes off the fitted rotation curve, not proportionally. */
+  depthChart: boolean;
+  /** Prefer the last-ten-games team read where the bundle carries one. */
+  nightly: boolean;
+}
+
+export function pricingModeOf(features: readonly string[]): PricingMode {
+  return {
+    split: features.includes("split_off_def"),
+    depthChart: features.includes("depth_chart_minutes"),
+    nightly: features.includes("nightly_strength"),
+  };
+}
 
 /**
  * Constants this receiver's pricing formula actually reads by name
@@ -135,6 +201,46 @@ export function checkFeatures(features: string[]): void {
         `unsupported feature "${f}" — this receiver does not implement it. ` +
           `Supported: ${[...SUPPORTED_FEATURES].join(", ")}.`,
       );
+    }
+  }
+}
+
+/**
+ * Rule 1, second half: two declared tokens that contradict each other about
+ * the same formula -> REJECT, naming both. Not in #24's original text because
+ * v1 had only one formula to describe; added with hub-v2, where there are two
+ * and exactly one of them must be in force.
+ */
+export function checkFeatureCoherence(features: string[]): void {
+  const set = new Set(features);
+  for (const [a, b] of MUTUALLY_EXCLUSIVE) {
+    if (set.has(a) && set.has(b)) {
+      throw new ContractRejection(
+        `features "${a}" and "${b}" contradict each other — they describe the same pricing ` +
+          `formula two different ways. Declare exactly one.`,
+      );
+    }
+  }
+}
+
+/**
+ * Rule 3, feature-scoped: a constant that a DECLARED feature cannot be
+ * honoured without -> REJECT, naming both the constant and the feature that
+ * demanded it. A bundle that does not declare the feature is untouched, which
+ * is what keeps a v1 bundle importable forever.
+ */
+export function checkFeatureConstants(
+  features: string[],
+  constants: Record<string, unknown> | null | undefined,
+): void {
+  for (const feature of features) {
+    for (const name of FEATURE_CONSTANTS[feature] ?? []) {
+      const v = constants ? constants[name] : undefined;
+      if (v === undefined || v === null) {
+        throw new ContractRejection(
+          `feature "${feature}" is declared but required constant "${name}" is missing`,
+        );
+      }
     }
   }
 }

@@ -23,6 +23,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { BUNDLE_FILES } from "@/lib/hoops/data";
 import {
   ContractRejection,
+  checkFeatureCoherence,
+  checkFeatureConstants,
   checkFeatures,
   checkPricingVersion,
   checkRequiredConstants,
@@ -152,8 +154,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
     contract = resolveContract(body.contract, fallbackGeneratedAt);
     checkFeatures(contract.features);
+    checkFeatureCoherence(contract.features);
     checkPricingVersion(contract.pricingVersion);
     checkRequiredConstants(constants);
+    // Feature-scoped, so a v1 bundle is untouched — see FEATURE_CONSTANTS.
+    checkFeatureConstants(contract.features, constants);
   } catch (err) {
     if (err instanceof ContractRejection) {
       return NextResponse.json({ error: err.message }, { status: 400 });
