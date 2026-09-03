@@ -27,8 +27,10 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
+import { additiveTerms, compareVerdict, verdictSentence } from "../lib/hoops/compare.ts";
 import { playerRowsFromBundle } from "../lib/hoops/playervalue.ts";
-import type { RawPlayersFile } from "../lib/hoops/types.ts";
+import { fmtSigned } from "../lib/hoops/rating.ts";
+import type { RawPlayerExplain, RawPlayersFile } from "../lib/hoops/types.ts";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -118,6 +120,169 @@ if (model) {
     (model.wage_sheet.made_3 ?? 0) > (model.wage_sheet.made_2 ?? 0),
     `explain_model.wage_sheet: a made three (${model.wage_sheet.made_3}) must earn more than a made two (${model.wage_sheet.made_2})`,
   );
+}
+
+// ── 1b. the side-by-side comparison ───────────────────────────────────────
+//
+// /hoops/players/compare says, in one sentence, who is rated higher and what
+// the single biggest reason is. Two ways that sentence can lie:
+//
+//   • it names a reason that is not actually the biggest gap between the two
+//     ledgers (or one that double-counts, which is why the reason is picked
+//     over the ADDITIVE terms and not over the printed rows — see the header
+//     of lib/hoops/compare.ts),
+//   • it prints a number that is not in either block.
+//
+// Second source for the first: the max is re-found here, longhand, straight
+// off the raw JSON, without calling the module's own scan. Second source for
+// the second: every figure in the sentence is extracted back out and has to
+// match a quantity read off the two blocks.
+{
+  // Two real players from the committed bundle, chosen because they are the
+  // two shapes the page has to handle at once: Jokić carries a plus-minus
+  // history to mix into his scouting report, Wembanyama does not. If either
+  // leaves the league, this list is stale and that is what the failure says.
+  const ANCHORS: Array<[number, string]> = [
+    [3112335, "Nikola Jokic"],
+    [5104157, "Victor Wembanyama"],
+  ];
+  const picked = ANCHORS.map(([id, name]) => {
+    const r = withs.find((x) => x.athlete_id === id);
+    check(
+      r != null && r.name === name,
+      `compare anchors are stale: athlete ${id} is ${r?.name ?? "absent"}, not ${name} — pick two current players`,
+    );
+    return r;
+  });
+
+  // The decomposition has to ADD UP or "the biggest term" means nothing. This
+  // runs over every carrier in the bundle, not just the anchors.
+  let termChecked = 0;
+  for (const r of withs) {
+    const e = r.explain as RawPlayerExplain;
+    const terms = additiveTerms(e);
+    for (const side of ["off", "def"] as const) {
+      const sum = terms.filter((t) => t.side === side).reduce((s, t) => s + t.value, 0);
+      check(
+        Math.abs(sum - e.final[side]) <= TOL,
+        `${r.name}: additive terms sum to ${sum.toFixed(4)}, not final.${side} ${e.final[side]}`,
+      );
+    }
+    termChecked += 1;
+  }
+
+  const [A, B] = picked;
+  if (A?.explain && B?.explain) {
+    const ae = A.explain;
+    const be = B.explain;
+    const aShort = A.name.split(" ").slice(-1)[0];
+    const bShort = B.name.split(" ").slice(-1)[0];
+    const v = compareVerdict(
+      { name: aShort, e: ae, valuePg: A.value_pg },
+      { name: bShort, e: be, valuePg: B.value_pg },
+    );
+
+    // Real basketball, not internal agreement: the man the bundle prices
+    // higher a game must be the man the page calls higher.
+    const aPg = A.value_pg ?? 0;
+    const bPg = B.value_pg ?? 0;
+    check(
+      v.leader === (aPg >= bPg ? "a" : "b"),
+      `compare: ${aShort} ${aPg} vs ${bShort} ${bPg} a game, but the verdict leads with ${v.leader}`,
+    );
+    check(
+      Math.abs((v.gameGap ?? -1) - Math.abs(aPg - bPg)) <= 1e-9,
+      `compare: gameGap ${v.gameGap} != |${aPg} − ${bPg}|`,
+    );
+
+    // 🔴 The reason, re-found longhand off the raw blocks. Nothing below calls
+    // additiveTerms or compareVerdict — a bug that mis-picks in one place has
+    // to be reproduced by hand here to survive.
+    const fineOf = (e: RawPlayerExplain): boolean =>
+      e.prior_kind === "box+history" &&
+      !e.prior_floored &&
+      e.box != null &&
+      e.history != null &&
+      e.weights != null;
+    const fine = fineOf(ae) && fineOf(be);
+    const byHand = (e: RawPlayerExplain, side: "off" | "def"): Record<string, number> => {
+      const move = side === "off" ? e.tape.move_off : e.tape.move_def;
+      if (fine && e.box && e.history && e.weights) {
+        const out: Record<string, number> = {
+          history: e.weights[side] * e.history[side],
+          box: (1 - e.weights[side]) * e.box[side],
+          tape: move,
+        };
+        if (e.aging[side] !== 0) out.aging = e.aging[side];
+        return out;
+      }
+      return { scouting: e.mu[side], tape: move };
+    };
+    let bestKey = "";
+    let bestSide: "off" | "def" = "off";
+    let bestAbs = -1;
+    for (const side of ["off", "def"] as const) {
+      const at = byHand(ae, side);
+      const bt = byHand(be, side);
+      for (const k of Object.keys(at)) {
+        if (!(k in bt)) continue;
+        const d = Math.abs(at[k] - bt[k]);
+        if (d > bestAbs) {
+          bestAbs = d;
+          bestKey = k;
+          bestSide = side;
+        }
+      }
+    }
+    check(
+      v.reason.key === bestKey && v.reason.side === bestSide,
+      `compare: the sentence names ${v.reason.key}/${v.reason.side}, but the biggest gap is ${bestKey}/${bestSide} (${bestAbs.toFixed(4)})`,
+    );
+    check(
+      Math.abs(Math.abs(v.reason.diff) - bestAbs) <= 1e-9,
+      `compare: reason diff ${v.reason.diff} does not match the hand-found gap ${bestAbs}`,
+    );
+
+    // Every figure in the sentence comes off the two blocks. "36" is the only
+    // literal ("points per 36 minutes"); anything else must be a quantity.
+    const sentence = verdictSentence(v, aShort, bShort);
+    const allowed = new Set<string>(["36"]);
+    allowed.add(fmtSigned(v.aNet, 2));
+    allowed.add(fmtSigned(v.bNet, 2));
+    allowed.add(v.rateGap.toFixed(2));
+    if (v.gameGap != null) allowed.add(v.gameGap.toFixed(2));
+    allowed.add(fmtSigned(v.reason.a, 2));
+    allowed.add(fmtSigned(v.reason.b, 2));
+    for (const e of [ae, be]) {
+      allowed.add(String(e.tape.n_off_poss));
+      allowed.add(String(e.tape.n_def_poss));
+    }
+    const tokens = sentence.match(/[-+]?\d[\d,]*(?:\.\d+)?/g) ?? [];
+    check(tokens.length >= 4, `compare: the sentence carries only ${tokens.length} figures`);
+    for (const t of tokens) {
+      const bare = t.replace(/,/g, "");
+      check(
+        allowed.has(bare),
+        `compare: the sentence prints ${t}, which is not a number from either block`,
+      );
+    }
+    // The two halves it must reconcile against, independently of the verdict:
+    // the ratings it quotes are the blocks' own finals.
+    check(
+      Math.abs(v.aNet - (ae.final.off + ae.final.def)) <= 1e-9 &&
+        Math.abs(v.bNet - (be.final.off + be.final.def)) <= 1e-9,
+      "compare: the quoted rates are not off + def from the blocks",
+    );
+    check(
+      sentence.includes(aShort) && sentence.includes(bShort),
+      `compare: the sentence names neither man — "${sentence}"`,
+    );
+    notes.push(
+      `compare: additive terms sum to the rating on ${termChecked} carriers; ` +
+        `${aShort} vs ${bShort} → ${v.reason.key}/${v.reason.side}, ` +
+        `${tokens.length} figures all traced back to the blocks`,
+    );
+  }
 }
 
 // ── 2. the importer writes it and the read model returns it ───────────────

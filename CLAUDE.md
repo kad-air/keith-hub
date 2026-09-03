@@ -27,6 +27,8 @@ npm run check:hoops:explain      # Player-page gate: the explain ledger reconcil
 npm run check:hoops:matchup      # Matchup gate: best-of-seven arithmetic vs closed forms, head-to-head
                                  #   anchored on the real 2025-26 schedule (same)
 npm run check:tracking-hidden    # Tracking section stays hidden (needs a running server; NOT in prebuild)
+npm run check:hoops:mobile       # Hoops still fits on a phone: seven pages at 375px and 430px in the
+                                 #   installed Chrome (needs a running server; NOT in prebuild)
 npm run check:books:bytes        # Books byte-identity gate: partialMd5 vs offline Python reference, ingest stores untouched bytes (same)
 npm run check:books:opds         # Books OPDS device-contract gate: CrossPoint parser constraints + the To Read shelf, anchored on Stump's device-proven feed (same)
 npm run check:books:kosync       # Books kosync protocol gate: md5 wire auth, opaque progress round-trip, no-rollback import (same)
@@ -957,7 +959,64 @@ stayed green while the real importer wrote NULL. 6/6 probes caught at merge. The
 offence/defence ranks are on the STACK halves, never the flagship split the ranking's Off/Def
 sorts use (Jokić is defence #89 on one and +1.67 on the other; different models).
 
+#### Side by side (`/hoops/players/compare?a=&b=`) — 2026-09-02
+
+Two players' ledgers in two narrow columns **at every width** (a comparison read one man at a time
+is not a comparison — that sets the four-digit numbers and the short row labels), the wage sheet
+as paired bars on ONE shared scale, and a closing sentence saying who is rated higher, by how much
+a game, and the single biggest reason. `?a=`/`?b=` are the whole state, so every comparison is a
+link; only the two `<select>`s are client code (`ComparePicker.tsx`, which also supplies the
+player page's "Compare with…" shortcut). An unknown id 404s; `a` alone renders the picker filled.
+
+🔴 **The "biggest reason" is NOT the biggest gap in the printed table.** Six of the ledger's rows
+contain each other (mixed is box+history, the scouting report is that plus aging, the rating is
+that plus the tape), so a max over them counts one difference three times. The reason is picked
+over the ADDITIVE terms — `final = w·history + (1−w)·box + aging + tape move`, or the coarse
+`scouting + tape` both shapes support — in `lib/hoops/compare.ts`, which also owns the ledger's
+ROWS and wording so the single-player page and this one cannot drift. 🔴 And the biggest gap does
+not have to run the LEADER's way: when it favours the trailing man the sentence says so ("the
+biggest single gap actually favours X … so Y is ahead on the rest of it") rather than claiming a
+reason the numbers contradict. 🔴 The block carries `weights` even for a man with NO history to
+mix in (403 of 532 carriers are box-only) — gate any "mixed 20% history" copy on
+`explain.history`, never on `weights`.
+
+Gate: `npm run check:hoops:explain` grew a comparison section — the additive terms must sum to the
+shipped rating on every carrier, and for two named anchors (Jokić, who has a history half, and
+Wembanyama, who does not) the reason is re-found LONGHAND off the raw JSON and every figure in the
+sentence is extracted back out and matched to a block quantity ("36" is the only literal). 8/8
+falsification probes broke it.
+
 #### The usability pass (2026-09-02)
+
+**Phone-fit conventions that look like regressions but are decisions (2026-09-02):** box scores
+abbreviate names to first initial below `sm` and drop the `Pts p10–p90` column there (the
+`VarianceNote` carries the spread), and scroll sideways rather than truncate; the matchup pickers
+show `TRI — Nickname` because no full team name fits a half-phone-wide `<select>` at a readable
+size, with tri, rank, strength and form on the context line under each; the Players rows below
+`sm` drop the duplicated val/g text (it is the right-hand column) and shorten the evidence string;
+the team page roster is on the STACK model (val/g + rate), the same one the ranking and the player
+page use, sorted by value a game — the older flagship per-36 no longer appears there.
+
+**The phone-fit gate: `npm run check:hoops:mobile`** (`scripts/check-hoops-mobile.mjs`; `FEED_BASE`
+defaults to `http://localhost:3000`, pass `--password` or set `FEED_PASSWORD` for production, `--out`
+picks the screenshot directory). The usability pass below was judged by a human taking screenshots,
+which does not repeat — this is the runnable version. It drives the *installed* Google Chrome through
+`playwright-core` (a devDependency that never downloads a browser) at two real iPhone widths, 375 and
+430, dark, and walks seven pages: the matchup (including a sim and a best-of-seven), Teams, a team page,
+the rankings, a player page, the side-by-side comparison, and a fresh game. Per page and width it asserts the page does not scroll
+sideways, that nothing carrying Tailwind's `truncate` is *actually* clipping its text (escape hatch:
+`data-truncate-ok` on the element — there are none today, adding one is a decision), that every
+`<select>`, `<button>` and `<a>` in `<main>` has its right edge on screen (controls inside a
+deliberate `overflow-x` scroller, i.e. the nav tabs, are skipped and counted), and that the page
+rendered its named landmark at all, so a dead server or a login redirect can never pass by rendering
+nothing. A failure prints the offending element's tag, classes and text and saves a full-page
+screenshot to `/tmp/hoops-mobile/`. Falsified 36/36 with `--falsify`, which injects a 2000px element,
+squeezes a `truncate` to 20px and parks a button off the right edge on every page at every width.
+Two traps worth keeping: `innerText` is useless for the landmark assertion because CSS `uppercase`
+transforms it, and `textContent` is worse because it includes the RSC flight payload — so the script
+walks visible text nodes itself; and a click that lands before React hydrates is swallowed silently,
+so every interaction retries until its answer appears. Deliberately **not** in `prebuild` — it needs
+a running server, exactly like `check:tracking-hidden`.
 
 Judged on iPhone-emulated screenshots, not on the source. What changed and why:
 - **`HoopsNav` is compact**: one line ("Hoops · games through Apr 12, 2026", the results window's

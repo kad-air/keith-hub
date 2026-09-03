@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   PLAYER_SORTS,
   SORT_COPY,
@@ -14,6 +14,7 @@ import type { PlayerSort, RankedPlayer } from "@/lib/hoops/playervalue";
 import type { HoopsMeta } from "@/lib/hoops/queries";
 import { fmtSigned, teamName } from "@/lib/hoops/rating";
 import type { PlayerRow } from "@/lib/hoops/types";
+import { useKeyboard } from "@/lib/useKeyboard";
 
 interface Props {
   rows: PlayerRow[];
@@ -36,6 +37,17 @@ export default function PlayersClient({ rows, tris, meta, initialSort, initialTe
   const [rotationOnly, setRotationOnly] = useState(false);
   // A name filter over 530 rows — "find Jokic" used to mean scrolling.
   const [query, setQuery] = useState("");
+  const searchRef = useRef<HTMLInputElement | null>(null);
+
+  // "/" jumps to the search box, the way it does everywhere else on the web.
+  // useKeyboard already ignores keys typed INTO an input, so this never
+  // swallows a slash the reader meant to type in a name.
+  useKeyboard({
+    "/": () => {
+      searchRef.current?.focus();
+      searchRef.current?.select();
+    },
+  });
 
   const floor = meta.rotationFloorMinutes;
 
@@ -110,13 +122,16 @@ export default function PlayersClient({ rows, tris, meta, initialSort, initialTe
             type="button"
             onClick={() => pickSort(s)}
             aria-pressed={s === activeSort}
-            className={`flex-1 border px-3 py-2 font-mono text-[0.7rem] uppercase tracking-kicker transition-colors ${
+            className={`flex-1 whitespace-nowrap border px-1.5 py-2 font-mono text-[0.7rem] uppercase tracking-kicker transition-colors sm:px-3 ${
               s === activeSort
                 ? "border-cat-hoops/70 bg-cat-hoops/10 text-cat-hoops"
                 : "border-rule/60 text-cream-dim hover:border-cat-hoops/40 hover:text-cream"
             }`}
           >
-            {SORT_COPY[s].label}
+            {/* "Off"/"Def"/"Val/G" on a phone — the full words push the fourth
+                button off a 375px screen. Same keys, same blurbs. */}
+            <span className="sm:hidden">{SORT_COPY[s].short}</span>
+            <span className="max-sm:hidden">{SORT_COPY[s].label}</span>
           </button>
         ))}
       </div>
@@ -132,19 +147,38 @@ export default function PlayersClient({ rows, tris, meta, initialSort, initialTe
           appear.
         </p>
       )}
-      <p className="mt-2 border-l-2 border-rule/60 pl-3 text-sm text-cream-dimmer">
-        Points per 36 minutes against an average player, from the Mini&rsquo;s value model as of{" "}
-        <span className="font-mono text-cream-dim">{meta.valueAsOf.slice(0, 10)}</span> — a model
-        estimate, not a measurement of this season. Replacement level is{" "}
-        <span className="font-mono text-cream-dim">{meta.replacementPer36.toFixed(2)}</span>, so an
-        end-of-bench player sits a little below zero rather than at it.{" "}
-        {coverage.valued < coverage.total && (
-          <>
-            {coverage.total - coverage.valued} of {coverage.total} players have no value estimate at
-            all — no history to price them from — and sit unranked at the bottom.
-          </>
-        )}
-      </p>
+      {/* Where the number comes from, folded under a visible summary line —
+          the same shape /hoops/teams uses for "How this rating is built".
+          Three explanatory blocks before rank 1 was most of a phone screen.
+          The summary still carries the two facts that date and qualify every
+          row below it: when the model last looked, and how many men it could
+          not price at all. */}
+      <details className="mt-2 border-l-2 border-rule/60 pl-3">
+        <summary className="cursor-pointer font-mono text-[0.62rem] uppercase tracking-kicker text-cream-dimmer hover:text-cream-dim">
+          Where this number comes from · model as of{" "}
+          <span className="text-cream-dim">{meta.valueAsOf.slice(0, 10)}</span>
+          {coverage.valued < coverage.total && (
+            <>
+              {" · "}
+              <span className="text-cream-dim">{coverage.total - coverage.valued}</span> of{" "}
+              {coverage.total} unpriced
+            </>
+          )}
+        </summary>
+        <p className="mt-2 text-sm text-cream-dimmer">
+          Points per 36 minutes against an average player, from the Mini&rsquo;s value model as of{" "}
+          <span className="font-mono text-cream-dim">{meta.valueAsOf.slice(0, 10)}</span> — a model
+          estimate, not a measurement of this season. Replacement level is{" "}
+          <span className="font-mono text-cream-dim">{meta.replacementPer36.toFixed(2)}</span>, so an
+          end-of-bench player sits a little below zero rather than at it.{" "}
+          {coverage.valued < coverage.total && (
+            <>
+              {coverage.total - coverage.valued} of {coverage.total} players have no value estimate
+              at all — no history to price them from — and sit unranked at the bottom.
+            </>
+          )}
+        </p>
+      </details>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <label className="sr-only" htmlFor="team-filter">
@@ -180,6 +214,7 @@ export default function PlayersClient({ rows, tris, meta, initialSort, initialTe
         )}
 
         <input
+          ref={searchRef}
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -191,6 +226,12 @@ export default function PlayersClient({ rows, tris, meta, initialSort, initialTe
           {shown.length} shown
         </span>
       </div>
+
+      {/* Mirrors the matchup screen's hint line: a keyboard fact, so it is
+          only drawn where there is a keyboard. */}
+      <p className="mt-1.5 hidden font-mono text-[0.58rem] uppercase tracking-kicker text-cream-dimmer sm:block">
+        / to search
+      </p>
 
       {/* A rate on thin minutes is a noisy rate, and this ranking is sorted by
           a rate — so say so where it can be seen, and give it a switch. The
@@ -205,11 +246,17 @@ export default function PlayersClient({ rows, tris, meta, initialSort, initialTe
       )}
 
       <ol className="mt-5">
-        <li className="flex items-baseline gap-2 border-b border-rule/60 pb-1 font-mono text-[0.62rem] uppercase tracking-kicker text-cream-dimmer">
+        {/* gap-1.5 and a 2.5rem minutes column below `sm`: the six pixels that
+            buys are the difference between "Shai Gilgeous-Alexander" and
+            "Shai Gilgeous-Alexande…". */}
+        <li className="flex items-baseline gap-1.5 border-b border-rule/60 pb-1 font-mono text-[0.62rem] uppercase tracking-kicker text-cream-dimmer sm:gap-2">
           <span className="w-7 shrink-0 text-right">#</span>
           <span className="flex-1">Player</span>
-          <span className="w-11 text-right">Min</span>
-          <span className="w-14 text-right">{SORT_COPY[activeSort].label}</span>
+          <span className="w-10 text-right sm:w-11">Min</span>
+          <span className="w-14 text-right">
+            <span className="sm:hidden">{SORT_COPY[activeSort].short}</span>
+            <span className="max-sm:hidden">{SORT_COPY[activeSort].label}</span>
+          </span>
         </li>
         {shown.map((p) => (
           <PlayerLine key={p.athlete_id} p={p} sort={activeSort} />
@@ -282,43 +329,76 @@ export default function PlayersClient({ rows, tris, meta, initialSort, initialTe
 /**
  * One ranked player.
  *
- * Two or three lines, at every breakpoint — the offence/defence split is the
- * reason this page exists, so it renders on a phone rather than hiding behind
- * `sm:`. The second line is the split and the per-game counting line; a third
- * (value/g, expected minutes, evidence) appears only for a bundle carrying
- * the stack rating. In mono, under the name: The Feed's own stacked-meta
- * shape.
+ * The scan line is rank / name / minutes / the number this list is sorted by.
+ * Under it, in mono, the meta — the offence/defence split is the reason this
+ * page exists, so it renders on a phone rather than hiding behind `sm:`.
+ *
+ * 🔴 The meta spans the WHOLE row, not the name column: squeezed into ~190px
+ * beside the minutes and value columns it truncated the half of itself worth
+ * reading ("· 27.7/12…"). On a phone it is also re-cut into two short lines
+ * that fit — off/def, then the counting line — and drops the two figures the
+ * row already shows in its own columns (value/g and expected minutes, which
+ * this bundle reports identically to the minutes column on all 532 players).
+ * At `sm`+ the original one-line-each form is unchanged.
  */
 function PlayerLine({ p, sort }: { p: RankedPlayer; sort: PlayerSort }) {
   const primary = sort === "off" ? p.off : sort === "def" ? p.def : sort === "value" ? p.valuePg : p.net;
+  const counting =
+    p.ppg != null && p.rpg != null && p.apg != null
+      ? `${p.ppg.toFixed(1)} / ${p.rpg.toFixed(1)} / ${p.apg.toFixed(1)} · ${p.gp ?? 0} gp`
+      : null;
+  const evidence = p.evidence == null ? null : shortEvidence(p.evidence);
+  const phoneSecond = [counting, evidence].filter(Boolean).join(" · ");
   return (
     <li>
       <Link
         href={`/hoops/players/${p.athlete_id}`}
-        className="flex items-baseline gap-2 border-b border-rule/40 py-2 transition-colors hover:bg-ink-raised/60"
+        className="block border-b border-rule/40 py-2 transition-colors hover:bg-ink-raised/60"
       >
-        <span className="w-7 shrink-0 text-right font-mono text-[0.7rem] text-cream-dimmer">
-          {p.rank === 0 ? "—" : p.rank}
-        </span>
+        <span className="flex items-baseline gap-1.5 sm:gap-2">
+          <span className="w-7 shrink-0 text-right font-mono text-[0.7rem] text-cream-dimmer">
+            {p.rank === 0 ? "—" : p.rank}
+          </span>
 
-        <span className="min-w-0 flex-1">
-          <span className="block truncate">
-            <span className="font-display text-cream">{p.name}</span>
-            {p.thinMinutes && (
-              <span
-                title="expected to play under hoops-sim's rotation floor — a per-36 rate on thin minutes"
-                className="ml-1 font-mono text-[0.7rem] text-cat-hoops"
-              >
-                !
-              </span>
-            )}
-            <span className="ml-2 font-mono text-[0.62rem] uppercase tracking-kicker text-cat-hoops">
+          {/* The tri sits OUTSIDE the truncation: on a phone a long name used
+              to eat its own team ("Shai Gilgeous-Alexander…"), which is the one
+              part of the line you cannot guess. The name gives way instead —
+              and at 14px below `sm` even the league's longest ("Yanic Konan
+              Niederhauser") fits without giving way at all. */}
+          <span className="flex min-w-0 flex-1 items-baseline gap-2">
+            <span className="truncate font-display text-sm text-cream sm:text-base">
+              {p.name}
+              {p.thinMinutes && (
+                <span
+                  title="expected to play under hoops-sim's rotation floor — a per-36 rate on thin minutes"
+                  className="ml-1 font-mono text-[0.7rem] text-cat-hoops"
+                >
+                  !
+                </span>
+              )}
+            </span>
+            <span className="shrink-0 font-mono text-[0.62rem] uppercase tracking-kicker text-cat-hoops">
               {p.tri}
             </span>
           </span>
-          <span className="mt-0.5 block truncate font-mono text-[0.62rem] text-cream-dimmer">
+
+          <span className="w-10 shrink-0 text-right font-mono text-[0.72rem] text-cream-dim sm:w-11">
+            {p.minutes.toFixed(1)}
+          </span>
+          <span
+            className={`w-14 shrink-0 text-right font-mono text-sm ${
+              primary == null ? "text-cream-dimmer" : primary >= 0 ? "text-cream" : "text-cream-dim"
+            }`}
+          >
+            {primary == null ? "—" : fmtSigned(primary, 2)}
+          </span>
+        </span>
+
+        {/* Phone: two short lines under the name, neither of them cut. */}
+        <span className="mt-0.5 block pl-9 font-mono text-[0.62rem] text-cream-dimmer sm:hidden">
+          <span className="block">
             {p.off == null || p.def == null ? (
-              <span>no off/def split</span>
+              "no off/def split"
             ) : (
               <>
                 <span className={sort === "off" ? "text-cream-dim" : undefined}>
@@ -330,35 +410,57 @@ function PlayerLine({ p, sort }: { p: RankedPlayer; sort: PlayerSort }) {
                 </span>
               </>
             )}
-            {p.ppg != null &&
-              p.rpg != null &&
-              p.apg != null &&
-              ` · ${p.ppg.toFixed(1)}/${p.rpg.toFixed(1)}/${p.apg.toFixed(1)} in ${p.gp ?? 0} gp`}
           </span>
-          {(p.valuePg != null || p.evidence != null) && (
-            <span className="mt-0.5 block truncate font-mono text-[0.62rem] text-cream-dimmer">
-              {p.valuePg != null && (
-                <span className={sort === "value" ? "text-cream-dim" : undefined}>
-                  val/g {fmtSigned(p.valuePg, 2)}
-                </span>
-              )}
-              {p.expectedMinutes != null && ` (${p.expectedMinutes.toFixed(1)} exp min)`}
-              {p.evidence != null && ` · ${p.evidence}`}
-            </span>
-          )}
+          {phoneSecond !== "" && <span className="block">{phoneSecond}</span>}
         </span>
 
-        <span className="w-11 shrink-0 text-right font-mono text-[0.72rem] text-cream-dim">
-          {p.minutes.toFixed(1)}
+        {/* sm+: the original shape, one line each, now with the whole row to
+            spread across. */}
+        <span className="mt-0.5 hidden pl-9 font-mono text-[0.62rem] text-cream-dimmer sm:block">
+          {p.off == null || p.def == null ? (
+            <span>no off/def split</span>
+          ) : (
+            <>
+              <span className={sort === "off" ? "text-cream-dim" : undefined}>
+                off {fmtSigned(p.off, 2)}
+              </span>
+              {" · "}
+              <span className={sort === "def" ? "text-cream-dim" : undefined}>
+                def {fmtSigned(p.def, 2)}
+              </span>
+            </>
+          )}
+          {p.ppg != null &&
+            p.rpg != null &&
+            p.apg != null &&
+            ` · ${p.ppg.toFixed(1)}/${p.rpg.toFixed(1)}/${p.apg.toFixed(1)} in ${p.gp ?? 0} gp`}
         </span>
-        <span
-          className={`w-14 shrink-0 text-right font-mono text-sm ${
-            primary == null ? "text-cream-dimmer" : primary >= 0 ? "text-cream" : "text-cream-dim"
-          }`}
-        >
-          {primary == null ? "—" : fmtSigned(primary, 2)}
-        </span>
+        {(p.valuePg != null || p.evidence != null) && (
+          <span className="mt-0.5 hidden pl-9 font-mono text-[0.62rem] text-cream-dimmer sm:block">
+            {p.valuePg != null && (
+              <span className={sort === "value" ? "text-cream-dim" : undefined}>
+                val/g {fmtSigned(p.valuePg, 2)}
+              </span>
+            )}
+            {p.expectedMinutes != null && ` (${p.expectedMinutes.toFixed(1)} exp min)`}
+            {p.evidence != null && ` · ${p.evidence}`}
+          </span>
+        )}
       </Link>
     </li>
   );
+}
+
+/**
+ * "38789 poss (7yr)" -> "38,789 poss"; "prior only" is already short.
+ *
+ * The phone line has room for the fact, not for the window it was measured
+ * over — which is the same seven seasons for everybody, and is spelled out on
+ * the player's own page. Thousands are grouped by hand rather than through
+ * toLocaleString, whose answer depends on the reader's locale and would split the
+ * server's render from the browser's.
+ */
+function shortEvidence(evidence: string): string {
+  const withoutWindow = evidence.replace(/\s*\([^)]*\)\s*$/, "");
+  return withoutWindow.replace(/^\d+/, (n) => n.replace(/\B(?=(\d{3})+(?!\d))/g, ","));
 }

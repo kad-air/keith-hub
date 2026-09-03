@@ -13,6 +13,7 @@ import {
   resolveRatingMode,
 } from "@/lib/hoops/queries";
 import type { TeamFormGame } from "@/lib/hoops/queries";
+import { rankPlayers } from "@/lib/hoops/playervalue";
 import { MODE_COPY, fmtSigned, rankTeams, teamName } from "@/lib/hoops/rating";
 
 export const dynamic = "force-dynamic";
@@ -47,7 +48,14 @@ export default function HoopsTeamPage({
   const form = getTeamForm(tri);
   const meta = getHoopsMeta();
 
-  const totalMinutes = roster.reduce((s, p) => s + p.minutes, 0);
+  // The roster is ordered and priced by the SAME model the league ranking and
+  // the player page use — the promoted stack rating (value_pg = rating ×
+  // expected minutes, stack_net_per36 = the rate). It used to show the older
+  // flagship `value_per36`, which meant a name could read one way here and
+  // another way one tap along. `rankPlayers` already does the fallback this
+  // wants: anyone the stack has no read on sorts to the bottom by minutes.
+  const ranked = rankPlayers(roster, "value", null);
+  const totalMinutes = roster.reduce((s, p) => s + (p.expected_minutes ?? p.minutes), 0);
 
   return (
     <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6">
@@ -184,20 +192,26 @@ export default function HoopsTeamPage({
 
       <h3 className="mt-8 font-display text-lg text-cream">Roster</h3>
       <p className="mt-1 text-xs text-cream-dimmer">
-        {roster.length} players · {totalMinutes.toFixed(0)} raw expected minutes. Value is
-        production net value per 36 minutes, in points; replacement level is{" "}
-        <span className="font-mono">{meta.replacementPer36.toFixed(2)}</span>. It is a model
-        estimate as of {meta.valueAsOf.slice(0, 10)}, not a measurement of this season.
+        {roster.length} players, best first by what each one is worth to {tri} on a night he plays.{" "}
+        <em>Val/G</em> is that: his rating times the minutes we expect him to get. <em>Rate</em> is
+        the same rating stated per 36 minutes on the floor, so a bench man who plays well in short
+        bursts reads high there and small on Val/G. Both are the same model that ranks the league on{" "}
+        <Link href="/hoops/players" className="underline hover:text-cream-dim">
+          Players
+        </Link>
+        , as of {meta.valueAsOf.slice(0, 10)} — what we expect of him, not a measurement of this
+        season. A dash means we have no read on him at all.
       </p>
 
       <ol className="mt-4">
         <li className="flex items-baseline gap-2 border-b border-rule/60 pb-1 font-mono text-[0.62rem] uppercase tracking-kicker text-cream-dimmer">
           <span className="flex-1">Player</span>
-          <span className="w-12 text-right">Min</span>
-          <span className="w-14 text-right">Value</span>
+          <span className="w-10 text-right">Min</span>
+          <span className="w-14 text-right">Val/G</span>
+          <span className="w-12 text-right">Rate</span>
           <span className="w-24 text-right max-sm:hidden">Pts/Reb/Ast</span>
         </li>
-        {roster.map((p) => (
+        {ranked.map((p) => (
           <li key={p.athlete_id} className="border-b border-rule/40 py-2">
             <span className="flex items-baseline gap-2">
               <Link
@@ -206,31 +220,38 @@ export default function HoopsTeamPage({
               >
                 {p.name}
               </Link>
-              <span className="w-12 shrink-0 text-right font-mono text-[0.72rem] text-cream-dim">
-                {p.minutes.toFixed(1)}
+              <span className="w-10 shrink-0 text-right font-mono text-[0.72rem] text-cream-dim">
+                {(p.expectedMinutes ?? p.minutes).toFixed(1)}
               </span>
               <span
                 className={`w-14 shrink-0 text-right font-mono text-sm ${
-                  p.value_per36 == null
+                  p.valuePg == null
                     ? "text-cream-dimmer"
-                    : p.value_per36 >= 0
+                    : p.valuePg >= 0
                       ? "text-cream"
                       : "text-cream-dim"
                 }`}
               >
-                {p.value_per36 == null ? "—" : fmtSigned(p.value_per36, 2)}
+                {p.valuePg == null ? "—" : fmtSigned(p.valuePg, 2)}
+              </span>
+              <span
+                className={`w-12 shrink-0 text-right font-mono text-[0.72rem] ${
+                  p.stackNet == null ? "text-cream-dimmer" : "text-cream-dim"
+                }`}
+              >
+                {p.stackNet == null ? "—" : fmtSigned(p.stackNet, 2)}
               </span>
               <span className="w-24 shrink-0 text-right font-mono text-[0.68rem] text-cream-dimmer max-sm:hidden">
-                {p.game_rates
-                  ? `${p.game_rates.pts.toFixed(1)}/${p.game_rates.reb.toFixed(1)}/${p.game_rates.ast.toFixed(1)}`
+                {p.ppg != null && p.rpg != null && p.apg != null
+                  ? `${p.ppg.toFixed(1)}/${p.rpg.toFixed(1)}/${p.apg.toFixed(1)}`
                   : "no games"}
               </span>
             </span>
             {/* Same counting line, folded under the name on a phone rather
                 than dropped — nothing renders on desktop that a phone hides. */}
             <span className="mt-0.5 block truncate font-mono text-[0.62rem] text-cream-dimmer sm:hidden">
-              {p.game_rates
-                ? `${p.game_rates.pts.toFixed(1)}/${p.game_rates.reb.toFixed(1)}/${p.game_rates.ast.toFixed(1)} in ${p.game_rates.gp} gp`
+              {p.ppg != null && p.rpg != null && p.apg != null
+                ? `${p.ppg.toFixed(1)}/${p.rpg.toFixed(1)}/${p.apg.toFixed(1)} in ${p.gp ?? 0} gp`
                 : "no games this season"}
             </span>
           </li>
@@ -238,8 +259,10 @@ export default function HoopsTeamPage({
       </ol>
 
       <p className="mt-4 text-xs text-cream-dimmer">
-        Minutes are the raw expected-minutes estimate before normalisation to a 240-minute team
-        game — the simulator renormalises at allocation time, so these will not sum to 240.
+        Min is the minutes we expect each man to play on a night he plays — they add to{" "}
+        <span className="font-mono">{totalMinutes.toFixed(0)}</span> here, more than the 240 a game
+        has to give out, because not everybody is available every night. The simulator shares out
+        the real 240 when it plays the game.
       </p>
     </article>
   );
@@ -276,14 +299,21 @@ function GameRow({ g }: { g: TeamFormGame }) {
       </span>
       <span className="shrink-0 text-right font-mono text-[0.65rem] text-cream-dimmer">
         {fmtSigned(g.margin, 0)}
-        {g.closingSpread != null && (
-          <>
-            {" · line "}
-            {fmtSigned(g.closingSpread, 1)}{" "}
-            <span className={g.ats === "covered" ? "text-cat-hoops" : undefined}>{g.ats}</span>
-          </>
-        )}
       </span>
+      {/* The market's number gets its own line on a phone. On one row it and
+          the score share ~343px with the date, which leaves the longest rows
+          (a 3-digit margin against a double-digit line) a couple of dozen
+          pixels of room — the wrap is what stops that being a clip. `w-full`
+          in a flex-wrap row forces the break; `sm:w-auto` puts it back inline
+          on anything wider. pl-14 lines it up under the opponent. */}
+      {g.closingSpread != null && (
+        <span className="w-full shrink-0 pl-14 font-mono text-[0.65rem] text-cream-dimmer sm:w-auto sm:pl-0 sm:text-right">
+          <span className="hidden sm:inline">· </span>
+          {"line "}
+          {fmtSigned(g.closingSpread, 1)}{" "}
+          <span className={g.ats === "covered" ? "text-cat-hoops" : undefined}>{g.ats}</span>
+        </span>
+      )}
     </li>
   );
 }

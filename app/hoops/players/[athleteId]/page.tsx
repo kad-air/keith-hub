@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { CompareWithPicker } from "@/components/hoops/ComparePicker";
+import type { PickOption } from "@/components/hoops/ComparePicker";
 import HoopsNav from "@/components/hoops/HoopsNav";
 import { PlayerExplainBlock } from "@/components/hoops/PlayerExplain";
 import { rankPlayers } from "@/lib/hoops/playervalue";
@@ -56,6 +58,12 @@ export default function HoopsPlayerPage({ params }: { params: { athleteId: strin
 
   const net = p.stack_net_per36 ?? p.value_per36;
   const gr = p.game_rates;
+  // The whole league, three fields each, for the "Compare with…" select.
+  const compareOptions: PickOption[] = all.map((r) => ({
+    athlete_id: r.athlete_id,
+    name: r.name,
+    tri: r.tri,
+  }));
   const through = getResultsWindow()?.to ?? null;
 
   return (
@@ -81,13 +89,15 @@ export default function HoopsPlayerPage({ params }: { params: { athleteId: strin
           {rOff.rank > 0 && ` · offence #${rOff.rank}`}
           {rDef.rank > 0 && ` · defence #${rDef.rank}`}
         </p>
+        {/* The comparison is a link, so this is only a shortcut into it. */}
+        <CompareWithPicker options={compareOptions} self={id} />
       </header>
 
       <dl className="mt-5 grid grid-cols-3 gap-2 border-y border-rule/60 py-3">
         <Stat
           label="Value / game"
           value={p.value_pg != null ? fmtSigned(p.value_pg, 2) : "—"}
-          sub="pts of margin vs avg"
+          sub="margin vs average"
         />
         <Stat
           label="Rate / 36"

@@ -16,6 +16,24 @@ export function teamName(tri: string): string {
 }
 
 /**
+ * "Oklahoma City Thunder" -> "Thunder". Label text only — nothing computes on
+ * it.
+ *
+ * The matchup pickers are half a phone wide, and no full name fits: measured
+ * at 375px, "Minnesota Timberwolves" needs 151px of a 126px select even before
+ * the tri code goes in front of it, and it still overflows shrunk to 12px.
+ * Every nickname in the league is unique, so "MIN — Timberwolves" says exactly
+ * as much as "MIN — Minnesota Timberwolves" and fits at a readable size.
+ * Portland's is the only two-word one.
+ */
+export function teamNickname(tri: string): string {
+  const parts = teamName(tri).split(" ");
+  if (parts.length < 2) return parts[0] ?? tri;
+  if (parts[parts.length - 2] === "Trail") return parts.slice(-2).join(" ");
+  return parts[parts.length - 1];
+}
+
+/**
  * Team strength in points per 100 possessions.
  *
  * 🔴 `off - def`, not `off + def`. This is hoops-sim's own convention —

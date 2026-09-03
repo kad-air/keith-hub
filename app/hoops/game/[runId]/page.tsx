@@ -119,7 +119,7 @@ export default function HoopsGamePage({
         <p className="mt-4 border-l-2 border-cat-hoops/50 pl-3 text-sm text-cream-dim">
           This is <em>one specific night</em> — a single simulated game, not an average. The lines
           below are whole numbers and they add up to the score above exactly. Reload and you get
-          this same game again, forever: it is a pure function of the run_id in the URL. For what a{" "}
+          this same game again, forever — the link <em>is</em> the game. For what a{" "}
           <em>typical</em> night looks like, the{" "}
           <Link
             href={`/hoops?home=${coords.home}&away=${coords.away}&mode=${coords.ratingMode}`}
@@ -151,10 +151,11 @@ export default function HoopsGamePage({
         }
       />
 
+      {/* The provenance footnote. Same fact as before — a Mini push replaces
+          the model under an old link — said the way you'd say it out loud. */}
       <p className="mt-3 text-xs leading-relaxed text-cream-dimmer">
-        The run_id reproduces this game against <em>this</em> fit. A refreshed parameter blob from
-        the Mac Mini replaces the model underneath it, which is why the fit version and its
-        as-of date sit next to the id rather than the id standing alone.
+        This link replays this exact game until the model is refreshed from the Mac Mini, which is
+        why the fit and the date it was built sit right next to the id.
       </p>
 
       <Link

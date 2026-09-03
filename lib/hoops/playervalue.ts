@@ -259,24 +259,34 @@ export function valueCoverage(ranked: RankedPlayer[]): ValueCoverage {
 }
 
 /** The sort control's labels and their on-screen explanations. */
-export const SORT_COPY: Record<PlayerSort, { label: string; blurb: string }> = {
+/**
+ * The button copy for each sort. `short` is the phone-width label — four
+ * buttons of "Value/G / Net / Offence / Defence" run off a 375px screen, and
+ * "Off"/"Def" are what a coach would write on a whiteboard anyway. Copy only:
+ * the keys, the blurbs and every number behind them are untouched.
+ */
+export const SORT_COPY: Record<PlayerSort, { label: string; short: string; blurb: string }> = {
   value: {
     label: "Value/G",
+    short: "Val/G",
     blurb:
       "Points of team margin per game vs. an average player — the stack rating times how many minutes he's expected to play, divided by 36. This is what a roster decision actually turns on.",
   },
   net: {
     label: "Net",
+    short: "Net",
     blurb:
       "Everything a player is worth per 36 minutes, offence and defence added together, against an average player.",
   },
   off: {
     label: "Offence",
+    short: "Off",
     blurb:
       "The offensive half only — points per 36 minutes his offence is worth above an average player's.",
   },
   def: {
     label: "Defence",
+    short: "Def",
     blurb:
       "The defensive half only. Higher is better here: it is points per 36 minutes he stops, so a rim protector reads big and positive.",
   },

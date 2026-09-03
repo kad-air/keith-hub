@@ -13,7 +13,7 @@ import MarginHistogram from "@/components/hoops/MarginHistogram";
 import type { BoxscoreResult } from "@/lib/hoops/boxscore";
 import type { Meeting, SimSummary } from "@/lib/hoops/matchup";
 import type { FormSummary, HoopsMeta } from "@/lib/hoops/queries";
-import { MODE_COPY, fmtSigned, rankTeams, teamName } from "@/lib/hoops/rating";
+import { MODE_COPY, fmtSigned, rankTeams, teamName, teamNickname } from "@/lib/hoops/rating";
 import { seriesLengthDistribution, seriesWinProb } from "@/lib/hoops/series";
 import type { RankedTeam, RatingMode, TeamRow } from "@/lib/hoops/types";
 import { useKeyboard } from "@/lib/useKeyboard";
@@ -238,31 +238,37 @@ export default function MatchupClient({
         <TeamContext team={rankedByTri[home]} form={form[home]} align="right" />
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          onClick={() => {
-            setNeutral((v) => !v);
-            setResult(null);
-            setSeries(null);
-          }}
-          aria-pressed={neutral}
-          className={`border px-3 py-1.5 font-mono text-[0.65rem] uppercase tracking-kicker transition-colors ${
-            neutral
-              ? "border-cat-hoops/70 bg-cat-hoops/10 text-cat-hoops"
-              : "border-rule/60 text-cream-dim hover:border-cat-hoops/40"
-          }`}
-        >
-          Neutral court
-        </button>
-        <span className="font-mono text-[0.62rem] text-cream-dimmer">
-          {neutral ? "no home advantage" : `home advantage ${meta.hcaPts.toFixed(2)} pts`}
-        </span>
+      {/* One row at every width: the toggle on the left with what it costs the
+          home side underneath it, Surprise me on the right. These three used to
+          wrap into two ragged rows on a phone, with the advantage text stranded
+          between two buttons. */}
+      <div className="mt-3 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <button
+            type="button"
+            onClick={() => {
+              setNeutral((v) => !v);
+              setResult(null);
+              setSeries(null);
+            }}
+            aria-pressed={neutral}
+            className={`whitespace-nowrap border px-3 py-1.5 font-mono text-[0.65rem] uppercase tracking-kicker transition-colors ${
+              neutral
+                ? "border-cat-hoops/70 bg-cat-hoops/10 text-cat-hoops"
+                : "border-rule/60 text-cream-dim hover:border-cat-hoops/40"
+            }`}
+          >
+            Neutral court
+          </button>
+          <span className="mt-1 block font-mono text-[0.62rem] text-cream-dimmer">
+            {neutral ? "no home advantage" : `home advantage ${meta.hcaPts.toFixed(2)} pts`}
+          </span>
+        </div>
         <button
           type="button"
           onClick={surprise}
           title="A random matchup (r)"
-          className="ml-auto border border-rule/60 px-3 py-1.5 font-mono text-[0.65rem] uppercase tracking-kicker text-cream-dim transition-colors hover:border-cat-hoops/40 hover:text-cream"
+          className="shrink-0 whitespace-nowrap border border-rule/60 px-3 py-1.5 font-mono text-[0.65rem] uppercase tracking-kicker text-cream-dim transition-colors hover:border-cat-hoops/40 hover:text-cream"
         >
           Surprise me
         </button>
@@ -281,7 +287,7 @@ export default function MatchupClient({
               setSeries(null);
             }}
             aria-pressed={m === mode}
-            className={`flex-1 border px-2 py-1.5 font-mono text-[0.65rem] uppercase tracking-kicker transition-colors ${
+            className={`flex-1 whitespace-nowrap border px-1 py-1.5 font-mono text-[0.65rem] uppercase tracking-kicker transition-colors sm:px-2 ${
               m === mode
                 ? "border-cat-hoops/70 bg-cat-hoops/10 text-cat-hoops"
                 : "border-rule/60 text-cream-dim hover:border-cat-hoops/40"
@@ -570,11 +576,16 @@ function TeamPicker({
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="mt-1 w-full min-w-0 appearance-none border border-rule/60 bg-ink-raised px-2 py-2 font-display text-sm text-cream focus:border-cat-hoops focus:outline-none sm:text-base"
+        className="mt-1 w-full min-w-0 appearance-none border border-rule/60 bg-ink-raised px-2 py-2 font-display text-[0.8rem] text-cream focus:border-cat-hoops focus:outline-none sm:text-base"
       >
+        {/* "OKC — Thunder". A select half a phone wide has room for about 126
+            pixels of text and "OKC — Oklahoma City Thunder" wanted well over
+            twice that, so it clipped to "OKC — Oklahoma Ci". The nickname is
+            unique across the league and the tri keeps the list's own order
+            readable. */}
         {options.map((t) => (
           <option key={t} value={t}>
-            {t} — {teamName(t)}
+            {t} — {teamNickname(t)}
           </option>
         ))}
       </select>
@@ -582,6 +593,15 @@ function TeamPicker({
   );
 }
 
+/**
+ * Who did I just pick — tri, rank, strength and recent form.
+ *
+ * The tri lives here now that the picker shows the team name alone, so it is
+ * still on screen for anyone reading a run_id or a head-to-head row. On a
+ * phone it drops the words "net" and "last" and breaks deliberately after the
+ * strength ("OKC · #1 · +10.6" / "7-3 L10") rather than truncating: this line
+ * used to end in an ellipsis exactly where the recent form was.
+ */
 function TeamContext({
   team,
   form,
@@ -594,16 +614,22 @@ function TeamContext({
   if (!team) return <span />;
   return (
     <p
-      className={`truncate font-mono text-[0.62rem] uppercase tracking-kicker text-cream-dimmer ${
+      className={`font-mono text-[0.62rem] uppercase tracking-kicker text-cream-dimmer ${
         align === "right" ? "text-right" : ""
       }`}
     >
-      #{team.rank} · <span className="text-cream-dim">{fmtSigned(team.net)}</span> net
+      <span className="block sm:inline">
+        <span className="text-cat-hoops">{team.tri}</span> · #{team.rank} ·{" "}
+        <span className="text-cream-dim">{fmtSigned(team.net)}</span>
+        <span className="max-sm:hidden"> net</span>
+      </span>
       {form && form.n > 0 && (
-        <>
-          {" · "}
-          {form.wins}–{form.losses} last {form.n}
-        </>
+        <span className="block sm:inline">
+          <span className="max-sm:hidden"> · </span>
+          {form.wins}–{form.losses}
+          <span className="max-sm:hidden"> last {form.n}</span>
+          <span className="sm:hidden"> L{form.n}</span>
+        </span>
       )}
     </p>
   );

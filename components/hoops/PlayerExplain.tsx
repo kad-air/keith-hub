@@ -1,6 +1,14 @@
 import Link from "next/link";
+import { ledgerLines, seasonLabel } from "@/lib/hoops/compare";
 import { fmtSigned } from "@/lib/hoops/rating";
 import type { ExplainItem, ExplainModel, RawPlayerExplain } from "@/lib/hoops/types";
+
+// The ledger's ROWS, their wording and the two small formatters moved to
+// lib/hoops/compare.ts when the side-by-side comparison shipped, so both
+// screens say the same things in the same words and only one of them can go
+// stale. This file is what turns those rows into markup. `seasonLabel` is
+// re-exported because it was part of this module's surface before the split.
+export { seasonLabel };
 
 // The player page's "how we got here" — every number below comes off the
 // bundle's explain block and reconciles to the rating it explains
@@ -36,14 +44,6 @@ const WAGE_COPY: Array<[string, string]> = [
   ["block", "a block"],
   ["dreb", "a defensive board"],
 ];
-
-export function seasonLabel(startYear: number): string {
-  return `${startYear}-${String((startYear + 1) % 100).padStart(2, "0")}`;
-}
-
-function pct(x: number): string {
-  return `${Math.round(x * 100)}%`;
-}
 
 /** Two numbers, offence and defence, on one row of the ledger. */
 function LedgerRow({
@@ -145,18 +145,8 @@ export function PlayerExplainBlock({
   const first = model ? seasonLabel(model.seasons.first) : "the tape window";
   const last = model ? seasonLabel(model.seasons.last) : "";
   const lam = model?.lam ?? null;
-  const n = Math.min(e.tape.n_off_poss, e.tape.n_def_poss);
-  const ownShare = lam != null && n + lam > 0 ? n / (n + lam) : null;
 
-  const mixed =
-    e.prior_kind === "box+history" && e.history && e.box && e.weights
-      ? {
-          off: e.weights.off * e.history.off + (1 - e.weights.off) * e.box.off,
-          def: e.weights.def * e.history.def + (1 - e.weights.def) * e.box.def,
-        }
-      : null;
-  const scoutingOff = e.mu.off;
-  const scoutingDef = e.mu.def;
+  const rows = ledgerLines(e, model);
   const items = e.box?.items ?? [];
   const maxAbs = items.reduce((m, it) => Math.max(m, Math.abs(it.contrib)), 0);
   const offItems = items.filter((it) => it.side === "off");
@@ -204,106 +194,17 @@ export function PlayerExplainBlock({
             <span className="text-right">Def</span>
           </li>
 
-          {e.prior_kind === "resume" && (
+          {rows.map((r) => (
             <LedgerRow
-              label="His résumé"
-              sub="no possessions on the tape yet — priced from box score and history alone"
-              off={e.mu.off}
-              def={e.mu.def}
+              key={r.key}
+              op={r.op}
+              label={r.label}
+              sub={r.sub}
+              off={r.off}
+              def={r.def}
+              emphasis={r.emphasis}
             />
-          )}
-          {e.prior_kind === "rookie" && (
-            <LedgerRow
-              label="Draft night"
-              sub="no NBA line yet: priced from draft slot, college box, age and size"
-              off={e.mu.off}
-              def={e.mu.def}
-            />
-          )}
-          {e.prior_kind === "none" && (
-            <LedgerRow
-              label="No scouting report"
-              sub="nothing to price him from before the tape — he starts at league average"
-              off={0}
-              def={0}
-              emphasis="muted"
-            />
-          )}
-
-          {e.box && (
-            <LedgerRow
-              label="What his box score earns"
-              sub={
-                e.box.minutes != null
-                  ? `the wage sheet on ${Math.round(e.box.minutes).toLocaleString()} minutes of his line`
-                  : "the wage sheet on his line"
-              }
-              off={e.box.off}
-              def={e.box.def}
-            />
-          )}
-          {e.history && (
-            <LedgerRow
-              label="What happened with him on the floor"
-              sub={`his plus-minus history through ${seasonLabel(e.history.ref_season)}, before the tape window`}
-              off={e.history.off}
-              def={e.history.def}
-            />
-          )}
-          {mixed && e.weights && (
-            <LedgerRow
-              op="="
-              label={`Mixed ${pct(e.weights.off)} history, ${pct(1 - e.weights.off)} box score`}
-              sub={
-                e.weights.def !== e.weights.off
-                  ? `defence is mixed ${pct(e.weights.def)} / ${pct(1 - e.weights.def)}`
-                  : undefined
-              }
-              off={mixed.off}
-              def={mixed.def}
-            />
-          )}
-          {(e.aging.off !== 0 || e.aging.def !== 0) && (
-            <LedgerRow
-              op="+"
-              label="A year older"
-              sub="the league's own aging curve, at the strength that predicts real next seasons"
-              off={e.aging.off}
-              def={e.aging.def}
-            />
-          )}
-          {e.prior_kind !== "none" && !e.prior_floored && (
-            <LedgerRow
-              op="="
-              label="The scouting report"
-              sub="what we would say before watching a possession"
-              off={scoutingOff}
-              def={scoutingDef}
-              emphasis="result"
-            />
-          )}
-          {e.prior_floored && (
-            <LedgerRow
-              op="="
-              label="Scouting report set aside"
-              sub={`under ${model?.prior_min_box_minutes?.toFixed(0) ?? "the floor of"} minutes of box evidence, so it is not trusted — he starts at league average instead`}
-              off={0}
-              def={0}
-              emphasis="muted"
-            />
-          )}
-          {e.prior_kind !== "resume" && (
-            <LedgerRow
-              op="+"
-              label="What the tape moved him"
-              sub={`${n.toLocaleString()} possessions${
-                ownShare != null ? ` — about ${pct(ownShare)} his own numbers, ${pct(1 - ownShare)} the report` : ""
-              }`}
-              off={e.tape.move_off}
-              def={e.tape.move_def}
-            />
-          )}
-          <LedgerRow op="=" label="His rating" off={e.final.off} def={e.final.def} emphasis="result" />
+          ))}
         </ol>
 
         <p className="mt-3 text-xs leading-relaxed text-cream-dimmer">

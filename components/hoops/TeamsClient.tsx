@@ -76,7 +76,7 @@ export default function TeamsClient({
             type="button"
             onClick={() => pick(m)}
             aria-pressed={m === mode}
-            className={`flex-1 border px-3 py-2 font-mono text-[0.7rem] uppercase tracking-kicker transition-colors ${
+            className={`flex-1 whitespace-nowrap border px-1.5 py-2 font-mono text-[0.7rem] uppercase tracking-kicker transition-colors sm:px-3 ${
               m === mode
                 ? "border-cat-hoops/70 bg-cat-hoops/10 text-cat-hoops"
                 : "border-rule/60 text-cream-dim hover:border-cat-hoops/40 hover:text-cream"
@@ -201,20 +201,29 @@ export default function TeamsClient({
                     {fmtSigned(t.def)}
                   </span>
                 </span>
+                {/* Recent form leads, because it is the line's most interesting
+                    fact and it used to be the part the ellipsis ate ("7…").
+                    Off/def follow it on a phone, where they have no columns of
+                    their own. Conference and roster size are what gets cut —
+                    dropped outright below `sm` rather than half-shown behind an
+                    ellipsis, and both are on the team's own page a tap away. */}
                 <span className="mt-0.5 block truncate pl-8 font-mono text-[0.62rem] uppercase tracking-kicker text-cream-dimmer">
-                  <span className="sm:hidden">
-                    off {fmtSigned(t.off)} · def {fmtSigned(t.def)} ·{" "}
-                  </span>
-                  {t.conference} · {rosterSizes[t.tri] ?? 0} players
                   {f && f.n > 0 && (
                     <>
-                      {" · "}
                       <span className={f.wins >= f.losses ? "text-cream-dim" : undefined}>
                         {f.wins}–{f.losses}
-                      </span>{" "}
-                      last {f.n}
+                      </span>
+                      <span className="max-sm:hidden"> last {f.n}</span>
+                      <span className="sm:hidden"> L{f.n}</span>
+                      {" · "}
                     </>
                   )}
+                  <span className="sm:hidden">
+                    off {fmtSigned(t.off)} · def {fmtSigned(t.def)}
+                  </span>
+                  <span className="max-sm:hidden">
+                    {t.conference} · {rosterSizes[t.tri] ?? 0} players
+                  </span>
                 </span>
               </Link>
             </li>
