@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import HoopsNav from "@/components/hoops/HoopsNav";
 import PlayersClient from "@/components/hoops/PlayersClient";
 import { defaultSortFor, isPlayerSort } from "@/lib/hoops/playervalue";
-import { getAllPlayers, getHoopsMeta, getTeamRows } from "@/lib/hoops/queries";
+import { getAllPlayers, getHoopsMeta, getResultsWindow, getTeamRows } from "@/lib/hoops/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +29,7 @@ export default function HoopsPlayersPage({
 
   return (
     <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6">
-      <HoopsNav active="players" />
+      <HoopsNav active="players" through={getResultsWindow()?.to ?? null} />
       <Suspense>
         <PlayersClient
           rows={rows}

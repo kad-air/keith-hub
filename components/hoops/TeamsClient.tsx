@@ -92,10 +92,29 @@ export default function TeamsClient({
         {MODE_COPY[mode].blurb}
       </p>
 
-      {/* Nightly's own provenance and its caveats — on screen, in the language
-          of the sport, and only when the lens is actually selected. */}
+      {/* The one nightly fact that is correctness, not polish, stays outside
+          the fold: who the read abstained on. */}
+      {mode === "nightly" && nightly.present && nightly.abstained.length > 0 && (
+        <p className="mt-2 border-l-2 border-cat-hoops pl-3 text-sm text-cream-dim">
+          No nightly read yet for{" "}
+          <span className="font-mono">{nightly.abstained.join(" ")}</span> — too few games so far,
+          so they keep their Results rating unchanged rather than showing a number we did not work
+          out.
+        </p>
+      )}
+
+      {/* Provenance and the disagreement note, folded under a visible summary
+          line: they used to be three paragraphs between the buttons and rank
+          1, most of a phone screen before the first team. The summary line
+          still carries the number that matters. */}
+      <details className="mt-2 border-l-2 border-rule/60 pl-3">
+        <summary className="cursor-pointer font-mono text-[0.62rem] uppercase tracking-kicker text-cream-dimmer hover:text-cream-dim">
+          How this rating is built · results and roster disagree by{" "}
+          <span className="text-cream-dim">{spread.median.toFixed(1)}</span> pts (median), up to{" "}
+          <span className="text-cream-dim">{spread.max.toFixed(1)}</span> for {spread.maxTeam}
+        </summary>
       {mode === "nightly" && nightly.present && (
-        <p className="mt-2 border-l-2 border-cat-hoops/30 pl-3 text-sm text-cream-dimmer">
+        <p className="mt-2 text-sm text-cream-dimmer">
           Built from each team&rsquo;s last{" "}
           <span className="font-mono text-cream-dim">{nightly.lastNGames ?? 10}</span> games, with
           player ratings as of{" "}
@@ -112,18 +131,9 @@ export default function TeamsClient({
               yet vouched for this read as a pricing input.
             </>
           )}
-          {nightly.abstained.length > 0 && (
-            <>
-              {" "}
-              No read yet for{" "}
-              <span className="font-mono">{nightly.abstained.join(" ")}</span> — too few games so
-              far, so they keep their Results rating unchanged rather than showing a number we
-              did not work out.
-            </>
-          )}
         </p>
       )}
-      <p className="mt-2 border-l-2 border-rule/60 pl-3 text-sm text-cream-dimmer">
+      <p className="mt-2 text-sm text-cream-dimmer">
         Results and roster ratings currently disagree by{" "}
         <span className="font-mono text-cream-dim">{spread.median.toFixed(1)}</span> points for the
         median team, and by as much as{" "}
@@ -138,6 +148,7 @@ export default function TeamsClient({
           </>
         )}
       </p>
+      </details>
 
       <ol className="mt-5">
         <li className="flex items-baseline gap-2 border-b border-rule/60 pb-1 font-mono text-[0.62rem] uppercase tracking-kicker text-cream-dimmer">

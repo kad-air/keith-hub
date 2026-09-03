@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "check:hoops": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-hoops.ts",
-    "prebuild": "npm run check:hoops && npm run check:hoops:fixture && npm run check:hoops:pricing-fixture && npm run check:hoops:multinomial && npm run check:hoops:boxscore && npm run check:hoops:players && npm run check:books:bytes && npm run check:books:opds && npm run check:books:kosync && npm run check:books:metadata && npm run check:books:stats && npm run check:books:xpointer && npm run check:books:drm && npm run check:books:acsm && npm run check:books:health && npm run check:books:discworld && npm run check:hoops:contract && npm run check:hoops:nightly",
+    "prebuild": "npm run check:hoops && npm run check:hoops:fixture && npm run check:hoops:pricing-fixture && npm run check:hoops:multinomial && npm run check:hoops:boxscore && npm run check:hoops:players && npm run check:books:bytes && npm run check:books:opds && npm run check:books:kosync && npm run check:books:metadata && npm run check:books:stats && npm run check:books:xpointer && npm run check:books:drm && npm run check:books:acsm && npm run check:books:health && npm run check:books:discworld && npm run check:hoops:contract && npm run check:hoops:nightly && npm run check:hoops:explain && npm run check:hoops:matchup",
     "check:books:bytes": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-books-bytes.ts",
     "check:books:opds": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-books-opds.ts",
     "check:books:kosync": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-books-kosync.ts",
@@ -26,7 +26,9 @@
     "check:books:health": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-books-health.ts",
     "check:books:discworld": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-books-discworld.ts",
     "check:hoops:contract": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-hoops-contract.ts",
-    "check:hoops:nightly": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-hoops-nightly.ts"
+    "check:hoops:nightly": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-hoops-nightly.ts",
+    "check:hoops:explain": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-hoops-explain.ts",
+    "check:hoops:matchup": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-hoops-matchup.ts"
   },
   "dependencies": {
     "@atproto/api": "^0.19.6",

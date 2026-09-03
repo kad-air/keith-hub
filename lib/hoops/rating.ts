@@ -119,21 +119,22 @@ export const MODE_COPY: Record<RatingMode, { label: string; blurb: string }> = {
   results: {
     label: "Results",
     blurb:
-      "Prices a roster correctly once that roster has played. Its blindness is a latency, not a bias: a few games in-season, the entire summer in the offseason. Roster-blind — a trade that hasn't played a game doesn't move it.",
+      "What the scoreboard says: the season's real margins, opponent-adjusted. Knows nothing about a trade until the new roster has played games — all summer, it is last season's team.",
   },
   roster: {
     label: "Roster",
     blurb:
-      "Bottom-up from today's roster, so it sees trades and signings immediately — at the cost of being noisier than the results rating.",
+      "Adds up today's roster player by player, so it sees a trade or a signing the moment it happens — and is the noisier of the two for it.",
   },
   blend: {
     label: "Blend",
-    blurb: "The fitted combination of the two, and the sane default.",
+    blurb:
+      "Results and roster mixed at the weight that has predicted real games best. The sane default when there is no nightly read.",
   },
   nightly: {
     label: "Nightly",
     blurb:
-      "Who has actually been on the floor. Re-prices each team from the men who played its last ten games — so a star who has been out, or a rotation that has changed shape, shows up here before it shows up anywhere else — then mixes that with the season-long results rating at the weight five earlier seasons say works best. It is the only one of these four that has been measured to predict real game margins better than the rating it is built from.",
+      "Who has actually been on the floor: each team re-priced from the men who played its last ten games, then mixed with the results rating. A star who has been out, or a rotation that changed shape, shows up here first — and it is the one lens measured to call real games better than the rating it is built from.",
   },
 };
 

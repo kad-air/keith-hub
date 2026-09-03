@@ -9,7 +9,7 @@ import {
 } from "@/components/hoops/BoxScoreTable";
 import HoopsNav from "@/components/hoops/HoopsNav";
 import { encodeRunId, parseRunId } from "@/lib/hoops/matchup";
-import { DEFAULT_RATING_MODE, isRatingMode } from "@/lib/hoops/queries";
+import { DEFAULT_RATING_MODE, getResultsWindow, isRatingMode } from "@/lib/hoops/queries";
 import { teamName } from "@/lib/hoops/rating";
 import { runSampledGame, UnknownTeamError } from "@/lib/hoops/run";
 
@@ -76,14 +76,24 @@ export default function HoopsGamePage({
 
   return (
     <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6">
-      <HoopsNav active="matchup" />
+      <HoopsNav active="matchup" through={getResultsWindow()?.to ?? null} />
 
-      <Link
-        href={`/hoops?home=${coords.home}&away=${coords.away}&mode=${coords.ratingMode}`}
-        className="font-mono text-[0.68rem] uppercase tracking-kicker text-cream-dimmer transition-colors hover:text-cream-dim"
-      >
-        ← Matchup
-      </Link>
+      <div className="flex items-baseline justify-between gap-3">
+        <Link
+          href={`/hoops?home=${coords.home}&away=${coords.away}&mode=${coords.ratingMode}${coords.neutralSite ? "&neutral=1" : ""}`}
+          className="font-mono text-[0.68rem] uppercase tracking-kicker text-cream-dimmer transition-colors hover:text-cream-dim"
+        >
+          ← Matchup
+        </Link>
+        {/* The re-roll is the fun of this page; it used to sit only at the
+            bottom of two box scores. */}
+        <Link
+          href={rerollHref}
+          className="border border-cat-hoops/60 px-3 py-1 font-mono text-[0.65rem] uppercase tracking-kicker text-cat-hoops transition-colors hover:bg-cat-hoops/10"
+        >
+          Sim another night →
+        </Link>
+      </div>
 
       <header className="mt-3">
         <p className="font-mono text-[0.62rem] uppercase tracking-kicker text-cat-hoops">

@@ -201,3 +201,78 @@ export function summarizeSim(
     marginHist: histogram(result.margin, binWidth),
   };
 }
+
+// ── Head to head ─────────────────────────────────────────────────────────
+//
+// What the market and the scoreboard said the last time these two met. The
+// bundle carries the whole season's schedule and closing lines, and the last
+// ~200 finals, so a matchup screen can put the sim's number next to a real
+// closing line — framed as the sim's read, never an edge (HOOPS_PLAN.md §8:
+// the market's typical miss is smaller than ours).
+
+export interface Meeting {
+  gameId: string;
+  date: string;
+  home: string;
+  away: string;
+  neutral: boolean;
+  /** Closing spread from the HOME side (market convention: favourite negative). */
+  homeSpread: number | null;
+  total: number | null;
+  /** Real final, when the game sits inside the results window; else null. */
+  homeScore: number | null;
+  awayScore: number | null;
+}
+
+interface ScheduleLike {
+  game_id: string;
+  date: string;
+  home: string;
+  away: string;
+  neutral_site: boolean | number;
+}
+interface LineLike {
+  game_id: string;
+  home_spread: number | null;
+  total: number | null;
+}
+interface ResultLike {
+  game_id: string;
+  home_score: number;
+  away_score: number;
+}
+
+/** Every scheduled game between `a` and `b`, oldest first, joined to its
+ *  closing line and (where the window has it) its real final. Pure, so the
+ *  build check can drive it over the committed JSON and the server over the
+ *  same rows read back out of SQLite. */
+export function meetingsBetween(
+  schedule: ScheduleLike[],
+  lines: LineLike[],
+  results: ResultLike[],
+  a: string,
+  b: string,
+): Meeting[] {
+  const A = a.toUpperCase();
+  const B = b.toUpperCase();
+  const lineOf = new Map(lines.map((l) => [l.game_id, l]));
+  const resultOf = new Map(results.map((r) => [r.game_id, r]));
+  return schedule
+    .filter((g) => (g.home === A && g.away === B) || (g.home === B && g.away === A))
+    .sort((x, y) => (x.date < y.date ? -1 : x.date > y.date ? 1 : x.game_id.localeCompare(y.game_id)))
+    .map((g) => {
+      const l = lineOf.get(g.game_id);
+      const r = resultOf.get(g.game_id);
+      return {
+        gameId: g.game_id,
+        date: g.date,
+        home: g.home,
+        away: g.away,
+        neutral: g.neutral_site === true || g.neutral_site === 1,
+        homeSpread: l?.home_spread ?? null,
+        total: l?.total ?? null,
+        homeScore: r?.home_score ?? null,
+        awayScore: r?.away_score ?? null,
+      };
+    });
+}

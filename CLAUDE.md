@@ -22,6 +22,10 @@ npm run check:hoops:boxscore     # Box-score gate: integer identity + level anch
 npm run check:hoops:players      # Player-rankings gate: the off/def sign convention (both ways),
                                  #   real-NBA anchors, the read-model round trip, the ranking
                                  #   itself, and the pricing scope boundary (same)
+npm run check:hoops:explain      # Player-page gate: the explain ledger reconciles to the shipped rating,
+                                 #   the importer binds the blob by position, list reads never hydrate it (same)
+npm run check:hoops:matchup      # Matchup gate: best-of-seven arithmetic vs closed forms, head-to-head
+                                 #   anchored on the real 2025-26 schedule (same)
 npm run check:tracking-hidden    # Tracking section stays hidden (needs a running server; NOT in prebuild)
 npm run check:books:bytes        # Books byte-identity gate: partialMd5 vs offline Python reference, ingest stores untouched bytes (same)
 npm run check:books:opds         # Books OPDS device-contract gate: CrossPoint parser constraints + the To Read shelf, anchored on Stump's device-proven feed (same)
@@ -918,7 +922,69 @@ Three things the site had never had, all gated on `contract.features`, all taugh
 
 **Honesty carries that render, not tooltips:** the variance note and the "how these lines were built" caveats on every box score (`VarianceNote` / `BoxScoreCaveats`), the `run_id` + fit version + data-as-of on every result (`RunProvenance` — the fit is printed *next to* the id because a Mini push can replace the model under an old link), the ratings-mode blurb, the participant basis and omitted-player count per team, and the histogram's "the answer is a distribution" paragraph naming the actual cloud width and quartiles.
 
-**Key files:** `lib/hoops/types.ts` (the export's shapes), `blob-contract.ts` (what the engine expects the blob to be — the stale-blob guard's source of truth), `params.ts` (decode into flat `Float64Array` + stride, throws `StaleBlobError`; `expectVersion: null` is the fixture-only escape hatch), `data.ts` (read + hash the COMMITTED disk bundle — cold-start seed only, see above), `import.ts` (project either byte source into SQLite; `ensureHoopsImport`/`importHoopsData` = the disk-seed path, `importPushedBundle` = the push path), `contract.ts` (the wire-contract capability negotiation), `bundleValidation.ts` (the structural completeness gate on a pushed bundle), `pricing.ts` (the pure roster-pricing formula port, for the not-yet-assertable pricing fixture), `queries.ts` (server reads, all off the DB, never disk), `rating.ts` (**pure** — no fs/db, so the client can re-rank all three modes without a round trip), `nba-franchises.ts` (the 30 real franchises, as an external fact), `blake2b.ts` (hand-rolled because the engine runs in the browser too and Web Crypto has no blake2b; matches node:crypto on 510 inputs), `philox.ts` (Philox4x64 + numpy's `random`/`standard_normal`), `ziggurat.ts` (generated tables), `rng.ts` (coordinate-keyed streams), `engine.ts` (the possession loop), `binomial.ts` (numpy's multinomial/binomial, for the box-score allocation), `boxscore.ts` (**pure** — the two-mode box score; the studio re-runs it in the browser), `matchup.ts` (**pure** — the run_id encoding + the distribution summary), `run.ts` (the server glue: DB + engine + box score in ONE place so the routes and the SSR pages cannot drift into simulating different games). API: `app/api/hoops/import/route.ts` (the push endpoint), `app/api/hoops/teams/route.ts`, `app/api/hoops/sim/route.ts`, `app/api/hoops/boxscore/route.ts`. UI: `components/hoops/HoopsNav.tsx` (the section self-hosts its in-page nav — there is no global sub-tab bar to extend; #68's first question is answered in favour of SIBLING PAGES with an in-section switcher, so every result is linkable and server-renderable), `components/hoops/MatchupClient.tsx`, `components/hoops/BoxScoreTable.tsx` (the shared table + the three honesty blocks), `components/hoops/MarginHistogram.tsx`, `components/hoops/TeamsClient.tsx`, `app/hoops/page.tsx`, `app/hoops/game/[runId]/page.tsx`, `app/hoops/teams/*`.
+**Key files:** `lib/hoops/types.ts` (the export's shapes), `blob-contract.ts` (what the engine expects the blob to be — the stale-blob guard's source of truth), `params.ts` (decode into flat `Float64Array` + stride, throws `StaleBlobError`; `expectVersion: null` is the fixture-only escape hatch), `data.ts` (read + hash the COMMITTED disk bundle — cold-start seed only, see above), `import.ts` (project either byte source into SQLite; `ensureHoopsImport`/`importHoopsData` = the disk-seed path, `importPushedBundle` = the push path), `contract.ts` (the wire-contract capability negotiation), `bundleValidation.ts` (the structural completeness gate on a pushed bundle), `pricing.ts` (the pure roster-pricing formula port, for the not-yet-assertable pricing fixture), `queries.ts` (server reads, all off the DB, never disk), `rating.ts` (**pure** — no fs/db, so the client can re-rank all three modes without a round trip), `nba-franchises.ts` (the 30 real franchises, as an external fact), `blake2b.ts` (hand-rolled because the engine runs in the browser too and Web Crypto has no blake2b; matches node:crypto on 510 inputs), `philox.ts` (Philox4x64 + numpy's `random`/`standard_normal`), `ziggurat.ts` (generated tables), `rng.ts` (coordinate-keyed streams), `engine.ts` (the possession loop), `binomial.ts` (numpy's multinomial/binomial, for the box-score allocation), `boxscore.ts` (**pure** — the two-mode box score; the studio re-runs it in the browser), `matchup.ts` (**pure** — the run_id encoding + the distribution summary), `run.ts` (the server glue: DB + engine + box score in ONE place so the routes and the SSR pages cannot drift into simulating different games). API: `app/api/hoops/import/route.ts` (the push endpoint), `app/api/hoops/teams/route.ts`, `app/api/hoops/sim/route.ts`, `app/api/hoops/boxscore/route.ts`. UI: `components/hoops/HoopsNav.tsx` (the section self-hosts its in-page nav — there is no global sub-tab bar to extend; #68's first question is answered in favour of SIBLING PAGES with an in-section switcher, so every result is linkable and server-renderable), `components/hoops/MatchupClient.tsx`, `components/hoops/BoxScoreTable.tsx` (the shared table + the three honesty blocks), `components/hoops/MarginHistogram.tsx`, `components/hoops/TeamsClient.tsx`, `components/hoops/PlayerExplain.tsx`, `app/hoops/page.tsx`, `app/hoops/game/[runId]/page.tsx`, `app/hoops/teams/*`, `app/hoops/players/[athleteId]/page.tsx`; `lib/hoops/series.ts` (best-of-seven arithmetic), `app/api/hoops/meetings/route.ts`.
+
+#### The player page (`/hoops/players/[athleteId]`) — how we come to a player's number (2026-09-02)
+
+Every row on the ranking and on a team's roster now opens a page that lays out HOW the stack
+rating was built, as a ledger that adds up: what his box line earns on the wage sheet (itemised
+stat by stat — scoring, shots used, turnovers, assists, boards, efficiency on volume; steals,
+blocks, defensive boards — each against the league rate), what his plus-minus history before the
+tape window said, how the two are mixed (the reliability weights), what a year of age costs him,
+the resulting scouting report, and how far seven seasons of tape moved him from it — then the
+wage sheet itself in points per event, and the tape's own facts (window, memory, luck-stripped
+defence, playoff possessions counting as one). Sender side and the measurements:
+`~/Code/hoops-sim/docs/milestones/explain-sidecar.md`.
+
+**The data.** hoops-sim's `tape-refresh` writes an explain sidecar beside its values snapshot,
+and `export-hub` attaches an `explain` block per stack carrier plus one top-level `explain_model`
+block on `hoops_players.json` — display fields, **no wire token** (the `value_off_per36`
+precedent). Here: `explain_json` on `hoops_players`, `explain_model_json` on `hoops_params`
+(additive migrations), a fifth no-op marker in the importer (`hasExplain`) so an existing volume
+backfills once, `getPlayer`/`getExplainModel` in `queries.ts`. 🔴 **List reads never hydrate the
+blob** (`getAllPlayers`/`getRoster` leave `explain` null): ~530 itemised blocks would triple the
+ranking payload for a page that shows none of them. Only `getPlayer` parses it.
+
+🔴 **`mu + move == final` is an identity, not a finding** — the tape's contribution is defined as
+the shipped number minus the scouting report. What `npm run check:hoops:explain` (in `prebuild`)
+actually convicts: the blend `w·hist + (1−w)·box + aging == mu`, the itemisation `Σ items +
+baseline == box` with each item equal to `coef × (rate − league)` on the shipped coefficients,
+`final` equal to the stack fields on the same row, real-basketball sign anchors on the wage sheet
+(a steal paid, a turnover charged, a three worth more than a two), the schema/INSERT cross-check,
+a 25-player round trip through the real schema, and **the importer's own `run(...)` argument in
+the `explain_json` slot, by position** — the first draft of the check bound the values itself and
+stayed green while the real importer wrote NULL. 6/6 probes caught at merge. The page's
+offence/defence ranks are on the STACK halves, never the flagship split the ranking's Off/Def
+sorts use (Jokić is defence #89 on one and +1.67 on the other; different models).
+
+#### The usability pass (2026-09-02)
+
+Judged on iPhone-emulated screenshots, not on the source. What changed and why:
+- **`HoopsNav` is compact**: one line ("Hoops · games through Apr 12, 2026", the results window's
+  end via a `through` prop every page passes) plus the tabs. The old three-line preamble spent a
+  quarter of the first phone screen on developer words.
+- **The matchup offers the same lenses as Teams and defaults the same way** (`availableRatingModes`
+  + `resolveRatingMode`): it used to offer three and default to the blend while Teams offered four
+  and defaulted to the nightly read the sim actually prices with. Same on the team page's cards.
+- **Matchup**: the pickers are in the URL (`?home&away&mode&neutral`) before a sim is run; a swap
+  button; "Surprise me" (random pair); the answer scrolls into view on a phone; keyboard `s`/`x`/`r`;
+  the Sim button says how many games. Head to head this season under the button (`GET
+  /api/hoops/meetings?a&b`, the pure `meetingsBetween` in `matchup.ts` over schedule + closing lines
+  + the results window), and after a sim, our line next to the market's closing line the last time
+  the two met — **framed as the sim's read, never an edge** (HOOPS_PLAN.md §8; the sentence says the
+  market misses by less than we do). **Best of seven** on demand: a second, mirrored sim for the
+  other floor, then `lib/hoops/series.ts` (pure, 2-2-1-1-1 state walk) — labelled regular-season
+  strength with no playoff rotation tightening, because the engine here has none.
+- **Teams**: the nightly provenance and the disagreement note fold under a visible summary line;
+  the abstained-teams disclosure stays outside the fold (correctness, not polish). Rating blurbs
+  rewritten in basketball terms (`MODE_COPY`).
+- **Players**: a name search (accent-insensitive). **Team page**: a link into the league ranking
+  filtered to the team, roster names link to the player page. **Game page**: "Sim another night"
+  at the top next to the score, not only under two box scores.
+- Gate: `npm run check:hoops:matchup` (in `prebuild`) — series odds against the closed form for a
+  constant p, complement symmetry on the mirrored court pattern, monotonicity, home court favouring
+  its holder; head to head anchored on real facts (the 2025-26 opener was HOU at OKC on 2025-10-21,
+  division rivals meet four times) and finals attached only inside the results window.
 
 #### The player rankings (`/hoops/players`)
 

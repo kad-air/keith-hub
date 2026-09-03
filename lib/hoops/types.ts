@@ -218,6 +218,89 @@ export interface RawPlayer {
   value_pg?: number | null;
   /** e.g. "27719 poss (7yr)" or "prior only" — what the stack rating rests on. */
   evidence?: string | null;
+  /**
+   * HOW the stack rating was assembled — the explain sidecar (hoops-sim
+   * `playervalue.build_tape_stack_explain`, exported per-36). Optional and a
+   * display field like the six above it: no wire token, an older bundle simply
+   * lacks it. `mu + tape.move == final` by construction; the blend and the
+   * wage-sheet items are real reconstructions and `check:hoops:explain`
+   * re-adds them on every build.
+   */
+  explain?: RawPlayerExplain | null;
+}
+
+/** One side of the ball, in points per 36 minutes. */
+export interface OffDef {
+  off: number;
+  def: number;
+}
+
+export interface ExplainItem {
+  /** wage-sheet feature: pts, load, tov, ast, oreb, load_x_eff, stl, blk, dreb */
+  stat: string;
+  side: "off" | "def";
+  /** the player's minutes-shrunk per-36 rate the sheet priced */
+  rate: number;
+  /** the league rate it is read against (0 for the interaction term) */
+  league: number;
+  /** points per 36 above/below what a league-average rate earns */
+  contrib: number;
+}
+
+export type PriorKind = "box+history" | "box only" | "history only" | "rookie" | "resume" | "none";
+
+export interface RawPlayerExplain {
+  prior_kind: PriorKind;
+  /** The box sample was under the model's floor, so the prior was IGNORED
+   *  (shrunk toward league average instead). `mu` reads 0/0 when true. */
+  prior_floored: boolean;
+  /** The scouting report the tape solve shrank toward. */
+  mu: OffDef;
+  /** The wage sheet's read of his box line, itemised. Null: no box half. */
+  box:
+    | (OffDef & {
+        minutes: number | null;
+        baseline_off: number;
+        baseline_def: number;
+        items: ExplainItem[];
+      })
+    | null;
+  /** His plus-minus history before the tape window. Null: no history half. */
+  history: (OffDef & { ref_season: number }) | null;
+  /** The reliability weights ON THE HISTORY half (box gets 1 − w). */
+  weights: OffDef | null;
+  /** The aging offset added after the blend. */
+  aging: OffDef;
+  tape: {
+    n_off_poss: number;
+    n_def_poss: number;
+    /** final − mu, per side: what seven seasons of tape moved him by. */
+    move_off: number;
+    move_def: number;
+  };
+  /** Equals stack_off_per36 / stack_def_per36 on the same row. */
+  final: OffDef;
+}
+
+/** League-level facts the player page prints once. */
+export interface ExplainModel {
+  seasons: { first: number; last: number };
+  decay: number;
+  lam: number;
+  luck_adjusted: boolean;
+  playoffs_included: boolean;
+  weights: OffDef;
+  aging_scale: number | null;
+  box_pool_seasons: number;
+  prior_min_box_minutes: number | null;
+  side_pace: number;
+  /** points per raw event for a full-season starter: made_2, made_3, missed_fg,
+   *  turnover, assist, oreb, steal, block, dreb */
+  wage_sheet: Record<string, number | null>;
+  wage_reference_minutes: number | null;
+  /** per-36 coefficients, so `contrib == coef * (rate − league)` on each item */
+  coefficients: { off: Record<string, number>; def: Record<string, number> };
+  as_of: string | null;
 }
 
 export interface RawPlayersFile {
@@ -228,6 +311,8 @@ export interface RawPlayersFile {
   replacement_per36: number;
   bench_default_minutes: number;
   players: RawPlayer[];
+  /** Present only when the sender's explain sidecar existed at export time. */
+  explain_model?: ExplainModel | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -361,4 +446,9 @@ export interface PlayerRow {
   expected_minutes: number | null;
   value_pg: number | null;
   evidence: string | null;
+  /** See RawPlayer.explain. Null on a bundle without the sidecar — and null on
+   *  every LIST read (getAllPlayers/getRoster), which never hydrate it; only
+   *  getPlayer does, because ~530 itemised blocks would triple the payload of a
+   *  page that shows none of them. */
+  explain: RawPlayerExplain | null;
 }

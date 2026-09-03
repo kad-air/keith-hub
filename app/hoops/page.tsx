@@ -1,12 +1,16 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import HoopsNav from "@/components/hoops/HoopsNav";
 import MatchupClient from "@/components/hoops/MatchupClient";
 import {
-  DEFAULT_RATING_MODE,
+  availableRatingModes,
   getHoopsMeta,
   getLeagueFormSummaries,
+  getMeetings,
+  getResultsWindow,
   getTeamRows,
   isRatingMode,
+  resolveRatingMode,
 } from "@/lib/hoops/queries";
 import { rankTeams } from "@/lib/hoops/rating";
 
@@ -25,11 +29,16 @@ export const metadata: Metadata = { title: "Hoops · Matchup — hub" };
 export default function HoopsMatchupPage({
   searchParams,
 }: {
-  searchParams: { home?: string; away?: string; mode?: string };
+  searchParams: { home?: string; away?: string; mode?: string; neutral?: string };
 }) {
   const rows = getTeamRows();
   const meta = getHoopsMeta();
-  const mode = isRatingMode(searchParams.mode) ? searchParams.mode : DEFAULT_RATING_MODE;
+  // Same lenses, same default, as /hoops/teams — the matchup used to offer
+  // three lenses and default to the blend while the teams page offered four
+  // and defaulted to the nightly read the sim actually prices with.
+  const modes = availableRatingModes(rows);
+  const asked = isRatingMode(searchParams.mode) ? searchParams.mode : null;
+  const mode = asked && modes.includes(asked) ? asked : resolveRatingMode(rows);
 
   // Default to the two best teams by the chosen rating — the matchup someone
   // opening this screen cold is most likely to want, and it makes the shape of
@@ -41,19 +50,25 @@ export default function HoopsMatchupPage({
     return tri && known.has(tri) ? tri : fallback;
   };
   const defaultHome = pick(searchParams.home, ranked[0]?.tri ?? "DEN");
-  const defaultAway = pick(searchParams.away, ranked[1]?.tri ?? "OKC");
+  const rawAway = pick(searchParams.away, ranked[1]?.tri ?? "OKC");
+  const defaultAway = rawAway === defaultHome ? (ranked[2]?.tri ?? "BOS") : rawAway;
 
   return (
     <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6">
-      <HoopsNav active="matchup" />
-      <MatchupClient
-        teams={rows}
-        form={getLeagueFormSummaries()}
-        meta={meta}
-        defaultHome={defaultHome}
-        defaultAway={defaultAway === defaultHome ? (ranked[2]?.tri ?? "BOS") : defaultAway}
-        defaultMode={mode}
-      />
+      <HoopsNav active="matchup" through={getResultsWindow()?.to ?? null} />
+      <Suspense>
+        <MatchupClient
+          teams={rows}
+          form={getLeagueFormSummaries()}
+          meta={meta}
+          modes={modes}
+          defaultHome={defaultHome}
+          defaultAway={defaultAway}
+          defaultMode={mode}
+          defaultNeutral={searchParams.neutral === "1"}
+          initialMeetings={getMeetings(defaultHome, defaultAway)}
+        />
+      </Suspense>
     </article>
   );
 }

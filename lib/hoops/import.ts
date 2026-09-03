@@ -79,6 +79,9 @@ interface StoredState {
    *  an existing volume would show three rating lenses when the bundle carries
    *  four. */
   hasNightly: boolean;
+  /** A fifth time, for the explain sidecar (the player page's "how we got
+   *  here" block). Marker column is explain_json on hoops_players. */
+  hasExplain: boolean;
 }
 
 function currentState(db: Database.Database): StoredState | null {
@@ -106,6 +109,11 @@ function currentState(db: Database.Database): StoredState | null {
       .prepare(`SELECT COUNT(*) AS n FROM hoops_teams WHERE nightly_off IS NOT NULL`)
       .get() as { n: number }
   ).n;
+  const explain = (
+    db
+      .prepare(`SELECT COUNT(*) AS n FROM hoops_players WHERE explain_json IS NOT NULL`)
+      .get() as { n: number }
+  ).n;
   return {
     hash: row.content_hash,
     generatedAt: row.generated_at,
@@ -115,6 +123,7 @@ function currentState(db: Database.Database): StoredState | null {
     hasPlayerSplit: split > 0,
     hasStackFields: stack > 0,
     hasNightly: nightly > 0,
+    hasExplain: explain > 0,
   };
 }
 
@@ -153,8 +162,9 @@ function writeBundle(db: Database.Database, bundle: HoopsBundle, meta: WriteMeta
       `INSERT INTO hoops_params
          (id, param_version, blob, generated_at, imported_at, content_hash, import_source,
           hca_pts, replacement_per36, value_as_of, pricing_version, features_json, constants_json,
-          nightly_as_of, nightly_value_source, nightly_last_n_games, nightly_priced)
-       VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          nightly_as_of, nightly_value_source, nightly_last_n_games, nightly_priced,
+          explain_model_json)
+       VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
       bundle.params.parameter_set.param_version,
       meta.paramsBlobText,
@@ -177,6 +187,9 @@ function writeBundle(db: Database.Database, bundle: HoopsBundle, meta: WriteMeta
       // allowed to bet on it. NULL when the sender said nothing, which the
       // reader treats as "display only".
       bundle.teams.nightly_priced == null ? null : bundle.teams.nightly_priced ? 1 : 0,
+      // The explain sidecar's league-level facts (tape window, memory, the
+      // wage sheet in points per event). NULL when the bundle predates it.
+      bundle.players.explain_model ? JSON.stringify(bundle.players.explain_model) : null,
     );
 
     const insTeam = db.prepare(
@@ -218,8 +231,9 @@ function writeBundle(db: Database.Database, bundle: HoopsBundle, meta: WriteMeta
       `INSERT INTO hoops_players
          (athlete_id, nba_player_id, tri, name, minutes,
           value_per36, value_off_per36, value_def_per36, game_rates, per36,
-          stack_net_per36, stack_off_per36, stack_def_per36, expected_minutes, value_pg, evidence)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          stack_net_per36, stack_off_per36, stack_def_per36, expected_minutes, value_pg, evidence,
+          explain_json)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     );
     for (const p of playerRowsFromBundle(bundle.players)) {
       insPlayer.run(
@@ -239,6 +253,7 @@ function writeBundle(db: Database.Database, bundle: HoopsBundle, meta: WriteMeta
         p.expected_minutes,
         p.value_pg,
         p.evidence,
+        p.explain ? JSON.stringify(p.explain) : null,
       );
     }
 
@@ -380,6 +395,10 @@ export function importHoopsData(force = false): ImportSummary {
   const bundleHasNightly = Object.values(bundle.teams.teams).some((t) => t.nightly != null);
   const nightlySettled = !bundleHasNightly || state?.hasNightly === true;
 
+  // A fifth time, for the explain sidecar (the player page).
+  const bundleHasExplain = bundle.players.players.some((p) => p.explain != null);
+  const explainSettled = !bundleHasExplain || state?.hasExplain === true;
+
   if (
     !force &&
     state &&
@@ -388,7 +407,8 @@ export function importHoopsData(force = false): ImportSummary {
     state.hasScalars &&
     splitSettled &&
     stackSettled &&
-    nightlySettled
+    nightlySettled &&
+    explainSettled
   ) {
     return {
       imported: false,

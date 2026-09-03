@@ -9,9 +9,17 @@ import Link from "next/link";
 // This answers the first half of the #68 design spike ("is /hoops one screen
 // with modes, or six sibling pages with an in-section switcher?") in favour of
 // SIBLING PAGES: each screen owns a route, so every result is linkable and
-// server-renderable, and the switcher is this row. /hoops/game/[runId] is
-// deliberately NOT a tab — it is a result you arrive at, not a destination you
-// navigate to, so it highlights Matchup while you are on it.
+// server-renderable, and the switcher is this row. /hoops/game/[runId] and
+// /hoops/players/[athleteId] are deliberately NOT tabs — they are results you
+// arrive at, not destinations you navigate to, so they highlight the tab you
+// came from.
+//
+// Compact on purpose (usability pass, 2026-09-02): the masthead already says
+// "Hoops", so the old three-line preamble ("Section / Hoops / An NBA
+// simulation studio. The read model is a committed snapshot…") spent a quarter
+// of the first phone screen saying it again in developer words. What a reader
+// actually needs above the tabs is the one fact that dates everything below:
+// how far the real season had got when the model last looked.
 
 export interface HoopsTab {
   key: string;
@@ -25,19 +33,35 @@ export const HOOPS_TABS: HoopsTab[] = [
   { key: "players", label: "Players", href: "/hoops/players" },
 ];
 
-export default function HoopsNav({ active }: { active: string }) {
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** "2026-04-12" → "Apr 12, 2026". String maths, never a Date round-trip. */
+function fmtDate(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  return `${MONTHS[(m ?? 1) - 1]} ${d}, ${y}`;
+}
+
+export default function HoopsNav({
+  active,
+  through,
+}: {
+  active: string;
+  /** The last real game date the bundle carries a result for — the results
+   *  window's end. Null on a bundle with no results at all. */
+  through?: string | null;
+}) {
   return (
-    <header className="mb-6">
-      <p className="font-mono text-[0.7rem] uppercase tracking-kicker text-cat-hoops">
-        Section
-      </p>
-      <h1 className="mt-1 font-display text-2xl text-cream">Hoops</h1>
-      <p className="mt-1 text-sm text-cream-dim">
-        An NBA simulation studio. The read model is a committed snapshot from
-        hoops-sim — no live connection to anything.
-      </p>
+    <header className="mb-5">
+      <div className="flex items-baseline justify-between gap-3">
+        <h1 className="font-display text-xl text-cream">Hoops</h1>
+        {through && (
+          <p className="truncate font-mono text-[0.6rem] uppercase tracking-kicker text-cream-dimmer">
+            games through {fmtDate(through)}
+          </p>
+        )}
+      </div>
       {HOOPS_TABS.length > 1 && (
-        <nav className="mt-4 flex gap-2 overflow-x-auto">
+        <nav className="mt-3 flex gap-2 overflow-x-auto">
           {HOOPS_TABS.map((t) => (
             <Link
               key={t.key}

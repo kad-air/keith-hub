@@ -34,6 +34,8 @@ export default function PlayersClient({ rows, tris, meta, initialSort, initialTe
   const [sort, setSort] = useState<PlayerSort>(initialSort);
   const [team, setTeam] = useState<string | null>(initialTeam);
   const [rotationOnly, setRotationOnly] = useState(false);
+  // A name filter over 530 rows — "find Jokic" used to mean scrolling.
+  const [query, setQuery] = useState("");
 
   const floor = meta.rotationFloorMinutes;
 
@@ -59,10 +61,14 @@ export default function PlayersClient({ rows, tris, meta, initialSort, initialTe
   const activeSort: PlayerSort = sorts.includes(sort) ? sort : "net";
 
   const ranked = useMemo(() => rankPlayers(rows, activeSort, floor), [rows, activeSort, floor]);
-  const shown = useMemo(
-    () => filterPlayers(ranked, { team, rotationOnly }),
-    [ranked, team, rotationOnly],
-  );
+  const shown = useMemo(() => {
+    const base = filterPlayers(ranked, { team, rotationOnly });
+    const q = query.trim().toLowerCase();
+    if (!q) return base;
+    // Accent-insensitive so "jokic" finds Jokić and "doncic" finds Dončić.
+    const fold = (s: string): string => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+    return base.filter((p) => fold(p.name).includes(fold(q)));
+  }, [ranked, team, rotationOnly, query]);
   const coverage = useMemo(() => valueCoverage(ranked), [ranked]);
 
   const syncUrl = useCallback(
@@ -173,6 +179,14 @@ export default function PlayersClient({ rows, tris, meta, initialSort, initialTe
           </button>
         )}
 
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Find a player"
+          aria-label="Find a player by name"
+          className="min-w-0 flex-1 border border-rule/60 bg-ink px-3 py-2 font-display text-sm text-cream placeholder:text-cream-dimmer focus:border-cat-hoops focus:outline-none"
+        />
         <span className="font-mono text-[0.65rem] uppercase tracking-kicker text-cream-dimmer">
           {shown.length} shown
         </span>
@@ -204,7 +218,7 @@ export default function PlayersClient({ rows, tris, meta, initialSort, initialTe
 
       {shown.length === 0 && (
         <p className="mt-6 text-sm text-cream-dim">
-          Nobody matches that. Clear the rotation filter, or pick another team.
+          Nobody matches that. Clear the search or the rotation filter, or pick another team.
         </p>
       )}
 
@@ -280,7 +294,7 @@ function PlayerLine({ p, sort }: { p: RankedPlayer; sort: PlayerSort }) {
   return (
     <li>
       <Link
-        href={`/hoops/teams/${p.tri}`}
+        href={`/hoops/players/${p.athlete_id}`}
         className="flex items-baseline gap-2 border-b border-rule/40 py-2 transition-colors hover:bg-ink-raised/60"
       >
         <span className="w-7 shrink-0 text-right font-mono text-[0.7rem] text-cream-dimmer">

@@ -233,6 +233,7 @@ export function playerRowOf(p: RawPlayer): PlayerRow {
     expected_minutes: p.expected_minutes ?? null,
     value_pg: p.value_pg ?? null,
     evidence: p.evidence ?? null,
+    explain: p.explain ?? null,
   };
 }
 

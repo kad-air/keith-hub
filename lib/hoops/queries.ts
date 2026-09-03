@@ -7,15 +7,19 @@ import { getDb } from "@/lib/db";
 import type { BoxPlayer } from "./boxscore";
 import { ensureHoopsImport } from "./import";
 import type { ImportSource } from "./import";
+import { meetingsBetween } from "./matchup";
+import type { Meeting } from "./matchup";
 import { decodeParams } from "./params";
 import type { DecodedParams } from "./params";
 import { availableRatingModes as availableModesOf, modeDisagreement, rankTeams } from "./rating";
 import type { ModeDisagreement } from "./rating";
 import type {
+  ExplainModel,
   PlayerRow,
   RankedTeam,
   RatingMode,
   RawParamsFile,
+  RawPlayerExplain,
   RawPlayerGameRates,
   RawPlayerPer36,
   TeamRow,
@@ -142,9 +146,12 @@ interface PlayerDbRow {
   expected_minutes: number | null;
   value_pg: number | null;
   evidence: string | null;
+  explain_json?: string | null;
 }
 
-function hydratePlayer(r: PlayerDbRow): PlayerRow {
+/** `withExplain` is opt-in: the list reads leave it null on purpose (see
+ *  PlayerRow.explain) and only getPlayer parses the blob. */
+function hydratePlayer(r: PlayerDbRow, withExplain = false): PlayerRow {
   return {
     athlete_id: r.athlete_id,
     nba_player_id: r.nba_player_id,
@@ -168,7 +175,28 @@ function hydratePlayer(r: PlayerDbRow): PlayerRow {
     expected_minutes: r.expected_minutes ?? null,
     value_pg: r.value_pg ?? null,
     evidence: r.evidence ?? null,
+    explain:
+      withExplain && r.explain_json ? (JSON.parse(r.explain_json) as RawPlayerExplain) : null,
   };
+}
+
+/** One player, WITH his explain block — the player page's read. Null for an
+ *  unknown athlete id (the page 404s). */
+export function getPlayer(athleteId: number): PlayerRow | null {
+  ensureHoopsImport();
+  const row = getDb()
+    .prepare(`SELECT * FROM hoops_players WHERE athlete_id = ?`)
+    .get(athleteId) as PlayerDbRow | undefined;
+  return row ? hydratePlayer(row, true) : null;
+}
+
+/** The explain sidecar's league-level facts, or null on a bundle without it. */
+export function getExplainModel(): ExplainModel | null {
+  ensureHoopsImport();
+  const row = getDb()
+    .prepare(`SELECT explain_model_json FROM hoops_params WHERE id = 1`)
+    .get() as { explain_model_json?: string | null } | undefined;
+  return row?.explain_model_json ? (JSON.parse(row.explain_model_json) as ExplainModel) : null;
 }
 
 /**
@@ -184,7 +212,7 @@ export function getAllPlayers(): PlayerRow[] {
   const rows = getDb()
     .prepare(`SELECT * FROM hoops_players ORDER BY name ASC`)
     .all() as PlayerDbRow[];
-  return rows.map(hydratePlayer);
+  return rows.map((r) => hydratePlayer(r));
 }
 
 /** One team's roster, heaviest minutes first. */
@@ -193,7 +221,7 @@ export function getRoster(tri: string): PlayerRow[] {
   const rows = getDb()
     .prepare(`SELECT * FROM hoops_players WHERE tri = ? ORDER BY minutes DESC, name ASC`)
     .all(tri.toUpperCase()) as PlayerDbRow[];
-  return rows.map(hydratePlayer);
+  return rows.map((r) => hydratePlayer(r));
 }
 
 /**
@@ -341,6 +369,38 @@ export function getTeamForm(tri: string): TeamForm {
     windowFrom: window?.from ?? null,
     windowTo: window?.to ?? null,
   };
+}
+
+/** Head to head this season: every scheduled game between two teams with its
+ *  closing line and, inside the results window, the real final. The join is
+ *  the pure `meetingsBetween`; this only fetches the rows. */
+export function getMeetings(a: string, b: string): Meeting[] {
+  ensureHoopsImport();
+  const db = getDb();
+  const A = a.toUpperCase();
+  const B = b.toUpperCase();
+  const sched = db
+    .prepare(
+      `SELECT game_id, date, home, away, neutral_site FROM hoops_schedule
+       WHERE (home = ? AND away = ?) OR (home = ? AND away = ?)`,
+    )
+    .all(A, B, B, A) as Array<{
+    game_id: string;
+    date: string;
+    home: string;
+    away: string;
+    neutral_site: number;
+  }>;
+  if (sched.length === 0) return [];
+  const ids = sched.map((g) => g.game_id);
+  const marks = ids.map(() => "?").join(", ");
+  const lines = db
+    .prepare(`SELECT game_id, home_spread, total FROM hoops_lines WHERE game_id IN (${marks})`)
+    .all(...ids) as Array<{ game_id: string; home_spread: number | null; total: number | null }>;
+  const results = db
+    .prepare(`SELECT game_id, home_score, away_score FROM hoops_results WHERE game_id IN (${marks})`)
+    .all(...ids) as Array<{ game_id: string; home_score: number; away_score: number }>;
+  return meetingsBetween(sched, lines, results, A, B);
 }
 
 /** The results window's date span — the label that keeps "recent form"

@@ -3,16 +3,17 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import HoopsNav from "@/components/hoops/HoopsNav";
 import {
-  DEFAULT_RATING_MODE,
+  availableRatingModes,
   getHoopsMeta,
+  getResultsWindow,
   getRoster,
   getTeamForm,
   getTeamRows,
   isRatingMode,
+  resolveRatingMode,
 } from "@/lib/hoops/queries";
 import type { TeamFormGame } from "@/lib/hoops/queries";
 import { MODE_COPY, fmtSigned, rankTeams, teamName } from "@/lib/hoops/rating";
-import { RATING_MODES } from "@/lib/hoops/types";
 
 export const dynamic = "force-dynamic";
 
@@ -32,9 +33,14 @@ export default function HoopsTeamPage({
   const rows = getTeamRows();
   if (!rows.some((r) => r.tri === tri)) notFound();
 
-  const mode = isRatingMode(searchParams.mode) ? searchParams.mode : DEFAULT_RATING_MODE;
+  // The same lenses and default as /hoops/teams and /hoops — four cards when
+  // the bundle carries a nightly read, and the default is the one the sim
+  // prices with.
+  const modes = availableRatingModes(rows);
+  const asked = isRatingMode(searchParams.mode) ? searchParams.mode : null;
+  const mode = asked && modes.includes(asked) ? asked : resolveRatingMode(rows);
   const byMode = Object.fromEntries(
-    RATING_MODES.map((m) => [m, rankTeams(rows, m).find((t) => t.tri === tri)!]),
+    modes.map((m) => [m, rankTeams(rows, m).find((t) => t.tri === tri)!]),
   );
   const team = byMode[mode];
   const roster = getRoster(tri);
@@ -45,7 +51,7 @@ export default function HoopsTeamPage({
 
   return (
     <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6">
-      <HoopsNav active="teams" />
+      <HoopsNav active="teams" through={getResultsWindow()?.to ?? null} />
 
       <Link
         href={`/hoops/teams?mode=${mode}`}
@@ -63,10 +69,10 @@ export default function HoopsTeamPage({
         </p>
       </header>
 
-      {/* All three ratings side by side — the mode is a choice, not a default
-          to be hidden. */}
-      <div className="mt-5 grid grid-cols-3 gap-2">
-        {RATING_MODES.map((m) => {
+      {/* Every rating side by side — the mode is a choice, not a default to
+          be hidden. */}
+      <div className={`mt-5 grid gap-2 ${modes.length === 4 ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-3"}`}>
+        {modes.map((m) => {
           const t = byMode[m];
           const active = m === mode;
           return (
@@ -161,12 +167,20 @@ export default function HoopsTeamPage({
         </section>
       )}
 
-      <Link
-        href={`/hoops?home=${tri}`}
-        className="mt-6 block border border-cat-hoops/60 px-4 py-3 text-center font-mono text-[0.68rem] uppercase tracking-kicker text-cat-hoops transition-colors hover:bg-cat-hoops/10"
-      >
-        Sim a matchup with {tri} →
-      </Link>
+      <div className="mt-6 grid grid-cols-2 gap-2">
+        <Link
+          href={`/hoops?home=${tri}&mode=${mode}`}
+          className="block border border-cat-hoops/60 px-4 py-3 text-center font-mono text-[0.68rem] uppercase tracking-kicker text-cat-hoops transition-colors hover:bg-cat-hoops/10"
+        >
+          Sim a game at {tri} →
+        </Link>
+        <Link
+          href={`/hoops/players?team=${tri}`}
+          className="block border border-rule/60 px-4 py-3 text-center font-mono text-[0.68rem] uppercase tracking-kicker text-cream-dim transition-colors hover:border-cat-hoops/40 hover:text-cream"
+        >
+          {tri} in the league ranking →
+        </Link>
+      </div>
 
       <h3 className="mt-8 font-display text-lg text-cream">Roster</h3>
       <p className="mt-1 text-xs text-cream-dimmer">
@@ -186,7 +200,12 @@ export default function HoopsTeamPage({
         {roster.map((p) => (
           <li key={p.athlete_id} className="border-b border-rule/40 py-2">
             <span className="flex items-baseline gap-2">
-              <span className="min-w-0 flex-1 truncate font-display text-cream">{p.name}</span>
+              <Link
+                href={`/hoops/players/${p.athlete_id}`}
+                className="min-w-0 flex-1 truncate font-display text-cream hover:text-cat-hoops"
+              >
+                {p.name}
+              </Link>
               <span className="w-12 shrink-0 text-right font-mono text-[0.72rem] text-cream-dim">
                 {p.minutes.toFixed(1)}
               </span>

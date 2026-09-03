@@ -534,6 +534,24 @@ export function getDb(): Database.Database {
     }
   }
 
+  // THE EXPLAIN SIDECAR (the player page's "how we got here"): one JSON blob
+  // per player with the ingredients of his stack rating, and one league-level
+  // block on hoops_params. Additive and nullable, the same shape as every
+  // migration above and for the same reason; the importer's no-op check
+  // (hasExplain) forces the one rewrite that backfills an existing volume.
+  const hoopsPlayerExplainCols = (
+    dbInstance.prepare(`PRAGMA table_info(hoops_players)`).all() as Array<{ name: string }>
+  ).map((c) => c.name);
+  if (!hoopsPlayerExplainCols.includes("explain_json")) {
+    dbInstance.exec(`ALTER TABLE hoops_players ADD COLUMN explain_json TEXT`);
+  }
+  const hoopsParamsExplainCols = (
+    dbInstance.prepare(`PRAGMA table_info(hoops_params)`).all() as Array<{ name: string }>
+  ).map((c) => c.name);
+  if (!hoopsParamsExplainCols.includes("explain_model_json")) {
+    dbInstance.exec(`ALTER TABLE hoops_params ADD COLUMN explain_model_json TEXT`);
+  }
+
   return dbInstance;
 }
 
