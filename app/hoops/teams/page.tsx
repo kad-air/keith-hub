@@ -38,7 +38,7 @@ export default function HoopsTeamsPage({
       <HoopsNav active="teams" through={getResultsWindow()?.to ?? null} />
       <Suspense>
         <TeamsClient
-          rows={rows}
+          rows={rows.map((r) => ({ ...r, nightly_movers_json: null }))}
           rosterSizes={sizes}
           form={getLeagueFormSummaries()}
           resultsWindow={getResultsWindow()}

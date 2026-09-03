@@ -82,6 +82,11 @@ interface StoredState {
   /** A fifth time, for the explain sidecar (the player page's "how we got
    *  here" block). Marker column is explain_json on hoops_players. */
   hasExplain: boolean;
+  /** And a sixth, for the nightly movers (the team page's "what moved").
+   *  Marker column is nightly_movers_json on hoops_teams — the blob itself
+   *  rather than one of the scalars beside it, because the blob is the thing
+   *  the block cannot be rendered without. */
+  hasMovers: boolean;
 }
 
 function currentState(db: Database.Database): StoredState | null {
@@ -114,6 +119,11 @@ function currentState(db: Database.Database): StoredState | null {
       .prepare(`SELECT COUNT(*) AS n FROM hoops_players WHERE explain_json IS NOT NULL`)
       .get() as { n: number }
   ).n;
+  const movers = (
+    db
+      .prepare(`SELECT COUNT(*) AS n FROM hoops_teams WHERE nightly_movers_json IS NOT NULL`)
+      .get() as { n: number }
+  ).n;
   return {
     hash: row.content_hash,
     generatedAt: row.generated_at,
@@ -124,6 +134,7 @@ function currentState(db: Database.Database): StoredState | null {
     hasStackFields: stack > 0,
     hasNightly: nightly > 0,
     hasExplain: explain > 0,
+    hasMovers: movers > 0,
   };
 }
 
@@ -163,8 +174,8 @@ function writeBundle(db: Database.Database, bundle: HoopsBundle, meta: WriteMeta
          (id, param_version, blob, generated_at, imported_at, content_hash, import_source,
           hca_pts, replacement_per36, value_as_of, pricing_version, features_json, constants_json,
           nightly_as_of, nightly_value_source, nightly_last_n_games, nightly_priced,
-          explain_model_json)
-       VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          explain_model_json, nightly_league_typical_shift)
+       VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
       bundle.params.parameter_set.param_version,
       meta.paramsBlobText,
@@ -190,14 +201,21 @@ function writeBundle(db: Database.Database, bundle: HoopsBundle, meta: WriteMeta
       // The explain sidecar's league-level facts (tape window, memory, the
       // wage sheet in points per event). NULL when the bundle predates it.
       bundle.players.explain_model ? JSON.stringify(bundle.players.explain_model) : null,
+      // How far the 30-team AVERAGE moved between the nightly reading and the
+      // season-typical one. Deliberately NOT charged to any player — a mover's
+      // number is his own team's change, and this is the level under all of
+      // them. NULL when the sender said nothing.
+      bundle.teams.nightly_league_typical_shift ?? null,
     );
 
     const insTeam = db.prepare(
       `INSERT INTO hoops_teams
          (tri, conference, division, results_off, results_def, roster_off, roster_def,
           blend_off, blend_def,
-          nightly_off, nightly_def, nightly_results_w, nightly_n_basis_games, nightly_abstained)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          nightly_off, nightly_def, nightly_results_w, nightly_n_basis_games, nightly_abstained,
+          nightly_movers_json, nightly_delta_pre_mix, nightly_delta_post_mix,
+          nightly_n_movers_total, nightly_movers_delta_sum)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     );
     for (const [tri, t] of Object.entries(bundle.teams.teams)) {
       insTeam.run(
@@ -218,6 +236,15 @@ function writeBundle(db: Database.Database, bundle: HoopsBundle, meta: WriteMeta
         t.nightly?.results_w ?? null,
         t.nightly?.n_basis_games ?? null,
         t.nightly ? (t.nightly.abstained ? 1 : 0) : null,
+        // WHAT MOVED. Same NULL-never-zero discipline: the sender omits all six
+        // on a team it abstained on (nothing was re-priced, so nothing moved to
+        // explain), and an empty list here would read on screen as "nobody
+        // moved". The blob is the marker column the no-op check watches.
+        t.nightly?.movers ? JSON.stringify(t.nightly.movers) : null,
+        t.nightly?.delta_pre_mix ?? null,
+        t.nightly?.delta_post_mix ?? null,
+        t.nightly?.n_movers_total ?? null,
+        t.nightly?.movers_delta_sum ?? null,
       );
     }
 
@@ -399,6 +426,10 @@ export function importHoopsData(force = false): ImportSummary {
   const bundleHasExplain = bundle.players.players.some((p) => p.explain != null);
   const explainSettled = !bundleHasExplain || state?.hasExplain === true;
 
+  // A sixth time, for the nightly movers (the team page's "what moved").
+  const bundleHasMovers = Object.values(bundle.teams.teams).some((t) => t.nightly?.movers != null);
+  const moversSettled = !bundleHasMovers || state?.hasMovers === true;
+
   if (
     !force &&
     state &&
@@ -408,7 +439,8 @@ export function importHoopsData(force = false): ImportSummary {
     splitSettled &&
     stackSettled &&
     nightlySettled &&
-    explainSettled
+    explainSettled &&
+    moversSettled
   ) {
     return {
       imported: false,

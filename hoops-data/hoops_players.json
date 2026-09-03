@@ -47,7 +47,7 @@
     }
   },
   "explain_note": "`explain` per player + `explain_model`: HOW the stack rating was assembled -- scouting-report halves (box wage sheet, plus-minus history), their reliability mix, the aging offset, the wage sheet itemised per stat, and what the tape moved him by; per-36 like the stack fields, `mu + move == stack` by construction. Display fields, no feature token (the value_off_per36 precedent)",
-  "generated_at": "2026-09-03T02:22:49.224349+00:00",
+  "generated_at": "2026-09-03T04:59:20.099149+00:00",
   "n_players": 533,
   "players": [
     {

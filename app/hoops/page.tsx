@@ -58,7 +58,7 @@ export default function HoopsMatchupPage({
       <HoopsNav active="matchup" through={getResultsWindow()?.to ?? null} />
       <Suspense>
         <MatchupClient
-          teams={rows}
+          teams={rows.map((r) => ({ ...r, nightly_movers_json: null }))}
           form={getLeagueFormSummaries()}
           meta={meta}
           modes={modes}

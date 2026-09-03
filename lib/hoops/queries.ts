@@ -18,6 +18,7 @@ import type {
   PlayerRow,
   RankedTeam,
   RatingMode,
+  RawNightlyMover,
   RawParamsFile,
   RawPlayerExplain,
   RawPlayerGameRates,
@@ -87,6 +88,12 @@ export interface NightlyMeta {
   /** Teams the read abstained on: too early in their season, or nobody could
    *  be priced. They keep their results rating exactly, and the page says so. */
   abstained: string[];
+  /** How far the 30-team AVERAGE moved between the nightly reading and the
+   *  season-typical one — a league-wide level (this build, about a point and a
+   *  third a game, because injuries and rest accumulate). Published apart from
+   *  the movers precisely so it is charged to nobody's name. Null on a bundle
+   *  that predates it. */
+  leagueTypicalShift: number | null;
 }
 
 export function getNightlyMeta(): NightlyMeta {
@@ -94,7 +101,8 @@ export function getNightlyMeta(): NightlyMeta {
   const db = getDb();
   const row = db
     .prepare(
-      `SELECT nightly_as_of, nightly_value_source, nightly_last_n_games, nightly_priced
+      `SELECT nightly_as_of, nightly_value_source, nightly_last_n_games, nightly_priced,
+              nightly_league_typical_shift
        FROM hoops_params WHERE id = 1`,
     )
     .get() as
@@ -103,6 +111,7 @@ export function getNightlyMeta(): NightlyMeta {
         nightly_value_source: string | null;
         nightly_last_n_games: number | null;
         nightly_priced: number | null;
+        nightly_league_typical_shift: number | null;
       }
     | undefined;
   const abstained = (
@@ -122,6 +131,58 @@ export function getNightlyMeta(): NightlyMeta {
     valueSource: row?.nightly_value_source ?? null,
     lastNGames: row?.nightly_last_n_games ?? null,
     abstained,
+    leagueTypicalShift: row?.nightly_league_typical_shift ?? null,
+  };
+}
+
+/** One team's "what moved": the whole gap between its nightly read and the
+ *  same roster priced off its season-typical minutes, and the three men most
+ *  responsible for it. */
+export interface TeamMovers {
+  /** The team's WHOLE gap, points a game, before the mix with the season-long
+   *  rating. The FULL decomposition sums to this; the three below do not. */
+  deltaPreMix: number;
+  /** deltaPreMix × (1 − results_w): the share of it inside the nightly number. */
+  deltaPostMix: number;
+  /** How many men moved the team by at least a hundredth of a point a game. */
+  nMoversTotal: number;
+  /** The sum over the SHOWN movers only — so the page can say "these three
+   *  account for X of the Y" without implying the three are the whole story. */
+  moversDeltaSum: number;
+  movers: RawNightlyMover[];
+}
+
+/**
+ * The movers for one team, or null when this bundle has none for it — an older
+ * bundle, or (the case that matters) a team the nightly read abstained on,
+ * where nothing was re-priced and so nothing moved. Null, never an empty list:
+ * "nobody moved" and "we never looked" are different sentences.
+ */
+export function getTeamMovers(tri: string): TeamMovers | null {
+  ensureHoopsImport();
+  const row = getDb()
+    .prepare(
+      `SELECT nightly_movers_json, nightly_delta_pre_mix, nightly_delta_post_mix,
+              nightly_n_movers_total, nightly_movers_delta_sum
+       FROM hoops_teams WHERE tri = ?`,
+    )
+    .get(tri.toUpperCase()) as
+    | {
+        nightly_movers_json: string | null;
+        nightly_delta_pre_mix: number | null;
+        nightly_delta_post_mix: number | null;
+        nightly_n_movers_total: number | null;
+        nightly_movers_delta_sum: number | null;
+      }
+    | undefined;
+  if (!row?.nightly_movers_json) return null;
+  if (row.nightly_delta_pre_mix == null || row.nightly_delta_post_mix == null) return null;
+  return {
+    deltaPreMix: row.nightly_delta_pre_mix,
+    deltaPostMix: row.nightly_delta_post_mix,
+    nMoversTotal: row.nightly_n_movers_total ?? 0,
+    moversDeltaSum: row.nightly_movers_delta_sum ?? 0,
+    movers: JSON.parse(row.nightly_movers_json) as RawNightlyMover[],
   };
 }
 

@@ -279,7 +279,11 @@ export function getDb(): Database.Database {
       nightly_as_of TEXT,
       nightly_value_source TEXT,
       nightly_last_n_games INTEGER,
-      nightly_priced INTEGER
+      nightly_priced INTEGER,
+      -- How much the 30-team AVERAGE moved between the nightly reading and the
+      -- season-typical one. A league-wide level, published apart from the
+      -- per-player spread precisely so it is charged to nobody's name.
+      nightly_league_typical_shift REAL
     );
 
     -- Wide, not long: one row per team with every rating mode as columns, so
@@ -304,7 +308,17 @@ export function getDb(): Database.Database {
       nightly_def REAL,
       nightly_results_w REAL,
       nightly_n_basis_games INTEGER,
-      nightly_abstained INTEGER
+      nightly_abstained INTEGER,
+      -- WHAT MOVED: the men behind the nightly gap. Nullable for the same
+      -- reason as the columns above, plus one of its own -- a team the read
+      -- abstained on has nothing to explain, and an empty movers list would
+      -- read on screen as "nobody moved" when the truth is "we never
+      -- re-priced this team".
+      nightly_movers_json TEXT,
+      nightly_delta_pre_mix REAL,
+      nightly_delta_post_mix REAL,
+      nightly_n_movers_total INTEGER,
+      nightly_movers_delta_sum REAL
     );
 
     -- value_off_per36/value_def_per36 are the genuine offence/defence split of
@@ -550,6 +564,34 @@ export function getDb(): Database.Database {
   ).map((c) => c.name);
   if (!hoopsParamsExplainCols.includes("explain_model_json")) {
     dbInstance.exec(`ALTER TABLE hoops_params ADD COLUMN explain_model_json TEXT`);
+  }
+
+  // WHAT MOVED (the team page's "why is this team's nightly rating down?"):
+  // the three biggest movers per team as one JSON blob, plus the four scalars
+  // the sentence under them is built from, plus the league-wide level on
+  // hoops_params. Additive and nullable, the same shape as every migration
+  // above and for the same reason; the importer's no-op check (hasMovers)
+  // forces the one rewrite that backfills an existing volume.
+  const hoopsTeamMoverCols = (
+    dbInstance.prepare(`PRAGMA table_info(hoops_teams)`).all() as Array<{ name: string }>
+  ).map((c) => c.name);
+  for (const col of [
+    "nightly_movers_json TEXT",
+    "nightly_delta_pre_mix REAL",
+    "nightly_delta_post_mix REAL",
+    "nightly_n_movers_total INTEGER",
+    "nightly_movers_delta_sum REAL",
+  ]) {
+    const name = col.split(" ")[0];
+    if (!hoopsTeamMoverCols.includes(name)) {
+      dbInstance.exec(`ALTER TABLE hoops_teams ADD COLUMN ${col}`);
+    }
+  }
+  const hoopsParamsMoverCols = (
+    dbInstance.prepare(`PRAGMA table_info(hoops_params)`).all() as Array<{ name: string }>
+  ).map((c) => c.name);
+  if (!hoopsParamsMoverCols.includes("nightly_league_typical_shift")) {
+    dbInstance.exec(`ALTER TABLE hoops_params ADD COLUMN nightly_league_typical_shift REAL`);
   }
 
   return dbInstance;

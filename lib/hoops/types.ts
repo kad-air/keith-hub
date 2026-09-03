@@ -115,6 +115,70 @@ export interface RawNightlyRating extends RawTeamRatings {
   n_basis_games: number;
   games_played: number;
   abstained: boolean;
+  /**
+   * WHAT MOVED — the six display fields that name the men behind the gap
+   * between the nightly read and the same roster priced off its season-typical
+   * minutes (hoops-sim `docs/milestones/nightly-movers.md`). All optional and
+   * travelling together: no wire token, absent on an abstained team (nothing
+   * was re-priced, so there is nothing to explain) and on any bundle published
+   * before the sender learned them.
+   *
+   * 🔴 Three quantities that are NOT interchangeable:
+   *   `delta_pre_mix`  — the team's WHOLE gap, points a game. The full
+   *                      decomposition (all `n_movers_total` men) sums to it
+   *                      exactly; the three shipped movers do not.
+   *   `movers_delta_sum` — the sum over the three SHOWN only.
+   *   `delta_post_mix` — `delta_pre_mix × (1 − results_w)`, the share of that
+   *                      gap that actually survives the mix into the nightly
+   *                      number.
+   * And `nightly_vs_results` is a fourth, different quantity (this team's
+   * Nightly column minus its Results column) that the movers do NOT decompose
+   * — it ships because the page wants it, labelled so nobody adds the three
+   * mover numbers and expects to land on it.
+   */
+  delta_pre_mix?: number | null;
+  delta_post_mix?: number | null;
+  nightly_vs_results?: number | null;
+  n_movers_total?: number | null;
+  movers_delta_sum?: number | null;
+  movers?: RawNightlyMover[] | null;
+}
+
+/**
+ * One man behind a team's nightly gap: what he is worth per 36, how many of
+ * the last ten he played, the minutes a night the team got out of him over
+ * that window against the whole season, and the points a game his change of
+ * usage moved the team by (BEFORE the mix — multiply by `1 − results_w` for
+ * the share that reaches the nightly rating itself).
+ *
+ * 🔴 `minutes_typical` averages across ALL of a team's games, counting a night
+ * off as zero, and so does `minutes_last_n`. Giannis Antetokounmpo reads 12.9
+ * typical minutes because he played 36 of Milwaukee's 82 — it is not a claim
+ * that he is a 13-minute player. Both halves use the same convention, so it
+ * cancels in the difference.
+ *
+ * 🔴 `athlete_id` −1 is the `absorbed` slot: the replacement-level "next man
+ * up" a declared absence's minutes were diverted to. It is NEVER a person and
+ * must never be rendered as one or linked to a player page.
+ */
+export interface RawNightlyMover {
+  athlete_id: number;
+  name: string;
+  games_played_of_last_n: number;
+  minutes_last_n: number;
+  minutes_typical: number;
+  value_per36: number;
+  delta_pts: number;
+  /**
+   * `out`      — did not play one of the last ten, and was a real part of the season
+   * `back`     — playing lately after missing most of it (appearance rate at
+   *              least twice his season rate). Says his AVAILABILITY is up, not
+   *              his minutes — and the delta can still be negative if he is a
+   *              below-replacement man taking a bigger share.
+   * `up`/`down`— around either way, at more or fewer minutes than his average
+   * `absorbed` — the next-man-up slot, never a person
+   */
+  direction: "out" | "back" | "up" | "down" | "absorbed";
 }
 
 export interface RawTeam {
@@ -140,6 +204,17 @@ export interface RawTeamsFile {
    *  to PRICE a game with and not merely to display. */
   nightly_priced?: boolean | null;
   nightly_note?: string | null;
+  /**
+   * How much the 30-team AVERAGE moved between the two readings — this build,
+   * −1.34 points a game, because injuries and rest accumulate over a season so
+   * the league as a whole prices lower off its last ten games than off its
+   * full one. 🔴 It is a league-wide level, deliberately NOT charged to any
+   * player: a mover's number is his team's own change, both halves recentred
+   * by the same constant so the drift cancels out of it. Report the level
+   * apart from the spread.
+   */
+  nightly_league_typical_shift?: number | null;
+  nightly_movers_note?: string | null;
   teams: Record<string, RawTeam>;
 }
 
@@ -405,6 +480,14 @@ export interface TeamRow {
   nightly_results_w?: number | null;
   nightly_n_basis_games?: number | null;
   nightly_abstained?: number | null;
+  /** WHAT MOVED — see RawNightlyRating. Null for a team the read abstained on,
+   *  and for every bundle published before the sender shipped the block. The
+   *  JSON column may ride along on a `SELECT *`; only getTeamMovers parses it. */
+  nightly_movers_json?: string | null;
+  nightly_delta_pre_mix?: number | null;
+  nightly_delta_post_mix?: number | null;
+  nightly_n_movers_total?: number | null;
+  nightly_movers_delta_sum?: number | null;
 }
 
 /** A team with one rating mode resolved, plus derived net/rank. */
