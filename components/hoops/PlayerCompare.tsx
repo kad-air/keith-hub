@@ -188,6 +188,12 @@ function ItemPair({
   maxAbs: number;
 }) {
   const copy = STAT_COPY[stat] ?? { label: stat, unit: "" };
+  // 🔴 THE ITEM'S OWN coef, not the pooled model's (wing-defence.md §9e) — on
+  // a group-interacted wage sheet the two men can genuinely be priced at
+  // different rates for the same stat (a different position group each).
+  // Shown only when it's informative (both present and actually different)
+  // so the tight two-column layout doesn't grow a line for every stat.
+  const showCoefs = a?.coef != null && b?.coef != null && Math.abs(a.coef - b.coef) > 0.005;
   return (
     <li className="border-b border-rule/30 py-1.5">
       <div className="flex items-baseline gap-1">
@@ -199,6 +205,11 @@ function ItemPair({
           {num(b?.contrib ?? null)}
         </span>
       </div>
+      {showCoefs && (
+        <div className="flex items-baseline gap-1 text-[0.55rem] text-cream-dimmer">
+          <span className="min-w-0 flex-1 truncate">priced at ×{(a?.coef as number).toFixed(2)} / ×{(b?.coef as number).toFixed(2)}</span>
+        </div>
+      )}
       <div className="mt-1 space-y-[2px]">
         <Bar v={a?.contrib ?? null} maxAbs={maxAbs} tone={A_BAR} />
         <Bar v={b?.contrib ?? null} maxAbs={maxAbs} tone={B_BAR} />

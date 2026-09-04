@@ -31,6 +31,9 @@ export const STAT_COPY: Record<string, { label: string; unit: string }> = {
   stl: { label: "Steals", unit: "stl / 36" },
   blk: { label: "Blocks", unit: "blk / 36" },
   dreb: { label: "Defensive boards", unit: "dreb / 36" },
+  // Arrived with the group-interacted wage sheet (issue #70 round 2).
+  mpg: { label: "Playing time", unit: "min / game" },
+  ast_potential_extra: { label: "Potential assists", unit: "extra ast / 36" },
 };
 
 const WAGE_COPY: Array<[string, string]> = [
@@ -94,14 +97,18 @@ function ItemRow({ item, maxAbs }: { item: ExplainItem; maxAbs: number }) {
   const w = maxAbs > 0 ? Math.min(1, Math.abs(item.contrib) / maxAbs) : 0;
   const pos = item.contrib >= 0;
   const isInteraction = item.stat === "load_x_eff";
+  // 🔴 THE ITEM'S OWN coef, not the pooled model's (wing-defence.md §9e) — on
+  // a group-interacted wage sheet this is what HE was actually priced at,
+  // which can differ from what the league-wide reference sheet below pays.
+  const coefSuffix = item.coef != null ? ` · ×${item.coef.toFixed(2)}` : "";
   return (
     <li className="border-b border-rule/30 py-1.5">
       <div className="flex items-baseline gap-2">
         <span className="min-w-0 flex-1 truncate text-sm text-cream-dim">{copy.label}</span>
         <span className="shrink-0 font-mono text-[0.62rem] text-cream-dimmer">
           {isInteraction
-            ? `${item.rate.toFixed(2)}`
-            : `${item.rate.toFixed(1)} vs ${item.league.toFixed(1)} lg`}
+            ? `${item.rate.toFixed(2)}${coefSuffix}`
+            : `${item.rate.toFixed(1)} vs ${item.league.toFixed(1)} lg${coefSuffix}`}
         </span>
         <span
           className={`w-14 shrink-0 text-right font-mono text-sm ${
@@ -134,6 +141,8 @@ export function PlayerExplainBlock({
   net,
   expectedMinutes,
   valuePg,
+  netAboveReplacement,
+  valuePgAboveReplacement,
 }: {
   name: string;
   e: RawPlayerExplain;
@@ -141,6 +150,11 @@ export function PlayerExplainBlock({
   net: number;
   expectedMinutes: number | null;
   valuePg: number | null;
+  /** See RawPlayer.value_per36_above_replacement (issue #70 F5). Null on a
+   *  bundle that predates the owner's "0 = replacement player" decision —
+   *  when null, section 1 below reads exactly as it did before this change. */
+  netAboveReplacement?: number | null;
+  valuePgAboveReplacement?: number | null;
 }) {
   const first = model ? seasonLabel(model.seasons.first) : "the tape window";
   const last = model ? seasonLabel(model.seasons.last) : "";
@@ -151,6 +165,12 @@ export function PlayerExplainBlock({
   const maxAbs = items.reduce((m, it) => Math.max(m, Math.abs(it.contrib)), 0);
   const offItems = items.filter((it) => it.side === "off");
   const defItems = items.filter((it) => it.side === "def");
+  // 🔴 A group-interacted wage sheet (positional_arm2/3) prices the items
+  // above at HIS OWN position group's rates, which can differ from the
+  // league-wide reference sheet in section 4 — say so once, here, rather
+  // than implying every player reads the same price for the same stat.
+  const groupPriced = model?.positional_arm != null && model.positional_arm !== "arm1";
+  const hasAboveReplacement = netAboveReplacement != null;
 
   return (
     <>
@@ -158,19 +178,44 @@ export function PlayerExplainBlock({
       <section className="mt-6">
         <h3 className="font-display text-lg text-cream">The number</h3>
         <p className="mt-1 text-sm text-cream-dim">
-          {name} is worth{" "}
-          <span className="font-mono text-cream">{fmtSigned(net, 2)}</span> points per 36 minutes
-          against an average NBA player —{" "}
-          <span className="font-mono">{fmtSigned(e.final.off, 2)}</span> of it on offence and{" "}
-          <span className="font-mono">{fmtSigned(e.final.def, 2)}</span> on defence.
-          {valuePg != null && expectedMinutes != null && (
+          {hasAboveReplacement ? (
             <>
-              {" "}
-              Over the{" "}
-              <span className="font-mono">{expectedMinutes.toFixed(1)}</span> minutes we expect
-              him to play, that is{" "}
-              <span className="font-mono text-cream">{fmtSigned(valuePg, 2)}</span> points of
-              margin a game.
+              {name} is worth{" "}
+              <span className="font-mono text-cream">{fmtSigned(netAboveReplacement as number, 2)}</span>{" "}
+              points per 36 minutes above a REPLACEMENT-level player — the last man a team could
+              realistically find. Against a plain league-average player he rates{" "}
+              <span className="font-mono">{fmtSigned(net, 2)}</span> per 36 —{" "}
+              <span className="font-mono">{fmtSigned(e.final.off, 2)}</span> of it on offence and{" "}
+              <span className="font-mono">{fmtSigned(e.final.def, 2)}</span> on defence.
+              {valuePgAboveReplacement != null && expectedMinutes != null && (
+                <>
+                  {" "}
+                  Over the <span className="font-mono">{expectedMinutes.toFixed(1)}</span> minutes
+                  we expect him to play, that is{" "}
+                  <span className="font-mono text-cream">
+                    {fmtSigned(valuePgAboveReplacement, 2)}
+                  </span>{" "}
+                  points of margin a game above a replacement player.
+                </>
+              )}
+            </>
+          ) : (
+            <>
+              {name} is worth{" "}
+              <span className="font-mono text-cream">{fmtSigned(net, 2)}</span> points per 36
+              minutes against an average NBA player —{" "}
+              <span className="font-mono">{fmtSigned(e.final.off, 2)}</span> of it on offence and{" "}
+              <span className="font-mono">{fmtSigned(e.final.def, 2)}</span> on defence.
+              {valuePg != null && expectedMinutes != null && (
+                <>
+                  {" "}
+                  Over the{" "}
+                  <span className="font-mono">{expectedMinutes.toFixed(1)}</span> minutes we expect
+                  him to play, that is{" "}
+                  <span className="font-mono text-cream">{fmtSigned(valuePg, 2)}</span> points of
+                  margin a game.
+                </>
+              )}
             </>
           )}
         </p>
@@ -207,6 +252,26 @@ export function PlayerExplainBlock({
           ))}
         </ol>
 
+        {/* Issue #70 F5: the ledger's closing line — what gets subtracted
+            from his rating to reach a value ABOVE REPLACEMENT instead of
+            above average. A single net number (real basketball has no
+            offence/defence halves of "the last man a team could find"), so
+            it renders as prose rather than another off/def grid row — and it
+            does not disturb the additive-terms identity above: it is one
+            more step AFTER "His rating", not a term inside it. */}
+        {e.replacement_per36 != null && (
+          <p className="mt-2 border-t border-rule/60 pt-2 font-mono text-sm">
+            <span className="text-cream-dim">{fmtSigned(e.final.off + e.final.def, 2)}</span>
+            <span className="text-cream-dimmer"> minus replacement </span>
+            <span className="text-cream-dim">{fmtSigned(e.replacement_per36, 2)}</span>
+            <span className="text-cream-dimmer"> = </span>
+            <span className="text-cream">
+              {fmtSigned(e.final.off + e.final.def - e.replacement_per36, 2)}
+            </span>
+            <span className="text-cream-dimmer"> value above replacement</span>
+          </p>
+        )}
+
         <p className="mt-3 text-xs leading-relaxed text-cream-dimmer">
           A positive defence is <em>good</em> defence — points he stops. Offence and defence add
           to his net. Every row above is read off the model&rsquo;s own fit, and the build checks
@@ -231,6 +296,8 @@ export function PlayerExplainBlock({
             His box score, rate by rate, against the league — and what each one earns on the wage
             sheet. Rates are per 36 minutes, shrunk toward the league&rsquo;s the fewer minutes
             they rest on.
+            {groupPriced &&
+              " Prices are HIS OWN position group's — a rebound or an assist is not worth the same at every position, so the ×-figure beside each rate can differ from the league-wide sheet below."}
           </p>
           <p className="mt-2 font-mono text-[0.62rem] uppercase tracking-kicker text-cream-dimmer">
             Offence · earns {fmtSigned(e.box.off, 2)} a game per 36
@@ -267,6 +334,8 @@ export function PlayerExplainBlock({
             What this model pays a full-season starter for each event, in points. A made shot
             earns its points back on top of the possession it cost; a turnover costs the
             possession and then some.
+            {groupPriced &&
+              " This is the LEAGUE-WIDE reference — the reading above is priced at his own position group's rates instead, which is what he actually earned."}
           </p>
           <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-1 font-mono text-[0.72rem] sm:grid-cols-3">
             {WAGE_COPY.filter(([k]) => model.wage_sheet[k] != null).map(([k, label]) => (

@@ -66,6 +66,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import {
   defaultSortFor,
+  displayValuePg,
   filterPlayers,
   playerRowsFromBundle,
   rankPlayers,
@@ -257,6 +258,11 @@ const STACK_COLS = [
   "evidence",
 ] as const;
 
+// Issue #70 F5 ("0 = replacement player"): two more display fields riding on
+// the same stack-carrier population, checked the same way — real INSERT,
+// real DDL, real round trip.
+const REPLACEMENT_COLS = ["value_per36_above_replacement", "value_per_game_above_replacement"] as const;
+
 async function checkReadModelRoundTrip(
   rows: ReturnType<typeof playerRowsFromBundle>,
   syntheticStackRows: PlayerRow[],
@@ -280,7 +286,7 @@ async function checkReadModelRoundTrip(
     `lib/hoops/import.ts: the hoops_players INSERT names ${cols.length} columns but binds ` +
       `${placeholders.length} placeholders`,
   );
-  for (const c of ["value_off_per36", "value_def_per36", ...STACK_COLS]) {
+  for (const c of ["value_off_per36", "value_def_per36", ...STACK_COLS, ...REPLACEMENT_COLS]) {
     check(
       cols.includes(c),
       `lib/hoops/import.ts: the hoops_players INSERT does not write ${c} — that field ` +
@@ -302,7 +308,7 @@ async function checkReadModelRoundTrip(
     const schemaCols = (
       db.prepare(`PRAGMA table_info(hoops_players)`).all() as Array<{ name: string }>
     ).map((c) => c.name);
-    for (const c of ["value_off_per36", "value_def_per36", ...STACK_COLS]) {
+    for (const c of ["value_off_per36", "value_def_per36", ...STACK_COLS, ...REPLACEMENT_COLS]) {
       check(
         schemaCols.includes(c),
         `lib/db.ts: hoops_players has no ${c} column — the importer writes a column the schema ` +
@@ -385,13 +391,17 @@ async function checkReadModelRoundTrip(
     // the code path production runs rather than a copy of it.
     check(syntheticStackRows.length > 0, "checkReadModelRoundTrip: no synthetic stack rows supplied");
     for (const p of syntheticStackRows) ins.run(...bindValues(p));
+    // The two replacement-level fields (issue #70 F5) round-trip through the
+    // exact same real INSERT/schema, in the same query — not a duplicated
+    // check, an extension of this one.
+    const ALL_STACK_COLS = [...STACK_COLS, ...REPLACEMENT_COLS] as const;
     const stackBack = db
       .prepare(
-        `SELECT athlete_id, stack_net_per36, stack_off_per36, stack_def_per36, ` +
-          `expected_minutes, value_pg, evidence FROM hoops_players WHERE athlete_id >= 900000000`,
+        `SELECT athlete_id, ${ALL_STACK_COLS.join(", ")} FROM hoops_players ` +
+          `WHERE athlete_id >= 900000000`,
       )
       .all() as Array<
-      { athlete_id: number } & Record<(typeof STACK_COLS)[number], number | string | null>
+      { athlete_id: number } & Record<(typeof ALL_STACK_COLS)[number], number | string | null>
     >;
     check(
       stackBack.length === syntheticStackRows.length,
@@ -402,7 +412,7 @@ async function checkReadModelRoundTrip(
     let stackMismatched = 0;
     for (const p of syntheticStackRows) {
       const r = stackById.get(p.athlete_id);
-      if (!r || STACK_COLS.some((c) => r[c] !== (p as unknown as Record<string, unknown>)[c])) {
+      if (!r || ALL_STACK_COLS.some((c) => r[c] !== (p as unknown as Record<string, unknown>)[c])) {
         stackMismatched += 1;
       }
     }
@@ -412,8 +422,9 @@ async function checkReadModelRoundTrip(
         `came back with a different stack field than went in`,
     );
     notes.push(
-      `stack round trip: ${syntheticStackRows.length} synthetic players round-tripped all six ` +
-        `stack fields intact through the real INSERT and schema`,
+      `stack round trip: ${syntheticStackRows.length} synthetic players round-tripped all ` +
+        `${ALL_STACK_COLS.length} stack + replacement-level fields intact through the real ` +
+        `INSERT and schema`,
     );
   } finally {
     try {
@@ -630,6 +641,12 @@ function checkAbsenceTolerance(rows: ReturnType<typeof playerRowsFromBundle>): v
  * from a genuine player rather than a hand-rolled object missing fields a
  * future PlayerRow addition would silently leave undefined here.
  */
+// A synthetic replacement level (issue #70 F5), used only to hand the three
+// stack-carrier rows below distinct, non-null value_per36/per_game_above_
+// replacement fields — real basketball's own number (hoops-sim's
+// `production_replacement_net_per36`) is not reachable from this fixture.
+const SYN_REPLACEMENT_PER36 = -1.18;
+
 function buildSyntheticStackRows(base: PlayerRow): PlayerRow[] {
   const row = (over: Partial<PlayerRow>): PlayerRow => ({ ...base, ...over });
   return [
@@ -645,6 +662,8 @@ function buildSyntheticStackRows(base: PlayerRow): PlayerRow[] {
       expected_minutes: 30.0,
       value_pg: (6.0 * 30.0) / 36, // 5.0 — the top of the value sort
       evidence: "27719 poss (7yr)",
+      value_per36_above_replacement: 6.0 - SYN_REPLACEMENT_PER36,
+      value_per_game_above_replacement: ((6.0 - SYN_REPLACEMENT_PER36) * 30.0) / 36,
     }),
     row({
       athlete_id: 900000002,
@@ -658,6 +677,8 @@ function buildSyntheticStackRows(base: PlayerRow): PlayerRow[] {
       expected_minutes: 18.0,
       value_pg: (2.0 * 18.0) / 36, // 1.0
       evidence: "prior only",
+      value_per36_above_replacement: 2.0 - SYN_REPLACEMENT_PER36,
+      value_per_game_above_replacement: ((2.0 - SYN_REPLACEMENT_PER36) * 18.0) / 36,
     }),
     row({
       athlete_id: 900000003,
@@ -671,6 +692,8 @@ function buildSyntheticStackRows(base: PlayerRow): PlayerRow[] {
       expected_minutes: 12.0,
       value_pg: (-4.0 * 12.0) / 36, // -1.333... — negative but still ranked
       evidence: "prior only",
+      value_per36_above_replacement: -4.0 - SYN_REPLACEMENT_PER36,
+      value_per_game_above_replacement: ((-4.0 - SYN_REPLACEMENT_PER36) * 12.0) / 36,
     }),
     // No stack read at all, mixed into the same bundle as the three above —
     // must sort last (unranked, rank 0) under "value", exactly like a
@@ -686,6 +709,8 @@ function buildSyntheticStackRows(base: PlayerRow): PlayerRow[] {
       stack_def_per36: null,
       expected_minutes: null,
       value_pg: null,
+      value_per36_above_replacement: null,
+      value_per_game_above_replacement: null,
       evidence: null,
     }),
   ];
@@ -730,6 +755,26 @@ function checkStackFieldsSynthetic(fixture: PlayerRow[]): void {
   check(
     unranked.every((p) => p.valuePg == null),
     'rankPlayers("value"): an unranked player has a non-null value_pg',
+  );
+
+  // Issue #70 F5: this fixture's three carriers each carry a REAL, distinct
+  // value_per36_above_replacement (see SYN_REPLACEMENT_PER36 above) — assert
+  // the "value" sort is actually driven by displayValuePg (above-replacement
+  // when present), not the frozen old value_pg, and that RankedPlayer carries
+  // the above-replacement field through untouched.
+  const aboveDescending = rankable.every(
+    (p, i) => i === 0 || (displayValuePg(rankable[i - 1]) as number) >= (displayValuePg(p) as number),
+  );
+  check(aboveDescending, 'rankPlayers("value"): not in descending displayValuePg (above-replacement) order');
+  const carriers = rankable.filter((p) => p.valuePg != null);
+  check(
+    carriers.every((p) => p.valuePgAboveReplacement != null),
+    'rankPlayers("value"): a carrier with a value_pg read has no valuePgAboveReplacement',
+  );
+  check(
+    carriers.some((p) => Math.abs((p.valuePgAboveReplacement as number) - (p.valuePg as number)) > 0.5),
+    'rankPlayers("value"): valuePgAboveReplacement is suspiciously close to the old value_pg — ' +
+      "the fixture's SYN_REPLACEMENT_PER36 level shift should be clearly visible",
   );
   const firstUnranked = ranked.findIndex((p) => p.rank === 0);
   check(

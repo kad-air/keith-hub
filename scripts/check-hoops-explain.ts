@@ -22,6 +22,21 @@
 // Second source: the stack fields on the SAME row (stack_off_per36 etc.),
 // which were produced by hoops-sim's own solve and are checked there against
 // real-NBA anchors — not by anything in this file.
+//
+// 🔴 2026-09-03 (issue #70 round 2, wing-defence.md §9e): the wage sheet
+// stopped being ONE set of prices for the whole league — a group-interacted
+// arm (`explain_model.positional_arm`) prices each position group's box
+// events differently. Each item now ships the `coef` it was ACTUALLY priced
+// at, and reconciliation reads THAT first, falling back to the pooled
+// `explain_model.coefficients` only for an older bundle with no per-item
+// coef at all. A second assertion (1a2, below) guards the regression a naive
+// fix would miss: a sender that silently stopped shipping real per-player
+// wages (items reading identical to the pooled sheet) would still satisfy
+// `contrib == coef * (rate - league)` — so a real, differentiated number of
+// carriers is required directly whenever the bundle isn't on the pooled arm.
+// Same round: the owner's "0 = replacement player" decision (issue #70 F5)
+// added `explain.replacement_per36`, cross-checked here against the player
+// row's own `value_per36_above_replacement`.
 
 import fs from "fs";
 import os from "os";
@@ -58,8 +73,22 @@ check(model != null, "hoops_players.json: explain_model block missing");
 
 let blendChecked = 0;
 let itemChecked = 0;
+let replacementChecked = 0;
 for (const r of withs) {
   const e = r.explain!;
+  // Issue #70 F5 ("0 = replacement player"): explain.replacement_per36 rides
+  // the SAME bundle-level constant the player row's own
+  // value_per36_above_replacement was built from — cross-check them against
+  // each other rather than trusting either in isolation.
+  if (e.replacement_per36 != null && r.value_per36_above_replacement != null) {
+    const rebuilt = e.final.off + e.final.def - e.replacement_per36;
+    check(
+      Math.abs(rebuilt - r.value_per36_above_replacement) <= TOL,
+      `${r.name}: final.off + final.def - explain.replacement_per36 = ${rebuilt.toFixed(4)} != ` +
+        `value_per36_above_replacement ${r.value_per36_above_replacement}`,
+    );
+    replacementChecked += 1;
+  }
   for (const side of ["off", "def"] as const) {
     const stack = side === "off" ? r.stack_off_per36 : r.stack_def_per36;
     check(
@@ -88,14 +117,23 @@ for (const r of withs) {
         Math.abs(sum + base - e.box[side]) <= TOL,
         `${r.name}: sum(items) + baseline = ${(sum + base).toFixed(4)} != box.${side} ${e.box[side]}`,
       );
-      if (model) {
-        for (const it of items) {
-          const c = model.coefficients[side][it.stat];
-          check(
-            c != null && Math.abs(c * (it.rate - it.league) - it.contrib) <= 5e-3,
-            `${r.name}: ${it.stat} contrib ${it.contrib} != coef ${c} * (rate - league)`,
-          );
-        }
+      // 🔴 Reconcile against THE ITEM'S OWN coef first (wing-defence.md §9e).
+      // model.coefficients is the POOLED, league-wide sheet — on a
+      // group-interacted arm (positional_arm2/3) a player is priced at his
+      // OWN position group's wages, which the ridge shrinks toward the
+      // pooled ones but does not equal. Reconciling against the pooled sheet
+      // unconditionally is exactly the bug that promotion exposed: 3/532
+      // carriers failed outright and the other 529 "near-missed" — passed a
+      // loose tolerance while quietly reading the wrong number. Fall back to
+      // the pooled coefficient only for an OLDER bundle whose items carry no
+      // `coef` of their own at all.
+      for (const it of items) {
+        const c = it.coef ?? (model ? model.coefficients[side]?.[it.stat] : undefined) ?? null;
+        if (c == null) continue; // no coefficient source at all — very old bundle
+        check(
+          Math.abs(c * (it.rate - it.league) - it.contrib) <= 5e-3,
+          `${r.name}: ${it.stat} contrib ${it.contrib} != coef ${c} * (rate - league)`,
+        );
       }
       itemChecked += 1;
     }
@@ -107,6 +145,17 @@ notes.push(
   `${withs.length} carriers: mu + move == final, final == stack fields; blend rebuilt on ` +
     `${blendChecked}, items summed on ${itemChecked}`,
 );
+if (replacementChecked > 0) {
+  check(
+    replacementChecked >= 400,
+    `only ${replacementChecked} carriers reconciled explain.replacement_per36 against ` +
+      `value_per36_above_replacement`,
+  );
+  notes.push(
+    `replacement zero: ${replacementChecked} carriers' final.off + final.def - ` +
+      `replacement_per36 == value_per36_above_replacement`,
+  );
+}
 
 // Sign convention, anchored on real basketball rather than on the bundle
 // agreeing with itself: on the wage sheet a steal must earn defence and a
@@ -119,6 +168,46 @@ if (model) {
   check(
     (model.wage_sheet.made_3 ?? 0) > (model.wage_sheet.made_2 ?? 0),
     `explain_model.wage_sheet: a made three (${model.wage_sheet.made_3}) must earn more than a made two (${model.wage_sheet.made_2})`,
+  );
+}
+
+// ── 1a2. per-item coef is a REAL, per-player wage, not a copy of the pooled
+// sheet ─────────────────────────────────────────────────────────────────
+//
+// The regression the coef fix above exists to guard: a sender that silently
+// stopped shipping per-player wages (fell back to items identical to the
+// pooled sheet) would still pass every reconciliation check above — a
+// coefficient equal to the pooled one satisfies `contrib == coef * (rate -
+// league)` just as well as the real one does. So this asserts the ACTUAL
+// DIFFERENTIATION directly: whenever the bundle's own positional_arm isn't
+// the plain pooled arm ("arm1" — one set of wages for the whole league),
+// require a real, meaningful number of carriers to show at least one item
+// whose coef genuinely differs from model.coefficients. Measured on the
+// committed bundle (positional_arm2): 531 of 532 carriers have an item that
+// differs from the pooled sheet by more than 0.01.
+const POOLED_ARM = "arm1";
+if (model && model.positional_arm && model.positional_arm !== POOLED_ARM) {
+  const MIN_DIFFERENTIATED = 100;
+  let differentiated = 0;
+  for (const r of withs) {
+    const items = r.explain?.box?.items ?? [];
+    const differs = items.some((it) => {
+      if (it.coef == null) return false;
+      const pooled = model.coefficients[it.side]?.[it.stat];
+      return pooled != null && Math.abs(it.coef - pooled) > 1e-3;
+    });
+    if (differs) differentiated += 1;
+  }
+  check(
+    differentiated >= MIN_DIFFERENTIATED,
+    `only ${differentiated}/${withs.length} carriers show a per-item coef that differs from the ` +
+      `pooled sheet on positional_arm=${model.positional_arm} — the sender may have stopped ` +
+      `shipping real per-player wages (items reading identical to the pooled sheet would still ` +
+      `pass every reconciliation check above)`,
+  );
+  notes.push(
+    `per-item coef: ${differentiated}/${withs.length} carriers priced off a wage that differs ` +
+      `from the pooled sheet (positional_arm=${model.positional_arm})`,
   );
 }
 

@@ -1,1878 +1,1878 @@
 {
   "avg_poss_per_team_game": 99.5041,
-  "generated_at": "2026-09-03T04:59:19.251344+00:00",
+  "generated_at": "2026-09-04T01:15:13.980499+00:00",
   "hca_pts": 1.9564,
   "minutes_model": "depth_chart",
   "minutes_model_note": "roster/blend ratings are priced with the Depth Chart allocator (the fitted rotation curve blended into each man's own expected minutes at depth_chart_w, then renormalized to 240) -- the same allocator contract.features declares as depth_chart_minutes, so a locally recomputed 'before + delta' matches the shipped 'after'.",
   "nightly_as_of": "2026-04-13",
   "nightly_last_n_games": 10,
-  "nightly_league_typical_shift": -1.343,
+  "nightly_league_typical_shift": -1.5482,
   "nightly_movers_note": "movers: the gap between a team's nightly read and the SAME team priced off its season-typical minutes, split one piece per player -- who has stopped playing, who is back, who is up or down on minutes. delta_pts is points a game BEFORE the mix with the season-long rating (multiply by 1 - results_w for the share that reaches the nightly number itself). The listed men are the biggest 3; n_movers_total counts everyone worth at least 0.01 of a point a game, and delta_pre_mix is the whole team's gap, which the FULL decomposition sums to exactly. nightly_league_typical_shift is how much the 30-team average moved between the two readings -- a league-wide level that is nobody's fault and is deliberately NOT charged to any player.",
   "nightly_note": "who has actually been on the floor: each team's last 10 real games of 2025-26, re-priced from the men who played them and mixed with the season-long results rating. contract.features declares nightly_strength, so this is the site's preferred read for pricing a game.",
   "nightly_priced": true,
-  "nightly_results_weight": 0.37,
+  "nightly_results_weight": 0.35,
   "nightly_season_start_year": 2025,
   "nightly_value_source": "stack_nightly",
   "off_def_note": "off - def is each team's margin rating; off + def is how many points it adds to a game's TOTAL vs an average team. Since 2026-08-21 all three rating families (results/roster/blend) carry a genuine offense/defense split -- roster/blend used to be off=+net/2, def=-net/2, i.e. off+def was exactly 0 for every team and the engine projected an identical total for every matchup. contract.features declares split_off_def: the receiver prices a roster EDIT per side too, from each player's own value_off_per36/value_def_per36, instead of halving his net.",
   "teams": {
     "ATL": {
       "blend": {
-        "def": -0.5177,
-        "off": -0.6813
+        "def": -0.4661,
+        "off": -0.8021
       },
       "conference": "East",
       "division": "Southeast",
       "nightly": {
         "abstained": false,
-        "def": 0.2648,
-        "delta_post_mix": 0.125,
-        "delta_pre_mix": 0.1984,
+        "def": 0.1486,
+        "delta_post_mix": 0.0631,
+        "delta_pre_mix": 0.0971,
         "games_played": 82,
         "movers": [
           {
             "athlete_id": 4433247,
-            "delta_pts": 0.8549,
+            "delta_pts": 0.8029,
             "direction": "back",
             "games_played_of_last_n": 8,
             "minutes_last_n": 17.6635,
             "minutes_typical": 4.3171,
             "name": "Jonathan Kuminga",
-            "value_per36": 2.3914
+            "value_per36": 2.2459
           },
           {
             "athlete_id": 2490149,
-            "delta_pts": 0.6382,
+            "delta_pts": 0.5507,
             "direction": "up",
             "games_played_of_last_n": 9,
             "minutes_last_n": 28.3742,
             "minutes_typical": 14.4682,
             "name": "CJ McCollum",
-            "value_per36": 1.7423
+            "value_per36": 1.5036
           },
           {
             "athlete_id": 4869342,
-            "delta_pts": -0.5083,
+            "delta_pts": -0.4924,
             "direction": "down",
             "games_played_of_last_n": 8,
             "minutes_last_n": 27.6587,
             "minutes_typical": 31.2836,
             "name": "Dyson Daniels",
-            "value_per36": 4.337
+            "value_per36": 4.2015
           }
         ],
-        "movers_delta_sum": 0.9848,
+        "movers_delta_sum": 0.8612,
         "n_basis_games": 10,
-        "n_movers_total": 21,
-        "net": 2.5932,
-        "nightly_vs_results": 1.4309,
-        "off": 2.858,
-        "results_w": 0.37
+        "n_movers_total": 22,
+        "net": 2.8255,
+        "nightly_vs_results": 1.6632,
+        "off": 2.9742,
+        "results_w": 0.35
       },
       "results": {
         "def": 0.9802,
         "off": 2.1426
       },
       "roster": {
-        "def": -0.8691,
-        "off": -1.3437
+        "def": -0.8054,
+        "off": -1.4928
       }
     },
     "BKN": {
       "blend": {
-        "def": 2.9129,
-        "off": -5.4715
+        "def": 2.9545,
+        "off": -5.3938
       },
       "conference": "East",
       "division": "Atlantic",
       "nightly": {
         "abstained": false,
-        "def": 2.1281,
-        "delta_post_mix": -3.0487,
-        "delta_pre_mix": -4.8392,
+        "def": 2.097,
+        "delta_post_mix": -3.2969,
+        "delta_pre_mix": -5.0721,
         "games_played": 82,
         "movers": [
           {
-            "athlete_id": 4432194,
-            "delta_pts": -1.6684,
-            "direction": "out",
-            "games_played_of_last_n": 0,
-            "minutes_last_n": 0.0,
-            "minutes_typical": 14.0175,
-            "name": "Day'Ron Sharpe",
-            "value_per36": 4.3036
-          },
-          {
             "athlete_id": 4278104,
-            "delta_pts": -1.3772,
+            "delta_pts": -1.4456,
             "direction": "out",
             "games_played_of_last_n": 0,
             "minutes_last_n": 0.0,
             "minutes_typical": 21.0597,
             "name": "Michael Porter Jr.",
-            "value_per36": 2.3646
+            "value_per36": 2.482
+          },
+          {
+            "athlete_id": 4432194,
+            "delta_pts": -1.3785,
+            "direction": "out",
+            "games_played_of_last_n": 0,
+            "minutes_last_n": 0.0,
+            "minutes_typical": 14.0175,
+            "name": "Day'Ron Sharpe",
+            "value_per36": 3.5558
           },
           {
             "athlete_id": 5037873,
-            "delta_pts": -1.1397,
+            "delta_pts": -1.1746,
             "direction": "up",
             "games_played_of_last_n": 9,
             "minutes_last_n": 25.8633,
             "minutes_typical": 16.4573,
             "name": "Drake Powell",
-            "value_per36": -4.3289
+            "value_per36": -4.4614
           }
         ],
-        "movers_delta_sum": -4.1853,
+        "movers_delta_sum": -3.9986,
         "n_basis_games": 10,
         "n_movers_total": 21,
-        "net": -13.1563,
-        "nightly_vs_results": 1.0228,
-        "off": -11.0282,
-        "results_w": 0.37
+        "net": -13.0939,
+        "nightly_vs_results": 1.0851,
+        "off": -10.997,
+        "results_w": 0.35
       },
       "results": {
         "def": 2.6395,
         "off": -11.5395
       },
       "roster": {
-        "def": 2.977,
-        "off": -4.0481
+        "def": 3.0284,
+        "off": -3.9522
       }
     },
     "BOS": {
       "blend": {
-        "def": -4.6431,
-        "off": 1.2619
+        "def": -4.6329,
+        "off": 1.2783
       },
       "conference": "East",
       "division": "Atlantic",
       "nightly": {
         "abstained": false,
-        "def": -9.051,
-        "delta_post_mix": 0.7814,
-        "delta_pre_mix": 1.2403,
+        "def": -8.9811,
+        "delta_post_mix": 0.7259,
+        "delta_pre_mix": 1.1167,
         "games_played": 82,
         "movers": [
           {
             "athlete_id": 4065648,
-            "delta_pts": 2.6251,
+            "delta_pts": 2.6404,
             "direction": "back",
             "games_played_of_last_n": 7,
             "minutes_last_n": 25.4047,
             "minutes_typical": 6.5438,
             "name": "Jayson Tatum",
-            "value_per36": 5.0031
+            "value_per36": 5.0323
           },
           {
             "athlete_id": 3078576,
-            "delta_pts": -0.7453,
+            "delta_pts": -0.7594,
             "direction": "down",
             "games_played_of_last_n": 8,
             "minutes_last_n": 26.9078,
             "minutes_typical": 32.8196,
             "name": "Derrick White",
-            "value_per36": 4.6216
+            "value_per36": 4.7095
           },
           {
             "athlete_id": 3917376,
-            "delta_pts": -0.3625,
+            "delta_pts": -0.3588,
             "direction": "down",
             "games_played_of_last_n": 6,
             "minutes_last_n": 21.4285,
             "minutes_typical": 30.161,
             "name": "Jaylen Brown",
-            "value_per36": 1.5112
+            "value_per36": 1.4958
           }
         ],
-        "movers_delta_sum": 1.5174,
+        "movers_delta_sum": 1.5222,
         "n_basis_games": 10,
-        "n_movers_total": 20,
-        "net": 7.3227,
-        "nightly_vs_results": -0.0996,
-        "off": -1.7283,
-        "results_w": 0.37
+        "n_movers_total": 19,
+        "net": 7.1827,
+        "nightly_vs_results": -0.2395,
+        "off": -1.7983,
+        "results_w": 0.35
       },
       "results": {
         "def": -9.1008,
         "off": -1.6785
       },
       "roster": {
-        "def": -3.5974,
-        "off": 1.9516
+        "def": -3.5849,
+        "off": 1.9719
       }
     },
     "CHA": {
       "blend": {
-        "def": -0.7384,
-        "off": -1.1199
+        "def": -0.6842,
+        "off": -1.0721
       },
       "conference": "East",
       "division": "Southeast",
       "nightly": {
         "abstained": false,
-        "def": -6.3424,
-        "delta_post_mix": 1.8613,
-        "delta_pre_mix": 2.9544,
+        "def": -6.5381,
+        "delta_post_mix": 2.0775,
+        "delta_pre_mix": 3.1962,
         "games_played": 82,
         "movers": [
           {
             "athlete_id": 4432816,
-            "delta_pts": 0.9599,
+            "delta_pts": 0.899,
             "direction": "up",
             "games_played_of_last_n": 10,
             "minutes_last_n": 31.9913,
             "minutes_typical": 25.2494,
             "name": "LaMelo Ball",
-            "value_per36": 4.9925
+            "value_per36": 4.6758
           },
           {
             "athlete_id": 4395651,
-            "delta_pts": 0.6952,
+            "delta_pts": 0.6898,
             "direction": "back",
             "games_played_of_last_n": 9,
             "minutes_last_n": 16.4007,
             "minutes_typical": 4.9773,
             "name": "Coby White",
-            "value_per36": 2.1849
+            "value_per36": 2.1679
           },
           {
             "athlete_id": 4433287,
-            "delta_pts": 0.5666,
+            "delta_pts": 0.577,
             "direction": "up",
             "games_played_of_last_n": 10,
             "minutes_last_n": 31.8803,
             "minutes_typical": 24.238,
             "name": "Brandon Miller",
-            "value_per36": 2.6105
+            "value_per36": 2.658
           }
         ],
-        "movers_delta_sum": 2.2218,
+        "movers_delta_sum": 2.1658,
         "n_basis_games": 10,
-        "n_movers_total": 19,
-        "net": 7.3747,
-        "nightly_vs_results": -1.923,
-        "off": 1.0323,
-        "results_w": 0.37
+        "n_movers_total": 17,
+        "net": 7.766,
+        "nightly_vs_results": -1.5318,
+        "off": 1.2279,
+        "results_w": 0.35
       },
       "results": {
         "def": -7.3039,
         "off": 1.9938
       },
       "roster": {
-        "def": 0.8016,
-        "off": -1.8503
+        "def": 0.8686,
+        "off": -1.7912
       }
     },
     "CHI": {
       "blend": {
-        "def": 3.6884,
-        "off": -2.9911
+        "def": 3.6648,
+        "off": -3.0884
       },
       "conference": "East",
       "division": "Central",
       "nightly": {
         "abstained": false,
-        "def": 8.8612,
-        "delta_post_mix": -2.5697,
-        "delta_pre_mix": -4.079,
+        "def": 8.9803,
+        "delta_post_mix": -3.0415,
+        "delta_pre_mix": -4.6792,
         "games_played": 82,
         "movers": [
           {
             "athlete_id": 4397189,
-            "delta_pts": -1.667,
+            "delta_pts": -1.4893,
             "direction": "out",
             "games_played_of_last_n": 0,
             "minutes_last_n": 0.0,
             "minutes_typical": 13.8014,
             "name": "Jalen Smith",
-            "value_per36": 4.3655
+            "value_per36": 3.9003
           },
           {
             "athlete_id": 6478,
-            "delta_pts": -1.5606,
+            "delta_pts": -1.372,
             "direction": "out",
             "games_played_of_last_n": 0,
             "minutes_last_n": 0.0,
             "minutes_typical": 17.0666,
             "name": "Nikola Vucevic",
-            "value_per36": 3.3049
+            "value_per36": 2.9055
           },
           {
-            "athlete_id": 4066372,
-            "delta_pts": -0.9256,
-            "direction": "out",
-            "games_played_of_last_n": 0,
-            "minutes_last_n": 0.0,
-            "minutes_typical": 12.5718,
-            "name": "Kevin Huerter",
-            "value_per36": 2.6609
+            "athlete_id": 4684275,
+            "delta_pts": -0.9427,
+            "direction": "back",
+            "games_played_of_last_n": 10,
+            "minutes_last_n": 22.8107,
+            "minutes_typical": 7.7781,
+            "name": "Rob Dillingham",
+            "value_per36": -2.2521
           }
         ],
-        "movers_delta_sum": -4.1531,
+        "movers_delta_sum": -3.804,
         "n_basis_games": 10,
         "n_movers_total": 24,
-        "net": -7.6323,
-        "nightly_vs_results": 0.6973,
-        "off": 1.2289,
-        "results_w": 0.37
+        "net": -7.8704,
+        "nightly_vs_results": 0.4591,
+        "off": 1.1099,
+        "results_w": 0.35
       },
       "results": {
         "def": 9.2098,
         "off": 0.8803
       },
       "roster": {
-        "def": 2.3932,
-        "off": -3.8992
+        "def": 2.3641,
+        "off": -4.0193
       }
     },
     "CLE": {
       "blend": {
-        "def": -0.7383,
-        "off": 5.035
+        "def": -0.7671,
+        "off": 4.7631
       },
       "conference": "East",
       "division": "Central",
       "nightly": {
         "abstained": false,
-        "def": -2.383,
-        "delta_post_mix": -0.9366,
-        "delta_pre_mix": -1.4866,
+        "def": -2.3648,
+        "delta_post_mix": -1.0478,
+        "delta_pre_mix": -1.612,
         "games_played": 82,
         "movers": [
           {
             "athlete_id": 3992,
-            "delta_pts": 1.3167,
+            "delta_pts": 1.2248,
             "direction": "back",
             "games_played_of_last_n": 8,
             "minutes_last_n": 26.975,
             "minutes_typical": 10.7933,
             "name": "James Harden",
-            "value_per36": 2.9233
+            "value_per36": 2.7194
           },
           {
             "athlete_id": 4066328,
-            "delta_pts": -1.0455,
+            "delta_pts": -1.0228,
             "direction": "down",
             "games_played_of_last_n": 5,
             "minutes_last_n": 11.7773,
             "minutes_typical": 18.6955,
             "name": "Jarrett Allen",
-            "value_per36": 5.4955
+            "value_per36": 5.376
           },
           {
             "athlete_id": 3908809,
-            "delta_pts": -0.8085,
+            "delta_pts": -0.7971,
             "direction": "down",
             "games_played_of_last_n": 7,
             "minutes_last_n": 24.0708,
             "minutes_typical": 29.2382,
             "name": "Donovan Mitchell",
-            "value_per36": 5.751
+            "value_per36": 5.6696
           }
         ],
-        "movers_delta_sum": -0.5374,
+        "movers_delta_sum": -0.595,
         "n_basis_games": 10,
         "n_movers_total": 21,
-        "net": 5.0043,
-        "nightly_vs_results": 0.9353,
-        "off": 2.6213,
-        "results_w": 0.37
+        "net": 4.9678,
+        "nightly_vs_results": 0.8988,
+        "off": 2.603,
+        "results_w": 0.35
       },
       "results": {
         "def": -1.9154,
         "off": 2.1536
       },
       "roster": {
-        "def": -0.4622,
-        "off": 5.7109
+        "def": -0.4977,
+        "off": 5.3751
       }
     },
     "DAL": {
       "blend": {
-        "def": 1.2641,
-        "off": -0.9655
+        "def": 1.2056,
+        "off": -0.7256
       },
       "conference": "West",
       "division": "Southwest",
       "nightly": {
         "abstained": false,
-        "def": 7.303,
-        "delta_post_mix": -0.6299,
-        "delta_pre_mix": -0.9998,
+        "def": 7.3124,
+        "delta_post_mix": -0.9635,
+        "delta_pre_mix": -1.4823,
         "games_played": 82,
         "movers": [
           {
             "athlete_id": 6583,
-            "delta_pts": -1.3655,
+            "delta_pts": -1.3343,
             "direction": "out",
             "games_played_of_last_n": 0,
             "minutes_last_n": 0.0,
             "minutes_typical": 7.7706,
             "name": "Anthony Davis",
-            "value_per36": 6.3979
+            "value_per36": 6.2513
           },
           {
             "athlete_id": 4278049,
-            "delta_pts": -0.8411,
+            "delta_pts": -0.8023,
             "direction": "down",
             "games_played_of_last_n": 4,
             "minutes_last_n": 6.9287,
             "minutes_typical": 14.7611,
             "name": "Daniel Gafford",
-            "value_per36": 3.9507
+            "value_per36": 3.7688
           },
           {
             "athlete_id": 2531367,
-            "delta_pts": 0.647,
+            "delta_pts": 0.5426,
             "direction": "up",
             "games_played_of_last_n": 10,
             "minutes_last_n": 18.7558,
             "minutes_typical": 10.8479,
             "name": "Dwight Powell",
-            "value_per36": 2.8978
+            "value_per36": 2.4303
           }
         ],
-        "movers_delta_sum": -1.5596,
+        "movers_delta_sum": -1.5939,
         "n_basis_games": 10,
-        "n_movers_total": 22,
-        "net": -5.0862,
-        "nightly_vs_results": 1.5119,
-        "off": 2.2168,
-        "results_w": 0.37
+        "n_movers_total": 21,
+        "net": -5.1051,
+        "nightly_vs_results": 1.493,
+        "off": 2.2074,
+        "results_w": 0.35
       },
       "results": {
         "def": 8.059,
         "off": 1.4608
       },
       "roster": {
-        "def": -0.3297,
-        "off": -1.5346
+        "def": -0.402,
+        "off": -1.2385
       }
     },
     "DEN": {
       "blend": {
-        "def": 0.6683,
-        "off": 5.987
+        "def": 0.6584,
+        "off": 5.8771
       },
       "conference": "West",
       "division": "Northwest",
       "nightly": {
         "abstained": false,
-        "def": 0.7647,
-        "delta_post_mix": 0.6841,
-        "delta_pre_mix": 1.0859,
+        "def": 0.6295,
+        "delta_post_mix": 0.8594,
+        "delta_pre_mix": 1.3221,
         "games_played": 82,
         "movers": [
           {
             "athlete_id": 3112335,
-            "delta_pts": 0.8159,
+            "delta_pts": 0.7817,
             "direction": "up",
             "games_played_of_last_n": 9,
             "minutes_last_n": 29.66,
             "minutes_typical": 26.8506,
             "name": "Nikola Jokic",
-            "value_per36": 11.4357
+            "value_per36": 10.9564
           },
           {
             "athlete_id": 3138196,
-            "delta_pts": 0.3686,
+            "delta_pts": 0.3791,
             "direction": "up",
             "games_played_of_last_n": 8,
             "minutes_last_n": 24.9792,
             "minutes_typical": 20.3784,
             "name": "Cameron Johnson",
-            "value_per36": 3.0385
+            "value_per36": 3.1256
           },
           {
             "athlete_id": 3064290,
-            "delta_pts": 0.2453,
+            "delta_pts": 0.2512,
             "direction": "up",
             "games_played_of_last_n": 6,
             "minutes_last_n": 17.6823,
             "minutes_typical": 12.622,
             "name": "Aaron Gordon",
-            "value_per36": 1.8138
+            "value_per36": 1.8569
           }
         ],
-        "movers_delta_sum": 1.4298,
+        "movers_delta_sum": 1.412,
         "n_basis_games": 10,
-        "n_movers_total": 18,
-        "net": 5.5418,
-        "nightly_vs_results": 0.2421,
-        "off": 6.3064,
-        "results_w": 0.37
+        "n_movers_total": 17,
+        "net": 5.8121,
+        "nightly_vs_results": 0.5124,
+        "off": 6.4416,
+        "results_w": 0.35
       },
       "results": {
         "def": 0.8857,
         "off": 6.1854
       },
       "roster": {
-        "def": 0.6173,
-        "off": 5.9404
+        "def": 0.6051,
+        "off": 5.8048
       }
     },
     "DET": {
       "blend": {
-        "def": -3.9392,
-        "off": 0.0772
+        "def": -3.8967,
+        "off": -0.0599
       },
       "conference": "East",
       "division": "Central",
       "nightly": {
         "abstained": false,
-        "def": -8.3262,
-        "delta_post_mix": 0.1565,
-        "delta_pre_mix": 0.2484,
+        "def": -8.2138,
+        "delta_post_mix": -0.0937,
+        "delta_pre_mix": -0.1441,
         "games_played": 82,
         "movers": [
           {
             "athlete_id": 4432166,
-            "delta_pts": -2.4707,
+            "delta_pts": -2.2827,
             "direction": "down",
             "games_played_of_last_n": 3,
             "minutes_last_n": 7.6313,
             "minutes_typical": 26.8095,
             "name": "Cade Cunningham",
-            "value_per36": 4.6664
+            "value_per36": 4.3113
           },
           {
             "athlete_id": 4066372,
-            "delta_pts": 1.244,
+            "delta_pts": 1.1367,
             "direction": "back",
             "games_played_of_last_n": 9,
             "minutes_last_n": 23.2583,
             "minutes_typical": 6.2288,
             "name": "Kevin Huerter",
-            "value_per36": 2.6609
+            "value_per36": 2.4315
           },
           {
             "athlete_id": 4278562,
-            "delta_pts": 0.571,
+            "delta_pts": 0.5234,
             "direction": "up",
             "games_played_of_last_n": 10,
             "minutes_last_n": 16.8232,
             "minutes_typical": 10.7631,
             "name": "Paul Reed",
-            "value_per36": 3.4476
+            "value_per36": 3.1603
           }
         ],
-        "movers_delta_sum": -0.6556,
+        "movers_delta_sum": -0.6225,
         "n_basis_games": 10,
-        "n_movers_total": 16,
-        "net": 5.9516,
-        "nightly_vs_results": -0.9999,
-        "off": -2.3746,
-        "results_w": 0.37
+        "n_movers_total": 15,
+        "net": 5.7268,
+        "nightly_vs_results": -1.2248,
+        "off": -2.487,
+        "results_w": 0.35
       },
       "results": {
         "def": -8.8262,
         "off": -1.8746
       },
       "roster": {
-        "def": -2.7929,
-        "off": 0.5351
+        "def": -2.7404,
+        "off": 0.3657
       }
     },
     "GSW": {
       "blend": {
-        "def": -1.2931,
-        "off": 1.4145
+        "def": -1.3369,
+        "off": 1.3981
       },
       "conference": "West",
       "division": "Pacific",
       "nightly": {
         "abstained": false,
-        "def": 0.5503,
-        "delta_post_mix": -1.0503,
-        "delta_pre_mix": -1.6671,
+        "def": 0.7108,
+        "delta_post_mix": -1.5112,
+        "delta_pre_mix": -2.3249,
         "games_played": 82,
         "movers": [
           {
             "athlete_id": 6430,
-            "delta_pts": -1.7497,
+            "delta_pts": -1.7712,
             "direction": "out",
             "games_played_of_last_n": 0,
             "minutes_last_n": 0.0,
             "minutes_typical": 14.2862,
             "name": "Jimmy Butler III",
-            "value_per36": 4.4508
+            "value_per36": 4.5055
           },
           {
             "athlete_id": 3102531,
-            "delta_pts": 1.1159,
+            "delta_pts": 0.9601,
             "direction": "back",
             "games_played_of_last_n": 7,
             "minutes_last_n": 16.9852,
             "minutes_typical": 4.0448,
             "name": "Kristaps Porzingis",
-            "value_per36": 3.0954
+            "value_per36": 2.6631
           },
           {
             "athlete_id": 3975,
-            "delta_pts": -0.9846,
+            "delta_pts": -0.9433,
             "direction": "down",
             "games_played_of_last_n": 4,
             "minutes_last_n": 10.7327,
             "minutes_typical": 16.489,
             "name": "Stephen Curry",
-            "value_per36": 6.3273
+            "value_per36": 6.0622
           }
         ],
-        "movers_delta_sum": -1.6183,
+        "movers_delta_sum": -1.7544,
         "n_basis_games": 10,
-        "n_movers_total": 23,
-        "net": -0.9486,
-        "nightly_vs_results": 3.4105,
-        "off": -0.3983,
-        "results_w": 0.37
+        "n_movers_total": 21,
+        "net": -1.2696,
+        "nightly_vs_results": 3.0895,
+        "off": -0.5587,
+        "results_w": 0.35
       },
       "results": {
         "def": 2.2556,
         "off": -2.1035
       },
       "roster": {
-        "def": -2.1255,
-        "off": 2.2397
+        "def": -2.1796,
+        "off": 2.2195
       }
     },
     "HOU": {
       "blend": {
-        "def": -4.5571,
-        "off": 1.2648
+        "def": -4.6347,
+        "off": 1.4319
       },
       "conference": "West",
       "division": "Southwest",
       "nightly": {
         "abstained": false,
-        "def": -7.5929,
-        "delta_post_mix": -0.3556,
-        "delta_pre_mix": -0.5645,
+        "def": -7.6637,
+        "delta_post_mix": -0.4478,
+        "delta_pre_mix": -0.6889,
         "games_played": 82,
         "movers": [
           {
             "athlete_id": 2991235,
-            "delta_pts": -0.7742,
+            "delta_pts": -0.6787,
             "direction": "out",
             "games_played_of_last_n": 0,
             "minutes_last_n": 0.0,
             "minutes_typical": 8.8463,
             "name": "Steven Adams",
-            "value_per36": 3.2211
+            "value_per36": 2.8236
           },
           {
             "athlete_id": 4433192,
-            "delta_pts": 0.5828,
+            "delta_pts": 0.5705,
             "direction": "up",
             "games_played_of_last_n": 10,
             "minutes_last_n": 24.7168,
             "minutes_typical": 18.8978,
             "name": "Tari Eason",
-            "value_per36": 3.3691
+            "value_per36": 3.2977
           },
           {
-            "athlete_id": 3922230,
-            "delta_pts": 0.2857,
-            "direction": "up",
-            "games_played_of_last_n": 10,
-            "minutes_last_n": 16.0118,
-            "minutes_typical": 9.331,
-            "name": "Aaron Holiday",
-            "value_per36": 1.4945
+            "athlete_id": 3202,
+            "delta_pts": -0.2585,
+            "direction": "down",
+            "games_played_of_last_n": 9,
+            "minutes_last_n": 31.2283,
+            "minutes_typical": 34.5113,
+            "name": "Kevin Durant",
+            "value_per36": 3.6727
           }
         ],
-        "movers_delta_sum": 0.0943,
+        "movers_delta_sum": -0.3668,
         "n_basis_games": 10,
-        "n_movers_total": 15,
-        "net": 5.3995,
-        "nightly_vs_results": 1.4213,
-        "off": -2.1934,
-        "results_w": 0.37
+        "n_movers_total": 14,
+        "net": 5.5412,
+        "nightly_vs_results": 1.563,
+        "off": -2.1225,
+        "results_w": 0.35
       },
       "results": {
         "def": -6.8822,
         "off": -2.904
       },
       "roster": {
-        "def": -4.0117,
-        "off": 2.2426
+        "def": -4.1075,
+        "off": 2.4489
       }
     },
     "IND": {
       "blend": {
-        "def": 4.1822,
-        "off": 0.1727
+        "def": 4.14,
+        "off": 0.4385
       },
       "conference": "East",
       "division": "Central",
       "nightly": {
         "abstained": false,
-        "def": 6.7059,
-        "delta_post_mix": -0.0632,
-        "delta_pre_mix": -0.1003,
+        "def": 6.9357,
+        "delta_post_mix": -0.2923,
+        "delta_pre_mix": -0.4497,
         "games_played": 82,
         "movers": [
           {
             "athlete_id": 3149673,
-            "delta_pts": -1.0675,
+            "delta_pts": -1.0837,
             "direction": "down",
             "games_played_of_last_n": 5,
             "minutes_last_n": 15.06,
             "minutes_typical": 25.2834,
             "name": "Pascal Siakam",
-            "value_per36": 3.8879
+            "value_per36": 3.9469
           },
           {
             "athlete_id": 4278355,
-            "delta_pts": 0.8718,
+            "delta_pts": 0.794,
             "direction": "back",
             "games_played_of_last_n": 10,
             "minutes_last_n": 18.4757,
             "minutes_typical": 5.1011,
             "name": "Obi Toppin",
-            "value_per36": 2.3348
+            "value_per36": 2.1264
           },
           {
             "athlete_id": 5106060,
-            "delta_pts": 0.7233,
+            "delta_pts": 0.7904,
             "direction": "down",
             "games_played_of_last_n": 5,
             "minutes_last_n": 12.3228,
             "minutes_typical": 23.8753,
             "name": "Jarace Walker",
-            "value_per36": -2.3183
+            "value_per36": -2.5333
           }
         ],
-        "movers_delta_sum": 0.5277,
+        "movers_delta_sum": 0.5007,
         "n_basis_games": 10,
-        "n_movers_total": 24,
-        "net": -5.7518,
-        "nightly_vs_results": 0.171,
-        "off": 0.9541,
-        "results_w": 0.37
+        "n_movers_total": 25,
+        "net": -6.2114,
+        "nightly_vs_results": -0.2886,
+        "off": 0.7243,
+        "results_w": 0.35
       },
       "results": {
         "def": 6.7914,
         "off": 0.8686
       },
       "roster": {
-        "def": 3.5701,
-        "off": 0.0095
+        "def": 3.5181,
+        "off": 0.3376
       }
     },
     "LAC": {
       "blend": {
-        "def": 0.537,
-        "off": 0.3841
+        "def": 0.5398,
+        "off": 0.409
       },
       "conference": "West",
       "division": "Pacific",
       "nightly": {
         "abstained": false,
-        "def": -2.3513,
-        "delta_post_mix": -0.9929,
-        "delta_pre_mix": -1.576,
+        "def": -2.441,
+        "delta_post_mix": -1.0213,
+        "delta_pre_mix": -1.5713,
         "games_played": 82,
         "movers": [
           {
             "athlete_id": 4017837,
-            "delta_pts": -1.695,
+            "delta_pts": -1.6009,
             "direction": "out",
             "games_played_of_last_n": 0,
             "minutes_last_n": 0.0,
             "minutes_typical": 16.5465,
             "name": "Ivica Zubac",
-            "value_per36": 3.7209
+            "value_per36": 3.5143
           },
           {
             "athlete_id": 3992,
-            "delta_pts": -1.5157,
+            "delta_pts": -1.41,
             "direction": "out",
             "games_played_of_last_n": 0,
             "minutes_last_n": 0.0,
             "minutes_typical": 18.8338,
             "name": "James Harden",
-            "value_per36": 2.9233
+            "value_per36": 2.7194
           },
           {
             "athlete_id": 4396907,
-            "delta_pts": 1.0361,
+            "delta_pts": 0.9452,
             "direction": "back",
             "games_played_of_last_n": 9,
             "minutes_last_n": 28.1375,
             "minutes_typical": 6.8674,
             "name": "Darius Garland",
-            "value_per36": 1.7495
+            "value_per36": 1.596
           }
         ],
-        "movers_delta_sum": -2.1746,
+        "movers_delta_sum": -2.0657,
         "n_basis_games": 10,
         "n_movers_total": 22,
-        "net": 2.4724,
-        "nightly_vs_results": 0.5198,
-        "off": 0.121,
-        "results_w": 0.37
+        "net": 2.6517,
+        "nightly_vs_results": 0.6992,
+        "off": 0.2107,
+        "results_w": 0.35
       },
       "results": {
         "def": -2.0914,
         "off": -0.1389
       },
       "roster": {
-        "def": 1.1535,
-        "off": 0.5068
+        "def": 1.1569,
+        "off": 0.5375
       }
     },
     "LAL": {
       "blend": {
-        "def": -0.664,
-        "off": 0.7518
+        "def": -0.5999,
+        "off": 0.6662
       },
       "conference": "West",
       "division": "Pacific",
       "nightly": {
         "abstained": false,
-        "def": -3.9034,
-        "delta_post_mix": -2.0417,
-        "delta_pre_mix": -3.2407,
+        "def": -3.8599,
+        "delta_post_mix": -2.2907,
+        "delta_pre_mix": -3.5242,
         "games_played": 82,
         "movers": [
           {
             "athlete_id": 3945274,
-            "delta_pts": -2.6387,
+            "delta_pts": -2.5694,
             "direction": "down",
             "games_played_of_last_n": 4,
             "minutes_last_n": 12.7305,
             "minutes_typical": 27.1521,
             "name": "Luka Doncic",
-            "value_per36": 6.6077
+            "value_per36": 6.4341
           },
           {
             "athlete_id": 2990992,
-            "delta_pts": -0.7802,
+            "delta_pts": -0.6899,
             "direction": "down",
             "games_played_of_last_n": 3,
             "minutes_last_n": 8.1583,
             "minutes_typical": 22.3446,
             "name": "Marcus Smart",
-            "value_per36": 1.9902
+            "value_per36": 1.7599
           },
           {
-            "athlete_id": 3913174,
-            "delta_pts": 0.3778,
-            "direction": "back",
+            "athlete_id": 4683774,
+            "delta_pts": -0.504,
+            "direction": "up",
             "games_played_of_last_n": 10,
-            "minutes_last_n": 26.5258,
-            "minutes_typical": 8.9257,
-            "name": "Luke Kennard",
-            "value_per36": 0.7877
+            "minutes_last_n": 14.8467,
+            "minutes_typical": 4.4264,
+            "name": "Bronny James",
+            "value_per36": -1.7738
           }
         ],
-        "movers_delta_sum": -3.0411,
+        "movers_delta_sum": -3.7633,
         "n_basis_games": 10,
-        "n_movers_total": 16,
-        "net": 1.2872,
-        "nightly_vs_results": -1.5852,
-        "off": -2.6162,
-        "results_w": 0.37
+        "n_movers_total": 15,
+        "net": 1.2003,
+        "nightly_vs_results": -1.672,
+        "off": -2.6596,
+        "results_w": 0.35
       },
       "results": {
         "def": -4.696,
         "off": -1.8236
       },
       "roster": {
-        "def": 0.2817,
-        "off": 1.3559
+        "def": 0.3608,
+        "off": 1.2502
       }
     },
     "MEM": {
       "blend": {
-        "def": 6.3951,
-        "off": -2.9819
+        "def": 6.4531,
+        "off": -2.7594
       },
       "conference": "West",
       "division": "Southwest",
       "nightly": {
         "abstained": false,
-        "def": 11.9588,
-        "delta_post_mix": -7.4404,
-        "delta_pre_mix": -11.8101,
+        "def": 11.9656,
+        "delta_post_mix": -7.7903,
+        "delta_pre_mix": -11.985,
         "games_played": 82,
         "movers": [
           {
             "athlete_id": 4896365,
-            "delta_pts": -1.9814,
+            "delta_pts": -1.9982,
             "direction": "back",
             "games_played_of_last_n": 8,
             "minutes_last_n": 23.6832,
             "minutes_typical": 2.8882,
             "name": "Adama Bal",
-            "value_per36": -3.4289
+            "value_per36": -3.458
           },
           {
             "athlete_id": 4277961,
-            "delta_pts": -1.6155,
+            "delta_pts": -1.6129,
             "direction": "out",
             "games_played_of_last_n": 0,
             "minutes_last_n": 0.0,
             "minutes_typical": 16.9842,
             "name": "Jaren Jackson Jr.",
-            "value_per36": 3.4327
+            "value_per36": 3.4273
           },
           {
             "athlete_id": 4700873,
-            "delta_pts": -1.3258,
+            "delta_pts": -1.3495,
             "direction": "back",
             "games_played_of_last_n": 6,
             "minutes_last_n": 21.4957,
             "minutes_typical": 2.6214,
             "name": "Toby Okani",
-            "value_per36": -2.5279
+            "value_per36": -2.5731
           }
         ],
-        "movers_delta_sum": -4.9226,
+        "movers_delta_sum": -4.9606,
         "n_basis_games": 10,
-        "n_movers_total": 27,
-        "net": -14.3803,
-        "nightly_vs_results": -1.1329,
-        "off": -2.4215,
-        "results_w": 0.37
+        "n_movers_total": 29,
+        "net": -14.3938,
+        "nightly_vs_results": -1.1464,
+        "off": -2.4282,
+        "results_w": 0.35
       },
       "results": {
         "def": 11.3924,
         "off": -1.8551
       },
       "roster": {
-        "def": 5.2229,
-        "off": -3.2462
+        "def": 5.2945,
+        "off": -2.9715
       }
     },
     "MIA": {
       "blend": {
-        "def": 0.0581,
-        "off": 3.1511
+        "def": 0.0896,
+        "off": 3.0178
       },
       "conference": "East",
       "division": "Southeast",
       "nightly": {
         "abstained": false,
-        "def": 5.5892,
-        "delta_post_mix": 0.9792,
-        "delta_pre_mix": 1.5543,
+        "def": 5.5047,
+        "delta_post_mix": 0.9732,
+        "delta_pre_mix": 1.4973,
         "games_played": 82,
         "movers": [
           {
             "athlete_id": 4066261,
-            "delta_pts": 0.8957,
+            "delta_pts": 0.8479,
             "direction": "up",
             "games_played_of_last_n": 10,
             "minutes_last_n": 34.4883,
             "minutes_typical": 29.2188,
             "name": "Bam Adebayo",
-            "value_per36": 6.0675
+            "value_per36": 5.7437
           },
           {
             "athlete_id": 4395725,
-            "delta_pts": 0.6688,
+            "delta_pts": 0.6374,
             "direction": "up",
             "games_played_of_last_n": 8,
             "minutes_last_n": 26.5827,
             "minutes_typical": 12.8053,
             "name": "Tyler Herro",
-            "value_per36": 1.745
+            "value_per36": 1.6631
           },
           {
             "athlete_id": 2595516,
-            "delta_pts": -0.527,
+            "delta_pts": -0.4999,
             "direction": "down",
             "games_played_of_last_n": 5,
             "minutes_last_n": 12.469,
             "minutes_typical": 21.233,
             "name": "Norman Powell",
-            "value_per36": 2.1729
+            "value_per36": 2.0612
           }
         ],
-        "movers_delta_sum": 1.0375,
+        "movers_delta_sum": 0.9854,
         "n_basis_games": 10,
         "n_movers_total": 13,
-        "net": 3.1122,
-        "nightly_vs_results": 1.8897,
-        "off": 8.7014,
-        "results_w": 0.37
+        "net": 3.2811,
+        "nightly_vs_results": 2.0586,
+        "off": 8.7858,
+        "results_w": 0.35
       },
       "results": {
         "def": 6.534,
         "off": 7.7566
       },
       "roster": {
-        "def": -1.4609,
-        "off": 2.0709
+        "def": -1.422,
+        "off": 1.9063
       }
     },
     "MIL": {
       "blend": {
-        "def": 4.4989,
-        "off": -3.3208
+        "def": 4.5201,
+        "off": -3.3414
       },
       "conference": "East",
       "division": "Central",
       "nightly": {
         "abstained": false,
-        "def": 4.4487,
-        "delta_post_mix": -4.1692,
-        "delta_pre_mix": -6.6178,
+        "def": 4.5866,
+        "delta_post_mix": -4.5466,
+        "delta_pre_mix": -6.9947,
         "games_played": 82,
         "movers": [
           {
             "athlete_id": 3032977,
-            "delta_pts": -3.1851,
+            "delta_pts": -3.159,
             "direction": "out",
             "games_played_of_last_n": 0,
             "minutes_last_n": 0.0,
             "minutes_typical": 12.8558,
             "name": "Giannis Antetokounmpo",
-            "value_per36": 8.9607
+            "value_per36": 8.8875
           },
           {
             "athlete_id": 4997526,
-            "delta_pts": -1.3954,
+            "delta_pts": -1.7027,
             "direction": "back",
             "games_played_of_last_n": 10,
             "minutes_last_n": 32.4477,
             "minutes_typical": 9.8367,
             "name": "Ousmane Dieng",
-            "value_per36": -2.2171
+            "value_per36": -2.7055
           },
           {
-            "athlete_id": 4591725,
-            "delta_pts": -0.9129,
+            "athlete_id": 3133628,
+            "delta_pts": -0.7238,
             "direction": "down",
-            "games_played_of_last_n": 4,
-            "minutes_last_n": 12.8395,
-            "minutes_typical": 29.1519,
-            "name": "Ryan Rollins",
-            "value_per36": 2.0315
+            "games_played_of_last_n": 5,
+            "minutes_last_n": 12.4333,
+            "minutes_typical": 23.5749,
+            "name": "Myles Turner",
+            "value_per36": 2.3618
           }
         ],
-        "movers_delta_sum": -5.4933,
+        "movers_delta_sum": -5.5855,
         "n_basis_games": 10,
-        "n_movers_total": 18,
-        "net": -9.2013,
-        "nightly_vs_results": 0.5481,
-        "off": -4.7526,
-        "results_w": 0.37
+        "n_movers_total": 20,
+        "net": -9.4771,
+        "nightly_vs_results": 0.2724,
+        "off": -4.8905,
+        "results_w": 0.35
       },
       "results": {
         "def": 4.7228,
         "off": -5.0266
       },
       "roster": {
-        "def": 4.4463,
-        "off": -2.9206
+        "def": 4.4726,
+        "off": -2.946
       }
     },
     "MIN": {
       "blend": {
-        "def": -1.9445,
-        "off": 0.6944
+        "def": -1.9164,
+        "off": 0.4928
       },
       "conference": "West",
       "division": "Northwest",
       "nightly": {
         "abstained": false,
-        "def": -2.2156,
-        "delta_post_mix": -2.3823,
-        "delta_pre_mix": -3.7814,
+        "def": -2.092,
+        "delta_post_mix": -2.8217,
+        "delta_pre_mix": -4.341,
         "games_played": 82,
         "movers": [
           {
             "athlete_id": 4594268,
-            "delta_pts": -2.0093,
+            "delta_pts": -1.9126,
             "direction": "down",
             "games_played_of_last_n": 3,
             "minutes_last_n": 7.7283,
             "minutes_typical": 25.8573,
             "name": "Anthony Edwards",
-            "value_per36": 4.0019
+            "value_per36": 3.8094
           },
           {
             "athlete_id": 3032976,
-            "delta_pts": -0.7764,
+            "delta_pts": -0.7366,
             "direction": "down",
             "games_played_of_last_n": 7,
             "minutes_last_n": 21.8747,
             "minutes_typical": 29.6459,
             "name": "Rudy Gobert",
-            "value_per36": 3.5608
+            "value_per36": 3.378
           },
           {
-            "athlete_id": 3064514,
-            "delta_pts": -0.5559,
+            "athlete_id": 4431671,
+            "delta_pts": -0.582,
             "direction": "down",
-            "games_played_of_last_n": 7,
-            "minutes_last_n": 23.462,
-            "minutes_typical": 31.8889,
-            "name": "Julius Randle",
-            "value_per36": 2.3517
+            "games_played_of_last_n": 3,
+            "minutes_last_n": 9.1692,
+            "minutes_typical": 28.6647,
+            "name": "Jaden McDaniels",
+            "value_per36": 1.0777
           }
         ],
-        "movers_delta_sum": -3.3416,
+        "movers_delta_sum": -3.2312,
         "n_basis_games": 10,
-        "n_movers_total": 21,
-        "net": 1.3526,
-        "nightly_vs_results": -1.0887,
-        "off": -0.863,
-        "results_w": 0.37
+        "n_movers_total": 19,
+        "net": 1.1055,
+        "nightly_vs_results": -1.3358,
+        "off": -0.9865,
+        "results_w": 0.35
       },
       "results": {
         "def": -2.7599,
         "off": -0.3186
       },
       "roster": {
-        "def": -1.7532,
-        "off": 0.932
+        "def": -1.7186,
+        "off": 0.6832
       }
     },
     "NOP": {
       "blend": {
-        "def": 2.8436,
-        "off": 0.5689
+        "def": 2.8229,
+        "off": 0.7648
       },
       "conference": "West",
       "division": "Southwest",
       "nightly": {
         "abstained": false,
-        "def": 6.5546,
-        "delta_post_mix": -1.2321,
-        "delta_pre_mix": -1.9557,
+        "def": 6.4831,
+        "delta_post_mix": -1.3559,
+        "delta_pre_mix": -2.086,
         "games_played": 82,
         "movers": [
           {
-            "athlete_id": 4397688,
-            "delta_pts": -0.9511,
-            "direction": "down",
-            "games_played_of_last_n": 3,
-            "minutes_last_n": 10.4217,
-            "minutes_typical": 28.5268,
-            "name": "Trey Murphy III",
-            "value_per36": 1.9116
-          },
-          {
             "athlete_id": 4683750,
-            "delta_pts": -0.9024,
+            "delta_pts": -1.0145,
             "direction": "up",
             "games_played_of_last_n": 8,
             "minutes_last_n": 16.6582,
             "minutes_typical": 8.1985,
             "name": "Jordan Hawkins",
-            "value_per36": -3.8148
+            "value_per36": -4.289
           },
           {
-            "athlete_id": 4277869,
-            "delta_pts": -0.437,
-            "direction": "out",
-            "games_played_of_last_n": 0,
-            "minutes_last_n": 0.0,
-            "minutes_typical": 10.6833,
-            "name": "Jose Alvarado",
-            "value_per36": 1.4827
+            "athlete_id": 4397688,
+            "delta_pts": -0.967,
+            "direction": "down",
+            "games_played_of_last_n": 3,
+            "minutes_last_n": 10.4217,
+            "minutes_typical": 28.5268,
+            "name": "Trey Murphy III",
+            "value_per36": 1.9436
+          },
+          {
+            "athlete_id": 3907497,
+            "delta_pts": 0.3537,
+            "direction": "back",
+            "games_played_of_last_n": 4,
+            "minutes_last_n": 11.3927,
+            "minutes_typical": 4.791,
+            "name": "Dejounte Murray",
+            "value_per36": 1.9191
           }
         ],
-        "movers_delta_sum": -2.2905,
+        "movers_delta_sum": -1.6279,
         "n_basis_games": 10,
-        "n_movers_total": 15,
-        "net": -4.7977,
-        "nightly_vs_results": -1.5234,
-        "off": 1.7568,
-        "results_w": 0.37
+        "n_movers_total": 18,
+        "net": -4.6549,
+        "nightly_vs_results": -1.3806,
+        "off": 1.8282,
+        "results_w": 0.35
       },
       "results": {
         "def": 5.7929,
         "off": 2.5185
       },
       "roster": {
-        "def": 2.1518,
-        "off": 0.1116
+        "def": 2.1262,
+        "off": 0.3534
       }
     },
     "NYK": {
       "blend": {
-        "def": -5.3583,
-        "off": 4.3348
+        "def": -5.4266,
+        "off": 4.3524
       },
       "conference": "East",
       "division": "Atlantic",
       "nightly": {
         "abstained": false,
-        "def": -10.4933,
-        "delta_post_mix": -0.615,
-        "delta_pre_mix": -0.9762,
+        "def": -10.5079,
+        "delta_post_mix": -0.5797,
+        "delta_pre_mix": -0.8918,
         "games_played": 82,
         "movers": [
           {
             "athlete_id": 3136195,
-            "delta_pts": -0.6933,
+            "delta_pts": -0.642,
             "direction": "down",
             "games_played_of_last_n": 8,
             "minutes_last_n": 24.3552,
             "minutes_typical": 29.1353,
             "name": "Karl-Anthony Towns",
-            "value_per36": 5.4346
+            "value_per36": 5.0328
           },
           {
             "athlete_id": 3934719,
-            "delta_pts": 0.4117,
+            "delta_pts": 0.4297,
             "direction": "up",
             "games_played_of_last_n": 9,
             "minutes_last_n": 31.0553,
             "minutes_typical": 27.3719,
             "name": "OG Anunoby",
-            "value_per36": 3.8395
+            "value_per36": 4.0079
           },
           {
-            "athlete_id": 4277869,
-            "delta_pts": 0.3469,
-            "direction": "back",
+            "athlete_id": 3934672,
+            "delta_pts": -0.2745,
+            "direction": "down",
             "games_played_of_last_n": 8,
-            "minutes_last_n": 14.2367,
-            "minutes_typical": 5.8515,
-            "name": "Jose Alvarado",
-            "value_per36": 1.4827
+            "minutes_last_n": 28.4712,
+            "minutes_typical": 31.1637,
+            "name": "Jalen Brunson",
+            "value_per36": 3.9657
           }
         ],
-        "movers_delta_sum": 0.0653,
+        "movers_delta_sum": -0.4868,
         "n_basis_games": 10,
-        "n_movers_total": 15,
-        "net": 10.4061,
-        "nightly_vs_results": -6.1721,
-        "off": -0.0872,
-        "results_w": 0.37
+        "n_movers_total": 18,
+        "net": 10.4353,
+        "nightly_vs_results": -6.1429,
+        "off": -0.0726,
+        "results_w": 0.35
       },
       "results": {
         "def": -13.5794,
         "off": 2.9988
       },
       "roster": {
-        "def": -3.4299,
-        "off": 4.6481
+        "def": -3.5143,
+        "off": 4.6699
       }
     },
     "OKC": {
       "blend": {
-        "def": -9.2581,
-        "off": 5.5378
+        "def": -9.3028,
+        "off": 5.6117
       },
       "conference": "West",
       "division": "Northwest",
       "nightly": {
         "abstained": false,
-        "def": -6.3927,
-        "delta_post_mix": -1.5776,
-        "delta_pre_mix": -2.5042,
+        "def": -6.407,
+        "delta_post_mix": -1.6257,
+        "delta_pre_mix": -2.501,
         "games_played": 82,
         "movers": [
           {
             "athlete_id": 4433255,
-            "delta_pts": -1.1496,
+            "delta_pts": -1.0778,
             "direction": "down",
             "games_played_of_last_n": 7,
             "minutes_last_n": 19.2062,
             "minutes_typical": 25.2852,
             "name": "Chet Holmgren",
-            "value_per36": 6.834
+            "value_per36": 6.4071
           },
           {
             "athlete_id": 4278073,
-            "delta_pts": -0.5922,
+            "delta_pts": -0.5944,
             "direction": "down",
             "games_played_of_last_n": 8,
             "minutes_last_n": 25.2912,
             "minutes_typical": 27.3525,
             "name": "Shai Gilgeous-Alexander",
-            "value_per36": 10.2335
+            "value_per36": 10.2717
           },
           {
             "athlete_id": 4593803,
-            "delta_pts": 0.4219,
+            "delta_pts": 0.4141,
             "direction": "up",
             "games_played_of_last_n": 6,
             "minutes_last_n": 16.5072,
             "minutes_typical": 11.5355,
             "name": "Jalen Williams",
-            "value_per36": 3.0986
+            "value_per36": 3.0414
           }
         ],
-        "movers_delta_sum": -1.3199,
+        "movers_delta_sum": -1.2581,
         "n_basis_games": 10,
-        "n_movers_total": 19,
-        "net": 10.6276,
-        "nightly_vs_results": -1.445,
-        "off": 4.2349,
-        "results_w": 0.37
+        "n_movers_total": 17,
+        "net": 10.6562,
+        "nightly_vs_results": -1.4164,
+        "off": 4.2492,
+        "results_w": 0.35
       },
       "results": {
         "def": -7.1152,
         "off": 4.9574
       },
       "roster": {
-        "def": -9.7607,
-        "off": 5.674
+        "def": -9.816,
+        "off": 5.7651
       }
     },
     "ORL": {
       "blend": {
-        "def": -2.7943,
-        "off": 0.0215
+        "def": -2.8071,
+        "off": -0.0274
       },
       "conference": "East",
       "division": "Southeast",
       "nightly": {
         "abstained": false,
-        "def": -3.7104,
-        "delta_post_mix": 0.4846,
-        "delta_pre_mix": 0.7692,
+        "def": -3.7834,
+        "delta_post_mix": 0.386,
+        "delta_pre_mix": 0.5938,
         "games_played": 82,
         "movers": [
           {
             "athlete_id": 4432165,
-            "delta_pts": 0.8187,
+            "delta_pts": 0.7806,
             "direction": "up",
             "games_played_of_last_n": 10,
             "minutes_last_n": 30.9798,
             "minutes_typical": 19.4591,
             "name": "Jalen Suggs",
-            "value_per36": 2.6209
+            "value_per36": 2.499
+          },
+          {
+            "athlete_id": 3133635,
+            "delta_pts": -0.5994,
+            "direction": "back",
+            "games_played_of_last_n": 10,
+            "minutes_last_n": 18.443,
+            "minutes_typical": 7.3464,
+            "name": "Jevon Carter",
+            "value_per36": -1.9809
           },
           {
             "athlete_id": 4066320,
-            "delta_pts": -0.5327,
+            "delta_pts": -0.511,
             "direction": "down",
             "games_played_of_last_n": 10,
             "minutes_last_n": 29.669,
             "minutes_typical": 33.8785,
             "name": "Desmond Bane",
-            "value_per36": 4.4292
-          },
-          {
-            "athlete_id": 4566434,
-            "delta_pts": 0.4573,
-            "direction": "up",
-            "games_played_of_last_n": 7,
-            "minutes_last_n": 16.4198,
-            "minutes_typical": 12.9505,
-            "name": "Franz Wagner",
-            "value_per36": 4.917
+            "value_per36": 4.2485
           }
         ],
-        "movers_delta_sum": 0.7434,
+        "movers_delta_sum": -0.3297,
         "n_basis_games": 10,
         "n_movers_total": 16,
-        "net": 2.4206,
-        "nightly_vs_results": 0.8165,
-        "off": -1.2898,
-        "results_w": 0.37
+        "net": 2.5665,
+        "nightly_vs_results": 0.9624,
+        "off": -1.2169,
+        "results_w": 0.35
       },
       "results": {
         "def": -3.3022,
         "off": -1.6981
       },
       "roster": {
-        "def": -2.6752,
-        "off": 0.4249
+        "def": -2.691,
+        "off": 0.3645
       }
     },
     "PHI": {
       "blend": {
-        "def": 1.5982,
-        "off": -0.7444
+        "def": 1.5301,
+        "off": -0.7243
       },
       "conference": "East",
       "division": "Atlantic",
       "nightly": {
         "abstained": false,
-        "def": -1.4741,
-        "delta_post_mix": 1.2974,
-        "delta_pre_mix": 2.0594,
+        "def": -1.6055,
+        "delta_post_mix": 1.4504,
+        "delta_pre_mix": 2.2314,
         "games_played": 82,
         "movers": [
           {
             "athlete_id": 4251,
-            "delta_pts": 1.532,
+            "delta_pts": 1.5189,
             "direction": "back",
             "games_played_of_last_n": 10,
             "minutes_last_n": 31.612,
             "minutes_typical": 14.1218,
             "name": "Paul George",
-            "value_per36": 3.1302
+            "value_per36": 3.1034
           },
           {
             "athlete_id": 3059318,
-            "delta_pts": 0.4176,
+            "delta_pts": 0.3828,
             "direction": "up",
             "games_played_of_last_n": 5,
             "minutes_last_n": 17.1038,
             "minutes_typical": 14.7437,
             "name": "Joel Embiid",
-            "value_per36": 6.0057
+            "value_per36": 5.5045
           },
           {
             "athlete_id": 4431675,
-            "delta_pts": 0.1987,
+            "delta_pts": 0.2765,
             "direction": "down",
             "games_played_of_last_n": 4,
             "minutes_last_n": 2.8917,
             "minutes_typical": 10.3323,
             "name": "Trendon Watford",
-            "value_per36": -0.9753
+            "value_per36": -1.357
           }
         ],
-        "movers_delta_sum": 2.1484,
+        "movers_delta_sum": 2.1782,
         "n_basis_games": 10,
-        "n_movers_total": 13,
-        "net": 1.9928,
-        "nightly_vs_results": 1.717,
-        "off": 0.5187,
-        "results_w": 0.37
+        "n_movers_total": 12,
+        "net": 2.2556,
+        "nightly_vs_results": 1.9799,
+        "off": 0.6501,
+        "results_w": 0.35
       },
       "results": {
         "def": -0.6156,
         "off": -0.3398
       },
       "roster": {
-        "def": 2.1174,
-        "off": -0.8393
+        "def": 2.0335,
+        "off": -0.8145
       }
     },
     "PHX": {
       "blend": {
-        "def": -0.1472,
-        "off": 0.4582
+        "def": -0.1465,
+        "off": 0.4071
       },
       "conference": "West",
       "division": "Pacific",
       "nightly": {
         "abstained": false,
-        "def": -3.4945,
-        "delta_post_mix": 0.0963,
-        "delta_pre_mix": 0.1528,
+        "def": -3.6073,
+        "delta_post_mix": 0.1151,
+        "delta_pre_mix": 0.1772,
         "games_played": 82,
         "movers": [
           {
             "athlete_id": 4278585,
-            "delta_pts": -0.4317,
+            "delta_pts": -0.344,
             "direction": "down",
             "games_played_of_last_n": 9,
             "minutes_last_n": 23.2847,
             "minutes_typical": 28.1446,
             "name": "Collin Gillespie",
-            "value_per36": 3.2755
+            "value_per36": 2.61
           },
           {
             "athlete_id": 5203685,
-            "delta_pts": 0.2212,
+            "delta_pts": 0.1969,
             "direction": "up",
             "games_played_of_last_n": 9,
             "minutes_last_n": 11.3355,
             "minutes_typical": 4.8358,
             "name": "Khaman Maluach",
-            "value_per36": 1.2224
+            "value_per36": 1.0884
           },
           {
-            "athlete_id": 4437244,
-            "delta_pts": 0.1987,
-            "direction": "back",
-            "games_played_of_last_n": 8,
-            "minutes_last_n": 20.681,
-            "minutes_typical": 10.3055,
-            "name": "Jalen Green",
-            "value_per36": 0.687
+            "athlete_id": 4066387,
+            "delta_pts": -0.1861,
+            "direction": "up",
+            "games_played_of_last_n": 3,
+            "minutes_last_n": 5.37,
+            "minutes_typical": 2.7157,
+            "name": "Amir Coffey",
+            "value_per36": -2.5158
           }
         ],
-        "movers_delta_sum": -0.0118,
+        "movers_delta_sum": -0.3332,
         "n_basis_games": 10,
-        "n_movers_total": 18,
-        "net": 1.4451,
-        "nightly_vs_results": 1.0629,
-        "off": -2.0494,
-        "results_w": 0.37
+        "n_movers_total": 17,
+        "net": 1.6708,
+        "nightly_vs_results": 1.2886,
+        "off": -1.9366,
+        "results_w": 0.35
       },
       "results": {
         "def": -2.963,
         "off": -2.5809
       },
       "roster": {
-        "def": 0.5133,
-        "off": 1.1711
+        "def": 0.5142,
+        "off": 1.108
       }
     },
     "POR": {
       "blend": {
-        "def": -1.8399,
-        "off": -0.2125
+        "def": -1.8904,
+        "off": -0.2703
       },
       "conference": "West",
       "division": "Northwest",
       "nightly": {
         "abstained": false,
-        "def": -5.2828,
-        "delta_post_mix": 2.2052,
-        "delta_pre_mix": 3.5003,
+        "def": -5.4393,
+        "delta_post_mix": 2.3551,
+        "delta_pre_mix": 3.6233,
         "games_played": 82,
         "movers": [
           {
             "athlete_id": 3995,
-            "delta_pts": 0.8924,
+            "delta_pts": 0.8547,
             "direction": "up",
             "games_played_of_last_n": 10,
             "minutes_last_n": 31.6688,
             "minutes_typical": 19.3012,
             "name": "Jrue Holiday",
-            "value_per36": 2.645
+            "value_per36": 2.5333
           },
           {
             "athlete_id": 3907498,
-            "delta_pts": 0.8869,
+            "delta_pts": 0.8544,
             "direction": "back",
             "games_played_of_last_n": 10,
             "minutes_last_n": 21.0325,
             "minutes_typical": 6.2516,
             "name": "Matisse Thybulle",
-            "value_per36": 2.1947
+            "value_per36": 2.1142
           },
           {
             "athlete_id": 5099752,
-            "delta_pts": 0.6329,
+            "delta_pts": 0.7578,
             "direction": "out",
             "games_played_of_last_n": 0,
             "minutes_last_n": 0.0,
             "minutes_typical": 6.9787,
             "name": "Rayan Rupert",
-            "value_per36": -3.3079
+            "value_per36": -3.9609
           }
         ],
-        "movers_delta_sum": 2.4122,
+        "movers_delta_sum": 2.4669,
         "n_basis_games": 10,
         "n_movers_total": 18,
-        "net": 3.054,
-        "nightly_vs_results": 1.1239,
-        "off": -2.2289,
-        "results_w": 0.37
+        "net": 3.3669,
+        "nightly_vs_results": 1.4369,
+        "off": -2.0724,
+        "results_w": 0.35
       },
       "results": {
         "def": -4.7208,
         "off": -2.7908
       },
       "roster": {
-        "def": -1.1641,
-        "off": 0.3923
+        "def": -1.2265,
+        "off": 0.3209
       }
     },
     "SAC": {
       "blend": {
-        "def": 5.4802,
-        "off": -2.1757
+        "def": 5.4607,
+        "off": -1.7138
       },
       "conference": "West",
       "division": "Pacific",
       "nightly": {
         "abstained": false,
-        "def": 5.4777,
-        "delta_post_mix": -0.2804,
-        "delta_pre_mix": -0.4451,
+        "def": 5.584,
+        "delta_post_mix": -0.7479,
+        "delta_pre_mix": -1.1506,
         "games_played": 82,
         "movers": [
           {
             "athlete_id": 3155942,
-            "delta_pts": -0.848,
+            "delta_pts": -0.8262,
             "direction": "out",
             "games_played_of_last_n": 0,
             "minutes_last_n": 0.0,
             "minutes_typical": 6.889,
             "name": "Domantas Sabonis",
-            "value_per36": 4.4696
+            "value_per36": 4.3548
           },
           {
-            "athlete_id": 4433188,
-            "delta_pts": 0.6655,
+            "athlete_id": 2528588,
+            "delta_pts": -0.7945,
             "direction": "back",
-            "games_played_of_last_n": 10,
-            "minutes_last_n": 29.1823,
-            "minutes_typical": 8.5497,
-            "name": "Devin Carter",
-            "value_per36": 1.1571
+            "games_played_of_last_n": 9,
+            "minutes_last_n": 17.0953,
+            "minutes_typical": 5.3696,
+            "name": "Doug McDermott",
+            "value_per36": -2.4298
           },
           {
-            "athlete_id": 4433174,
-            "delta_pts": 0.6606,
-            "direction": "up",
-            "games_played_of_last_n": 10,
-            "minutes_last_n": 20.6473,
-            "minutes_typical": 10.7964,
-            "name": "Dylan Cardwell",
-            "value_per36": 2.3918
+            "athlete_id": 3468,
+            "delta_pts": 0.7245,
+            "direction": "out",
+            "games_played_of_last_n": 0,
+            "minutes_last_n": 0.0,
+            "minutes_typical": 23.4345,
+            "name": "Russell Westbrook",
+            "value_per36": -1.1225
           }
         ],
-        "movers_delta_sum": 0.4781,
+        "movers_delta_sum": -0.8963,
         "n_basis_games": 10,
-        "n_movers_total": 21,
-        "net": -6.7894,
-        "nightly_vs_results": 2.349,
-        "off": -1.3118,
-        "results_w": 0.37
+        "n_movers_total": 18,
+        "net": -7.0021,
+        "nightly_vs_results": 2.1364,
+        "off": -1.4181,
+        "results_w": 0.35
       },
       "results": {
         "def": 6.6522,
         "off": -2.4863
       },
       "roster": {
-        "def": 5.2053,
-        "off": -2.1029
+        "def": 5.1813,
+        "off": -1.5326
       }
     },
     "SAS": {
       "blend": {
-        "def": -6.6834,
-        "off": 3.9124
+        "def": -6.7035,
+        "off": 3.8466
       },
       "conference": "West",
       "division": "Southwest",
       "nightly": {
         "abstained": false,
-        "def": -7.5984,
-        "delta_post_mix": -0.6578,
-        "delta_pre_mix": -1.0441,
+        "def": -7.6595,
+        "delta_post_mix": -0.6976,
+        "delta_pre_mix": -1.0733,
         "games_played": 82,
         "movers": [
           {
             "athlete_id": 5104157,
-            "delta_pts": -0.8613,
+            "delta_pts": -0.8402,
             "direction": "down",
             "games_played_of_last_n": 7,
             "minutes_last_n": 20.0955,
             "minutes_typical": 23.119,
             "name": "Victor Wembanyama",
-            "value_per36": 9.7776
+            "value_per36": 9.5383
           },
           {
             "athlete_id": 4395630,
-            "delta_pts": 0.3456,
+            "delta_pts": 0.3405,
             "direction": "up",
             "games_played_of_last_n": 10,
             "minutes_last_n": 30.0862,
             "minutes_typical": 25.1834,
             "name": "Devin Vassell",
-            "value_per36": 2.6725
+            "value_per36": 2.6334
           },
           {
-            "athlete_id": 3064560,
-            "delta_pts": -0.313,
-            "direction": "down",
-            "games_played_of_last_n": 7,
-            "minutes_last_n": 14.5052,
-            "minutes_typical": 17.2671,
-            "name": "Luke Kornet",
-            "value_per36": 3.9308
+            "athlete_id": 5061568,
+            "delta_pts": -0.2934,
+            "direction": "up",
+            "games_played_of_last_n": 10,
+            "minutes_last_n": 15.735,
+            "minutes_typical": 9.7579,
+            "name": "Carter Bryant",
+            "value_per36": -1.8093
           }
         ],
-        "movers_delta_sum": -0.8287,
+        "movers_delta_sum": -0.7931,
         "n_basis_games": 10,
-        "n_movers_total": 15,
-        "net": 10.451,
-        "nightly_vs_results": -4.5802,
-        "off": 2.8526,
-        "results_w": 0.37
+        "n_movers_total": 14,
+        "net": 10.5734,
+        "nightly_vs_results": -4.4578,
+        "off": 2.9138,
+        "results_w": 0.35
       },
       "results": {
         "def": -9.8885,
         "off": 5.1427
       },
       "roster": {
-        "def": -5.9316,
-        "off": 3.6238
+        "def": -5.9564,
+        "off": 3.5426
       }
     },
     "TOR": {
       "blend": {
-        "def": -3.0849,
-        "off": -0.3659
+        "def": -3.1062,
+        "off": -0.4325
       },
       "conference": "East",
       "division": "Atlantic",
       "nightly": {
         "abstained": false,
-        "def": -4.3189,
-        "delta_post_mix": 0.403,
-        "delta_pre_mix": 0.6396,
+        "def": -4.3682,
+        "delta_post_mix": 0.262,
+        "delta_pre_mix": 0.403,
         "games_played": 82,
         "movers": [
           {
             "athlete_id": 4395724,
-            "delta_pts": -1.3644,
+            "delta_pts": -1.2037,
             "direction": "down",
             "games_played_of_last_n": 3,
             "minutes_last_n": 5.8987,
             "minutes_typical": 27.7714,
             "name": "Immanuel Quickley",
-            "value_per36": 2.2612
+            "value_per36": 1.9949
           },
           {
             "athlete_id": 3134908,
-            "delta_pts": 1.126,
+            "delta_pts": 1.0428,
             "direction": "up",
             "games_played_of_last_n": 10,
             "minutes_last_n": 24.3103,
             "minutes_typical": 14.4475,
             "name": "Jakob Poeltl",
-            "value_per36": 4.0849
+            "value_per36": 3.7833
           },
           {
             "athlete_id": 4395625,
-            "delta_pts": 0.5871,
+            "delta_pts": 0.5786,
             "direction": "up",
             "games_played_of_last_n": 9,
             "minutes_last_n": 29.0852,
             "minutes_typical": 21.612,
             "name": "RJ Barrett",
-            "value_per36": 2.7922
+            "value_per36": 2.7517
           }
         ],
-        "movers_delta_sum": 0.3487,
+        "movers_delta_sum": 0.4177,
         "n_basis_games": 10,
         "n_movers_total": 15,
-        "net": 3.4729,
-        "nightly_vs_results": -0.6738,
-        "off": -0.8461,
-        "results_w": 0.37
+        "net": 3.5714,
+        "nightly_vs_results": -0.5753,
+        "off": -0.7968,
+        "results_w": 0.35
       },
       "results": {
         "def": -4.6558,
         "off": -0.5092
       },
       "roster": {
-        "def": -2.7165,
-        "off": -0.3322
+        "def": -2.7427,
+        "off": -0.4145
       }
     },
     "UTA": {
       "blend": {
-        "def": 4.7422,
-        "off": -1.9158
+        "def": 4.7116,
+        "off": -1.9276
       },
       "conference": "West",
       "division": "Northwest",
       "nightly": {
         "abstained": false,
-        "def": 12.362,
-        "delta_post_mix": -3.037,
-        "delta_pre_mix": -4.8206,
+        "def": 12.5231,
+        "delta_post_mix": -3.5415,
+        "delta_pre_mix": -5.4485,
         "games_played": 82,
         "movers": [
           {
             "athlete_id": 4066336,
-            "delta_pts": -2.2189,
+            "delta_pts": -2.2691,
             "direction": "out",
             "games_played_of_last_n": 0,
             "minutes_last_n": 0.0,
             "minutes_typical": 17.8187,
             "name": "Lauri Markkanen",
-            "value_per36": 4.5194
+            "value_per36": 4.6216
           },
           {
             "athlete_id": 4898237,
-            "delta_pts": -2.111,
+            "delta_pts": -2.0795,
             "direction": "back",
             "games_played_of_last_n": 9,
             "minutes_last_n": 29.1202,
             "minutes_typical": 5.935,
             "name": "Bez Mbeng",
-            "value_per36": -3.2916
+            "value_per36": -3.2424
           },
           {
-            "athlete_id": 3102530,
-            "delta_pts": -1.2796,
+            "athlete_id": 4683766,
+            "delta_pts": 1.2394,
             "direction": "out",
             "games_played_of_last_n": 0,
             "minutes_last_n": 0.0,
-            "minutes_typical": 12.7561,
-            "name": "Jusuf Nurkic",
-            "value_per36": 3.6405
+            "minutes_typical": 18.4115,
+            "name": "Isaiah Collier",
+            "value_per36": -2.4431
           }
         ],
-        "movers_delta_sum": -5.6095,
+        "movers_delta_sum": -3.1092,
         "n_basis_games": 10,
-        "n_movers_total": 24,
-        "net": -10.4764,
-        "nightly_vs_results": -0.8018,
-        "off": 1.8855,
-        "results_w": 0.37
+        "n_movers_total": 22,
+        "net": -10.7987,
+        "nightly_vs_results": -1.1241,
+        "off": 1.7244,
+        "results_w": 0.35
       },
       "results": {
         "def": 11.9611,
         "off": 2.2864
       },
       "roster": {
-        "def": 3.0489,
-        "off": -2.9015
+        "def": 3.0111,
+        "off": -2.9161
       }
     },
     "WAS": {
       "blend": {
-        "def": 6.8872,
-        "off": -5.1401
+        "def": 6.9174,
+        "off": -4.9233
       },
       "conference": "East",
       "division": "Southeast",
       "nightly": {
         "abstained": false,
-        "def": 11.9621,
-        "delta_post_mix": -1.3767,
-        "delta_pre_mix": -2.1853,
+        "def": 12.0711,
+        "delta_post_mix": -1.7441,
+        "delta_pre_mix": -2.6832,
         "games_played": 82,
         "movers": [
           {
             "athlete_id": 5144126,
-            "delta_pts": -0.8382,
+            "delta_pts": -0.8604,
             "direction": "up",
             "games_played_of_last_n": 10,
             "minutes_last_n": 32.3407,
             "minutes_typical": 19.6834,
             "name": "Will Riley",
-            "value_per36": -2.3683
+            "value_per36": -2.431
           },
           {
             "athlete_id": 2490149,
-            "delta_pts": -0.6422,
+            "delta_pts": -0.5542,
             "direction": "out",
             "games_played_of_last_n": 0,
             "minutes_last_n": 0.0,
             "minutes_typical": 13.3209,
             "name": "CJ McCollum",
-            "value_per36": 1.7423
+            "value_per36": 1.5036
           },
           {
-            "athlete_id": 5160992,
-            "delta_pts": -0.418,
-            "direction": "down",
-            "games_played_of_last_n": 1,
-            "minutes_last_n": 2.285,
-            "minutes_typical": 16.1512,
-            "name": "Alex Sarr",
-            "value_per36": 1.0901
+            "athlete_id": 4432173,
+            "delta_pts": -0.4875,
+            "direction": "back",
+            "games_played_of_last_n": 10,
+            "minutes_last_n": 18.5978,
+            "minutes_typical": 8.3134,
+            "name": "Sharife Cooper",
+            "value_per36": -1.7006
           }
         ],
-        "movers_delta_sum": -1.8984,
+        "movers_delta_sum": -1.9021,
         "n_basis_games": 10,
-        "n_movers_total": 25,
-        "net": -13.0619,
-        "nightly_vs_results": 1.1555,
-        "off": -1.0999,
-        "results_w": 0.37
+        "n_movers_total": 24,
+        "net": -13.2799,
+        "nightly_vs_results": 0.9375,
+        "off": -1.2088,
+        "results_w": 0.35
       },
       "results": {
         "def": 12.5398,
         "off": -1.6776
       },
       "roster": {
-        "def": 5.5613,
-        "off": -5.9522
+        "def": 5.5985,
+        "off": -5.6846
       }
     }
   }

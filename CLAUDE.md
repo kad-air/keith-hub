@@ -974,6 +974,39 @@ stayed green while the real importer wrote NULL. 6/6 probes caught at merge. The
 offence/defence ranks are on the STACK halves, never the flagship split the ranking's Off/Def
 sorts use (Jokić is defence #89 on one and +1.67 on the other; different models).
 
+🔴 **2026-09-03 (issue #70 round 2): the wage sheet stopped being ONE set of prices for the whole
+league, so an item's `coef` is now shipped PER ITEM and reconciliation reads that first, never
+`explain_model.coefficients` (the pooled, league-wide reference) unconditionally** — a
+group-interacted arm (`explain_model.positional_arm`, e.g. `"arm2"`) prices each position group's
+box events at its own rates, which the ridge shrinks toward the pooled sheet but does not equal.
+Reconciling against the pooled sheet unconditionally was the exact bug the sender's own promotion
+exposed (wing-defence.md §9e): 3 of 532 carriers failed outright and the other 529 "near-missed" —
+close enough to pass a loose tolerance while quietly reading the wrong number. `check:hoops:explain`
+now also asserts the DIFFERENTIATION directly (≥100 carriers must show an item whose `coef` genuinely
+differs from the pooled sheet whenever the arm isn't the plain pooled one), because an item that
+happens to equal the pooled coefficient satisfies the reconciliation identity just as well as a real
+per-player wage — a sender that silently stopped shipping real wages would sail through the identity
+check alone. `ItemRow`/`ItemPair` show the item's own coefficient (`×N.NN`) next to its rate, never
+the pooled one; "The wage sheet" section is labelled the league-wide REFERENCE when the arm isn't
+pooled.
+
+🔴 **Same round, owner decision 2026-09-03 (issue #70 F5): "I would like 0 to be replacement
+player."** The player page and the players list now show `value_per_game_above_replacement` /
+`value_per36_above_replacement` as the headline Value/game and Rate/36 — zero means a
+replacement-level player (the last man a team could find), not a league-average one — falling back
+to the old `value_pg`/`stack_net_per36` fields with the old "vs average" label whenever a bundle
+carries no above-replacement read (an older bundle, or a no-history player). Off/Def stay on their
+existing average-zero scale everywhere (a split of the rating, same convention real VORP/BPM use);
+only the two headline numbers move. `explain.replacement_per36` prints as the ledger's closing line
+("… minus replacement = value above replacement"), a single net number rather than an off/def row
+(real basketball has no offence/defence halves of "the last man a team could find"). Storage: two
+additive `hoops_players` columns, a seventh no-op marker in the importer (`hasAboveReplacement`, read
+off `value_per_game_above_replacement` so an existing volume backfills once); `pricing.ts` is
+untouched — it keeps reading the old `value_per36`/`replacement_per36` pair exactly as before, this
+is display only. `check:hoops:explain` cross-checks `final.off + final.def − replacement_per36 ==
+value_per36_above_replacement` on every carrier; `check:hoops:players` round-trips both new columns
+through the real INSERT the same way the six stack fields already were.
+
 #### Side by side (`/hoops/players/compare?a=&b=`) — 2026-09-02
 
 Two players' ledgers in two narrow columns **at every width** (a comparison read one man at a time

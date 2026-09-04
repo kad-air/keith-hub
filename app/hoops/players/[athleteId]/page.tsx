@@ -93,15 +93,28 @@ export default function HoopsPlayerPage({ params }: { params: { athleteId: strin
         <CompareWithPicker options={compareOptions} self={id} />
       </header>
 
+      {/* Issue #70 F5, owner decision 2026-09-03: 0 = a replacement-level
+          player — the last man a team could realistically find — not an
+          average one. Falls back to the old "vs average" label whenever the
+          bundle carries no above-replacement read for him (an older bundle,
+          or a no-history player with no stack rating at all). */}
       <dl className="mt-5 grid grid-cols-3 gap-2 border-y border-rule/60 py-3">
         <Stat
           label="Value / game"
-          value={p.value_pg != null ? fmtSigned(p.value_pg, 2) : "—"}
-          sub="margin vs average"
+          value={
+            (p.value_per_game_above_replacement ?? p.value_pg) != null
+              ? fmtSigned((p.value_per_game_above_replacement ?? p.value_pg) as number, 2)
+              : "—"
+          }
+          sub={p.value_per_game_above_replacement != null ? "vs replacement" : "margin vs average"}
         />
         <Stat
           label="Rate / 36"
-          value={net != null ? fmtSigned(net, 2) : "—"}
+          value={
+            (p.value_per36_above_replacement ?? net) != null
+              ? fmtSigned((p.value_per36_above_replacement ?? net) as number, 2)
+              : "—"
+          }
           sub={
             p.stack_off_per36 != null && p.stack_def_per36 != null
               ? `${fmtSigned(p.stack_off_per36, 1)} off · ${fmtSigned(p.stack_def_per36, 1)} def`
@@ -114,6 +127,12 @@ export default function HoopsPlayerPage({ params }: { params: { athleteId: strin
           sub={p.evidence ?? ""}
         />
       </dl>
+      {p.value_per_game_above_replacement != null && (
+        <p className="mt-2 text-xs text-cream-dimmer">
+          0 = replacement level ({meta.replacementPer36.toFixed(2)}/36) for Value/game and Rate/36.
+          The off/def split above stays measured against a league-average player.
+        </p>
+      )}
 
       {gr && (
         <p className="mt-3 text-sm text-cream-dim">
@@ -145,6 +164,8 @@ export default function HoopsPlayerPage({ params }: { params: { athleteId: strin
           net={net}
           expectedMinutes={p.expected_minutes}
           valuePg={p.value_pg}
+          netAboveReplacement={p.value_per36_above_replacement}
+          valuePgAboveReplacement={p.value_per_game_above_replacement}
         />
       ) : (
         <p className="mt-6 border-l-2 border-cat-hoops pl-3 text-sm text-cream-dim">

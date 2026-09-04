@@ -28,7 +28,7 @@
     "replacement_percentile": 0.1,
     "total_team_minutes": 240.0
   },
-  "generated_at": "2026-09-03T04:58:30.123271+00:00",
+  "generated_at": "2026-09-04T01:14:13.850480+00:00",
   "parameter_set": {
     "avg_poss_per_team_game": 99.5041,
     "base_mean_ppp": [
@@ -1096,7 +1096,7 @@
         4.0
       ]
     ],
-    "data_as_of": "2026-09-02",
+    "data_as_of": "2026-09-03",
     "duration_bin_edges": [
       0.0,
       1.0,
@@ -8916,7 +8916,7 @@
     ],
     "efficiency_sigma": 0.0,
     "endgame_window_seconds": 180.0,
-    "fitted_at": "2026-09-03T04:58:30.123059+00:00",
+    "fitted_at": "2026-09-04T01:14:13.850300+00:00",
     "grid_ppp": [
       0.15,
       0.16,

@@ -594,6 +594,24 @@ export function getDb(): Database.Database {
     dbInstance.exec(`ALTER TABLE hoops_params ADD COLUMN nightly_league_typical_shift REAL`);
   }
 
+  // REPLACEMENT-ZERO (issue #70 F5, owner decision 2026-09-03: "I would like
+  // 0 to be replacement player"). Two more per-player display fields, same
+  // additive/nullable shape as every migration above and for the same
+  // reason: a pre-existing DB has hoops_players without these columns and
+  // CREATE TABLE IF NOT EXISTS never alters an existing table. Display only —
+  // pricing.ts keeps reading the unchanged value_per36/replacement_per36
+  // pair; the importer's no-op check (hasAboveReplacement) forces the one
+  // rewrite that backfills an existing volume.
+  const hoopsPlayerReplacementCols = (
+    dbInstance.prepare(`PRAGMA table_info(hoops_players)`).all() as Array<{ name: string }>
+  ).map((c) => c.name);
+  for (const col of ["value_per36_above_replacement REAL", "value_per_game_above_replacement REAL"]) {
+    const name = col.split(" ")[0];
+    if (!hoopsPlayerReplacementCols.includes(name)) {
+      dbInstance.exec(`ALTER TABLE hoops_players ADD COLUMN ${col}`);
+    }
+  }
+
   return dbInstance;
 }
 

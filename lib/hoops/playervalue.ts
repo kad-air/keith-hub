@@ -94,6 +94,14 @@ export interface RankedPlayer {
    * on.
    */
   valuePg: number | null;
+  /**
+   * `value_per_game_above_replacement` — the SAME quantity as `valuePg`, but
+   * zeroed at a REPLACEMENT-level player (the last man a team could find)
+   * instead of an average one (issue #70 F5). Null together with `valuePg`
+   * being present is possible on an older bundle; the "value" sort and its
+   * display fall back to `valuePg` with the old label whenever this is null.
+   */
+  valuePgAboveReplacement: number | null;
   /** hoops-sim's own expected-minutes-per-game input to `valuePg`. */
   expectedMinutes: number | null;
   /** e.g. "27719 poss (7yr)" or "prior only" — what the stack rating rests on. */
@@ -103,6 +111,12 @@ export interface RankedPlayer {
   stackNet: number | null;
   stackOff: number | null;
   stackDef: number | null;
+  /** `value_per36_above_replacement` — `stackNet` above a replacement-level
+   *  player instead of an average one (issue #70 F5). `stackOff`/`stackDef`
+   *  stay average-referenced on purpose — a split of the rating, same
+   *  convention real VORP/BPM use. Null on an older bundle or a player with
+   *  no stack rating; readers fall back to `stackNet` with the old label. */
+  stackNetAboveReplacement: number | null;
   /**
    * League rank under the active sort, 1-based. 0 means UNRANKED — either no
    * value estimate at all, or (under an off/def/value sort) no read to sort
@@ -118,10 +132,30 @@ export interface RankedPlayer {
   thinMinutes: boolean;
 }
 
+/**
+ * The "value" sort's number, and the one the page displays for it: above
+ * replacement when the bundle carries it, `valuePg` (average-zero) otherwise.
+ * A plain `?? ` fallback rather than two separate sorts — issue #70 F5 is a
+ * LEVEL SHIFT (every player's rate moves by the same constant), so ordering
+ * is unaffected for the near-universal case where both are present.
+ */
+export function displayValuePg(p: Pick<RankedPlayer, "valuePg" | "valuePgAboveReplacement">): number | null {
+  return p.valuePgAboveReplacement ?? p.valuePg;
+}
+
+/** Same idea, for the stack rating's per-36 headline (a team page's "Rate"
+ *  column) — above replacement when the bundle carries it, `stackNet`
+ *  (average-zero) otherwise. */
+export function displayStackNet(
+  p: Pick<RankedPlayer, "stackNet" | "stackNetAboveReplacement">,
+): number | null {
+  return p.stackNetAboveReplacement ?? p.stackNet;
+}
+
 function sortKey(p: RankedPlayer, sort: PlayerSort): number | null {
   if (sort === "off") return p.off;
   if (sort === "def") return p.def;
-  if (sort === "value") return p.valuePg;
+  if (sort === "value") return displayValuePg(p);
   return p.net;
 }
 
@@ -156,11 +190,13 @@ export function rankPlayers(
     apg: r.game_rates?.ast ?? null,
     gp: r.game_rates?.gp ?? null,
     valuePg: r.value_pg,
+    valuePgAboveReplacement: r.value_per_game_above_replacement,
     expectedMinutes: r.expected_minutes,
     evidence: r.evidence,
     stackNet: r.stack_net_per36,
     stackOff: r.stack_off_per36,
     stackDef: r.stack_def_per36,
+    stackNetAboveReplacement: r.value_per36_above_replacement,
     rank: 0,
     thinMinutes: rotationFloorMinutes != null && r.minutes < rotationFloorMinutes,
   }));
@@ -233,6 +269,8 @@ export function playerRowOf(p: RawPlayer): PlayerRow {
     expected_minutes: p.expected_minutes ?? null,
     value_pg: p.value_pg ?? null,
     evidence: p.evidence ?? null,
+    value_per36_above_replacement: p.value_per36_above_replacement ?? null,
+    value_per_game_above_replacement: p.value_per_game_above_replacement ?? null,
     explain: p.explain ?? null,
   };
 }
@@ -272,6 +310,10 @@ export const SORT_COPY: Record<PlayerSort, { label: string; short: string; blurb
     blurb:
       "Points of team margin per game vs. an average player — the stack rating times how many minutes he's expected to play, divided by 36. This is what a roster decision actually turns on.",
   },
+  // Nothing above rewritten: this is the OLD, average-zero wording, and it
+  // stays live as the fallback for a bundle without value_per_game_above_
+  // replacement — see valueSortBlurb below, which is what the page actually
+  // prints.
   net: {
     label: "Net",
     short: "Net",
@@ -291,3 +333,23 @@ export const SORT_COPY: Record<PlayerSort, { label: string; short: string; blurb
       "The defensive half only. Higher is better here: it is points per 36 minutes he stops, so a rim protector reads big and positive.",
   },
 };
+
+/**
+ * The blurb the page actually prints under the "value" sort button — the
+ * OWNER'S 2026-09-03 decision that 0 should mean a replacement-level player,
+ * not an average one (issue #70 F5, hoops-sim's `replacement-zero.md`). Off/
+ * def stay average-referenced on purpose — a split of the rating, the same
+ * convention real VORP/BPM use, and untouched here. Falls back to
+ * `SORT_COPY.value.blurb` (the OLD, average-zero wording) whenever the bundle
+ * carries no `value_per_game_above_replacement` reads at all, so an older
+ * bundle never shows a promise this page cannot keep.
+ */
+export function valueSortBlurb(hasAboveReplacement: boolean): string {
+  if (!hasAboveReplacement) return SORT_COPY.value.blurb;
+  return (
+    "Points of team margin per game above a REPLACEMENT-level player — the last man a team " +
+    "could realistically find, not an average NBA player — the stack rating above replacement " +
+    "times how many minutes he's expected to play, divided by 36. Zero means replacement level. " +
+    "This is what a roster decision actually turns on."
+  );
+}

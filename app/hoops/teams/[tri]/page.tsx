@@ -15,7 +15,7 @@ import {
   resolveRatingMode,
 } from "@/lib/hoops/queries";
 import type { TeamFormGame, TeamMovers } from "@/lib/hoops/queries";
-import { rankPlayers } from "@/lib/hoops/playervalue";
+import { displayStackNet, displayValuePg, rankPlayers } from "@/lib/hoops/playervalue";
 import { MODE_COPY, fmtSigned, rankTeams, teamName } from "@/lib/hoops/rating";
 import type { RawNightlyMover } from "@/lib/hoops/types";
 
@@ -64,6 +64,10 @@ export default function HoopsTeamPage({
   // wants: anyone the stack has no read on sorts to the bottom by minutes.
   const ranked = rankPlayers(roster, "value", null);
   const totalMinutes = roster.reduce((s, p) => s + (p.expected_minutes ?? p.minutes), 0);
+  // Issue #70 F5: 0 = replacement level on Val/G and Rate once the bundle
+  // carries the above-replacement fields; falls back to average-zero (the
+  // old label) on an older bundle rather than showing a promise it can't keep.
+  const hasAboveReplacement = ranked.some((p) => p.stackNetAboveReplacement != null);
 
   return (
     <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6">
@@ -217,7 +221,10 @@ export default function HoopsTeamPage({
           Players
         </Link>
         , as of {meta.valueAsOf.slice(0, 10)} — what we expect of him, not a measurement of this
-        season. A dash means we have no read on him at all.
+        season. A dash means we have no read on him at all.{" "}
+        {hasAboveReplacement
+          ? `0 = replacement level (${meta.replacementPer36.toFixed(2)}/36) — the last man a team could realistically find.`
+          : `Replacement level is ${meta.replacementPer36.toFixed(2)}, so a fringe player sits a little below zero rather than at it.`}
       </p>
 
       <ol className="mt-4">
@@ -228,7 +235,10 @@ export default function HoopsTeamPage({
           <span className="w-12 text-right">Rate</span>
           <span className="w-24 text-right max-sm:hidden">Pts/Reb/Ast</span>
         </li>
-        {ranked.map((p) => (
+        {ranked.map((p) => {
+          const valG = displayValuePg(p);
+          const rate = displayStackNet(p);
+          return (
           <li key={p.athlete_id} className="border-b border-rule/40 py-2">
             <span className="flex items-baseline gap-2">
               <Link
@@ -242,21 +252,21 @@ export default function HoopsTeamPage({
               </span>
               <span
                 className={`w-14 shrink-0 text-right font-mono text-sm ${
-                  p.valuePg == null
+                  valG == null
                     ? "text-cream-dimmer"
-                    : p.valuePg >= 0
+                    : valG >= 0
                       ? "text-cream"
                       : "text-cream-dim"
                 }`}
               >
-                {p.valuePg == null ? "—" : fmtSigned(p.valuePg, 2)}
+                {valG == null ? "—" : fmtSigned(valG, 2)}
               </span>
               <span
                 className={`w-12 shrink-0 text-right font-mono text-[0.72rem] ${
-                  p.stackNet == null ? "text-cream-dimmer" : "text-cream-dim"
+                  rate == null ? "text-cream-dimmer" : "text-cream-dim"
                 }`}
               >
-                {p.stackNet == null ? "—" : fmtSigned(p.stackNet, 2)}
+                {rate == null ? "—" : fmtSigned(rate, 2)}
               </span>
               <span className="w-24 shrink-0 text-right font-mono text-[0.68rem] text-cream-dimmer max-sm:hidden">
                 {p.ppg != null && p.rpg != null && p.apg != null
@@ -272,7 +282,8 @@ export default function HoopsTeamPage({
                 : "no games this season"}
             </span>
           </li>
-        ))}
+          );
+        })}
       </ol>
 
       <p className="mt-4 text-xs text-cream-dimmer">

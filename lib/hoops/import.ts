@@ -87,6 +87,13 @@ interface StoredState {
    *  rather than one of the scalars beside it, because the blob is the thing
    *  the block cannot be rendered without. */
   hasMovers: boolean;
+  /** And a seventh, for the two REPLACEMENT-LEVEL display fields (issue #70
+   *  F5): false when no player row carries value_per_game_above_replacement,
+   *  i.e. this read model predates the owner's "0 = replacement player"
+   *  decision. Same trick, same reason: the migration adds the columns but
+   *  leaves every value NULL, and an unchanged content hash would otherwise
+   *  keep it that way forever. */
+  hasAboveReplacement: boolean;
 }
 
 function currentState(db: Database.Database): StoredState | null {
@@ -124,6 +131,11 @@ function currentState(db: Database.Database): StoredState | null {
       .prepare(`SELECT COUNT(*) AS n FROM hoops_teams WHERE nightly_movers_json IS NOT NULL`)
       .get() as { n: number }
   ).n;
+  const aboveReplacement = (
+    db
+      .prepare(`SELECT COUNT(*) AS n FROM hoops_players WHERE value_per_game_above_replacement IS NOT NULL`)
+      .get() as { n: number }
+  ).n;
   return {
     hash: row.content_hash,
     generatedAt: row.generated_at,
@@ -135,6 +147,7 @@ function currentState(db: Database.Database): StoredState | null {
     hasNightly: nightly > 0,
     hasExplain: explain > 0,
     hasMovers: movers > 0,
+    hasAboveReplacement: aboveReplacement > 0,
   };
 }
 
@@ -259,8 +272,9 @@ function writeBundle(db: Database.Database, bundle: HoopsBundle, meta: WriteMeta
          (athlete_id, nba_player_id, tri, name, minutes,
           value_per36, value_off_per36, value_def_per36, game_rates, per36,
           stack_net_per36, stack_off_per36, stack_def_per36, expected_minutes, value_pg, evidence,
+          value_per36_above_replacement, value_per_game_above_replacement,
           explain_json)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     );
     for (const p of playerRowsFromBundle(bundle.players)) {
       insPlayer.run(
@@ -280,6 +294,10 @@ function writeBundle(db: Database.Database, bundle: HoopsBundle, meta: WriteMeta
         p.expected_minutes,
         p.value_pg,
         p.evidence,
+        // REPLACEMENT-ZERO (issue #70 F5): 0 = the last man a team could
+        // find, not an average NBA player. Display fields only.
+        p.value_per36_above_replacement,
+        p.value_per_game_above_replacement,
         p.explain ? JSON.stringify(p.explain) : null,
       );
     }
@@ -430,6 +448,13 @@ export function importHoopsData(force = false): ImportSummary {
   const bundleHasMovers = Object.values(bundle.teams.teams).some((t) => t.nightly?.movers != null);
   const moversSettled = !bundleHasMovers || state?.hasMovers === true;
 
+  // A seventh time, for the two replacement-level display fields (issue #70
+  // F5, "I would like 0 to be replacement player").
+  const bundleHasAboveReplacement = bundle.players.players.some(
+    (p) => p.value_per_game_above_replacement != null,
+  );
+  const aboveReplacementSettled = !bundleHasAboveReplacement || state?.hasAboveReplacement === true;
+
   if (
     !force &&
     state &&
@@ -440,7 +465,8 @@ export function importHoopsData(force = false): ImportSummary {
     stackSettled &&
     nightlySettled &&
     explainSettled &&
-    moversSettled
+    moversSettled &&
+    aboveReplacementSettled
   ) {
     return {
       imported: false,

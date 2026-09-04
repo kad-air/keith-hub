@@ -294,6 +294,21 @@ export interface RawPlayer {
   /** e.g. "27719 poss (7yr)" or "prior only" — what the stack rating rests on. */
   evidence?: string | null;
   /**
+   * REPLACEMENT-LEVEL versions of `stack_net_per36`/`value_pg` (issue #70 F5,
+   * owner decision 2026-09-03: "I would like 0 to be replacement player").
+   * `value_per36_above_replacement = stack_net_per36 - replacement_per36`;
+   * `value_per_game_above_replacement` is that times expected minutes / 36.
+   * Shipped pre-computed, never derived here — same discipline as `value_pg`.
+   * Display fields only: `pricing.ts`'s roster-strength math keeps reading
+   * the UNCHANGED `value_per36`/`replacement_per36` pair exactly as before.
+   * Optional and travel together with the stack fields above: null on a
+   * player with no stack rating, and both null together on a bundle that
+   * predates this addition — everything that reads them falls back to
+   * `value_pg`/`stack_net_per36` (average-zero) with the old label.
+   */
+  value_per36_above_replacement?: number | null;
+  value_per_game_above_replacement?: number | null;
+  /**
    * HOW the stack rating was assembled — the explain sidecar (hoops-sim
    * `playervalue.build_tape_stack_explain`, exported per-36). Optional and a
    * display field like the six above it: no wire token, an older bundle simply
@@ -311,7 +326,8 @@ export interface OffDef {
 }
 
 export interface ExplainItem {
-  /** wage-sheet feature: pts, load, tov, ast, oreb, load_x_eff, stl, blk, dreb */
+  /** wage-sheet feature: pts, load, tov, ast, oreb, load_x_eff, stl, blk, dreb, mpg,
+   *  ast_potential_extra — the last two arrived with the group-interacted wage sheet. */
   stat: string;
   side: "off" | "def";
   /** the player's minutes-shrunk per-36 rate the sheet priced */
@@ -320,6 +336,16 @@ export interface ExplainItem {
   league: number;
   /** points per 36 above/below what a league-average rate earns */
   contrib: number;
+  /**
+   * The coefficient THIS ITEM was actually priced at — `contrib == coef *
+   * (rate − league)` (wing-defence.md §9e). On a group-interacted wage sheet
+   * (`explain_model.positional_arm` beyond the pooled arm) this differs from
+   * `explain_model.coefficients[side][stat]`, which is the LEAGUE-WIDE
+   * reference sheet, not what any one player was priced at. Reconcile and
+   * display against THIS field; fall back to the pooled model coefficient
+   * only for an older bundle that doesn't carry it.
+   */
+  coef?: number | null;
 }
 
 export type PriorKind = "box+history" | "box only" | "history only" | "rookie" | "resume" | "none";
@@ -355,6 +381,16 @@ export interface RawPlayerExplain {
   };
   /** Equals stack_off_per36 / stack_def_per36 on the same row. */
   final: OffDef;
+  /**
+   * The SAME bundle-level replacement level (`RawPlayersFile.replacement_per36`)
+   * riding on each carrier's own explain block, so a page reconstructing "how
+   * this number was built" can also show what gets subtracted from
+   * `final.off + final.def` to reach `value_per36_above_replacement`. A single
+   * NET number, not an off/def split — real basketball has no offence/defence
+   * halves of "the last man a team could find". Null on a bundle that
+   * predates issue #70 F5.
+   */
+  replacement_per36?: number | null;
 }
 
 /** League-level facts the player page prints once. */
@@ -373,9 +409,18 @@ export interface ExplainModel {
    *  turnover, assist, oreb, steal, block, dreb */
   wage_sheet: Record<string, number | null>;
   wage_reference_minutes: number | null;
-  /** per-36 coefficients, so `contrib == coef * (rate − league)` on each item */
+  /** per-36 coefficients — the POOLED, league-wide reference sheet. On a
+   *  group-interacted arm (see `positional_arm` below) this is NOT what any
+   *  one player was priced at; read `ExplainItem.coef` for that instead and
+   *  use this only as the reference "what the league pays" reading. */
   coefficients: { off: Record<string, number>; def: Record<string, number> };
   as_of: string | null;
+  /** The wage-sheet arm this bundle priced players with — e.g. "arm1" (one
+   *  set of wages for the whole league, so `ExplainItem.coef` always equals
+   *  `coefficients[side][stat]`) or "arm2"/"arm3" (each position group gets
+   *  its own wages, so items can differ from the pooled sheet). Null on a
+   *  bundle that predates the group-interacted wage sheet (issue #70). */
+  positional_arm?: string | null;
 }
 
 export interface RawPlayersFile {
@@ -529,6 +574,12 @@ export interface PlayerRow {
   expected_minutes: number | null;
   value_pg: number | null;
   evidence: string | null;
+  /** See RawPlayer — 0 = REPLACEMENT LEVEL, not average (issue #70 F5). Null
+   *  together on a player with no stack rating, or on a bundle that predates
+   *  this addition; everything that reads them falls back to
+   *  value_pg/stack_net_per36 with the old "vs average" label. */
+  value_per36_above_replacement: number | null;
+  value_per_game_above_replacement: number | null;
   /** See RawPlayer.explain. Null on a bundle without the sidecar — and null on
    *  every LIST read (getAllPlayers/getRoster), which never hydrate it; only
    *  getPlayer does, because ~530 itemised blocks would triple the payload of a

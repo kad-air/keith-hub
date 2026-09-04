@@ -207,6 +207,8 @@ interface PlayerDbRow {
   expected_minutes: number | null;
   value_pg: number | null;
   evidence: string | null;
+  value_per36_above_replacement?: number | null;
+  value_per_game_above_replacement?: number | null;
   explain_json?: string | null;
 }
 
@@ -236,6 +238,10 @@ function hydratePlayer(r: PlayerDbRow, withExplain = false): PlayerRow {
     expected_minutes: r.expected_minutes ?? null,
     value_pg: r.value_pg ?? null,
     evidence: r.evidence ?? null,
+    // Same `?? null` reasoning again: a DB row written before this migration
+    // (issue #70 F5) reads undefined for both until the ALTER TABLE lands.
+    value_per36_above_replacement: r.value_per36_above_replacement ?? null,
+    value_per_game_above_replacement: r.value_per_game_above_replacement ?? null,
     explain:
       withExplain && r.explain_json ? (JSON.parse(r.explain_json) as RawPlayerExplain) : null,
   };
