@@ -6,11 +6,11 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import {
   PLAYER_SORTS,
   SORT_COPY,
-  displayValuePg,
   filterPlayers,
   rankPlayers,
+  replacementLevelsOf,
+  sortBlurb,
   valueCoverage,
-  valueSortBlurb,
 } from "@/lib/hoops/playervalue";
 import type { PlayerSort, RankedPlayer } from "@/lib/hoops/playervalue";
 import type { HoopsMeta } from "@/lib/hoops/queries";
@@ -67,14 +67,16 @@ export default function PlayersClient({ rows, tris, meta, initialSort, initialTe
   // of hasSplit — the two milestones shipped separately and a bundle could in
   // principle carry one without the other.
   const hasValue = useMemo(() => rows.some((r) => r.value_pg != null), [rows]);
-  // 🔴 Issue #70 F5 ("0 = replacement player", owner decision 2026-09-03):
-  // independent again — an older bundle carries value_pg but not the
-  // replacement-level pair, and the page must fall back to the OLD label
-  // rather than breaking or printing a promise it cannot keep.
-  const hasAboveReplacement = useMemo(
-    () => rows.some((r) => r.value_per_game_above_replacement != null),
-    [rows],
+  // 🔴 Issue #70 F5 round 2 (owner decision 2026-09-04: "one scale on every
+  // player surface" — off/def included, not just the Value/G headline round
+  // 1 shipped). Null on a bundle that predates `replacement_tilt_per36`;
+  // every render below falls back to the OLD average-zero labels in that
+  // case, never a half-shifted page.
+  const levels = useMemo(
+    () => replacementLevelsOf(meta.replacementPer36, meta.replacementTiltPer36),
+    [meta.replacementPer36, meta.replacementTiltPer36],
   );
+  const hasReplacementScale = levels != null;
   const sorts = PLAYER_SORTS.filter((s) => {
     if (s === "value") return hasValue;
     if (s === "off" || s === "def") return hasSplit;
@@ -82,7 +84,14 @@ export default function PlayersClient({ rows, tris, meta, initialSort, initialTe
   });
   const activeSort: PlayerSort = sorts.includes(sort) ? sort : "net";
 
-  const ranked = useMemo(() => rankPlayers(rows, activeSort, floor), [rows, activeSort, floor]);
+  // rankPlayers shifts net/off/def/stackNet/stackOff/stackDef/valuePg onto
+  // the replacement scale ONCE, here, when `levels` is available — every
+  // render below just reads the fields off `RankedPlayer` directly, on
+  // whichever scale is live, rather than each re-deriving its own.
+  const ranked = useMemo(
+    () => rankPlayers(rows, activeSort, floor, levels),
+    [rows, activeSort, floor, levels],
+  );
   const shown = useMemo(() => {
     const base = filterPlayers(ranked, { team, rotationOnly });
     const q = query.trim().toLowerCase();
@@ -148,7 +157,7 @@ export default function PlayersClient({ rows, tris, meta, initialSort, initialTe
 
       {/* The honesty carry. What the number means, in one line, on screen. */}
       <p className="mt-3 border-l-2 border-cat-hoops/50 pl-3 text-sm text-cream-dim">
-        {activeSort === "value" ? valueSortBlurb(hasAboveReplacement) : SORT_COPY[activeSort].blurb}
+        {sortBlurb(activeSort, hasReplacementScale)}
       </p>
       {!hasSplit && (
         <p className="mt-2 border-l-2 border-cat-hoops pl-3 text-sm text-cream-dim">
@@ -176,20 +185,21 @@ export default function PlayersClient({ rows, tris, meta, initialSort, initialTe
           )}
         </summary>
         <p className="mt-2 text-sm text-cream-dimmer">
-          Points per 36 minutes against an average player, from the Mini&rsquo;s value model as of{" "}
-          <span className="font-mono text-cream-dim">{meta.valueAsOf.slice(0, 10)}</span> — a model
-          estimate, not a measurement of this season.{" "}
-          {activeSort === "value" && hasAboveReplacement ? (
+          {hasReplacementScale ? (
             <>
-              <em>Val/G</em> here is priced above a REPLACEMENT-level player instead — the last man
-              a team could realistically find, at{" "}
+              Points per 36 minutes from the Mini&rsquo;s value model as of{" "}
+              <span className="font-mono text-cream-dim">{meta.valueAsOf.slice(0, 10)}</span> — a
+              model estimate, not a measurement of this season. Every number on this page is priced
+              against a REPLACEMENT-level player — the last man a team could realistically find, at{" "}
               <span className="font-mono text-cream-dim">{meta.replacementPer36.toFixed(2)}</span>{" "}
-              points per 36 minutes. Net/Offence/Defence stay measured against a league-average
-              player.
+              points per 36 minutes this season — so 0 means replacement level everywhere, not a
+              league-average player.
             </>
           ) : (
             <>
-              Replacement level is{" "}
+              Points per 36 minutes against an average player, from the Mini&rsquo;s value model as
+              of <span className="font-mono text-cream-dim">{meta.valueAsOf.slice(0, 10)}</span> — a
+              model estimate, not a measurement of this season. Replacement level is{" "}
               <span className="font-mono text-cream-dim">{meta.replacementPer36.toFixed(2)}</span>,
               so an end-of-bench player sits a little below zero rather than at it.
             </>
@@ -365,11 +375,10 @@ export default function PlayersClient({ rows, tris, meta, initialSort, initialTe
  * At `sm`+ the original one-line-each form is unchanged.
  */
 function PlayerLine({ p, sort }: { p: RankedPlayer; sort: PlayerSort }) {
-  // Issue #70 F5: "value" reads above replacement when the bundle carries it
-  // (see displayValuePg) — the same number the "value" sort is keyed on, so
-  // the row always shows what it's ranked by.
-  const valuePgShown = displayValuePg(p);
-  const primary = sort === "off" ? p.off : sort === "def" ? p.def : sort === "value" ? valuePgShown : p.net;
+  // 🔴 No wrapper needed: rankPlayers already shifted every field on `p` onto
+  // the live scale (replacement, or the old average-zero when the bundle
+  // doesn't carry replacement_tilt_per36) — this just reads them.
+  const primary = sort === "off" ? p.off : sort === "def" ? p.def : sort === "value" ? p.valuePg : p.net;
   const counting =
     p.ppg != null && p.rpg != null && p.apg != null
       ? `${p.ppg.toFixed(1)} / ${p.rpg.toFixed(1)} / ${p.apg.toFixed(1)} · ${p.gp ?? 0} gp`
@@ -464,9 +473,9 @@ function PlayerLine({ p, sort }: { p: RankedPlayer; sort: PlayerSort }) {
         </span>
         {(p.valuePg != null || p.evidence != null) && (
           <span className="mt-0.5 hidden pl-9 font-mono text-[0.62rem] text-cream-dimmer sm:block">
-            {valuePgShown != null && (
+            {p.valuePg != null && (
               <span className={sort === "value" ? "text-cream-dim" : undefined}>
-                val/g {fmtSigned(valuePgShown, 2)}
+                val/g {fmtSigned(p.valuePg, 2)}
               </span>
             )}
             {p.expectedMinutes != null && ` (${p.expectedMinutes.toFixed(1)} exp min)`}

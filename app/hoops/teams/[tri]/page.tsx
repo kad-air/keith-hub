@@ -15,7 +15,7 @@ import {
   resolveRatingMode,
 } from "@/lib/hoops/queries";
 import type { TeamFormGame, TeamMovers } from "@/lib/hoops/queries";
-import { displayStackNet, displayValuePg, rankPlayers } from "@/lib/hoops/playervalue";
+import { rankPlayers, replacementLevelsOf } from "@/lib/hoops/playervalue";
 import { MODE_COPY, fmtSigned, rankTeams, teamName } from "@/lib/hoops/rating";
 import type { RawNightlyMover } from "@/lib/hoops/types";
 
@@ -62,12 +62,15 @@ export default function HoopsTeamPage({
   // flagship `value_per36`, which meant a name could read one way here and
   // another way one tap along. `rankPlayers` already does the fallback this
   // wants: anyone the stack has no read on sorts to the bottom by minutes.
-  const ranked = rankPlayers(roster, "value", null);
+  // Issue #70 F5 round 2: 0 = replacement level on Val/G and Rate once the
+  // bundle carries `replacement_tilt_per36`; falls back to average-zero (the
+  // old label) on an older bundle rather than showing a promise it can't
+  // keep. rankPlayers applies the shift once, here — every row below just
+  // reads its own (already-scaled) fields.
+  const levels = replacementLevelsOf(meta.replacementPer36, meta.replacementTiltPer36);
+  const ranked = rankPlayers(roster, "value", null, levels);
   const totalMinutes = roster.reduce((s, p) => s + (p.expected_minutes ?? p.minutes), 0);
-  // Issue #70 F5: 0 = replacement level on Val/G and Rate once the bundle
-  // carries the above-replacement fields; falls back to average-zero (the
-  // old label) on an older bundle rather than showing a promise it can't keep.
-  const hasAboveReplacement = ranked.some((p) => p.stackNetAboveReplacement != null);
+  const hasReplacementScale = levels != null;
 
   return (
     <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6">
@@ -222,7 +225,7 @@ export default function HoopsTeamPage({
         </Link>
         , as of {meta.valueAsOf.slice(0, 10)} — what we expect of him, not a measurement of this
         season. A dash means we have no read on him at all.{" "}
-        {hasAboveReplacement
+        {hasReplacementScale
           ? `0 = replacement level (${meta.replacementPer36.toFixed(2)}/36) — the last man a team could realistically find.`
           : `Replacement level is ${meta.replacementPer36.toFixed(2)}, so a fringe player sits a little below zero rather than at it.`}
       </p>
@@ -236,8 +239,10 @@ export default function HoopsTeamPage({
           <span className="w-24 text-right max-sm:hidden">Pts/Reb/Ast</span>
         </li>
         {ranked.map((p) => {
-          const valG = displayValuePg(p);
-          const rate = displayStackNet(p);
+          // 🔴 No wrapper needed: rankPlayers already shifted these onto the
+          // live scale when `levels` was supplied above.
+          const valG = p.valuePg;
+          const rate = p.stackNet;
           return (
           <li key={p.athlete_id} className="border-b border-rule/40 py-2">
             <span className="flex items-baseline gap-2">

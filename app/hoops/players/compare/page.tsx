@@ -6,7 +6,8 @@ import type { PickOption } from "@/components/hoops/ComparePicker";
 import HoopsNav from "@/components/hoops/HoopsNav";
 import PlayerCompare from "@/components/hoops/PlayerCompare";
 import type { ComparePlayer } from "@/components/hoops/PlayerCompare";
-import { rankPlayers } from "@/lib/hoops/playervalue";
+import { rankPlayers, replacementLevelsOf } from "@/lib/hoops/playervalue";
+import { fmtSigned } from "@/lib/hoops/rating";
 import {
   getAllPlayers,
   getExplainModel,
@@ -37,6 +38,10 @@ export default function HoopsComparePage({
   const meta = getHoopsMeta();
   const model = getExplainModel();
   const through = getResultsWindow()?.to ?? null;
+  // Issue #70 F5 round 2 (owner decision 2026-09-04: "one scale on every
+  // player surface" — the compare page too, so it never disagrees with the
+  // player page about what zero means).
+  const levels = replacementLevelsOf(meta.replacementPer36, meta.replacementTiltPer36);
 
   const resolve = (raw: string | undefined): number | null => {
     if (raw == null || raw === "") return null;
@@ -90,6 +95,12 @@ export default function HoopsComparePage({
           Two players&rsquo; ratings with the working shown — where each man&rsquo;s number came
           from, and which part of it puts one above the other.
         </p>
+        {levels && (
+          <p className="mt-2 font-mono text-[0.6rem] uppercase tracking-kicker text-cream-dimmer">
+            0 = a replacement-level player ({fmtSigned(levels.net, 2)} per 36 below the league
+            average this season)
+          </p>
+        )}
       </header>
 
       <div className="mt-4">
@@ -102,7 +113,7 @@ export default function HoopsComparePage({
         </p>
       )}
 
-      {!same && a && b && <PlayerCompare a={a} b={b} model={model} />}
+      {!same && a && b && <PlayerCompare a={a} b={b} model={model} levels={levels} />}
 
       {!same && !(a && b) && (
         <p className="mt-6 text-sm text-cream-dimmer">

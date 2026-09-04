@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { ledgerLines, seasonLabel } from "@/lib/hoops/compare";
+import { ledgerLines, seasonLabel, shiftExplainToReplacement } from "@/lib/hoops/compare";
+import type { ReplacementLevels } from "@/lib/hoops/playervalue";
 import { fmtSigned } from "@/lib/hoops/rating";
 import type { ExplainItem, ExplainModel, RawPlayerExplain } from "@/lib/hoops/types";
 
@@ -136,29 +137,40 @@ function ItemRow({ item, maxAbs }: { item: ExplainItem; maxAbs: number }) {
 
 export function PlayerExplainBlock({
   name,
-  e,
+  e: rawE,
   model,
-  net,
   expectedMinutes,
-  valuePg,
-  netAboveReplacement,
-  valuePgAboveReplacement,
+  levels,
 }: {
   name: string;
   e: RawPlayerExplain;
   model: ExplainModel | null;
-  net: number;
   expectedMinutes: number | null;
-  valuePg: number | null;
-  /** See RawPlayer.value_per36_above_replacement (issue #70 F5). Null on a
-   *  bundle that predates the owner's "0 = replacement player" decision —
-   *  when null, section 1 below reads exactly as it did before this change. */
-  netAboveReplacement?: number | null;
-  valuePgAboveReplacement?: number | null;
+  /**
+   * The bundle's replacement levels (issue #70 F5 round 2, owner decision
+   * 2026-09-04: "one scale on every player surface" — a replacement-level
+   * player must read 0.00 everywhere, off/def included, not just the
+   * headline round 1 shipped). Null on a bundle that predates
+   * `replacement_tilt_per36`: every row below then reads exactly as it did
+   * before issue #70 F5 existed at all (average-zero, "against an average
+   * NBA player"), never a half-shifted page.
+   */
+  levels: ReplacementLevels | null;
 }) {
   const first = model ? seasonLabel(model.seasons.first) : "the tape window";
   const last = model ? seasonLabel(model.seasons.last) : "";
   const lam = model?.lam ?? null;
+  const hasReplacementScale = levels != null;
+
+  // 🔴 ONE shift, here, and everything below — the ledger rows, the
+  // headline, the box baseline — reads off `e` (the shifted copy), never the
+  // raw `rawE`. ledgerLines/additiveTerms/compareVerdict/netOfExplain need NO
+  // changes of their own: they just consume RawPlayerExplain fields, and `e`
+  // is one. See lib/hoops/compare.ts's shiftExplainToReplacement for why the
+  // whole ledger still adds down correctly after this.
+  const e = shiftExplainToReplacement(rawE, levels);
+  const net = e.final.off + e.final.def;
+  const valuePg = expectedMinutes != null ? (net * expectedMinutes) / 36 : null;
 
   const rows = ledgerLines(e, model);
   const items = e.box?.items ?? [];
@@ -170,52 +182,33 @@ export function PlayerExplainBlock({
   // league-wide reference sheet in section 4 — say so once, here, rather
   // than implying every player reads the same price for the same stat.
   const groupPriced = model?.positional_arm != null && model.positional_arm !== "arm1";
-  const hasAboveReplacement = netAboveReplacement != null;
 
   return (
     <>
+      {/* No caption here — the ONE caption for the page lives once, near the
+          top, in app/hoops/players/[athleteId]/page.tsx, so it appears even
+          when this block itself is the "no ingredients yet" fallback and
+          doesn't render. Never re-declare a second copy here. */}
+
       {/* ── 1. The number ─────────────────────────────────────────────── */}
       <section className="mt-6">
         <h3 className="font-display text-lg text-cream">The number</h3>
         <p className="mt-1 text-sm text-cream-dim">
-          {hasAboveReplacement ? (
-            <>
-              {name} is worth{" "}
-              <span className="font-mono text-cream">{fmtSigned(netAboveReplacement as number, 2)}</span>{" "}
-              points per 36 minutes above a REPLACEMENT-level player — the last man a team could
-              realistically find. Against a plain league-average player he rates{" "}
-              <span className="font-mono">{fmtSigned(net, 2)}</span> per 36 —{" "}
-              <span className="font-mono">{fmtSigned(e.final.off, 2)}</span> of it on offence and{" "}
-              <span className="font-mono">{fmtSigned(e.final.def, 2)}</span> on defence.
-              {valuePgAboveReplacement != null && expectedMinutes != null && (
-                <>
-                  {" "}
-                  Over the <span className="font-mono">{expectedMinutes.toFixed(1)}</span> minutes
-                  we expect him to play, that is{" "}
-                  <span className="font-mono text-cream">
-                    {fmtSigned(valuePgAboveReplacement, 2)}
-                  </span>{" "}
-                  points of margin a game above a replacement player.
-                </>
-              )}
-            </>
+          {name} is worth <span className="font-mono text-cream">{fmtSigned(net, 2)}</span> points
+          per 36 minutes {hasReplacementScale ? (
+            <>above a REPLACEMENT-level player — the last man a team could find</>
           ) : (
+            <>against an average NBA player</>
+          )}{" "}
+          — <span className="font-mono">{fmtSigned(e.final.off, 2)}</span> of it on offence and{" "}
+          <span className="font-mono">{fmtSigned(e.final.def, 2)}</span> on defence.
+          {valuePg != null && expectedMinutes != null && (
             <>
-              {name} is worth{" "}
-              <span className="font-mono text-cream">{fmtSigned(net, 2)}</span> points per 36
-              minutes against an average NBA player —{" "}
-              <span className="font-mono">{fmtSigned(e.final.off, 2)}</span> of it on offence and{" "}
-              <span className="font-mono">{fmtSigned(e.final.def, 2)}</span> on defence.
-              {valuePg != null && expectedMinutes != null && (
-                <>
-                  {" "}
-                  Over the{" "}
-                  <span className="font-mono">{expectedMinutes.toFixed(1)}</span> minutes we expect
-                  him to play, that is{" "}
-                  <span className="font-mono text-cream">{fmtSigned(valuePg, 2)}</span> points of
-                  margin a game.
-                </>
-              )}
+              {" "}
+              Over the <span className="font-mono">{expectedMinutes.toFixed(1)}</span> minutes we
+              expect him to play, that is{" "}
+              <span className="font-mono text-cream">{fmtSigned(valuePg, 2)}</span> points of
+              margin a game{hasReplacementScale ? " above a replacement player" : ""}.
             </>
           )}
         </p>
@@ -251,26 +244,6 @@ export function PlayerExplainBlock({
             />
           ))}
         </ol>
-
-        {/* Issue #70 F5: the ledger's closing line — what gets subtracted
-            from his rating to reach a value ABOVE REPLACEMENT instead of
-            above average. A single net number (real basketball has no
-            offence/defence halves of "the last man a team could find"), so
-            it renders as prose rather than another off/def grid row — and it
-            does not disturb the additive-terms identity above: it is one
-            more step AFTER "His rating", not a term inside it. */}
-        {e.replacement_per36 != null && (
-          <p className="mt-2 border-t border-rule/60 pt-2 font-mono text-sm">
-            <span className="text-cream-dim">{fmtSigned(e.final.off + e.final.def, 2)}</span>
-            <span className="text-cream-dimmer"> minus replacement </span>
-            <span className="text-cream-dim">{fmtSigned(e.replacement_per36, 2)}</span>
-            <span className="text-cream-dimmer"> = </span>
-            <span className="text-cream">
-              {fmtSigned(e.final.off + e.final.def - e.replacement_per36, 2)}
-            </span>
-            <span className="text-cream-dimmer"> value above replacement</span>
-          </p>
-        )}
 
         <p className="mt-3 text-xs leading-relaxed text-cream-dimmer">
           A positive defence is <em>good</em> defence — points he stops. Offence and defence add
@@ -316,12 +289,24 @@ export function PlayerExplainBlock({
             ))}
           </ol>
           <p className="mt-3 text-xs leading-relaxed text-cream-dimmer">
-            A perfectly league-average line earns{" "}
-            <span className="font-mono">{fmtSigned(e.box.baseline_off, 2)}</span> on offence and{" "}
-            <span className="font-mono">{fmtSigned(e.box.baseline_def, 2)}</span> on defence here;
-            the bars are what {name} earns above or below that. The sheet cannot see most of
-            defence — help rotations, deterrence, switching — so a defensive box line earns little
-            either way, and it is the tape that decides defence for anyone it has watched.
+            {hasReplacementScale ? (
+              <>
+                A perfectly REPLACEMENT-level line earns{" "}
+                <span className="font-mono">{fmtSigned(e.box.baseline_off, 2)}</span> on offence
+                and <span className="font-mono">{fmtSigned(e.box.baseline_def, 2)}</span> on
+                defence here; the bars are what {name} earns above or below that.
+              </>
+            ) : (
+              <>
+                A perfectly league-average line earns{" "}
+                <span className="font-mono">{fmtSigned(e.box.baseline_off, 2)}</span> on offence
+                and <span className="font-mono">{fmtSigned(e.box.baseline_def, 2)}</span> on
+                defence here; the bars are what {name} earns above or below that.
+              </>
+            )}{" "}
+            The sheet cannot see most of defence — help rotations, deterrence, switching — so a
+            defensive box line earns little either way, and it is the tape that decides defence
+            for anyone it has watched.
           </p>
         </section>
       )}

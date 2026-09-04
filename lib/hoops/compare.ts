@@ -29,10 +29,69 @@
 // sentence names really is the biggest of them.
 // ───────────────────────────────────────────────────────────────────────────
 
+import { toReplacementScale } from "./playervalue.ts";
+import type { ReplacementLevels } from "./playervalue.ts";
 import { fmtSigned } from "./rating.ts";
 import type { ExplainModel, OffDef, RawPlayerExplain } from "./types.ts";
 
 export type Side = "off" | "def";
+
+// ───────────────────────────────────────────────────────────────────────────
+// REPLACEMENT-ZERO, round 2 (issue #70 F5, owner decision 2026-09-04: "one
+// scale on every player surface" — the owner saw the player page's ledger
+// print "+4.98 minus replacement −1.18 = +6.16" and, correctly, called it
+// still average-zero with a conversion bolted on).
+//
+// `shiftExplainToReplacement` builds a COPY of a player's explain block with
+// every LEVEL quantity shifted onto the replacement scale, so a
+// replacement-level player's own numbers read exactly 0.00. Once built, it
+// is just a `RawPlayerExplain` — every existing function below
+// (`ledgerLines`, `additiveTerms`, `compareVerdict`, `verdictSentence`,
+// `netOfExplain`) keeps working on it completely UNCHANGED, because none of
+// them do anything but read `RawPlayerExplain`'s own fields. That is what
+// makes this ONE shift apply consistently everywhere the ledger appears
+// (the player page, the compare page's table AND its verdict sentence)
+// without a second implementation anywhere.
+//
+// Which rows are levels and which are deltas, and why the sum still holds:
+// `mixed = w·history + (1−w)·box`. Shifting `history` and `box` by the SAME
+// constant R (their own side's replacement level) shifts `mixed` by exactly
+// R too, because `w + (1−w) == 1` — a weighted AVERAGE of two equally-shifted
+// numbers shifts by that same amount, regardless of the weight. `report (mu)
+// = mixed + aging`; aging is a genuine DELTA (what a year older costs him)
+// and must NOT be shifted, so adding it to a now-R-shifted mixed keeps the
+// report shifted by exactly R. Same story one row further: `final = report +
+// tape move`, tape move is a delta too, so final ends up shifted by R as
+// well. The chain never breaks, on any side, regardless of prior_kind.
+export function shiftExplainToReplacement(
+  e: RawPlayerExplain,
+  levels: ReplacementLevels | null,
+): RawPlayerExplain {
+  if (!levels) return e;
+  const shift = (v: OffDef): OffDef => ({
+    off: toReplacementScale("off", v.off, levels),
+    def: toReplacementScale("def", v.def, levels),
+  });
+  return {
+    ...e,
+    mu: shift(e.mu),
+    box: e.box
+      ? {
+          ...e.box,
+          ...shift(e.box),
+          baseline_off: toReplacementScale("off", e.box.baseline_off, levels),
+          baseline_def: toReplacementScale("def", e.box.baseline_def, levels),
+          // items (rate/league/coef/contrib) are UNTOUCHED — contrib is a
+          // delta (a stat's contribution above or below league average), and
+          // the baseline shift above already carries the level.
+        }
+      : null,
+    history: e.history ? { ...e.history, ...shift(e.history) } : null,
+    final: shift(e.final),
+    // aging, tape, weights, prior_kind, prior_floored, replacement_per36:
+    // UNCHANGED. aging/tape are deltas; the rest are not per-36 levels at all.
+  };
+}
 
 /** "2018" → "2018-19". Shared with the player page's ledger. */
 export function seasonLabel(startYear: number): string {
@@ -139,12 +198,19 @@ export function ledgerLines(e: RawPlayerExplain, model: ExplainModel | null): Le
     });
   }
   if (e.prior_kind === "none") {
+    // 🔴 Reads e.mu, never a hardcoded 0 — the model sets him to league
+    // average internally either way, but once `e` has been through
+    // shiftExplainToReplacement, "league average" is no longer 0.00: it is
+    // whatever a league-average player is worth above replacement (a real,
+    // positive number, since a replacement player is BELOW average). A
+    // literal 0 here would silently stop being true the moment the caller
+    // shifts.
     out.push({
       key: "no-prior",
       label: "No scouting report",
       sub: "nothing to price him from before the tape — he starts at league average",
-      off: 0,
-      def: 0,
+      off: e.mu.off,
+      def: e.mu.def,
       emphasis: "muted",
     });
   }

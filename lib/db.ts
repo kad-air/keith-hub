@@ -612,6 +612,24 @@ export function getDb(): Database.Database {
     }
   }
 
+  // REPLACEMENT-ZERO ROUND 2 (issue #70 F5, owner decision 2026-09-04: "one
+  // scale on every player surface" — a replacement-level player must read
+  // 0.00 everywhere a player's LEVEL is shown, off/def included, not just the
+  // two headline fields above). The bundle-level off/def LEAN of a
+  // replacement player, needed to split `replacement_per36` the same way any
+  // other player's net splits into off/def (`lib/hoops/playervalue.ts`'s
+  // `replacementLevelsOf`). Same additive shape; the importer's no-op check
+  // (hasReplacementTilt) forces the one rewrite that backfills an existing
+  // volume, separately from hasScalars — an already-settled pre-existing
+  // volume (hca_pts already non-null) would otherwise never learn this column
+  // exists at all.
+  const hoopsParamsTiltCols = (
+    dbInstance.prepare(`PRAGMA table_info(hoops_params)`).all() as Array<{ name: string }>
+  ).map((c) => c.name);
+  if (!hoopsParamsTiltCols.includes("replacement_tilt_per36")) {
+    dbInstance.exec(`ALTER TABLE hoops_params ADD COLUMN replacement_tilt_per36 REAL`);
+  }
+
   return dbInstance;
 }
 

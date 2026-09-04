@@ -42,8 +42,13 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
-import { additiveTerms, compareVerdict, verdictSentence } from "../lib/hoops/compare.ts";
-import { playerRowsFromBundle } from "../lib/hoops/playervalue.ts";
+import {
+  additiveTerms,
+  compareVerdict,
+  shiftExplainToReplacement,
+  verdictSentence,
+} from "../lib/hoops/compare.ts";
+import { playerRowsFromBundle, replacementLevelsOf, stackDisplay, toReplacementScale } from "../lib/hoops/playervalue.ts";
 import { fmtSigned } from "../lib/hoops/rating.ts";
 import type { RawPlayerExplain, RawPlayersFile } from "../lib/hoops/types.ts";
 
@@ -69,6 +74,10 @@ check(
   `hoops_players.json: ${withs.length}/${carriers.length} stack carriers have an explain block`,
 );
 const model = playersFile.explain_model ?? null;
+// Issue #70 F5 round 2 (owner decision 2026-09-04: "one scale on every
+// player surface"). Null on a bundle that predates replacement_tilt_per36 —
+// every shift-dependent assertion below is then skipped, never half-applied.
+const levels = replacementLevelsOf(playersFile.replacement_per36, playersFile.replacement_tilt_per36 ?? null);
 check(model != null, "hoops_players.json: explain_model block missing");
 
 let blendChecked = 0;
@@ -211,6 +220,58 @@ if (model && model.positional_arm && model.positional_arm !== POOLED_ARM) {
   );
 }
 
+// ── 1c. the ledger still adds down after the replacement-zero shift ───────
+//
+// Issue #70 F5 round 2 (owner decision 2026-09-04, after seeing the ledger
+// print "+4.98 minus replacement −1.18 = +6.16" and correctly calling it
+// still average-zero with a conversion bolted on): every LEVEL row in the
+// player page's ledger shifts by a per-side constant, every DELTA row
+// (aging, the tape move) does not — this asserts, on EVERY carrier, that the
+// chain still adds down exactly the way the unshifted ledger does: box ->
+// mixed -> +aging -> report -> +tape move -> rating == the headline, using
+// shiftExplainToReplacement — THE SAME helper the player page and the
+// compare page both call, never a second implementation here.
+if (levels) {
+  let ledgerChecked = 0;
+  for (const r of withs) {
+    const se = shiftExplainToReplacement(r.explain as RawPlayerExplain, levels);
+    for (const side of ["off", "def"] as const) {
+      if (se.prior_kind === "box+history" && !se.prior_floored && se.box && se.history && se.weights) {
+        const mixed = se.weights[side] * se.history[side] + (1 - se.weights[side]) * se.box[side];
+        const report = mixed + se.aging[side];
+        check(
+          Math.abs(report - se.mu[side]) <= TOL,
+          `${r.name}: shifted mixed + aging = ${report.toFixed(4)} != shifted mu ${se.mu[side]} on ${side}`,
+        );
+      }
+      const move = side === "off" ? se.tape.move_off : se.tape.move_def;
+      check(
+        Math.abs(se.mu[side] + move - se.final[side]) <= TOL,
+        `${r.name}: shifted mu + move != shifted final on ${side}`,
+      );
+    }
+    // final == the headline (his rate above replacement).
+    const headline = se.final.off + se.final.def;
+    const expected = toReplacementScale("net", r.stack_net_per36 as number, levels);
+    check(
+      Math.abs(headline - expected) <= TOL,
+      `${r.name}: shifted final sums to ${headline.toFixed(4)}, != net above replacement ` +
+        `${expected.toFixed(4)}`,
+    );
+    ledgerChecked += 1;
+  }
+  check(ledgerChecked >= 400, `only ${ledgerChecked} carriers had their shifted ledger re-verified`);
+  notes.push(
+    `replacement-zero ledger: ${ledgerChecked} carriers' shifted box -> mixed -> +aging -> ` +
+      `report -> +tape move -> rating chain adds down to the headline`,
+  );
+} else {
+  notes.push(
+    "replacement-zero ledger: this bundle carries no replacement_tilt_per36 yet — the shift is " +
+      "not exercised",
+  );
+}
+
 // ── 1b. the side-by-side comparison ───────────────────────────────────────
 //
 // /hoops/players/compare says, in one sentence, who is rated higher and what
@@ -262,19 +323,30 @@ if (model && model.positional_arm && model.positional_arm !== POOLED_ARM) {
 
   const [A, B] = picked;
   if (A?.explain && B?.explain) {
-    const ae = A.explain;
-    const be = B.explain;
+    // 🔴 SHIFTED, via the SAME helper the compare page calls — issue #70 F5
+    // round 2: the page now renders these two men's ledger AND verdict
+    // sentence on the replacement scale (when the bundle carries one), so
+    // testing the raw, unshifted blocks here would no longer describe what
+    // actually renders. Null levels (an older bundle) makes this a no-op —
+    // ae/be come back byte-identical to A.explain/B.explain.
+    const ae = shiftExplainToReplacement(A.explain, levels);
+    const be = shiftExplainToReplacement(B.explain, levels);
     const aShort = A.name.split(" ").slice(-1)[0];
     const bShort = B.name.split(" ").slice(-1)[0];
+    // Same reason: PlayerCompare.tsx feeds compareVerdict the STACK
+    // DISPLAY's valuePg (above replacement when levels is live), not the
+    // raw wire value_pg.
+    const aDisplay = stackDisplay(A, levels);
+    const bDisplay = stackDisplay(B, levels);
     const v = compareVerdict(
-      { name: aShort, e: ae, valuePg: A.value_pg },
-      { name: bShort, e: be, valuePg: B.value_pg },
+      { name: aShort, e: ae, valuePg: aDisplay.valuePg },
+      { name: bShort, e: be, valuePg: bDisplay.valuePg },
     );
 
     // Real basketball, not internal agreement: the man the bundle prices
     // higher a game must be the man the page calls higher.
-    const aPg = A.value_pg ?? 0;
-    const bPg = B.value_pg ?? 0;
+    const aPg = aDisplay.valuePg ?? 0;
+    const bPg = bDisplay.valuePg ?? 0;
     check(
       v.leader === (aPg >= bPg ? "a" : "b"),
       `compare: ${aShort} ${aPg} vs ${bShort} ${bPg} a game, but the verdict leads with ${v.leader}`,

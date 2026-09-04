@@ -7,9 +7,12 @@ import {
   ledgerLines,
   pct,
   seasonLabel,
+  shiftExplainToReplacement,
   verdictSentence,
 } from "@/lib/hoops/compare";
 import type { LedgerKey, LedgerLine } from "@/lib/hoops/compare";
+import { stackDisplay } from "@/lib/hoops/playervalue";
+import type { ReplacementLevels } from "@/lib/hoops/playervalue";
 import { fmtSigned, teamName } from "@/lib/hoops/rating";
 import type { ExplainItem, ExplainModel, PlayerRow } from "@/lib/hoops/types";
 
@@ -48,9 +51,17 @@ function num(v: number | null): string {
 // 1. The two headers
 // ---------------------------------------------------------------------------
 
-function PlayerColumn({ p, tone }: { p: ComparePlayer; tone: string }) {
+function PlayerColumn({
+  p,
+  tone,
+  levels,
+}: {
+  p: ComparePlayer;
+  tone: string;
+  levels: ReplacementLevels | null;
+}) {
   const r = p.row;
-  const net = r.stack_net_per36 ?? r.value_per36;
+  const { net, off, def, valuePg } = stackDisplay(r, levels);
   return (
     <div className="min-w-0">
       <p className="truncate font-mono text-[0.6rem] uppercase tracking-kicker text-cream-dimmer">
@@ -74,15 +85,11 @@ function PlayerColumn({ p, tone }: { p: ComparePlayer; tone: string }) {
         )}
       </p>
       <dl className="mt-2 space-y-1">
-        <Cell label="Value / game" value={r.value_pg != null ? fmtSigned(r.value_pg, 2) : "—"} />
+        <Cell label="Value / game" value={valuePg != null ? fmtSigned(valuePg, 2) : "—"} />
         <Cell
           label="Rate / 36"
           value={net != null ? fmtSigned(net, 2) : "—"}
-          sub={
-            r.stack_off_per36 != null && r.stack_def_per36 != null
-              ? `${fmtSigned(r.stack_off_per36, 1)} off · ${fmtSigned(r.stack_def_per36, 1)} def`
-              : undefined
-          }
+          sub={off != null && def != null ? `${fmtSigned(off, 1)} off · ${fmtSigned(def, 1)} def` : undefined}
         />
         <Cell label="Expected min" value={(r.expected_minutes ?? r.minutes).toFixed(1)} />
       </dl>
@@ -224,13 +231,19 @@ export default function PlayerCompare({
   a,
   b,
   model,
+  levels,
 }: {
   a: ComparePlayer;
   b: ComparePlayer;
   model: ExplainModel | null;
+  /** See app/hoops/players/[athleteId]/page.tsx — issue #70 F5 round 2, "one
+   *  scale on every player surface." Null on a bundle that predates
+   *  `replacement_tilt_per36`: this page then reads exactly as it did
+   *  before, average-zero throughout. */
+  levels: ReplacementLevels | null;
 }) {
-  const ae = a.row.explain;
-  const be = b.row.explain;
+  const rawAe = a.row.explain;
+  const rawBe = b.row.explain;
   let aShort = lastName(a.row.name);
   let bShort = lastName(b.row.name);
   if (aShort === bShort) {
@@ -240,15 +253,17 @@ export default function PlayerCompare({
 
   const header = (
     <section className="mt-4 grid grid-cols-2 gap-3">
-      <PlayerColumn p={a} tone={A_TONE} />
-      <PlayerColumn p={b} tone={B_TONE} />
+      <PlayerColumn p={a} tone={A_TONE} levels={levels} />
+      <PlayerColumn p={b} tone={B_TONE} levels={levels} />
     </section>
   );
 
   // A player with no explain block: say so rather than printing an empty
   // ledger. The rating itself, and both headers, still stand.
-  if (!ae || !be) {
-    const missing = [!ae ? a.row.name : null, !be ? b.row.name : null].filter(Boolean).join(" and ");
+  if (!rawAe || !rawBe) {
+    const missing = [!rawAe ? a.row.name : null, !rawBe ? b.row.name : null]
+      .filter(Boolean)
+      .join(" and ");
     return (
       <>
         {header}
@@ -260,6 +275,13 @@ export default function PlayerCompare({
       </>
     );
   }
+
+  // 🔴 ONE shift, here — everything below (the paired ledger table AND the
+  // verdict sentence) reads off `ae`/`be` (the shifted copies), so the table
+  // and the prose underneath it can never quote two different scales on the
+  // same page. See lib/hoops/compare.ts's shiftExplainToReplacement.
+  const ae = shiftExplainToReplacement(rawAe, levels);
+  const be = shiftExplainToReplacement(rawBe, levels);
 
   const aRows = ledgerLines(ae, model);
   const bRows = ledgerLines(be, model);
@@ -276,8 +298,8 @@ export default function PlayerCompare({
     });
 
   const v = compareVerdict(
-    { name: aShort, e: ae, valuePg: a.row.value_pg },
-    { name: bShort, e: be, valuePg: b.row.value_pg },
+    { name: aShort, e: ae, valuePg: stackDisplay(a.row, levels).valuePg },
+    { name: bShort, e: be, valuePg: stackDisplay(b.row, levels).valuePg },
   );
   const sentence = verdictSentence(v, aShort, bShort);
 

@@ -5,7 +5,7 @@ import { CompareWithPicker } from "@/components/hoops/ComparePicker";
 import type { PickOption } from "@/components/hoops/ComparePicker";
 import HoopsNav from "@/components/hoops/HoopsNav";
 import { PlayerExplainBlock } from "@/components/hoops/PlayerExplain";
-import { rankPlayers } from "@/lib/hoops/playervalue";
+import { rankPlayers, replacementLevelsOf, stackDisplay } from "@/lib/hoops/playervalue";
 import {
   getAllPlayers,
   getExplainModel,
@@ -56,7 +56,14 @@ export default function HoopsPlayerPage({ params }: { params: { athleteId: strin
   const rOff = stackRank("stack_off_per36");
   const rDef = stackRank("stack_def_per36");
 
-  const net = p.stack_net_per36 ?? p.value_per36;
+  // Issue #70 F5 round 2 (owner decision 2026-09-04: "one scale on every
+  // player surface" — a replacement-level player reads 0.00 everywhere a
+  // player's LEVEL is shown, off/def included). Null on a bundle that
+  // predates `replacement_tilt_per36`: every value below then falls back to
+  // the OLD average-zero rendering unchanged, never a half-shifted page.
+  const levels = replacementLevelsOf(meta.replacementPer36, meta.replacementTiltPer36);
+  const hasReplacementScale = levels != null;
+  const { net, off, def, valuePg } = stackDisplay(p, levels);
   const gr = p.game_rates;
   // The whole league, three fields each, for the "Compare with…" select.
   const compareOptions: PickOption[] = all.map((r) => ({
@@ -93,33 +100,22 @@ export default function HoopsPlayerPage({ params }: { params: { athleteId: strin
         <CompareWithPicker options={compareOptions} self={id} />
       </header>
 
-      {/* Issue #70 F5, owner decision 2026-09-03: 0 = a replacement-level
-          player — the last man a team could realistically find — not an
-          average one. Falls back to the old "vs average" label whenever the
-          bundle carries no above-replacement read for him (an older bundle,
-          or a no-history player with no stack rating at all). */}
+      {/* Issue #70 F5 round 2, owner decision 2026-09-04: ONE scale, not two
+          — Value/game, Rate/36, AND the off/def split all read 0.00 for a
+          replacement-level player, the last man a team could realistically
+          find. Falls back to the old "vs average" rendering whenever the
+          bundle carries no replacement tilt at all (an older bundle, or a
+          no-history player with no stack rating). */}
       <dl className="mt-5 grid grid-cols-3 gap-2 border-y border-rule/60 py-3">
         <Stat
           label="Value / game"
-          value={
-            (p.value_per_game_above_replacement ?? p.value_pg) != null
-              ? fmtSigned((p.value_per_game_above_replacement ?? p.value_pg) as number, 2)
-              : "—"
-          }
-          sub={p.value_per_game_above_replacement != null ? "vs replacement" : "margin vs average"}
+          value={valuePg != null ? fmtSigned(valuePg, 2) : "—"}
+          sub={hasReplacementScale ? "vs replacement" : "margin vs average"}
         />
         <Stat
           label="Rate / 36"
-          value={
-            (p.value_per36_above_replacement ?? net) != null
-              ? fmtSigned((p.value_per36_above_replacement ?? net) as number, 2)
-              : "—"
-          }
-          sub={
-            p.stack_off_per36 != null && p.stack_def_per36 != null
-              ? `${fmtSigned(p.stack_off_per36, 1)} off · ${fmtSigned(p.stack_def_per36, 1)} def`
-              : "no rating"
-          }
+          value={net != null ? fmtSigned(net, 2) : "—"}
+          sub={off != null && def != null ? `${fmtSigned(off, 1)} off · ${fmtSigned(def, 1)} def` : "no rating"}
         />
         <Stat
           label="Expected min"
@@ -127,10 +123,11 @@ export default function HoopsPlayerPage({ params }: { params: { athleteId: strin
           sub={p.evidence ?? ""}
         />
       </dl>
-      {p.value_per_game_above_replacement != null && (
+      {/* The ONE caption — printed once, here. */}
+      {levels && (
         <p className="mt-2 text-xs text-cream-dimmer">
-          0 = replacement level ({meta.replacementPer36.toFixed(2)}/36) for Value/game and Rate/36.
-          The off/def split above stays measured against a league-average player.
+          0 = a replacement-level player ({fmtSigned(levels.net, 2)} per 36 below the league
+          average this season), everywhere on this page.
         </p>
       )}
 
@@ -161,11 +158,8 @@ export default function HoopsPlayerPage({ params }: { params: { athleteId: strin
           name={p.name.split(" ").slice(-1)[0] || p.name}
           e={p.explain}
           model={model}
-          net={net}
           expectedMinutes={p.expected_minutes}
-          valuePg={p.value_pg}
-          netAboveReplacement={p.value_per36_above_replacement}
-          valuePgAboveReplacement={p.value_per_game_above_replacement}
+          levels={levels}
         />
       ) : (
         <p className="mt-6 border-l-2 border-cat-hoops pl-3 text-sm text-cream-dim">

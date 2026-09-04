@@ -990,22 +990,63 @@ check alone. `ItemRow`/`ItemPair` show the item's own coefficient (`×N.NN`) nex
 the pooled one; "The wage sheet" section is labelled the league-wide REFERENCE when the arm isn't
 pooled.
 
-🔴 **Same round, owner decision 2026-09-03 (issue #70 F5): "I would like 0 to be replacement
-player."** The player page and the players list now show `value_per_game_above_replacement` /
-`value_per36_above_replacement` as the headline Value/game and Rate/36 — zero means a
-replacement-level player (the last man a team could find), not a league-average one — falling back
-to the old `value_pg`/`stack_net_per36` fields with the old "vs average" label whenever a bundle
-carries no above-replacement read (an older bundle, or a no-history player). Off/Def stay on their
-existing average-zero scale everywhere (a split of the rating, same convention real VORP/BPM use);
-only the two headline numbers move. `explain.replacement_per36` prints as the ledger's closing line
-("… minus replacement = value above replacement"), a single net number rather than an off/def row
-(real basketball has no offence/defence halves of "the last man a team could find"). Storage: two
-additive `hoops_players` columns, a seventh no-op marker in the importer (`hasAboveReplacement`, read
-off `value_per_game_above_replacement` so an existing volume backfills once); `pricing.ts` is
-untouched — it keeps reading the old `value_per36`/`replacement_per36` pair exactly as before, this
-is display only. `check:hoops:explain` cross-checks `final.off + final.def − replacement_per36 ==
-value_per36_above_replacement` on every carrier; `check:hoops:players` round-trips both new columns
-through the real INSERT the same way the six stack fields already were.
+🔴 **Owner decision 2026-09-03 (issue #70 F5): "I would like 0 to be replacement player" — RE-DECIDED
+2026-09-04 to a single scale, after the owner saw the shipped round-1 ledger print "+4.98 minus
+replacement −1.18 = +6.16" and correctly called it "still average-zero with a conversion bolted
+on."** Round 1 (superseded below) moved only the two headline fields and left off/def
+average-referenced; round 2's rule is **0 = a replacement-level player everywhere a player's LEVEL
+is shown — off/def included, not just Value/game and Rate/36.**
+
+**The one helper**, `lib/hoops/playervalue.ts`'s `toReplacementScale(side, value, levels)` (`side`
+is `"off" | "def" | "net"`), subtracts the matching entry of `ReplacementLevels` — `{ net, off, def
+}`, built by `replacementLevelsOf(replacementPer36, replacementTiltPer36)` from hoops-sim's own
+`off = (net + tilt) / 2, def = (net − tilt) / 2` formula (`rosterratings.py`'s SPLIT team-pricing
+section — read from the source, never guessed): `off_repl + def_repl == replacement_per36` exactly,
+asserted live by `check:hoops:players`' `checkReplacementLevels`. `replacement_tilt_per36` (the
+off-minus-def LEAN of a replacement player, `hoops.playervalue`'s convention) is a new bundle-level
+scalar on `hoops_params`, an eighth no-op marker (`hasReplacementTilt`) since it rides in a LATER
+migration than `hca_pts`/`replacement_per36` and an already-settled volume would otherwise never
+learn the column exists. **Null `levels` (an older bundle) means every surface below renders EXACTLY
+as it did before issue #70 F5 ever existed — average-zero throughout, never a half-shifted page.**
+
+**Where the shift applies — LEVELS only, never DELTAS.** A level is a standing rate (a box line's
+worth, a plus-minus history, the final rating); a delta already has no reference point (the aging
+offset, what the tape moved him by, a wage-item's `contrib`) and subtracting a level from one would
+be a unit error. `rankPlayers`'s optional 4th argument (`levels`) shifts `net`/`off`/`def`/
+`stackNet`/`stackOff`/`stackDef`/`valuePg` ONCE, at construction — every list (Players, a team
+roster) just reads the field. `lib/hoops/compare.ts`'s `shiftExplainToReplacement(e, levels)` does
+the same for one player's explain block, and because `ledgerLines`/`additiveTerms`/`compareVerdict`/
+`verdictSentence` only ever read `RawPlayerExplain`'s own fields, feeding them the shifted copy is
+enough — none of their own code changed. The proof the chain still adds down: a weighted blend of
+two equally-shifted numbers (`w·history + (1−w)·box`) shifts by that same constant regardless of the
+weight, so `mixed`, then `mixed + aging` (an unshifted delta), then `+ tape move` (another unshifted
+delta) all end up shifted by exactly the per-side replacement level — `check:hoops:explain` asserts
+this box → mixed → +aging → report → +tape move → rating chain on every carrier.
+`stackDisplay(row, levels)` is the shared helper for a player ROW's headline (Value/game, Rate/36,
+off/def) so the player page, the team roster, and the compare page can never quote different
+numbers for the same man.
+
+**Every surface**: the player page's ledger (every LEVEL row shifts, the box baseline reads "what a
+REPLACEMENT-level line earns"), its top stat cards and one caption near the top ("0 = a
+replacement-level player…"); the players list's Val/G **and** Net/Off/Def sorts and blurbs (`net`/
+`off`/`def` here are the FLAGSHIP split, a different model from Val/G's stack rating, sharing the
+same replacement levels); the team roster's Val/G and Rate columns; the compare page's paired ledger
+**and** its verdict sentence (fed the shifted blocks, so the table and the prose beneath it can never
+disagree). 🔴 **Order is provably unaffected only for the three per-36 RATE sorts** (a constant shift
+can't swap who's ahead); **Val/G (per-GAME) is NOT order-invariant and that is correct, not a bug** —
+`value_pg = (net − replacement) × minutes / 36`, so the (negative) replacement level hands every
+player a bonus proportional to HIS OWN minutes, and a heavy-minutes average starter gains far more
+than a lightly-used hot-rate bench man. Measured on the real bundle: 440 of ~500 rankable players
+change rank once Val/G is priced above replacement — the same reason real VORP re-ranks a per-minute
+rate stat substantially, not a defect.
+
+`check:hoops:explain` adds the ledger-chain assertion above (every carrier) and re-derives the
+compare page's Jokić-vs-Wembanyama anchor on the SHIFTED blocks (not the raw wire ones, since that's
+what the page now actually renders); `check:hoops:players` adds `checkReplacementLevels` (the
+off_repl+def_repl identity, and that `rankPlayers(…, levels)` preserves order under net/off/def on
+the real bundle) alongside a rankPlayers-with-levels re-run of the synthetic stack fixture.
+`pricing.ts` is untouched — it keeps reading the old `value_per36`/`replacement_per36` pair exactly
+as before; this is display only.
 
 #### Side by side (`/hoops/players/compare?a=&b=`) — 2026-09-02
 

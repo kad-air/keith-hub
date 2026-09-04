@@ -429,6 +429,21 @@ export interface RawPlayersFile {
   value_as_of: string;
   n_players: number;
   replacement_per36: number;
+  /**
+   * The minutes-weighted mean OFFENCE-MINUS-DEFENCE lean of a replacement-level
+   * player (hoops-sim's `rosterratings.replacement_tilt_per36`), in
+   * `hoops.playervalue`'s convention (`off + def == net`, positive def = GOOD
+   * defence) — the SAME convention `value_off_per36`/`value_def_per36` ride.
+   * A replacement-level player's own off/def split is therefore
+   * `off = (replacement_per36 + replacement_tilt_per36) / 2`,
+   * `def = (replacement_per36 - replacement_tilt_per36) / 2` — see
+   * `lib/hoops/playervalue.ts`'s `replacementLevelsOf`, the ONE place this
+   * arithmetic is done. Optional: null on a bundle that predates issue #70 F5
+   * round 2 (2026-09-04, "one scale on every player surface") — every reader
+   * must fall back to the OLD average-zero rendering when this is absent,
+   * never guess a tilt of 0.
+   */
+  replacement_tilt_per36?: number | null;
   bench_default_minutes: number;
   players: RawPlayer[];
   /** Present only when the sender's explain sidecar existed at export time. */

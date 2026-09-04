@@ -530,6 +530,14 @@ export interface HoopsMeta {
   avgPossPerTeamGame: number;
   /** Value per 36 of a replacement-level player — the zero line for value. */
   replacementPer36: number;
+  /**
+   * The off-minus-def LEAN of a replacement-level player (issue #70 F5 round
+   * 2, 2026-09-04). Null on a bundle that predates it — see
+   * `lib/hoops/playervalue.ts`'s `replacementLevelsOf`, which returns null in
+   * that case so every reader falls back to the old average-zero rendering
+   * rather than guessing a tilt of 0.
+   */
+  replacementTiltPer36: number | null;
   valueAsOf: string;
   /**
    * hoops-sim's own `absorption_rotation_floor_minutes` — the minutes at which
@@ -568,7 +576,7 @@ export function getHoopsMeta(): HoopsMeta {
   const row = db
     .prepare(
       `SELECT param_version, blob, generated_at, imported_at, import_source,
-              hca_pts, replacement_per36, value_as_of
+              hca_pts, replacement_per36, replacement_tilt_per36, value_as_of
        FROM hoops_params WHERE id = 1`,
     )
     .get() as
@@ -580,6 +588,7 @@ export function getHoopsMeta(): HoopsMeta {
         import_source: ImportSource;
         hca_pts: number;
         replacement_per36: number;
+        replacement_tilt_per36: number | null;
         value_as_of: string;
       }
     | undefined;
@@ -603,6 +612,7 @@ export function getHoopsMeta(): HoopsMeta {
     hcaPts: row.hca_pts,
     avgPossPerTeamGame: blob.parameter_set.avg_poss_per_team_game,
     replacementPer36: row.replacement_per36,
+    replacementTiltPer36: row.replacement_tilt_per36 ?? null,
     valueAsOf: row.value_as_of,
     rotationFloorMinutes: typeof rotationFloor === "number" && Number.isFinite(rotationFloor)
       ? rotationFloor

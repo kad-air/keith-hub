@@ -94,13 +94,29 @@ interface StoredState {
    *  leaves every value NULL, and an unchanged content hash would otherwise
    *  keep it that way forever. */
   hasAboveReplacement: boolean;
+  /** And an eighth, for `replacement_tilt_per36` (issue #70 F5 round 2,
+   *  2026-09-04, "one scale on every player surface"): a pre-existing DB
+   *  already past the hasScalars/hasAboveReplacement migrations would
+   *  otherwise never learn this bundle-level scalar exists, since it rides
+   *  on `hoops_params` alongside `hca_pts` but arrived in a LATER migration.
+   *  Read directly off `hoops_params`, not derived from `hasScalars`. */
+  hasReplacementTilt: boolean;
 }
 
 function currentState(db: Database.Database): StoredState | null {
   const row = db
-    .prepare(`SELECT content_hash, generated_at, import_source, hca_pts FROM hoops_params WHERE id = 1`)
+    .prepare(
+      `SELECT content_hash, generated_at, import_source, hca_pts, replacement_tilt_per36
+         FROM hoops_params WHERE id = 1`,
+    )
     .get() as
-    | { content_hash: string; generated_at: string; import_source: ImportSource; hca_pts: number | null }
+    | {
+        content_hash: string;
+        generated_at: string;
+        import_source: ImportSource;
+        hca_pts: number | null;
+        replacement_tilt_per36: number | null;
+      }
     | undefined;
   if (!row) return null;
   const count = (
@@ -148,6 +164,7 @@ function currentState(db: Database.Database): StoredState | null {
     hasExplain: explain > 0,
     hasMovers: movers > 0,
     hasAboveReplacement: aboveReplacement > 0,
+    hasReplacementTilt: row.replacement_tilt_per36 !== null,
   };
 }
 
@@ -187,8 +204,8 @@ function writeBundle(db: Database.Database, bundle: HoopsBundle, meta: WriteMeta
          (id, param_version, blob, generated_at, imported_at, content_hash, import_source,
           hca_pts, replacement_per36, value_as_of, pricing_version, features_json, constants_json,
           nightly_as_of, nightly_value_source, nightly_last_n_games, nightly_priced,
-          explain_model_json, nightly_league_typical_shift)
-       VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          explain_model_json, nightly_league_typical_shift, replacement_tilt_per36)
+       VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
       bundle.params.parameter_set.param_version,
       meta.paramsBlobText,
@@ -219,6 +236,11 @@ function writeBundle(db: Database.Database, bundle: HoopsBundle, meta: WriteMeta
       // number is his own team's change, and this is the level under all of
       // them. NULL when the sender said nothing.
       bundle.teams.nightly_league_typical_shift ?? null,
+      // REPLACEMENT-ZERO ROUND 2 (issue #70 F5): the off-minus-def LEAN of a
+      // replacement-level player, needed to split replacement_per36 the same
+      // way every other player's net splits into off/def. NULL on a bundle
+      // that predates it — every reader must fall back to the old rendering.
+      bundle.players.replacement_tilt_per36 ?? null,
     );
 
     const insTeam = db.prepare(
@@ -455,6 +477,13 @@ export function importHoopsData(force = false): ImportSummary {
   );
   const aboveReplacementSettled = !bundleHasAboveReplacement || state?.hasAboveReplacement === true;
 
+  // An eighth time, for replacement_tilt_per36 (issue #70 F5 round 2,
+  // 2026-09-04, "one scale on every player surface"). A bundle-level scalar,
+  // not per-player, so the presence check reads the file directly rather than
+  // scanning `players`.
+  const bundleHasReplacementTilt = bundle.players.replacement_tilt_per36 != null;
+  const replacementTiltSettled = !bundleHasReplacementTilt || state?.hasReplacementTilt === true;
+
   if (
     !force &&
     state &&
@@ -466,7 +495,8 @@ export function importHoopsData(force = false): ImportSummary {
     nightlySettled &&
     explainSettled &&
     moversSettled &&
-    aboveReplacementSettled
+    aboveReplacementSettled &&
+    replacementTiltSettled
   ) {
     return {
       imported: false,

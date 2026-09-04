@@ -66,12 +66,12 @@ import path from "path";
 import { fileURLToPath } from "url";
 import {
   defaultSortFor,
-  displayValuePg,
   filterPlayers,
   playerRowsFromBundle,
   rankPlayers,
+  replacementLevelsOf,
 } from "../lib/hoops/playervalue.ts";
-import type { RankedPlayer } from "../lib/hoops/playervalue.ts";
+import type { RankedPlayer, ReplacementLevels } from "../lib/hoops/playervalue.ts";
 import { teamNetRating } from "../lib/hoops/pricing.ts";
 import type { PricingConstants, PricingPlayer } from "../lib/hoops/pricing.ts";
 import type { PlayerRow, RawPlayersFile } from "../lib/hoops/types.ts";
@@ -757,25 +757,45 @@ function checkStackFieldsSynthetic(fixture: PlayerRow[]): void {
     'rankPlayers("value"): an unranked player has a non-null value_pg',
   );
 
-  // Issue #70 F5: this fixture's three carriers each carry a REAL, distinct
-  // value_per36_above_replacement (see SYN_REPLACEMENT_PER36 above) — assert
-  // the "value" sort is actually driven by displayValuePg (above-replacement
-  // when present), not the frozen old value_pg, and that RankedPlayer carries
-  // the above-replacement field through untouched.
-  const aboveDescending = rankable.every(
-    (p, i) => i === 0 || (displayValuePg(rankable[i - 1]) as number) >= (displayValuePg(p) as number),
-  );
-  check(aboveDescending, 'rankPlayers("value"): not in descending displayValuePg (above-replacement) order');
-  const carriers = rankable.filter((p) => p.valuePg != null);
+  // Issue #70 F5 round 2 (owner decision 2026-09-04: "one scale on every
+  // player surface"): rankPlayers's OPTIONAL 4th argument shifts net/off/
+  // def/stackNet/stackOff/stackDef/valuePg onto the replacement scale, once,
+  // at construction — re-run the exact same "value" sort WITH a real
+  // ReplacementLevels object and assert (a) the order is byte-for-byte
+  // unchanged (a constant shift can never swap who's ahead), and (b) every
+  // rankable player's numbers actually moved by the expected amount, so a
+  // future rankPlayers change that quietly stops shifting cannot pass by
+  // returning the unshifted numbers unchanged.
+  const syntheticLevels: ReplacementLevels = { net: SYN_REPLACEMENT_PER36, off: -0.6, def: -0.58 };
+  const rankedAbove = rankPlayers(fixture, "value", null, syntheticLevels);
+  const rankableAbove = rankedAbove.filter((p) => p.rank > 0);
   check(
-    carriers.every((p) => p.valuePgAboveReplacement != null),
-    'rankPlayers("value"): a carrier with a value_pg read has no valuePgAboveReplacement',
+    rankableAbove.map((p) => p.name).join("|") === rankable.map((p) => p.name).join("|"),
+    'rankPlayers("value", levels): shifting reordered the rankable players — a constant shift ' +
+      "must never change who is ahead of whom",
   );
-  check(
-    carriers.some((p) => Math.abs((p.valuePgAboveReplacement as number) - (p.valuePg as number)) > 0.5),
-    'rankPlayers("value"): valuePgAboveReplacement is suspiciously close to the old value_pg — ' +
-      "the fixture's SYN_REPLACEMENT_PER36 level shift should be clearly visible",
+  const byName = new Map(rankable.map((p) => [p.name, p]));
+  let shiftChecked = 0;
+  for (const p of rankableAbove) {
+    const before = byName.get(p.name);
+    if (!before || before.stackNet == null || p.stackNet == null) continue;
+    check(
+      Math.abs(p.stackNet - (before.stackNet - syntheticLevels.net)) <= 1e-9,
+      `${p.name}: shifted stackNet ${p.stackNet} != unshifted ${before.stackNet} - ` +
+        `${syntheticLevels.net}`,
+    );
+    check(
+      Math.abs((p.valuePg as number) - (p.stackNet * (p.expectedMinutes as number)) / 36) <= 1e-9,
+      `${p.name}: shifted valuePg ${p.valuePg} != shifted stackNet * expectedMinutes / 36`,
+    );
+    shiftChecked += 1;
+  }
+  check(shiftChecked >= 3, `only ${shiftChecked} synthetic carriers had their shift re-verified`);
+  notes.push(
+    `rankPlayers(levels): ${shiftChecked} synthetic carriers shifted by exactly the replacement ` +
+      "level with the same rank order as unshifted",
   );
+
   const firstUnranked = ranked.findIndex((p) => p.rank === 0);
   check(
     firstUnranked === -1 || firstUnranked === rankable.length,
@@ -793,7 +813,85 @@ function checkStackFieldsSynthetic(fixture: PlayerRow[]): void {
   );
 }
 
-// ────────────────────────────────────────────────── 7. the scope boundary ──
+// ─────────────────────────────────── 7. replacement-zero (issue #70 F5 R2) ──
+
+/**
+ * The owner's 2026-09-04 decision: "he saw the ledger... and, correctly,
+ * read the page as still average-zero with a conversion bolted on" — 0 must
+ * mean a replacement-level player everywhere a player's LEVEL is shown, off
+ * and def included, not just the two headline fields round 1 shipped.
+ *
+ * Two things, on the REAL committed bundle (not the synthetic fixture,
+ * which already checked the shift arithmetic in isolation):
+ *
+ *   (a) off_repl + def_repl == replacement_per36 to 1e-9 — this is the
+ *       identity the whole design leans on (a weighted blend of two
+ *       equally-shifted numbers shifts by the same amount), proven from
+ *       hoops-sim's own `off = (net + tilt) / 2, def = (net - tilt) / 2`
+ *       formula (rosterratings.py's SPLIT team-pricing section).
+ *   (b) rankPlayers(rows, sort, floor, levels) on the real bundle preserves
+ *       rank order for the three per-36 RATE sorts (net/off/def) — proving
+ *       that property live, not just on hand-built numbers. "value" is
+ *       deliberately NOT asserted here: it is per-GAME (rate × minutes), so
+ *       the shift is not a constant in per-game terms and DOES reorder
+ *       substantially (440/~500 real players) — a real, correct effect of
+ *       pricing by minutes played, not a property to guard.
+ */
+function checkReplacementLevels(rows: ReturnType<typeof playerRowsFromBundle>): void {
+  if (players?.replacement_tilt_per36 == null) {
+    notes.push(
+      "replacement-zero: this committed bundle carries no replacement_tilt_per36 yet — " +
+        "the shift is exercised only by the synthetic fixture above",
+    );
+    return;
+  }
+  const levels = replacementLevelsOf(players.replacement_per36, players.replacement_tilt_per36);
+  check(levels != null, "replacementLevelsOf returned null despite a non-null replacement_tilt_per36");
+  if (!levels) return;
+
+  check(
+    Math.abs(levels.off + levels.def - levels.net) <= 1e-9,
+    `off_repl (${levels.off}) + def_repl (${levels.def}) = ${levels.off + levels.def}, != ` +
+      `replacement_per36 (${levels.net}) — the off/def split of a replacement-level player must ` +
+      `reconstruct his net exactly, the same identity every other player's split satisfies`,
+  );
+
+  // 🔴 Order-preservation is a PROVABLE property only for the three per-36
+  // RATE sorts — subtracting the same constant from every player's rate can
+  // never change who is ahead. "value" is a per-GAME quantity (rate ×
+  // minutes), and different players play different minutes, so a per-36
+  // shift is NOT a constant shift in per-game terms — two players very close
+  // together can legitimately swap right at the margin. That is expected,
+  // not a bug (the task's own framing: "nothing visible reorders except the
+  // zero line") — so this only pins the property that actually holds.
+  const floor = paramsConstants?.absorption_rotation_floor_minutes ?? null;
+  for (const sort of ["net", "off", "def"] as const) {
+    const unshifted = rankPlayers(rows, sort, floor).filter((p) => p.rank > 0);
+    const shifted = rankPlayers(rows, sort, floor, levels).filter((p) => p.rank > 0);
+    check(
+      shifted.map((p) => p.athlete_id).join(",") === unshifted.map((p) => p.athlete_id).join(","),
+      `rankPlayers(rows, "${sort}", floor, levels): shifting reordered the real bundle's rankable ` +
+        `players`,
+    );
+  }
+  // 🔴 "value" (per-game) is DELIBERATELY NOT checked for order-invariance.
+  // Measured: on the real committed bundle, 440 of ~500 rankable players
+  // change rank once "value" is priced above replacement — and that is
+  // CORRECT, not a bug. value_pg = (net − replacement) × minutes / 36:
+  // replacement_per36 is negative, so subtracting it hands every player a
+  // bonus proportional to HIS OWN minutes — a heavy-minutes average starter
+  // gains far more than a lightly-used bench man with a hot rate, which is
+  // exactly what a replacement-level value stat is FOR (the same reason real
+  // VORP reorders a per-minute rate stat substantially). Asserting
+  // near-invariance here would be asserting a false premise about the metric.
+  notes.push(
+    `replacement-zero: off_repl ${levels.off.toFixed(4)} + def_repl ${levels.def.toFixed(4)} == ` +
+      `replacement_per36 ${levels.net.toFixed(4)}; net/off/def preserve rank order exactly under ` +
+      `the shift (value does not, by design — see comment)`,
+  );
+}
+
+// ────────────────────────────────────────────────── 8. the scope boundary ──
 
 function checkScopeBoundary(): void {
   // 🔴 RE-DECIDED 2026-09-02 (hub-v2). This used to GREP pricing.ts and
@@ -884,6 +982,7 @@ async function main(): Promise<void> {
     checkStackFieldsSynthetic(syntheticStackRows);
     await checkReadModelRoundTrip(rows, syntheticStackRows);
     checkRanking(rows);
+    checkReplacementLevels(rows);
   }
   checkScopeBoundary();
 
