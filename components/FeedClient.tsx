@@ -8,6 +8,7 @@ import { useKeyboard } from "@/lib/useKeyboard";
 import FeedCard from "@/components/FeedCard";
 import Toast from "@/components/Toast";
 import KeyboardHelp from "@/components/KeyboardHelp";
+import { dismissViaOutbox, flushDismissOutbox } from "@/lib/dismiss-outbox";
 
 interface FeedClientProps {
   initialItems: Item[];
@@ -23,6 +24,12 @@ const FEED_LIMIT = 2000;
 // initial DOM size small. More chunks load as the user scrolls.
 const INITIAL_CHUNK = 50;
 const CHUNK_SIZE = 50;
+
+// True once FeedClient has mounted in this document. A second mount is a
+// client-side navigation back to the feed (Contents, `g h`), and the RSC
+// payload that mounted it can come from Next's router cache — up to 30s old,
+// from BEFORE the last dismissals — so the server is asked again.
+let feedMountedThisDocument = false;
 
 // ── Pull to refresh ──────────────────────────────────────────
 // Finger travel is damped before driving the indicator zone's height,
@@ -179,6 +186,8 @@ export default function FeedClient({
     invalidateCache();
     setRefreshing(true);
     try {
+      // Undelivered dismissals go first, or the refetch would bring them back.
+      await flushDismissOutbox();
       const res = await fetch("/api/refresh", { method: "POST" });
       if (!res.ok) throw new Error("refresh failed");
       const data = (await res.json()) as {
@@ -211,9 +220,16 @@ export default function FeedClient({
   // Server SSR's the All view. If the URL says otherwise (deep link,
   // refresh on a filtered tab, PWA cold-start), fetch the right slice.
   useEffect(() => {
-    if (initialCategory !== "all") {
-      void fetchItems(initialCategory);
-    }
+    const remounted = feedMountedThisDocument;
+    feedMountedThisDocument = true;
+    // Any dismissal a previous session failed to deliver is replayed FIRST;
+    // if there was one, the SSR list is stale and is refetched. Same when
+    // this mount came from a client-side navigation (see the flag above).
+    void flushDismissOutbox().then((replayed) => {
+      if (initialCategory !== "all" || remounted || replayed) {
+        void fetchItems(initialCategory);
+      }
+    });
     // Mount-only: subsequent URL changes come from handleCategoryChange,
     // which already updates state and fetches.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -247,7 +263,10 @@ export default function FeedClient({
       if (Date.now() - lastRefreshRef.current < 60_000) return;
       lastRefreshRef.current = Date.now();
       invalidateCache();
-      fetch("/api/refresh", { method: "POST" })
+      // Replay any dismissal the last session failed to deliver BEFORE the
+      // crawl and the refetch — otherwise the list below resurrects it.
+      flushDismissOutbox()
+        .then(() => fetch("/api/refresh", { method: "POST" }))
         .then(() => {
           // Fetch fresh data for counts and new-items detection — don't
           // touch the visible items or scroll position unless the user
@@ -297,9 +316,14 @@ export default function FeedClient({
         })
         .catch(() => {});
     }
+    // Back online: deliver whatever the outbox is holding.
+    const onOnline = () => void flushDismissOutbox();
     document.addEventListener("visibilitychange", onVisibilityChange);
-    return () =>
+    window.addEventListener("online", onOnline);
+    return () => {
       document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("online", onOnline);
+    };
   }, [activeCategory, invalidateCache]);
 
   // Apply the pending new-items payload — the user has opted in, so replacing
@@ -372,7 +396,7 @@ export default function FeedClient({
       try {
         // /open marks the item as both read AND consumed, so it appears
         // in the /read view. /read alone would only mark it as dismissed.
-        await fetch(`/api/items/${item.id}/open`, { method: "POST" });
+        await fetch(`/api/items/${item.id}/open`, { method: "POST", keepalive: true });
       } catch {
         // best effort
       }
@@ -397,7 +421,7 @@ export default function FeedClient({
         );
       }
       try {
-        await fetch(`/api/items/${item.id}/save`, { method: "POST" });
+        await fetch(`/api/items/${item.id}/save`, { method: "POST", keepalive: true });
       } catch (err) {
         console.error("[FeedClient] Save error:", err);
       }
@@ -448,11 +472,7 @@ export default function FeedClient({
         items: [item],
         message: "Dismissed",
       });
-      try {
-        await fetch(`/api/items/${item.id}/read`, { method: "POST" });
-      } catch {
-        // best effort
-      }
+      void dismissViaOutbox([item.id]);
     },
     [removeFromList, decrementCount, invalidateCache]
   );
@@ -506,15 +526,7 @@ export default function FeedClient({
         window.scrollTo({ top: 0, behavior: "smooth" });
       });
 
-      try {
-        await fetch("/api/items/read-bulk", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ ids: clearIds }),
-        });
-      } catch {
-        // best effort
-      }
+      void dismissViaOutbox(clearIds);
     },
     [invalidateCache]
   );
@@ -545,15 +557,7 @@ export default function FeedClient({
       return { ...prev, [activeCategory]: 0, all: Math.max(0, prev.all - dismissCount) };
     });
 
-    try {
-      await fetch("/api/items/read-bulk", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ ids: dismissIds }),
-      });
-    } catch {
-      // best effort — counts/items will reconcile on the next refresh
-    }
+    await dismissViaOutbox(dismissIds);
 
     setPending({
       ids: dismissIds,
@@ -604,19 +608,9 @@ export default function FeedClient({
     }
     setPending(null);
 
-    try {
-      if (ids.length === 1) {
-        await fetch(`/api/items/${ids[0]}/unread`, { method: "POST" });
-      } else if (ids.length > 0) {
-        await fetch("/api/items/read-bulk", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ ids, unread: true }),
-        });
-      }
-    } catch (err) {
-      console.error("[FeedClient] Undo error:", err);
-    }
+    // The undo rides the same outbox as the dismissal it reverses, so the
+    // two replay in order even if both were queued offline.
+    await dismissViaOutbox(ids, true);
 
     // Mark-all-undo: refetch the visible list from the server now that
     // read_at is cleared. This is the only path that takes us through

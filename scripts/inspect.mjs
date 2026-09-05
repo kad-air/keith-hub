@@ -326,6 +326,112 @@ function sources() {
   ]);
 }
 
+// Cross-source duplicates and the two bugs of 2026-09-04: the same piece in
+// two sources (Verge review in Reading AND Tech Review; a Vergecast episode as
+// article AND podcast), and dismissed items resurrected by retention. Zero rows
+// everywhere is the healthy state. See `npm run check:feed`.
+function dedup() {
+  const conn = db();
+
+  header("Same URL under more than one source");
+  const urlDups = conn
+    .prepare(
+      `SELECT i.url,
+              GROUP_CONCAT(i.source_id || ':' || CASE WHEN ist.read_at IS NULL THEN 'unread' ELSE 'read' END, ' | ') AS rows_
+       FROM items i LEFT JOIN item_state ist ON ist.item_id = i.id
+       WHERE i.url IN (SELECT url FROM items GROUP BY url HAVING COUNT(DISTINCT source_id) > 1)
+       GROUP BY i.url ORDER BY MAX(i.published_at) DESC LIMIT 30`
+    )
+    .all();
+  table(urlDups, [
+    { label: "url", get: (r) => truncate(r.url, 70) },
+    { label: "rows", get: (r) => truncate(r.rows_, 50) },
+  ]);
+
+  header("Verge: same post id in more than one row (guid ?p=N / URL /N/)");
+  const verge = conn
+    .prepare(
+      `SELECT i.id, i.source_id, i.external_id, i.url, i.title, ist.read_at
+       FROM items i LEFT JOIN item_state ist ON ist.item_id = i.id
+       WHERE i.source_id IN ('verge-full', 'verge-reviews', 'verge-quickposts')`
+    )
+    .all();
+  const postId = (r) =>
+    (/[?&]p=(\d+)/.exec(r.external_id ?? "") ??
+      /\/(\d{5,})(?:\/|$)/.exec(r.external_id ?? "") ??
+      /\/(\d{5,})\//.exec(r.url) ??
+      [])[1];
+  const byPost = new Map();
+  for (const r of verge) {
+    const k = postId(r);
+    if (!k) continue;
+    if (!byPost.has(k)) byPost.set(k, []);
+    byPost.get(k).push(r);
+  }
+  const postDups = [...byPost.entries()]
+    .filter(([, v]) => v.length > 1)
+    .map(([k, v]) => ({
+      pid: k,
+      title: v[0].title,
+      rows_: v.map((r) => `${r.source_id}:${r.read_at ? "read" : "unread"}`).join(" | "),
+    }));
+  table(postDups, [
+    { label: "post", get: (r) => r.pid },
+    { label: "title", get: (r) => truncate(r.title ?? "", 44) },
+    { label: "rows", get: (r) => r.rows_ },
+  ]);
+
+  header("Vergecast episodes still doubled as full-feed articles");
+  const doubled = conn
+    .prepare(
+      `SELECT f.title, f.url FROM items f
+       WHERE f.source_id = 'verge-full' AND f.url LIKE '%/podcast/%'
+         AND EXISTS (SELECT 1 FROM items p JOIN sources s ON s.id = p.source_id
+                     WHERE s.type = 'podcast' AND lower(trim(p.title)) = lower(trim(f.title)))`
+    )
+    .all();
+  table(doubled, [
+    { label: "title", get: (r) => truncate(r.title ?? "", 50) },
+    { label: "url", get: (r) => truncate(r.url.replace("https://www.theverge.com", ""), 40) },
+  ]);
+
+  header("Tombstones (dismissed_keys) — 'dismissed' by retention, 'folded' by the dedup");
+  let tomb = [];
+  try {
+    tomb = conn
+      .prepare(
+        `SELECT source_id, reason, COUNT(*) AS n, MAX(dismissed_at) AS newest
+         FROM dismissed_keys GROUP BY 1, 2 ORDER BY 1, 2`
+      )
+      .all();
+  } catch {
+    console.log(c.dim("  (no dismissed_keys table — this DB predates it)"));
+  }
+  table(tomb, [
+    { label: "source", get: (r) => truncate(r.source_id, 18) },
+    { label: "reason", get: (r) => r.reason },
+    { label: "keys", get: (r) => r.n },
+    { label: "newest", get: (r) => relativeTime(r.newest) },
+  ]);
+
+  header("Resurrection signature: UNREAD rows fetched more than 7 days after they were published");
+  const resurrected = conn
+    .prepare(
+      `SELECT i.source_id, COUNT(*) AS n, MAX(i.fetched_at) AS last_fetch
+       FROM items i JOIN sources s ON s.id = i.source_id
+       LEFT JOIN item_state ist ON ist.item_id = i.id
+       WHERE s.type IN ('rss', 'podcast') AND ist.read_at IS NULL
+         AND julianday(i.fetched_at) - julianday(i.published_at) > 7
+       GROUP BY 1 ORDER BY n DESC`
+    )
+    .all();
+  table(resurrected, [
+    { label: "source", get: (r) => truncate(r.source_id, 18) },
+    { label: "rows", get: (r) => r.n },
+    { label: "last fetch", get: (r) => relativeTime(r.last_fetch) },
+  ]);
+}
+
 function bskyRich(args) {
   const kind = args[0]; // optional: images|video|external|quoted|reply|repost
 
@@ -560,6 +666,7 @@ ${c.bold("Commands:")}
                                 ${c.dim("--limit N (default 20)")}
   ${c.cyan("item <id-prefix>")}            Full detail of one item, parsed metadata
   ${c.cyan("sources")}                     Configured sources, item counts, last fetch
+  ${c.cyan("dedup")}                       Cross-source duplicates, Verge post-id dups, tombstones, resurrections
   ${c.cyan("bsky-rich [kind]")}            Find Bluesky items with rich content
                                 ${c.dim("kinds: images video external quoted reply repost")}
   ${c.cyan("html [path]")}                 Fetch live page, count rendered structures
@@ -575,6 +682,7 @@ const COMMANDS = {
   items,
   item,
   sources,
+  dedup,
   "bsky-rich": bskyRich,
   html,
   logs,

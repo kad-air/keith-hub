@@ -55,7 +55,7 @@ export default function ReadClient({ initialItems }: ReadClientProps) {
     a.remove();
     // Bump consumed_at so re-opening moves the item to the top of /read.
     try {
-      await fetch(`/api/items/${item.id}/open`, { method: "POST" });
+      await fetch(`/api/items/${item.id}/open`, { method: "POST", keepalive: true });
     } catch {
       // best effort
     }
@@ -71,7 +71,7 @@ export default function ReadClient({ initialItems }: ReadClientProps) {
       )
     );
     try {
-      await fetch(`/api/items/${item.id}/save`, { method: "POST" });
+      await fetch(`/api/items/${item.id}/save`, { method: "POST", keepalive: true });
     } catch (err) {
       console.error("[ReadClient] Save error:", err);
     }

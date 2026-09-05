@@ -57,7 +57,7 @@ export default function SavedClient({ initialItems }: SavedClientProps) {
       // Opening from /saved does NOT remove the item — saved is its own pile.
       // But we DO record the consume so it shows up in /read too.
       try {
-        await fetch(`/api/items/${item.id}/open`, { method: "POST" });
+        await fetch(`/api/items/${item.id}/open`, { method: "POST", keepalive: true });
       } catch {
         // best effort
       }
@@ -70,7 +70,7 @@ export default function SavedClient({ initialItems }: SavedClientProps) {
     async (item: Item) => {
       removeFromList(item.id);
       try {
-        await fetch(`/api/items/${item.id}/save`, { method: "POST" });
+        await fetch(`/api/items/${item.id}/save`, { method: "POST", keepalive: true });
       } catch (err) {
         console.error("[SavedClient] Save toggle error:", err);
       }
