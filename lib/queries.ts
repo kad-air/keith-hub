@@ -246,38 +246,124 @@ export function pruneExpiredUnread(db: Database.Database): number {
     total += bskyTargetIds.length;
   }
 
-  // Universal expiry: after 7 days, silently drop anything the user never
-  // engaged with — i.e., read but not saved and not opened. Dismissed items
+  // Universal expiry: after retentionHours, silently drop anything the user
+  // never engaged with — read but neither saved nor opened. Dismissed items
   // and TTL-pruned items both land here. Saved or consumed items survive
   // forever (so /saved is permanent and /read is a full history).
+  //
+  // 🔴 Deleting the row also deletes the MEMORY that it was dismissed, and a
+  // feed that still carries the item re-inserts it as a fresh unread row on
+  // the next crawl — the Verge reviews feed runs ~24 days deep and podcast
+  // feeds carry every episode ever. So every deleted row leaves a tombstone
+  // in dismissed_keys, keyed the way the fetchers upsert (source_id,
+  // external_id), and the fetchers skip anything tombstoned.
+  //
+  // 🔴 Only rows whose STATE says "silently dismissed" are deleted. The
+  // previous version also dropped every item with no state row at all that
+  // was older than the retention window — i.e. every never-seen unread item
+  // in any category whose TTL is longer than retention (one Tune knob away),
+  // deleted and re-inserted under a new id on every crawl.
   const staleReadCutoff = new Date(
     Date.now() - algo.retentionHours * 3600_000
   ).toISOString();
-  const staleDeleteState = db.prepare(`
-    DELETE FROM item_state
-    WHERE read_at IS NOT NULL
-      AND read_at < ?
-      AND saved_at IS NULL
-      AND consumed_at IS NULL
-  `);
-  const staleDeleteItems = db.prepare(`
-    DELETE FROM items
-    WHERE id NOT IN (SELECT item_id FROM item_state)
-      AND id IN (
-        SELECT i.id FROM items i
-        WHERE i.published_at < ?
-      )
-  `);
-  const staleTx = db.transaction(() => {
-    staleDeleteState.run(staleReadCutoff);
-    // Items orphaned by the state delete above AND old enough to not be
-    // in-flight (still loading, waiting for first interaction) get dropped.
-    const r = staleDeleteItems.run(staleReadCutoff);
-    total += r.changes;
-  });
-  staleTx();
+  const staleRows = db
+    .prepare(
+      `SELECT i.id, i.source_id, i.external_id, ist.read_at
+       FROM item_state ist
+       JOIN items i ON i.id = ist.item_id
+       WHERE ist.read_at IS NOT NULL
+         AND ist.read_at < ?
+         AND ist.saved_at IS NULL
+         AND ist.consumed_at IS NULL`
+    )
+    .all(staleReadCutoff) as Array<{
+    id: string;
+    source_id: string;
+    external_id: string | null;
+    read_at: string;
+  }>;
+  if (staleRows.length > 0) {
+    const tombstone = db.prepare(`
+      INSERT INTO dismissed_keys (source_id, external_id, dismissed_at, reason)
+      VALUES (?, ?, ?, 'dismissed')
+      ON CONFLICT(source_id, external_id) DO UPDATE SET
+        dismissed_at = excluded.dismissed_at,
+        reason = 'dismissed'
+    `);
+    const deleteState = db.prepare(`DELETE FROM item_state WHERE item_id = ?`);
+    const deleteItem = db.prepare(`DELETE FROM items WHERE id = ?`);
+    const staleTx = db.transaction((rows: typeof staleRows) => {
+      for (const r of rows) {
+        if (r.external_id) tombstone.run(r.source_id, r.external_id, r.read_at);
+        deleteState.run(r.id);
+        deleteItem.run(r.id);
+      }
+    });
+    staleTx(staleRows);
+    total += staleRows.length;
+  }
 
   return total;
+}
+
+/**
+ * The tombstoned (source_id, external_id) keys for one source: items the
+ * user dismissed and retention has since hard-deleted ('dismissed'), plus
+ * copies the cross-source dedup folded into another source ('folded'). The
+ * fetchers skip every key so a feed that still carries the item can't
+ * resurrect it; pass a reason to read one kind only.
+ */
+export function loadDismissedKeys(
+  db: Database.Database,
+  sourceId: string,
+  reason?: "dismissed" | "folded"
+): Set<string> {
+  const rows = (
+    reason
+      ? db
+          .prepare(`SELECT external_id FROM dismissed_keys WHERE source_id = ? AND reason = ?`)
+          .all(sourceId, reason)
+      : db.prepare(`SELECT external_id FROM dismissed_keys WHERE source_id = ?`).all(sourceId)
+  ) as Array<{ external_id: string }>;
+  return new Set(rows.map((r) => r.external_id));
+}
+
+/**
+ * Bulk dismiss (set read_at) or bulk undo (clear read_at) for a list of item
+ * ids, in one transaction. Returns how many rows were touched.
+ *
+ * 🔴 Ids that no longer exist are IGNORED, never an error. A client can hold
+ * an id for a row the server has since replaced or removed (retention, the
+ * cross-source dedup) — the dismissal is moot, not wrong — and item_state's
+ * foreign key would otherwise fail the WHOLE batch. The client's dismiss
+ * outbox retries a failed batch until it succeeds, so a 500 here would wedge
+ * every later dismissal behind one dead id.
+ */
+export function markReadBulk(
+  db: Database.Database,
+  ids: string[],
+  opts: { unread?: boolean } = {}
+): number {
+  if (ids.length === 0) return 0;
+  const exists = db.prepare(`SELECT 1 FROM items WHERE id = ?`);
+  const live = ids.filter((id) => exists.get(id) !== undefined);
+  if (live.length === 0) return 0;
+  const now = new Date().toISOString();
+  const stmt = opts.unread
+    ? db.prepare(`UPDATE item_state SET read_at = NULL WHERE item_id = ?`)
+    : db.prepare(`
+        INSERT INTO item_state (item_id, read_at)
+        VALUES (?, ?)
+        ON CONFLICT(item_id) DO UPDATE SET read_at = excluded.read_at
+      `);
+  const tx = db.transaction((rowIds: string[]) => {
+    for (const id of rowIds) {
+      if (opts.unread) stmt.run(id);
+      else stmt.run(id, now);
+    }
+  });
+  tx(live);
+  return live.length;
 }
 
 /**

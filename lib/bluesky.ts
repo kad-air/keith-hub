@@ -1,6 +1,7 @@
 import { AtpAgent } from "@atproto/api";
 import type Database from "better-sqlite3";
 import type { SourceConfig } from "@/lib/config";
+import { loadDismissedKeys } from "@/lib/queries";
 import type {
   BlueskyMetadata,
   BlueskyImage,
@@ -368,7 +369,11 @@ export async function fetchBlueskySource(
     })
     .filter((row) => row.url && row.external_id);
 
-  insertMany(rows);
+  // Same tombstone rule as the RSS fetcher: a post the user dismissed and
+  // retention has since deleted must not come back because the feed still
+  // carries it. See the retention step of pruneExpiredUnread.
+  const dismissed = loadDismissedKeys(db, source.id);
+  insertMany(rows.filter((row) => !dismissed.has(row.external_id)));
   updateSource.run({ last_fetched_at: now, id: source.id });
 
   console.log(`[bluesky] ${source.name}: inserted ${insertedCount} new posts`);

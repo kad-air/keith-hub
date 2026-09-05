@@ -2,7 +2,7 @@ import Parser from "rss-parser";
 import type Database from "better-sqlite3";
 import { getConfig, invalidateConfig, type SourceConfig } from "@/lib/config";
 import { fetchBlueskySource } from "@/lib/bluesky";
-import { pruneExpiredUnread } from "@/lib/queries";
+import { loadDismissedKeys, pruneExpiredUnread } from "@/lib/queries";
 
 const RSS_FETCH_TIMEOUT_MS = 10_000;
 
@@ -366,7 +366,12 @@ export async function fetchRssSource(
     }];
   });
 
-  insertMany(itemsToInsert);
+  // Tombstoned keys are items the user dismissed and retention has since
+  // hard-deleted. This feed still carries them (or they wouldn't be in the
+  // list), and without this they'd come straight back as brand-new unread
+  // rows — see the retention step of pruneExpiredUnread.
+  const dismissed = loadDismissedKeys(db, source.id);
+  insertMany(itemsToInsert.filter((row) => !dismissed.has(row.external_id)));
 
   updateSource.run({ last_fetched_at: now, id: source.id });
 
@@ -374,6 +379,167 @@ export async function fetchRssSource(
     `[fetcher] ${source.name}: inserted ${insertedCount} new items`
   );
   return insertedCount;
+}
+
+// ── Cross-source dedup ──────────────────────────────────────────────────────
+//
+// The same piece can arrive through two sources. Two cases we know about:
+//
+// 1. Verge reviews. verge-full (category reading) and verge-reviews
+//    (tech_review) overlap: a review is in both, and the review copy wins
+//    because tech_review carries the higher priority. The review copy can
+//    also arrive LATER than the full-feed copy (the reviews feed is a tag,
+//    applied when the desk gets to it), by which time the full-feed row may
+//    already have been dismissed, saved or opened.
+// 2. Vergecast episodes. The Verge posts every episode as an article under
+//    /podcast/ in the full feed, and the same episode arrives through the
+//    vergecast podcast source. The podcast row wins — it is the one that
+//    opens in Apple Podcasts.
+//
+// 🔴 Whatever the user already did to the losing row MOVES to the winner
+// before the loser is deleted. The first version deleted the full-feed row
+// AND its item_state, so a review dismissed in Reading came back unread in
+// Tech Review the moment it was tagged (and a saved one vanished from
+// /saved). read_at/saved_at/consumed_at/notes are copied wherever the winner
+// has none; the winner's own state is never downgraded. A full-feed twin
+// that was dismissed so long ago that retention already tombstoned it still
+// counts: the review copy is born read.
+//
+// 🔴 Matching is by WordPress post id, not by URL. Both Verge feeds carry
+// the post id in the guid (`https://www.theverge.com/?p=990658`) and in the
+// link path (`/tech/990658/slug`); the section prefix and the slug can be
+// edited after publication, and the items upsert never rewrites `url`, so
+// exact-URL matching (the first version) missed exactly the rows that had
+// been touched.
+//
+// Self-healing: runs every crawl, only when both sources of a pair are in
+// the config. Exported so the build gate can drive the real thing.
+
+export function vergePostId(row: { external_id: string | null; url: string }): string | null {
+  const g = row.external_id ?? "";
+  const fromGuid = g.match(/[?&]p=(\d+)/) ?? g.match(/\/(\d{5,})(?:\/|$)/);
+  if (fromGuid) return fromGuid[1];
+  const fromUrl = row.url.match(/\/(\d{5,})\//);
+  return fromUrl ? fromUrl[1] : null;
+}
+
+interface DedupRow {
+  id: string;
+  external_id: string | null;
+  url: string;
+  title: string | null;
+}
+
+const normTitle = (t: string | null): string => (t ?? "").trim().toLowerCase();
+
+export function dedupCrossSourceDuplicates(
+  db: Database.Database,
+  config: { sources: Array<{ id: string; type: string }> }
+): { reviews: number; podcasts: number } {
+  const has = (id: string) => config.sources.some((s) => s.id === id);
+  const podcastSourceIds = config.sources
+    .filter((s) => s.type === "podcast")
+    .map((s) => s.id);
+
+  const rowsFor = (sourceId: string): DedupRow[] =>
+    db
+      .prepare(`SELECT id, external_id, url, title FROM items WHERE source_id = ?`)
+      .all(sourceId) as DedupRow[];
+
+  // Copy the loser's state onto the winner (winner's own values win), then
+  // drop the loser. One statement per step, all inside one transaction.
+  const carryState = db.prepare(`
+    INSERT INTO item_state (item_id, read_at, saved_at, consumed_at, notes)
+    SELECT ?, read_at, saved_at, consumed_at, notes FROM item_state WHERE item_id = ?
+    ON CONFLICT(item_id) DO UPDATE SET
+      read_at = COALESCE(item_state.read_at, excluded.read_at),
+      saved_at = COALESCE(item_state.saved_at, excluded.saved_at),
+      consumed_at = COALESCE(item_state.consumed_at, excluded.consumed_at),
+      notes = COALESCE(item_state.notes, excluded.notes)
+  `);
+  const deleteState = db.prepare(`DELETE FROM item_state WHERE item_id = ?`);
+  const deleteItem = db.prepare(`DELETE FROM items WHERE id = ?`);
+  const bornRead = db.prepare(`
+    INSERT INTO item_state (item_id, read_at) VALUES (?, ?)
+    ON CONFLICT(item_id) DO UPDATE SET read_at = COALESCE(item_state.read_at, excluded.read_at)
+  `);
+  // The loser's key is tombstoned as 'folded' so the feed that still carries
+  // it (the full feed, for ~2 days) doesn't re-insert it — and re-count it as
+  // a new item — on every crawl until it ages out.
+  const tombstoneFolded = db.prepare(`
+    INSERT INTO dismissed_keys (source_id, external_id, dismissed_at, reason)
+    VALUES (?, ?, ?, 'folded')
+    ON CONFLICT(source_id, external_id) DO NOTHING
+  `);
+  const resolve = db.transaction(
+    (pairs: Array<{ winner: string; loser: DedupRow; loserSource: string }>) => {
+      const now = new Date().toISOString();
+      for (const { winner, loser, loserSource } of pairs) {
+        carryState.run(winner, loser.id);
+        deleteState.run(loser.id);
+        deleteItem.run(loser.id);
+        if (loser.external_id) tombstoneFolded.run(loserSource, loser.external_id, now);
+      }
+    }
+  );
+
+  let reviews = 0;
+  let podcasts = 0;
+
+  if (has("verge-full") && has("verge-reviews")) {
+    const reviewByPost = new Map<string, DedupRow>();
+    for (const r of rowsFor("verge-reviews")) {
+      const pid = vergePostId(r);
+      if (pid) reviewByPost.set(pid, r);
+    }
+    const pairs: Array<{ winner: string; loser: DedupRow; loserSource: string }> = [];
+    for (const f of rowsFor("verge-full")) {
+      const pid = vergePostId(f);
+      const winner = pid ? reviewByPost.get(pid) : undefined;
+      if (winner) pairs.push({ winner: winner.id, loser: f, loserSource: "verge-full" });
+    }
+    resolve(pairs);
+    reviews = pairs.length;
+
+    // A review whose full-feed twin was dismissed long enough ago to have
+    // been tombstoned: inherit the dismissal instead of surfacing it again.
+    const fullTombstones = loadDismissedKeys(db, "verge-full", "dismissed");
+    if (fullTombstones.size > 0) {
+      const now = new Date().toISOString();
+      const inherit = db.transaction((rows: DedupRow[]) => {
+        for (const r of rows) {
+          if (r.external_id && fullTombstones.has(r.external_id)) bornRead.run(r.id, now);
+        }
+      });
+      inherit(rowsFor("verge-reviews"));
+    }
+  }
+
+  if (has("verge-full") && podcastSourceIds.length > 0) {
+    const placeholders = podcastSourceIds.map(() => "?").join(",");
+    const episodeByTitle = new Map<string, DedupRow>();
+    for (const r of db
+      .prepare(`SELECT id, external_id, url, title FROM items WHERE source_id IN (${placeholders})`)
+      .all(...podcastSourceIds) as DedupRow[]) {
+      const t = normTitle(r.title);
+      if (t) episodeByTitle.set(t, r);
+    }
+    const pairs: Array<{ winner: string; loser: DedupRow; loserSource: string }> = [];
+    for (const f of rowsFor("verge-full")) {
+      if (!/\/podcast\//.test(f.url)) continue;
+      const winner = episodeByTitle.get(normTitle(f.title));
+      if (winner) pairs.push({ winner: winner.id, loser: f, loserSource: "verge-full" });
+    }
+    resolve(pairs);
+    podcasts = pairs.length;
+  }
+
+  if (reviews + podcasts > 0) {
+    console.log(
+      `[fetcher] cross-source dedup: ${reviews} full-feed review(s) folded into verge-reviews, ${podcasts} episode article(s) folded into podcasts`
+    );
+  }
+  return { reviews, podcasts };
 }
 
 // Record a fetch failure on the source row. NULL last_error = healthy; the
@@ -460,6 +626,7 @@ async function fetchAllSourcesImpl(db: Database.Database): Promise<FetchSummary>
     db.prepare(`DELETE FROM item_state WHERE item_id IN (SELECT id FROM items WHERE source_id NOT IN (${placeholders}))`).run(...configIds);
     db.prepare(`DELETE FROM items WHERE source_id NOT IN (${placeholders})`).run(...configIds);
     db.prepare(`DELETE FROM sources WHERE id NOT IN (${placeholders})`).run(...configIds);
+    db.prepare(`DELETE FROM dismissed_keys WHERE source_id NOT IN (${placeholders})`).run(...configIds);
   });
 
   syncSources();
@@ -494,35 +661,7 @@ async function fetchAllSourcesImpl(db: Database.Database): Promise<FetchSummary>
     rssFetched += count;
   }
 
-  // Verge dedup: articles that appear in both verge-full and verge-reviews
-  // should only exist as tech_review (higher priority). Remove the verge-full
-  // copy so the review version wins. Self-healing — runs every cycle.
-  const hasVergeFull = config.sources.some((s) => s.id === "verge-full");
-  const hasVergeReviews = config.sources.some((s) => s.id === "verge-reviews");
-  if (hasVergeFull && hasVergeReviews) {
-    const dedup = db.transaction(() => {
-      const purgeState = db.prepare(`
-        DELETE FROM item_state WHERE item_id IN (
-          SELECT f.id FROM items f
-          WHERE f.source_id = 'verge-full'
-            AND f.url IN (SELECT r.url FROM items r WHERE r.source_id = 'verge-reviews')
-        )
-      `);
-      const purgeItems = db.prepare(`
-        DELETE FROM items
-        WHERE source_id = 'verge-full'
-          AND url IN (SELECT url FROM items WHERE source_id = 'verge-reviews')
-      `);
-      purgeState.run();
-      const result = purgeItems.run();
-      if (result.changes > 0) {
-        console.log(
-          `[fetcher] Verge dedup: removed ${result.changes} full-feed item(s) that also appear in reviews`
-        );
-      }
-    });
-    dedup();
-  }
+  dedupCrossSourceDuplicates(db, config);
 
   const blueskySources = config.sources.filter(
     (s) => s.type === "bluesky" && shouldFetch(s)

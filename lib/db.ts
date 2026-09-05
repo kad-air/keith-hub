@@ -58,6 +58,29 @@ export function getDb(): Database.Database {
     CREATE INDEX IF NOT EXISTS idx_state_saved ON item_state(saved_at) WHERE saved_at IS NOT NULL;
     CREATE INDEX IF NOT EXISTS idx_state_consumed ON item_state(consumed_at) WHERE consumed_at IS NOT NULL;
 
+    -- Tombstones for silently-dismissed items whose rows retention has
+    -- hard-deleted (pruneExpiredUnread in lib/queries.ts). A feed that still
+    -- carries the item — the Verge reviews feed runs ~24 days deep, podcast
+    -- feeds carry every episode ever — would otherwise re-insert it as a
+    -- brand-new unread row on the very next crawl: "the articles I dismissed
+    -- keep coming back". Keyed the way the fetchers upsert. The fetchers skip
+    -- anything present here; rows leave with their source when a source is
+    -- removed from config. The cross-source dedup in lib/fetcher.ts uses the
+    -- same table so a folded copy isn't re-inserted (and re-counted as "new")
+    -- on every crawl either.
+    CREATE TABLE IF NOT EXISTS dismissed_keys (
+      source_id TEXT NOT NULL,
+      external_id TEXT NOT NULL,
+      dismissed_at TEXT NOT NULL,
+      -- 'dismissed': retention deleted a silently-dismissed row.
+      -- 'folded': the cross-source dedup deleted this copy in favour of the
+      --           same piece under another source (a Verge review's full-feed
+      --           twin, a Vergecast episode's article twin). Only 'dismissed'
+      --           tombstones carry the user's verdict onto a later copy.
+      reason TEXT NOT NULL DEFAULT 'dismissed',
+      PRIMARY KEY (source_id, external_id)
+    );
+
     CREATE TABLE IF NOT EXISTS kv (
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL
