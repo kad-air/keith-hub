@@ -4,6 +4,14 @@ import AdmZip from "adm-zip";
 import { resolveSpine } from "./epubText.ts";
 import { inspectEncryption } from "./adept.ts";
 import { extractEpubMeta } from "./epubMeta.ts";
+import {
+  type LanguageVerdict,
+  detectLanguage,
+  tokenizeWords,
+  tagLanguageCode,
+  describeTag,
+  MEASURED_LANGUAGES,
+} from "./language.ts";
 
 // EPUB health: a pure read over the stored bytes that answers "is this file
 // actually a working book?" — rendered on /books/[id].
@@ -31,11 +39,12 @@ import { extractEpubMeta } from "./epubMeta.ts";
 //   red   — the file is likely broken as a book (ciphertext, no text,
 //           unreadable structure)
 //   amber — readable but degraded (mojibake, OCR damage, no chapters)
-//   info  — worth a line, not a warning (no cover, no language tag)
+//   info  — worth a line, not a warning (no cover, no language tag, a book
+//           that is not in English)
 
 /** Bump to invalidate every cached report when a check changes — improved
  *  heuristics re-run instead of trusting a stale verdict forever. */
-export const HEALTH_VERSION = 1;
+export const HEALTH_VERSION = 2;
 
 export type HealthSeverity = "red" | "amber" | "info";
 
@@ -53,6 +62,8 @@ export type HealthCode =
   | "sparse-toc"
   | "no-cover"
   | "no-language"
+  | "not-english"
+  | "language-mismatch"
   | "image-heavy"
   | "file-missing"; // emitted by healthData.ts, never by checkEpubHealth
 
@@ -377,8 +388,14 @@ export function checkEpubHealth(bytes: Buffer): EpubHealth {
   // Character-level damage, measured over the readable text only (counting a
   // ciphertext doc's noise here would drown the signal from the real prose).
   const meta = extractEpubMeta(bytes);
+  const declaredCode = tagLanguageCode(meta.language);
+  // The language verdict, when there is text to measure it on. Shared by
+  // the OCR gate below and the findings after it, so the report can never
+  // gate on one answer and print another.
+  let language: LanguageVerdict | null = null;
   if (words > 0) {
     const fullText = readable.map((d) => d.text).join("\n");
+    language = detectLanguage(tokenizeWords(fullText));
 
     const mojibake = MOJIBAKE.reduce((n, re) => n + countMatches(re, fullText), 0);
     if (mojibake > 0) {
@@ -408,8 +425,16 @@ export function checkEpubHealth(bytes: Buffer): EpubHealth {
 
     // OCR damage. Digit-in-word and split hyphens are language-neutral; the
     // scanno list and lone-letter test are English facts, so they only run
-    // when the book is English (or doesn't say).
-    const english = meta.language == null || /^en/i.test(meta.language);
+    // on an English book.
+    //
+    // 🔴 Gated on the MEASURED language, with the declared tag only as the
+    // fallback when there is too little text to measure. Gating on the tag
+    // was the original implementation and it fails in both directions on
+    // exactly the files that need it most: a Spanish novel tagged en scores
+    // a "stray single letter" on every "y" and "o" in the book, and an
+    // English novel tagged de silently skips the scanno list that would
+    // have caught its OCR damage.
+    const english = language.isEnglish ?? (declaredCode == null || declaredCode === "en");
     const digitWords = countMatches(/[a-z][01][a-z]/g, fullText);
     const hyphenBreaks = countMatches(/[a-z]- [a-z]/g, fullText);
     let scannos = 0;
@@ -485,6 +510,68 @@ export function checkEpubHealth(bytes: Buffer): EpubHealth {
         summary:
           "No language tag (dc:language) — device hyphenation and dictionary lookup may misbehave.",
       });
+    }
+
+    // Is this actually an English book? Two separate facts, at most one
+    // finding: the text is not English (info — a real fact about a library
+    // that is otherwise entirely English), or the text and the dc:language
+    // tag DISAGREE (amber — one of them is wrong, and the device trusts the
+    // tag for hyphenation and dictionary).
+    //
+    // 🔴 Silent when the verdict is null. Under MIN_WORDS_FOR_VERDICT, or in
+    // the middle band where nothing scores like prose, there is no claim to
+    // make — an unnameable book gets no accusation, and the OCR gate above
+    // quietly falls back to the declared tag.
+    if (language != null && language.isEnglish != null) {
+      const measured = language.name;
+      const enPct = `${(language.englishRate * 100).toFixed(language.englishRate < 0.1 ? 1 : 0)}%`;
+      const rates =
+        language.script != null
+          ? `${language.script} script`
+          : language.isEnglish
+            ? `${enPct} English function words`
+            : measured != null
+              ? `${(language.bestRate * 100).toFixed(0)}% ${measured} function words against ${enPct} English`
+              : `${enPct} English function words`;
+      const declaredName = meta.language != null ? describeTag(meta.language) : null;
+      // 🔴 Only ever accuse the TAG when the text can be NAMED. Text that
+      // matches no known language is far more likely to be damaged, or in a
+      // language this check cannot measure, than to be proof the tag lies —
+      // and 'tagged English, reads as some other language' claims something
+      // no measurement here supports. Unnameable text falls through to the
+      // info line below, which states only the number.
+      const nameable = language.code != null || language.script != null;
+      const tagDisagrees =
+        declaredCode != null &&
+        nameable &&
+        (language.isEnglish
+          ? declaredCode !== "en"
+          : declaredCode === "en" || (language.code != null && declaredCode !== language.code));
+
+      if (tagDisagrees) {
+        findings.push({
+          code: "language-mismatch",
+          severity: "amber",
+          summary: `Tagged ${declaredName}, but the text reads as ${
+            language.isEnglish ? "English" : (measured ?? "some other language")
+          } — ${rates}.`,
+          detail:
+            "The device picks hyphenation and dictionary lookup from the tag, so both are wrong for this book. Fix the language in Edit details.",
+        });
+      } else if (!language.isEnglish) {
+        findings.push({
+          code: "not-english",
+          severity: "info",
+          summary:
+            measured != null
+              ? `Not an English book — the text reads as ${measured} (${rates}).`
+              : `The text does not read as English prose — only ${rates}, where real English runs 40–60%.`,
+          detail:
+            measured != null
+              ? "The English-only OCR checks in this report were skipped."
+              : `It matches none of the languages this check can name (${MEASURED_LANGUAGES.join(", ")}), so it may be in another language, or the text may be damaged. The English-only OCR checks were skipped.`,
+        });
+      }
     }
     if (
       words > 0 &&

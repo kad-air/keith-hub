@@ -7,6 +7,7 @@ import type { Book } from "@/lib/books/store";
 import type { BookHistory } from "@/lib/books/statsData";
 import type { BookHealth } from "@/lib/books/healthData";
 import type { HealthSeverity } from "@/lib/books/health";
+import { needsReplacementFile } from "@/lib/books/healthRemedy";
 import type { PhraseSearchResult, PositionCandidate } from "@/lib/books/xpointer";
 import { finishLabel } from "@/lib/books/stats";
 
@@ -521,7 +522,7 @@ export default function BookDetailClient({ book, sync, history, health }: Props)
                   </li>
                 ))}
               </ul>
-              {healthState.findings.some((f) => f.severity !== "info") && (
+              {healthState.findings.some(needsReplacementFile) && (
                 <p className="mt-3 border-t border-rule/40 pt-2 text-[0.7rem] leading-relaxed text-cream-dimmer">
                   Fixing any of this means replacing the file with a better copy — which is a new
                   book with a fresh sync identity, because devices identify a book by its exact

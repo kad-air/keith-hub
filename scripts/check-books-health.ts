@@ -28,13 +28,26 @@
 //     a HEALTH_VERSION mismatch recomputes, and a missing file reports red
 //     WITHOUT being cached (a restore could bring the bytes back).
 //
+//  C. The language check (lib/books/language.ts) over REAL BOOKS, because
+//     it is the one part of the checker a self-built fixture cannot test:
+//     text assembled from the detector's own function-word lists would be
+//     verifying itself. books-fixture/language-samples.json holds passages
+//     from eleven Project Gutenberg books in seven languages, and the
+//     LABEL is Gutenberg's own catalogue header — not a judgment made in
+//     this repo and not derived from the module under test. Madame Bovary
+//     is in there twice, French original and English translation: same
+//     novel, same author, same register, so language is the only thing
+//     separating them.
+//
 // 🔴 What this gate cannot see, stated plainly: the fixtures are self-built,
 // so it proves the checker recognises the damage patterns as CONSTRUCTED
 // here — no real OCR-mangled or DRM-ghosted book can live in the repo (the
 // one would be junk to ship, the other a rights problem). The thresholds
 // (TOC_MATTERS_WORDS, the amber floors) are judgment calls pinned only at
 // the boundaries exercised below; recalibrating them against the real
-// library is legitimate and means updating both sides.
+// library is legitimate and means updating both sides. The language
+// passages are the exception — those are real books, and re-running
+// scripts/gen-language-samples.mjs re-fetches them.
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -42,6 +55,8 @@ import { createHash } from "node:crypto";
 import AdmZip from "adm-zip";
 
 import { checkEpubHealth, HEALTH_VERSION, type EpubHealth } from "../lib/books/health.ts";
+import { detectLanguage, tokenizeWords, LANGUAGE_NAMES } from "../lib/books/language.ts";
+import { needsReplacementFile } from "../lib/books/healthRemedy.ts";
 
 let failures = 0;
 function assert(cond: boolean, label: string): void {
@@ -348,9 +363,286 @@ console.log("\nOCR damage:");
   const bodies = [1, 2, 3, 4, 5, 6].map(stdBody);
   bodies[0] += `<p>${"tbe ".repeat(30)}</p>`;
   const en = checkEpubHealth(buildEpub({ chapterBodies: bodies, language: "en" }));
-  const fr = checkEpubHealth(buildEpub({ chapterBodies: bodies, language: "fr" }));
   assertCodes(en, ["ocr-artifacts"], "English scannos fire on an English book");
-  assertCodes(fr, [], "🔴 …and are language-gated: the same tokens on a French book do not");
+}
+
+// ---------------------------------------------------------------------------
+// C. The language check, against real books labelled by Project Gutenberg
+// ---------------------------------------------------------------------------
+console.log("\nlanguage (real books, labelled by Project Gutenberg):");
+
+type Sample = {
+  id: number;
+  title: string;
+  language: string;
+  script: string;
+  words: number;
+  text: string;
+};
+const SAMPLES: Sample[] = JSON.parse(
+  fs.readFileSync(
+    path.resolve(
+      path.dirname(new URL(import.meta.url).pathname),
+      "../books-fixture/language-samples.json",
+    ),
+    "utf8",
+  ),
+).samples;
+
+const sampleOf = (id: number): Sample => {
+  const s = SAMPLES.find((x) => x.id === id);
+  if (!s) throw new Error("missing language sample " + id);
+  return s;
+};
+/** dc:language tag for a Gutenberg language name. */
+const TAG_FOR: Record<string, string> = {
+  English: "en",
+  French: "fr",
+  German: "de",
+  Spanish: "es",
+  Italian: "it",
+  Portuguese: "pt",
+  Dutch: "nl",
+  Russian: "ru",
+};
+const esc = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+/** A six-chapter book whose prose is one real passage. */
+const bookOf = (sample: Sample, language: string | null) =>
+  buildEpub({
+    chapterBodies: [1, 2, 3, 4, 5, 6].map(
+      (i) => `<h1>Chapter ${i}</h1><p>${esc(sample.text)}</p>`,
+    ),
+    language,
+  });
+
+// 🔴 The anchor: the detector's answer must equal Gutenberg's catalogue label
+// on every passage. Nothing here is this codebase's opinion about what French
+// looks like.
+for (const sample of SAMPLES) {
+  const v = detectLanguage(tokenizeWords(sample.text));
+  const latin = sample.script === "Latin";
+  const got = latin ? (v.code != null ? LANGUAGE_NAMES[v.code] : (v.name ?? "(none)")) : v.script;
+  const ok = latin ? got === sample.language : v.script === sample.script;
+  assert(
+    ok,
+    `${sample.language} — ${sample.title.slice(0, 32)} reads as ${got} ` +
+      `(best ${(v.bestRate * 100).toFixed(0)}%, English ${(v.englishRate * 100).toFixed(1)}%)`,
+  );
+}
+
+// 🔴 Same novel, two languages. Topic, author and register are held constant,
+// so nothing but the language can be doing the work.
+{
+  const fr = detectLanguage(tokenizeWords(sampleOf(14155).text));
+  const en = detectLanguage(tokenizeWords(sampleOf(2413).text));
+  assert(
+    fr.code === "fr" && en.code === "en" && fr.isEnglish === false && en.isEnglish === true,
+    "🔴 Madame Bovary splits: the French original reads French, the English translation reads English",
+  );
+}
+
+console.log("\nlanguage findings:");
+{
+  const r = checkEpubHealth(bookOf(sampleOf(1342), "en"));
+  assertCodes(r, [], "🔴 a real English book, correctly tagged, is still CLEAN");
+}
+{
+  const sample = sampleOf(2000);
+  const r = checkEpubHealth(bookOf(sample, TAG_FOR[sample.language]));
+  assertCodes(r, ["not-english"], "a Spanish book, correctly tagged, gets one info line");
+  assert(r.findings[0].severity === "info", "…at info severity — it is a fact, not a fault");
+  assert(
+    /Spanish/.test(r.findings[0].summary) && /%/.test(r.findings[0].summary),
+    "…naming the language and carrying its measurement",
+  );
+}
+{
+  const r = checkEpubHealth(bookOf(sampleOf(22367), "en"));
+  assertCodes(r, ["language-mismatch"], "🔴 a German book tagged en is a MISMATCH, not a fact");
+  assert(r.findings[0].severity === "amber", "…at amber — the device trusts the tag");
+  assert(
+    /Tagged English/.test(r.findings[0].summary) && /German/.test(r.findings[0].summary),
+    "…naming both the tag and what the text actually reads as",
+  );
+}
+{
+  const r = checkEpubHealth(bookOf(sampleOf(1342), "de"));
+  assertCodes(r, ["language-mismatch"], "…and the mirror: an English book tagged de");
+  assert(
+    !/against/.test(r.findings[0].summary),
+    "…without the redundant 'English against English' phrasing",
+  );
+}
+{
+  const r = checkEpubHealth(bookOf(sampleOf(14155), null));
+  assertCodes(
+    r,
+    ["no-language", "not-english"],
+    "an untagged French book reports both facts — no tag, and not English",
+  );
+}
+{
+  const r = checkEpubHealth(bookOf(sampleOf(30774), "ru"));
+  assertCodes(r, ["not-english"], "🔴 a Cyrillic book is caught by SCRIPT, before any word list");
+  assert(/Cyrillic/.test(r.findings[0].summary), "…and names the script");
+}
+
+console.log("\n🔴 the OCR gate follows the TEXT, not the tag:");
+{
+  // The false positive this replaced. "y" and "o" are ordinary Spanish words,
+  // and the lone-letter OCR signal counts every one of them — so under the old
+  // tag-gated rule a Spanish novel mislabelled en was reported as OCR-damaged.
+  const sample = sampleOf(2000);
+  const text = sample.text.repeat(6);
+  let lone = 0;
+  for (const tok of text.split(/\s+/)) {
+    const bare = tok.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, "");
+    if (bare.length === 1 && /[b-hj-z]/.test(bare)) lone++;
+  }
+  // Assert the case is LIVE before asserting it is handled — otherwise this
+  // passes for the wrong reason the day the passage changes.
+  assert(lone >= 50, `the Spanish passage really does carry the signal (${lone} lone letters)`);
+  const r = checkEpubHealth(bookOf(sample, "en"));
+  assert(
+    !r.findings.some((f) => f.code === "ocr-artifacts"),
+    "🔴 …yet a Spanish book mislabelled en is NOT reported as OCR-damaged",
+  );
+}
+{
+  // The other direction, which a tag-gated rule fails silently: real English
+  // prose with real scannos, mislabelled as German, must still be checked.
+  const sample = sampleOf(1342);
+  const damaged: Sample = {
+    ...sample,
+    text: sample.text + " " + "tbe ".repeat(40) + "witli ".repeat(30),
+  };
+  const r = checkEpubHealth(bookOf(damaged, "de"));
+  assert(
+    r.findings.some((f) => f.code === "ocr-artifacts"),
+    "🔴 …and an English book mislabelled de still gets its scanno check",
+  );
+}
+
+console.log("\nno verdict on thin evidence:");
+{
+  // 🔴 An accusation needs a NAME. This is the repo's own committed fixture
+  // epub — 180k words of "word0 word1 word2 …", tagged `en` — so the text is
+  // 0.0% English function words while the file claims English. Amber would be
+  // asserting the tag is wrong; all this check can honestly say is the number.
+  const fixture = fs.readFileSync(
+    path.resolve(path.dirname(new URL(import.meta.url).pathname), "../books-fixture/fixture.epub"),
+  );
+  const r = checkEpubHealth(fixture);
+  const lang = r.findings.filter(
+    (f) => f.code === "not-english" || f.code === "language-mismatch",
+  );
+  assert(
+    lang.length === 1 && lang[0].code === "not-english" && lang[0].severity === "info",
+    `🔴 unnameable text tagged en states the measurement, it does not accuse the tag (got: ${JSON.stringify(lang.map((f) => f.code + "/" + f.severity))})`,
+  );
+  assert(
+    !/some other language/.test(lang[0].summary) && /0\.0%/.test(lang[0].summary),
+    "…and says only what it measured, never 'reads as some other language'",
+  );
+}
+
+{
+  // 🔴 The ambiguous band, which is what the MARGIN rule in language.ts buys.
+  // A book that is half English and half Dutch scores both in the high 20s and
+  // whichever edges ahead is a coin toss — so the honest answer is no answer.
+  // Without the margin this book is confidently declared Dutch.
+  const en = sampleOf(1342).text.split(/\s+/);
+  const nl = sampleOf(11024).text.split(/\s+/);
+  const cut = Math.floor(en.length * 0.4);
+  const mixed = en.slice(0, cut).concat(nl.slice(0, en.length - cut)).join(" ");
+  const v = detectLanguage(tokenizeWords(mixed));
+  assert(
+    v.bestRate >= 0.2 && v.bestRate / Math.max(v.englishRate, 1e-9) < 1.5,
+    `the mix really is ambiguous (English ${(v.englishRate * 100).toFixed(1)}%, ` +
+      `best ${(v.bestRate * 100).toFixed(1)}%)`,
+  );
+  assert(
+    v.isEnglish === null,
+    "🔴 a half-English, half-Dutch book gets NO verdict — a near-tie is not evidence",
+  );
+  const r = checkEpubHealth(
+    bookOf({ ...sampleOf(1342), text: mixed }, "en"),
+  );
+  assert(
+    !r.findings.some((f) => f.code === "not-english" || f.code === "language-mismatch"),
+    "…and therefore no language finding either way",
+  );
+}
+
+{
+  const words = sampleOf(14155).text.split(/\s+/).slice(0, 120).join(" ");
+  const r = checkEpubHealth(
+    buildEpub({ chapterBodies: [`<h1>One</h1><p>${esc(words)}</p>`], ncxPoints: 1, language: "en" }),
+  );
+  assert(
+    !r.findings.some((f) => f.code === "not-english" || f.code === "language-mismatch"),
+    "🔴 under MIN_WORDS_FOR_VERDICT there is NO language claim, right or wrong",
+  );
+}
+{
+  const v = detectLanguage(tokenizeWords("word ".repeat(500)));
+  assert(
+    v.isEnglish === false && v.code === null,
+    "text that is no language at all reads as not-English but is never NAMED",
+  );
+}
+
+console.log("\npurity + the remedy the card offers:");
+{
+  // 🔴 The pages.ts lesson: lib/books/health.ts imports AdmZip, so any module a
+  // CLIENT component reads must not reach it at runtime. Both of these are
+  // asserted structurally, because the failure is invisible — everything works
+  // perfectly and only the bundle size ever says so.
+  const langSrc = fs.readFileSync(
+    path.resolve(path.dirname(new URL(import.meta.url).pathname), "../lib/books/language.ts"),
+    "utf8",
+  );
+  const runtimeImports = (src: string) =>
+    (src.match(/^\s*import\s+(?!type\b)[^\n]*$/gm) ?? []).filter((l) => !/^\s*import\s+type\b/.test(l));
+  assert(
+    runtimeImports(langSrc).length === 0,
+    `🔴 language.ts imports NOTHING at runtime (got: ${JSON.stringify(runtimeImports(langSrc))})`,
+  );
+
+  const remedySrc = fs.readFileSync(
+    path.resolve(path.dirname(new URL(import.meta.url).pathname), "../lib/books/healthRemedy.ts"),
+    "utf8",
+  );
+  assert(
+    runtimeImports(remedySrc).length === 0,
+    `🔴 healthRemedy.ts imports NOTHING at runtime — a client component reads it (got: ${JSON.stringify(runtimeImports(remedySrc))})`,
+  );
+}
+{
+  // 🔴 The card's standing advice is "replace the file, which is a new book
+  // with a fresh sync identity". That is right for damaged BYTES and wrong for
+  // a wrong language tag, which Edit details fixes for free.
+  const mismatch = checkEpubHealth(bookOf(sampleOf(22367), "en")).findings[0];
+  assert(
+    mismatch.code === "language-mismatch" && !needsReplacementFile(mismatch),
+    "🔴 a language mismatch does NOT tell the reader to replace a perfectly good file",
+  );
+  assert(
+    /Edit details/.test(mismatch.detail ?? ""),
+    "…it points at the metadata editor instead",
+  );
+  const bodies = [1, 2, 3, 4, 5, 6].map(stdBody);
+  bodies[1] += `<p>${(MOJI_RSQUO + " ").repeat(12)}</p>`;
+  const damaged = checkEpubHealth(buildEpub({ chapterBodies: bodies })).findings[0];
+  assert(
+    damaged.code === "mojibake" && needsReplacementFile(damaged),
+    "…while damaged bytes still do",
+  );
+  const info = checkEpubHealth(bookOf(sampleOf(2000), "es")).findings[0];
+  assert(
+    info.severity === "info" && !needsReplacementFile(info),
+    "…and an info-tier fact never asks for anything",
+  );
 }
 
 console.log("\nchapters:");
