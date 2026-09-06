@@ -44,7 +44,7 @@ import {
 
 /** Bump to invalidate every cached report when a check changes — improved
  *  heuristics re-run instead of trusting a stale verdict forever. */
-export const HEALTH_VERSION = 2;
+export const HEALTH_VERSION = 3;
 
 export type HealthSeverity = "red" | "amber" | "info";
 
@@ -100,9 +100,9 @@ const SPARSE_TEXT_WORDS = 1_000;
 const NOISE_AMBER_COUNT = 10;
 /** OCR signals: ignore fewer than this (dialect, stylistic oddities). */
 const OCR_MIN_TOTAL = 5;
-/** OCR signals: amber at this rate per 10k words, or at 50+ total. */
+/** OCR signals: amber at this rate per 10k words. Deliberately NOT also an
+ *  absolute count — see the severity line below. */
 const OCR_AMBER_PER_10K = 5;
-const OCR_AMBER_TOTAL = 50;
 /** image-heavy: file at least this big AND this many bytes per word. */
 const IMAGE_HEAVY_MIN_BYTES = 5 * 1024 * 1024;
 const IMAGE_HEAVY_BYTES_PER_WORD = 150;
@@ -180,6 +180,63 @@ function countArtifactChars(text: string): number {
     else if (c >= 0xe000 && c <= 0xf8ff) n++;
   }
   return n;
+}
+
+/** Spine documents that must carry the stray-letter signal before it counts
+ *  as damage rather than subject matter. Below this many, a book is too few
+ *  files for "spread" to mean anything and the share test is skipped. */
+const STRAY_MIN_DOCS = 8;
+/** 🔴 Share of documents that must show stray letters. MEASURED on a real
+ *  book: The Return of the King carries 104 of them and 94 sit in ONE file —
+ *  Appendix E, "Writing and Spelling", an essay whose SUBJECT is individual
+ *  letters ("C has always the value of k even before e and i"). 7 of its 132
+ *  documents show the signal, 5%. A scanned book is damaged in every chapter,
+ *  not in one appendix, so spread is what separates damage from subject. */
+const STRAY_MIN_DOC_SHARE = 0.25;
+
+/**
+ * Stray single letters — the weakest of the four OCR signals and the one that
+ * false-positives on perfectly good books, so it is the one with rules.
+ *
+ * 🔴 Every exclusion here came from a real file (Return of the King, 210k
+ * words), which reported 278 "OCR-style artifacts" and had NO OCR damage at
+ * all. What it actually had:
+ *   - 78 abbreviations and elisions — "see p. 1351", "c . 1600" (circa),
+ *     hobbit dialect "a lot o' beer", "one of them 's in charge". Stripping
+ *     the trailing punctuation turned each into a bare letter. A real OCR
+ *     split ("t he") leaves NO punctuation attached, so requiring a bare
+ *     token costs the true signal nothing.
+ *   - 96 more of the `c .` form, where this file's typesetting puts a space
+ *     before the period, so the abbreviation arrives as two tokens.
+ *   - 94 in Appendix E, which discusses letters AS letters.
+ * Measured after these rules: real English prose (Alice, Pride and Prejudice,
+ * Madame Bovary) scores 0.0 per 10k, Return of the King scores 0, and text
+ * with one split word per 100 scores 29.
+ */
+function countStrayLetters(docs: DocText[]): number {
+  let total = 0;
+  let docsWithHits = 0;
+  for (const doc of docs) {
+    const toks = doc.text.split(/\s+/);
+    let hits = 0;
+    toks.forEach((tok, i) => {
+      const bare = tok.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, "");
+      if (bare.length !== 1 || !/[b-hj-z]/.test(bare)) return;
+      // Punctuation attached => an abbreviation ("p.") or an elision ("o'"),
+      // not a letter stranded by a broken scan.
+      if (tok !== bare) return;
+      // The same abbreviation with a space before its stop ("c . 1600").
+      if (/^[.,]$/.test(toks[i + 1] ?? "")) return;
+      hits++;
+    });
+    if (hits > 0) docsWithHits++;
+    total += hits;
+  }
+  // 🔴 Concentrated in a file or two => subject matter, not damage.
+  if (docs.length >= STRAY_MIN_DOCS && docsWithHits / docs.length < STRAY_MIN_DOC_SHARE) {
+    return 0;
+  }
+  return total;
 }
 
 function per10k(count: number, words: number): number {
@@ -441,10 +498,7 @@ export function checkEpubHealth(bytes: Buffer): EpubHealth {
     let loneLetters = 0;
     if (english) {
       scannos = countMatches(SCANNO_WORDS, fullText);
-      for (const tok of fullText.split(/\s+/)) {
-        const bare = tok.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, "");
-        if (bare.length === 1 && /[b-hj-z]/.test(bare)) loneLetters++;
-      }
+      loneLetters = countStrayLetters(readable);
     }
     const ocrTotal = digitWords + hyphenBreaks + scannos + loneLetters;
     if (ocrTotal >= OCR_MIN_TOTAL) {
@@ -456,10 +510,11 @@ export function checkEpubHealth(bytes: Buffer): EpubHealth {
       ].filter((p): p is string => p != null);
       findings.push({
         code: "ocr-artifacts",
-        severity:
-          ocrTotal >= OCR_AMBER_TOTAL || per10k(ocrTotal, words) >= OCR_AMBER_PER_10K
-            ? "amber"
-            : "info",
+        // 🔴 Severity is a RATE, never an absolute count. The old rule was
+        // `total >= 50 || rate >= 5`, and the absolute half made EVERY long
+        // book amber on its own length: 50 hits in a 210k-word book is 2.4
+        // per 10k, which is nothing.
+        severity: per10k(ocrTotal, words) >= OCR_AMBER_PER_10K ? "amber" : "info",
         summary: `${ocrTotal.toLocaleString()} OCR-style artifacts — ${fmtRate(ocrTotal, words)} per 10k words. Likely a scanned or re-ripped source.`,
         detail: parts.join(" · ") + ".",
       });

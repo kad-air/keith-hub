@@ -592,6 +592,91 @@ console.log("\nno verdict on thin evidence:");
   );
 }
 
+console.log("\n🔴 stray single letters — the signal that cried wolf on Tolkien:");
+// Provenance: The Return of the King (210,909 words) reported 278 "OCR-style
+// artifacts" at 13 per 10k and was DEGRADED on the card, with no OCR damage in
+// it at all. The book cannot live in this repo, so the three shapes that
+// produced those 278 are reproduced here on real Gutenberg prose, and the
+// numbers in the assertions below are the ones measured on the real file.
+const enBook = sampleOf(1342).text;
+/** N chapters of real English prose, chapter 1 optionally replaced. */
+const chapters = (n: number, first?: string) =>
+  Array.from({ length: n }, (_, i) => `<p>${esc(i === 0 && first ? first : enBook)}</p>`);
+const ocrOf = (bodies: string[]) =>
+  checkEpubHealth(buildEpub({ chapterBodies: bodies })).findings.find(
+    (f) => f.code === "ocr-artifacts",
+  );
+
+{
+  // Appendix E, "Writing and Spelling", discusses letters AS letters: 94 of the
+  // real book's hits sat in that ONE file, 7 of 132 documents in total.
+  const lettersEssay =
+    "The consonant c has always the value of k even before e and i as in celeb " +
+    "and the sound g is as in bulge while d is related to t and n to r throughout. ";
+  const r = ocrOf(chapters(12, lettersEssay.repeat(30)));
+  assert(
+    r === undefined,
+    `🔴 letters discussed AS letters in one appendix is SUBJECT MATTER, not a scanned book (got: ${r?.summary ?? "clean"})`,
+  );
+}
+{
+  // "see p. 1351", "c . 1600" (circa, spaced period in that file's typesetting),
+  // and hobbit dialect "a lot o' beer" / "one of them 's in charge".
+  const abbrevAndDialect =
+    "It was about the end o' last year, see p. 1351 and Vol. I p. 6 for the tale. " +
+    "c . 1600 Sauron forges the One Ring, and one of them 's in charge at the Tower now. ";
+  // 🔴 In EVERY chapter, not one. The real book's dialect and page references
+  // run right through it (chapters 11, 12, 17, 18 and three appendices), so a
+  // one-chapter fixture would be zeroed by the concentration rule and this
+  // case would pass without the punctuation exclusions doing any work at all.
+  const r = ocrOf(
+    Array.from(
+      { length: 12 },
+      () => `<p>${esc(enBook)}</p><p>${esc(abbrevAndDialect.repeat(20))}</p>`,
+    ),
+  );
+  assert(
+    r === undefined,
+    `🔴 abbreviations and dialect elision are not stray letters (got: ${r?.summary ?? "clean"})`,
+  );
+}
+{
+  // The signal must still work. Real prose, split after the first letter in
+  // EVERY chapter — which is what a bad scan actually looks like.
+  const split = (t: string, every: number) => {
+    const w = t.split(/\s+/);
+    const out: string[] = [];
+    w.forEach((x, i) => {
+      if (i % every === 0 && x.length > 3 && /[b-hj-z]/.test(x[0])) out.push(x[0], x.slice(1));
+      else out.push(x);
+    });
+    return out.join(" ");
+  };
+  const damaged = Array.from({ length: 12 }, () => `<p>${esc(split(enBook, 50))}</p>`);
+  const r = ocrOf(damaged);
+  assert(
+    r !== undefined && r.severity === "amber",
+    `🔴 …yet a book split in every chapter IS still caught (got: ${r?.summary ?? "MISSED"})`,
+  );
+  // And the undamaged same book stays silent, so the case is a contrast.
+  assert(ocrOf(chapters(12)) === undefined, "…while the same book undamaged is silent");
+}
+{
+  // 🔴 Severity is a rate. The old rule was `total >= 50 || rate >= 5`, so any
+  // long book went amber on its own length — 60 hits in 200k words is 3 per 10k.
+  // 160 chapters of real prose is ~128k words, so 60 hits is 4.7 per 10k —
+  // under the amber rate, but over the old absolute count of 50.
+  const withHyphens = `<p>${esc(enBook)}</p><p>${"ex- ample ".repeat(60)}</p>`;
+  const long = [withHyphens, ...chapters(160).slice(1)];
+  const r = ocrOf(long);
+  const words = checkEpubHealth(buildEpub({ chapterBodies: long })).stats.words;
+  assert(words > 120_000, `the long-book case really is long (${words.toLocaleString()} words)`);
+  assert(
+    r !== undefined && r.severity === "info",
+    `🔴 60 hits in a 128k-word book is a LOW RATE (4.7/10k) — info, never amber on count alone (got: ${r?.severity ?? "clean"})`,
+  );
+}
+
 console.log("\npurity + the remedy the card offers:");
 {
   // 🔴 The pages.ts lesson: lib/books/health.ts imports AdmZip, so any module a

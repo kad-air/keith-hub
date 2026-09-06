@@ -543,8 +543,8 @@ message saying to download it again, because that is the actual fix.
 disagree), ciphertext spine documents (🔴 the retroactive sweep for ghosts ingested BEFORE the
 upload-time DRM gate existed — the "34-page" failure with no error surface), no/sparse text,
 mojibake (UTF-8 read as Latin-1), artifact characters (U+FFFD / controls / private-use),
-OCR damage (digit-in-word, split hyphens, scanno tokens — the English-only signals are gated on
-the MEASURED language, see below), a book that **is not in English** (or whose text and
+OCR damage (digit-in-word, split hyphens, scanno tokens, stray single letters — the English-only
+signals are gated on the MEASURED language, and the stray-letter one has its own rules, below), a book that **is not in English** (or whose text and
 `dc:language` disagree), and a missing/sparse TOC (flagged only on books ≥10k words; a short story doesn't
 need chapters). Findings are red/amber/info, each a MEASUREMENT with its number, and one red
 cause suppresses the downstream noise (a ciphertext book doesn't also nag about covers). Healthy
@@ -582,6 +582,37 @@ folding costs 0.2–3.1 points of the winner's rate and changes no verdict on an
 The comment now records the measurement instead of the claim. A second probe (dropping the
 near-tie MARGIN) went undetected until the check grew the mixed-language case it had never
 exercised.
+
+##### 🔴 Stray single letters — the signal that cried wolf on Tolkien
+
+The weakest of the four OCR signals, and the only one with rules, because it flagged a perfectly
+good book. **The Return of the King** (210,909 words) reported *"278 OCR-style artifacts — 13 per
+10k words. Likely a scanned or re-ripped source"* and was **DEGRADED** on the card, with no OCR
+damage in it whatsoever. What it actually had, measured:
+- **94 in Appendix E, "Writing and Spelling"** — an essay whose SUBJECT is individual letters
+  ("C has always the value of k even before e and i"). One file of 132.
+- **~96 of the `c .` form** — circa in the chronology tables, where this file's typesetting puts a
+  space before the period, so the abbreviation arrives as two tokens.
+- **78 abbreviations and elisions** — "see p. 1351", "Vol. I p. 6", hobbit dialect "a lot o' beer",
+  "one of them 's in charge". Stripping trailing punctuation turned each into a bare letter.
+- A few of Sindarin's `o` ("silivren penna míriel o menel").
+
+Three rules now, each measured (`countStrayLetters`): the token must be **bare** (a real OCR split,
+"t he", leaves no punctuation attached, so this costs the true signal nothing); a letter followed by
+a lone `.`/`,` is an abbreviation; and 🔴 **the hits are ignored entirely when CONCENTRATED** —
+a scan is damaged in every chapter, an appendix about letters is damaged in one, so
+`STRAY_MIN_DOC_SHARE` (25% of spine documents, applied only at `STRAY_MIN_DOCS` = 8+) is what
+separates damage from subject matter. Return of the King showed the signal in **7 of 132 documents**.
+
+Measured after the fix: real English prose (Alice, Pride and Prejudice, Madame Bovary) **0.0 per
+10k**, Return of the King **0 findings**, and a book split once per 100 words in every chapter
+**29 per 10k**, still amber. 🔴 **The accepted cost, stated: damage confined to one chapter of a
+dozen is now missed.** Better than calling Tolkien a bad scan.
+
+🔴 **Severity is a RATE, never an absolute count.** The old rule was `total >= 50 || rate >= 5`, and
+the absolute half made every long book amber on its own length — 50 hits in a 210k-word book is 2.4
+per 10k, which is nothing. `OCR_AMBER_TOTAL` is gone; `check:books:health` pins a 128k-word book
+with 60 hits at **info**.
 
 ##### Is this actually an English book?
 
