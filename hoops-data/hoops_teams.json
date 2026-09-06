@@ -1,6 +1,6 @@
 {
   "avg_poss_per_team_game": 99.5041,
-  "generated_at": "2026-09-04T01:15:13.980499+00:00",
+  "generated_at": "2026-09-06T17:46:47.494989+00:00",
   "hca_pts": 1.9564,
   "minutes_model": "depth_chart",
   "minutes_model_note": "roster/blend ratings are priced with the Depth Chart allocator (the fitted rotation curve blended into each man's own expected minutes at depth_chart_w, then renormalized to 240) -- the same allocator contract.features declares as depth_chart_minutes, so a locally recomputed 'before + delta' matches the shipped 'after'.",

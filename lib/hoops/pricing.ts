@@ -80,6 +80,15 @@ export interface PricingConstants {
    *  key all share that last value. */
   depth_chart_w?: number;
   depth_chart_curve?: Record<string, number>;
+  /** hub-v3, `goto_scorer` only (hoops-sim issue #73). `star_goto_premium` is
+   *  points of team margin a game per unit of the leading scorer's share of
+   *  his team's projected points; the share is clamped to
+   *  `star_goto_share_band` ([floor, ceiling]) and the charge is measured from
+   *  `star_goto_league_share`. All three ship unconditionally (the depth-chart
+   *  rule) and are only READ when the token is declared. */
+  star_goto_premium?: number;
+  star_goto_league_share?: number;
+  star_goto_share_band?: readonly [number, number] | number[];
 }
 
 export interface PricingPlayer {
@@ -108,6 +117,10 @@ export interface PricingPlayer {
    *  there is no history. A fictional add must say `false` explicitly — he has
    *  stated minutes and no history, and nothing else can tell the two apart. */
   has_history?: boolean;
+  /** hub-v3, `goto_scorer`: his points per 36 in his own most recent season
+   *  with games. null/absent -> he contributes NOTHING to the team's projected
+   *  points (never a league default), exactly as on the hoops-sim side. */
+  pts_per36?: number | null;
 }
 
 export interface AllocationResult {
@@ -367,6 +380,11 @@ export interface RawStrengthResult {
   rawTilt: number;
   ghostMinutes: number;
   shares: Map<number, number>;
+  /** hub-v3, `goto_scorer`: the leading man's RAW (unclamped) share of the
+   *  team's projected points, and the charge added to rawStrength. Both 0 when
+   *  the term is off or nobody on the floor has a scoring rate. */
+  gotoShare: number;
+  gotoCredit: number;
 }
 
 /** Which of the hub-v2 pricing paths to take. Resolved from the bundle's
@@ -375,6 +393,8 @@ export interface RawStrengthResult {
 export interface PricingOptions {
   split?: boolean;
   depthChart?: boolean;
+  /** hub-v3: the go-to-scorer term. Omitted is off, bit-identical to v2. */
+  goto?: boolean;
 }
 
 /**
@@ -399,13 +419,16 @@ export function rawTeamStrength(
   const budget = constants.total_team_minutes;
   const split = options?.split === true;
   const depthChart = options?.depthChart === true;
+  const goto = options?.goto === true;
   const raw = new Map<number, number>();
   const values = new Map<number, number>();
   const tilts = new Map<number, number>();
+  const pts36 = new Map<number, number>();
   const hasHistory = new Set<number>();
   for (const p of players) {
     raw.set(p.athlete_id, p.raw_minutes ?? constants.bench_default_minutes);
     if (p.value_per36 != null) values.set(p.athlete_id, p.value_per36);
+    if (p.pts_per36 != null) pts36.set(p.athlete_id, p.pts_per36);
     if (p.value_off_per36 != null && p.value_def_per36 != null) {
       tilts.set(p.athlete_id, p.value_off_per36 - p.value_def_per36);
     }
@@ -456,7 +479,7 @@ export function rawTeamStrength(
     // through to replacement_per36, so no special case is needed here.
   }
 
-  const rawStrength = sideValue(participantIds, shares, valueOf, budget);
+  let rawStrength = sideValue(participantIds, shares, valueOf, budget);
   // THE SPLIT: the SAME participants, the SAME shares, the SAME formula —
   // only the per-player quantity changes (net -> offence-minus-defence). Not
   // called at all when the split is off, which is what keeps a v1 bundle's
@@ -466,7 +489,53 @@ export function rawTeamStrength(
     ? sideValue(participantIds, shares, (id) => tilts.get(id) ?? replacementTilt, budget)
     : 0;
 
-  return { rawStrength, rawTilt, ghostMinutes, shares };
+  // THE GO-TO SCORER (hub-v3, hoops-sim issue #73 —
+  // `rosterratings.raw_team_strength`'s goto block, ported line for line).
+  // Five men who each score fifteen are not the same team as one who scores
+  // twenty-five and four who score twelve. Each man on the floor is projected
+  // to score his pts_per36 over his ALLOCATED minutes; the leading share is
+  // the biggest projection over the team's; the charge is the premium times
+  // that share's distance from the league reference, with the share clamped
+  // to the band. Added to the NET only — the tilt (game totals) is untouched,
+  // so `off + def` is bit-identical with the term on or off. A man with no
+  // scoring rate contributes nothing (the ghost never has one). Not touched at
+  // all when the token is off, which is what keeps a v2 bundle bit-identical.
+  let gotoShare = 0;
+  let gotoCredit = 0;
+  if (goto) {
+    const gamma = constants.star_goto_premium;
+    const leagueShare = constants.star_goto_league_share;
+    const band = constants.star_goto_share_band;
+    if (typeof gamma !== "number" || typeof leagueShare !== "number" || !band || band.length !== 2) {
+      throw new Error(
+        "pricing: goto_scorer is in force but star_goto_premium / star_goto_league_share / " +
+          "star_goto_share_band are missing from the wire constants — contract.checkFeatureConstants " +
+          "should have rejected this bundle before it got here",
+      );
+    }
+    const proj: number[] = [];
+    for (const id of participantIds) {
+      const rate = pts36.get(id);
+      const share = shares.get(id);
+      if (rate == null || share == null) continue;
+      proj.push((rate * share) / 36);
+    }
+    if (proj.length > 0) {
+      // hoops-sim sums the projections in ASCENDING order so two implementations
+      // agree to the last bit; the max is order-free.
+      const ascending = [...proj].sort((a, b) => a - b);
+      let total = 0;
+      for (const v of ascending) total += v;
+      if (total > 0) {
+        gotoShare = Math.max(...proj) / total;
+        const clamped = Math.min(Math.max(gotoShare, band[0]), band[1]);
+        gotoCredit = gamma * (clamped - leagueShare);
+        rawStrength = rawStrength + gotoCredit;
+      }
+    }
+  }
+
+  return { rawStrength, rawTilt, ghostMinutes, shares, gotoShare, gotoCredit };
 }
 
 export interface NetRatingResult {
@@ -479,6 +548,9 @@ export interface NetRatingResult {
   tilt: number;
   rawStrength: number;
   ghostMinutes: number;
+  /** hub-v3: see RawStrengthResult. */
+  gotoShare: number;
+  gotoCredit: number;
 }
 
 /**
@@ -512,10 +584,10 @@ export function teamNetRating(
   options?: PricingOptions,
   leagueRecenterTilt = 0,
 ): NetRatingResult {
-  const { rawStrength, rawTilt, ghostMinutes } = rawTeamStrength(
+  const { rawStrength, rawTilt, ghostMinutes, gotoShare, gotoCredit } = rawTeamStrength(
     players, constants, absentRaw, options,
   );
   const net = rawStrength - leagueRecenter;
   const tilt = options?.split === true ? rawTilt - leagueRecenterTilt : 0;
-  return { ...splitOffDef(net, tilt), net, tilt, rawStrength, ghostMinutes };
+  return { ...splitOffDef(net, tilt), net, tilt, rawStrength, ghostMinutes, gotoShare, gotoCredit };
 }

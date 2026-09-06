@@ -29,7 +29,7 @@ import crypto from "crypto";
  *  are not). Rule 4 is one-directional: a bundle at pricing_version 1 still
  *  imports and is still priced by the v1 formula, unchanged. */
 export const SUPPORTED_WIRE_VERSION = 1;
-export const SUPPORTED_PRICING_VERSION = 2;
+export const SUPPORTED_PRICING_VERSION = 3;
 
 /**
  * Every feature token this receiver implements. 🔴 The spelling is a
@@ -45,6 +45,12 @@ export const SUPPORTED_PRICING_VERSION = 2;
  *   nightly_strength    v2 — prefer the last-ten-games team read for pricing
  *   absorption          a departed man's minutes partly go to a replacement
  *   fictional_values    a declared per-36 value is honoured unconverted
+ *   goto_scorer         v3 — a team built around one big scorer is worth more
+ *                       than its five men summed (hoops-sim issue #73): add
+ *                       star_goto_premium x (clamp(leading scorer's share of
+ *                       projected points) - star_goto_league_share) to the raw
+ *                       strength, the share projected from each man's
+ *                       pts_per36 over his allocated minutes
  */
 export const SUPPORTED_FEATURES: ReadonlySet<string> = new Set([
   "symmetric_off_def",
@@ -53,6 +59,7 @@ export const SUPPORTED_FEATURES: ReadonlySet<string> = new Set([
   "nightly_strength",
   "absorption",
   "fictional_values",
+  "goto_scorer",
 ]);
 
 /**
@@ -68,6 +75,7 @@ export const SUPPORTED_FEATURES: ReadonlySet<string> = new Set([
 export const FEATURE_CONSTANTS: Readonly<Record<string, readonly string[]>> = {
   split_off_def: ["replacement_tilt_per36"],
   depth_chart_minutes: ["depth_chart_w", "depth_chart_curve"],
+  goto_scorer: ["star_goto_premium", "star_goto_league_share", "star_goto_share_band"],
 };
 
 /**
@@ -89,6 +97,8 @@ export interface PricingMode {
   depthChart: boolean;
   /** Prefer the last-ten-games team read where the bundle carries one. */
   nightly: boolean;
+  /** v3: charge the go-to-scorer term on a roster's raw strength. */
+  goto: boolean;
 }
 
 export function pricingModeOf(features: readonly string[]): PricingMode {
@@ -96,6 +106,7 @@ export function pricingModeOf(features: readonly string[]): PricingMode {
     split: features.includes("split_off_def"),
     depthChart: features.includes("depth_chart_minutes"),
     nightly: features.includes("nightly_strength"),
+    goto: features.includes("goto_scorer"),
   };
 }
 

@@ -61,7 +61,20 @@ const V2_CONSTANTS: Record<string, unknown> = {
   depth_chart_w: 0.4,
   depth_chart_max_rank: 15,
   depth_chart_curve: { "1": 34.257, "15": 5.559 },
+  // hub-v3 (hoops-sim issue #73): shipped unconditionally like the depth-chart trio.
+  star_goto_premium: 21.2094,
+  star_goto_league_share: 0.19,
+  star_goto_share_band: [0.1, 0.5],
 };
+
+const V3_FEATURES = [
+  "split_off_def",
+  "depth_chart_minutes",
+  "nightly_strength",
+  "absorption",
+  "fictional_values",
+  "goto_scorer",
+];
 
 const V1_FEATURES = ["symmetric_off_def", "absorption", "fictional_values"];
 const V2_FEATURES = [
@@ -211,9 +224,20 @@ function negotiate(
   );
 }
 
+// ── 7b. v3: the go-to scorer negotiates through at pricing_version 3 ──────
+{
+  const rejected = negotiate(V3_FEATURES, 3, V2_CONSTANTS);
+  check(rejected === null, `the v3 contract block was rejected: ${rejected}`);
+  // …and a v2 bundle that happens to carry the three goto constants is still
+  // priced v2: the constants are inert without the token (rule 2 again).
+  const v2WithConstants = negotiate(V2_FEATURES, 2, V2_CONSTANTS);
+  check(v2WithConstants === null, `a v2 bundle carrying the goto constants was rejected: ${v2WithConstants}`);
+  notes.push("v3: goto_scorer negotiates through at pricing_version 3; its constants are inert without the token");
+}
+
 // ── 8. the sender's whole vocabulary is implemented here ──────────────────
 {
-  // 🔴 This list is hoops-sim's `exporthub.FEATURES_V1 + FEATURES_V2` — the
+  // 🔴 This list is hoops-sim's `exporthub.FEATURES_V1 + FEATURES_V3` — the
   // complete set of tokens the sender is CAPABLE of declaring. The deploy
   // order is receiver-first precisely so this can never be false: if a token
   // the sender can send is missing here, the publish that sends it takes the
@@ -225,6 +249,7 @@ function negotiate(
     "nightly_strength",
     "absorption",
     "fictional_values",
+    "goto_scorer",
   ];
   for (const token of SENDER_VOCABULARY) {
     check(

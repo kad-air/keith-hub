@@ -135,6 +135,7 @@ interface FixturePlayer {
   value_off_per36?: number | null;
   value_def_per36?: number | null;
   has_history?: boolean;
+  pts_per36?: number | null;
 }
 
 interface FixtureCase {
@@ -149,6 +150,8 @@ interface FixtureCase {
     net: number;
     tilt?: number;
     ghost_minutes?: number;
+    goto_share?: number;
+    goto_credit?: number;
   };
 }
 
@@ -192,6 +195,7 @@ if (!fixture.constants || !fixture.cases || fixture.cases.length === 0) {
       value_off_per36: p.value_off_per36,
       value_def_per36: p.value_def_per36,
       has_history: p.has_history,
+      pts_per36: p.pts_per36,
     }));
     const absentRaw = c.absent
       ? new Map(
@@ -207,7 +211,7 @@ if (!fixture.constants || !fixture.cases || fixture.cases.length === 0) {
       fixture.constants,
       fixture.league_recenter,
       absentRaw,
-      { split: mode.split, depthChart: mode.depthChart },
+      { split: mode.split, depthChart: mode.depthChart, goto: mode.goto },
       fixture.league_recenter_tilt ?? 0,
     );
 
@@ -243,6 +247,22 @@ if (!fixture.constants || !fixture.cases || fixture.cases.length === 0) {
     }
     if (!mode.split && result.tilt !== 0) {
       fail(`case "${c.name}": symmetric pricing must give tilt exactly 0, got ${result.tilt}`);
+    }
+    // hub-v3: the go-to-scorer term is gated by the contract and lands on the
+    // net only. A case without the token must read exactly 0 credit even when
+    // its players carry pts_per36 (the "declared off" witness); a case with it
+    // must reproduce hoops-sim's own share and credit, and the credit must be
+    // the whole difference between raw_strength and the minutes-weighted sum.
+    if (!mode.goto && result.gotoCredit !== 0) {
+      fail(`case "${c.name}": goto_scorer not declared, but the port charged ${result.gotoCredit}`);
+    }
+    if (c.expected.goto_credit != null) {
+      if (!close(result.gotoCredit + 1, c.expected.goto_credit + 1)) {
+        fail(`case "${c.name}": goto_credit ${result.gotoCredit} vs hoops-sim ${c.expected.goto_credit}`);
+      }
+      if (!close(result.gotoShare + 1, (c.expected.goto_share ?? 0) + 1)) {
+        fail(`case "${c.name}": goto_share ${result.gotoShare} vs hoops-sim ${c.expected.goto_share}`);
+      }
     }
 
     // The backward-compatibility pins.

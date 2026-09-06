@@ -26,9 +26,15 @@
     "ghost_athlete_id": -1,
     "playoff_alpha": 1.45,
     "replacement_percentile": 0.1,
+    "star_goto_league_share": 0.19,
+    "star_goto_premium": 21.2094,
+    "star_goto_share_band": [
+      0.1,
+      0.5
+    ],
     "total_team_minutes": 240.0
   },
-  "generated_at": "2026-09-04T01:14:13.850480+00:00",
+  "generated_at": "2026-09-06T17:45:57.958090+00:00",
   "parameter_set": {
     "avg_poss_per_team_game": 99.5041,
     "base_mean_ppp": [
@@ -1096,7 +1102,7 @@
         4.0
       ]
     ],
-    "data_as_of": "2026-09-03",
+    "data_as_of": "2026-09-06",
     "duration_bin_edges": [
       0.0,
       1.0,
@@ -8916,7 +8922,7 @@
     ],
     "efficiency_sigma": 0.0,
     "endgame_window_seconds": 180.0,
-    "fitted_at": "2026-09-04T01:14:13.850300+00:00",
+    "fitted_at": "2026-09-06T17:45:57.957895+00:00",
     "grid_ppp": [
       0.15,
       0.16,
