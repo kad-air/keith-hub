@@ -10,6 +10,12 @@ export type Section = {
   href: string;
   group: SectionGroup;
   desc?: string;
+  /**
+   * The letter after `g` that jumps here from anywhere in the hub (`g h` →
+   * Feed). One letter per section, unique — `lib/shortcuts.ts` asserts that
+   * at module load so two sections can never claim the same chord.
+   */
+  hotkey: string;
   match: (pathname: string) => boolean;
 };
 
@@ -21,6 +27,7 @@ const FEED_SECTION: Section = {
   href: "/",
   group: "Reading",
   desc: "Today's unread",
+  hotkey: "h",
   match: (p) => p === "/",
 };
 
@@ -31,6 +38,7 @@ const SAVED_SECTION: Section = {
   href: "/saved",
   group: "Reading",
   desc: "Kept for later",
+  hotkey: "s",
   match: (p) => p.startsWith("/saved"),
 };
 
@@ -41,6 +49,7 @@ const READ_SECTION: Section = {
   href: "/read",
   group: "Reading",
   desc: "Open history",
+  hotkey: "r",
   match: (p) => p.startsWith("/read"),
 };
 
@@ -51,6 +60,7 @@ const BOOKS_SECTION: Section = {
   href: "/books",
   group: "Library",
   desc: "EPUB library · OPDS · reading sync",
+  hotkey: "b",
   match: (p) => p.startsWith("/books"),
 };
 
@@ -64,6 +74,7 @@ const DISCWORLD_SECTION: Section = {
   href: "/books/discworld",
   group: "Library",
   desc: "Reading order map · synced progress",
+  hotkey: "d",
   match: (p) => p.startsWith("/books/discworld"),
 };
 
@@ -74,6 +85,7 @@ const COMICS_SECTION: Section = {
   href: "/comics",
   group: "Library",
   desc: "Marvel Unlimited",
+  hotkey: "m",
   match: (p) => p.startsWith("/comics"),
 };
 
@@ -87,6 +99,7 @@ const HOOPS_SECTION: Section = {
   href: "/hoops",
   group: "Library",
   desc: "NBA sim · matchup · box score · teams",
+  hotkey: "n",
   match: (p) => p.startsWith("/hoops"),
 };
 
@@ -97,6 +110,7 @@ const PRACTICE_SECTION: Section = {
   href: "/practice",
   group: "Guitar",
   desc: "Today · Fretboard · CAGED · Licks",
+  hotkey: "p",
   match: (p) => p.startsWith("/practice"),
 };
 
@@ -107,6 +121,7 @@ const TUNE_SECTION: Section = {
   href: "/tune",
   group: "System",
   desc: "Sources · algorithm · config",
+  hotkey: "t",
   match: (p) => p.startsWith("/tune"),
 };
 
@@ -117,6 +132,7 @@ const CHARTS_SECTION: Section = {
   href: "/charts",
   group: "Guitar",
   desc: "Chord charts · setlists · autoscroll",
+  hotkey: "c",
   match: (p) => p.startsWith("/charts"),
 };
 
@@ -133,6 +149,8 @@ export const SECTIONS: Section[] = (() => {
     href: `/trackers/${t.slug}`,
     group: "Tracking",
     desc: t.statusOptions.slice(0, 3).join(" · "),
+    // Tracking is hidden; if it ever returns, give each tracker a real letter.
+    hotkey: "",
     match: (p) =>
       p === `/trackers/${t.slug}` || p.startsWith(`/trackers/${t.slug}/`),
   }));

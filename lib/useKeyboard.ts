@@ -39,6 +39,10 @@ export function useKeyboard(shortcuts: ShortcutMap, enabled = true): void {
     }
 
     function onKeyDown(e: KeyboardEvent) {
+      // An overlay (Contents, the keyboard help) owns the keyboard while it
+      // is open. It flags the root element rather than threading a context
+      // through every client, since Masthead and the page are siblings.
+      if (document.documentElement.hasAttribute("data-kb-modal")) return;
       // Don't intercept while typing
       const target = e.target as HTMLElement | null;
       if (target) {

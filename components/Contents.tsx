@@ -14,9 +14,9 @@ const GROUP_ORDER: SectionGroup[] = [
 ];
 
 const SHORTCUT_HINTS = [
-  ["g h", "Feed"],
-  ["g s", "Saved"],
-  ["g r", "Read"],
+  ["g ·", "Jump to a section"],
+  ["[ ]", "Prev / next section"],
+  ["j k", "Walk a list"],
   ["?", "Shortcuts"],
   ["⌘ K", "Jump"],
   ["Esc", "Close"],
@@ -197,7 +197,7 @@ function ContentsRow({
       href={section.href}
       onClick={onNavigate}
       className={[
-        "group relative grid items-baseline gap-4 border-b border-rule py-4 sm:grid-cols-[56px_1fr_auto] sm:gap-6 sm:py-[18px]",
+        "group relative grid items-baseline gap-4 border-b border-rule py-4 sm:grid-cols-[56px_1fr_auto_auto] sm:gap-6 sm:py-[18px]",
         "grid-cols-[36px_1fr]",
       ].join(" ")}
     >
@@ -227,6 +227,22 @@ function ContentsRow({
           {section.desc}
         </span>
       )}
+      {/* The chord that lands here from anywhere — the same letters the
+          help overlay lists, read off the section itself. */}
+      <span className="hidden items-center gap-1 sm:inline-flex" aria-hidden>
+        {section.hotkey ? (
+          ["g", section.hotkey].map((k) => (
+            <kbd
+              key={k}
+              className="border border-rule-strong bg-ink-raised px-1.5 py-0.5 font-mono text-[0.58rem] text-cream-dim"
+            >
+              {k}
+            </kbd>
+          ))
+        ) : (
+          <span className="w-[3.2rem]" />
+        )}
+      </span>
     </Link>
   );
 }

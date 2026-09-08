@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import SectionTabKeys from "@/components/SectionTabKeys";
 import {
   anyDayDoneToday,
   getCurriculum,
@@ -65,6 +66,7 @@ export default function PracticeLandingPage() {
 
   return (
     <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6">
+      <SectionTabKeys hrefs={TILES.map((t) => t.href)} />
       <header className="mb-8">
         <p className="font-mono text-[0.7rem] uppercase tracking-kicker text-cat-practice">
           Section
@@ -115,6 +117,7 @@ export default function PracticeLandingPage() {
             <li key={t.key}>
               <Link
                 href={t.href}
+                data-kb-item
                 className="block border border-rule/60 bg-ink-raised/40 px-4 py-3 transition-colors hover:border-cat-practice/60 hover:bg-ink-raised/70"
               >
                 {Body}

@@ -16,7 +16,6 @@ import type { PlayerSort, RankedPlayer } from "@/lib/hoops/playervalue";
 import type { HoopsMeta } from "@/lib/hoops/queries";
 import { fmtSigned, teamName } from "@/lib/hoops/rating";
 import type { PlayerRow } from "@/lib/hoops/types";
-import { useKeyboard } from "@/lib/useKeyboard";
 
 interface Props {
   rows: PlayerRow[];
@@ -41,15 +40,8 @@ export default function PlayersClient({ rows, tris, meta, initialSort, initialTe
   const [query, setQuery] = useState("");
   const searchRef = useRef<HTMLInputElement | null>(null);
 
-  // "/" jumps to the search box, the way it does everywhere else on the web.
-  // useKeyboard already ignores keys typed INTO an input, so this never
-  // swallows a slash the reader meant to type in a name.
-  useKeyboard({
-    "/": () => {
-      searchRef.current?.focus();
-      searchRef.current?.select();
-    },
-  });
+  // "/" jumps to the search box: the hub-wide layer (components/GlobalKeys.tsx)
+  // focuses whichever input carries data-kb-search, so nothing is bound here.
 
   const floor = meta.rotationFloorMinutes;
 
@@ -248,6 +240,7 @@ export default function PlayersClient({ rows, tris, meta, initialSort, initialTe
 
         <input
           ref={searchRef}
+          data-kb-search
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -389,6 +382,7 @@ function PlayerLine({ p, sort }: { p: RankedPlayer; sort: PlayerSort }) {
     <li>
       <Link
         href={`/hoops/players/${p.athlete_id}`}
+        data-kb-item
         className="block border-b border-rule/40 py-2 transition-colors hover:bg-ink-raised/60"
       >
         <span className="flex items-baseline gap-1.5 sm:gap-2">

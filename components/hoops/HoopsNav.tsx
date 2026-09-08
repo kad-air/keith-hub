@@ -1,4 +1,5 @@
 import Link from "next/link";
+import SectionTabKeys from "@/components/SectionTabKeys";
 
 // 🔴 There is no global sub-tab bar to hang hoops screens off — SubBar,
 // HeaderNav and BottomNav were all removed upstream, and Masthead + Contents
@@ -60,6 +61,8 @@ export default function HoopsNav({
           </p>
         )}
       </div>
+      {/* 1 / 2 / 3 switch tabs from the keyboard (lib/shortcuts.ts lists them). */}
+      <SectionTabKeys hrefs={HOOPS_TABS.map((t) => t.href)} />
       {HOOPS_TABS.length > 1 && (
         <nav className="mt-3 flex gap-2 overflow-x-auto">
           {HOOPS_TABS.map((t) => (

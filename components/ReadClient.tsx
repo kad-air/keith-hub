@@ -1,10 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import type { Item } from "@/lib/types";
 import FeedCard from "@/components/FeedCard";
-import KeyboardHelp from "@/components/KeyboardHelp";
 import Toast from "@/components/Toast";
 import { useKeyboard } from "@/lib/useKeyboard";
 
@@ -19,10 +17,8 @@ interface ReadClientProps {
 // behave the same as elsewhere. There's no dismiss-from-read action; this
 // view is the safety net for "I clicked a link and now I want it back."
 export default function ReadClient({ initialItems }: ReadClientProps) {
-  const router = useRouter();
   const [items, setItems] = useState<Item[]>(initialItems);
   const [focusedIndex, setFocusedIndex] = useState(0);
-  const [helpOpen, setHelpOpen] = useState(false);
   const [bskyError, setBskyError] = useState<string | null>(null);
   const READ_CHUNK = 40;
   const [renderedCount, setRenderedCount] = useState(READ_CHUNK);
@@ -179,12 +175,7 @@ export default function ReadClient({ initialItems }: ReadClientProps) {
         const it = items[focusedIndex];
         if (it) void handleSave(it);
       },
-      "g h": () => router.push("/"),
-      "g s": () => router.push("/saved"),
-      "g r": () => router.push("/read"),
-      "?": () => setHelpOpen((v) => !v),
     },
-    !helpOpen
   );
 
   return (
@@ -241,7 +232,6 @@ export default function ReadClient({ initialItems }: ReadClientProps) {
         />
       )}
 
-      <KeyboardHelp open={helpOpen} onClose={() => setHelpOpen(false)} />
     </div>
   );
 }

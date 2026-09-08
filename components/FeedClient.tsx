@@ -5,9 +5,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import type { Item, CategoryCounts, ItemsResponse } from "@/lib/types";
 import { groupByDate } from "@/lib/groupByDate";
 import { useKeyboard } from "@/lib/useKeyboard";
+import { requestKeyboardHelp } from "@/components/GlobalKeys";
 import FeedCard from "@/components/FeedCard";
 import Toast from "@/components/Toast";
-import KeyboardHelp from "@/components/KeyboardHelp";
 import { dismissViaOutbox, flushDismissOutbox } from "@/lib/dismiss-outbox";
 
 interface FeedClientProps {
@@ -101,7 +101,6 @@ export default function FeedClient({
   const [newItemsAvailable, setNewItemsAvailable] =
     useState<NewItemsAvailable | null>(null);
   const [bskyError, setBskyError] = useState<string | null>(null);
-  const [helpOpen, setHelpOpen] = useState(false);
   const [renderedCount, setRenderedCount] = useState(INITIAL_CHUNK);
   const cardRefs = useRef<Array<HTMLElement | null>>([]);
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -680,13 +679,7 @@ export default function FeedClient({
         if (it) void handleClearAbove(it);
       },
       r: () => void handleRefresh(),
-      "g h": () => router.push("/"),
-      "g s": () => router.push("/saved"),
-      "g r": () => router.push("/read"),
-      "g t": () => router.push("/tune"),
-      "?": () => setHelpOpen((v) => !v),
     },
-    !helpOpen
   );
 
   // ─── Pull to refresh (touch only) ────────────────────────
@@ -996,7 +989,7 @@ export default function FeedClient({
             <FooterActions
               count={items.length}
               onMarkAllRead={handleMarkAllRead}
-              onShowHelp={() => setHelpOpen(true)}
+              onShowHelp={requestKeyboardHelp}
             />
           )}
         </div>
@@ -1040,7 +1033,6 @@ export default function FeedClient({
       ) : null}
 
       {/* ── Help overlay ── */}
-      <KeyboardHelp open={helpOpen} onClose={() => setHelpOpen(false)} />
     </div>
   );
 }

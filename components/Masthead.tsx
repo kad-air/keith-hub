@@ -5,14 +5,33 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import AppMenu from "@/components/AppMenu";
 import Contents from "@/components/Contents";
+import GlobalKeys from "@/components/GlobalKeys";
+import KeyboardHelp from "@/components/KeyboardHelp";
 import { getCurrentSection } from "@/lib/sections";
 
 export default function Masthead() {
   const pathname = usePathname();
   const section = getCurrentSection(pathname);
   const [open, setOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
 
   const close = useCallback(() => setOpen(false), []);
+  const closeHelp = useCallback(() => setHelpOpen(false), []);
+  const openContents = useCallback(() => {
+    setHelpOpen(false);
+    setOpen(true);
+  }, []);
+  const toggleHelp = useCallback(() => setHelpOpen((v) => !v), []);
+
+  // While either overlay is up, every useKeyboard consumer stands down
+  // (lib/useKeyboard.ts reads this attribute) — so `j` under the help
+  // overlay can't dismiss a card you can't see.
+  useEffect(() => {
+    const root = document.documentElement;
+    if (open || helpOpen) root.setAttribute("data-kb-modal", "");
+    else root.removeAttribute("data-kb-modal");
+    return () => root.removeAttribute("data-kb-modal");
+  }, [open, helpOpen]);
 
   // ⌘K / Ctrl+K opens the Contents overlay globally
   useEffect(() => {
@@ -33,9 +52,10 @@ export default function Masthead() {
     return () => document.removeEventListener("keydown", onKey);
   }, [open]);
 
-  // Close the overlay whenever the route changes
+  // Close the overlays whenever the route changes
   useEffect(() => {
     setOpen(false);
+    setHelpOpen(false);
   }, [pathname]);
 
   return (
@@ -80,6 +100,8 @@ export default function Masthead() {
       </header>
 
       <Contents open={open} onClose={close} currentKey={section.key} />
+      <KeyboardHelp open={helpOpen} onClose={closeHelp} pathname={pathname} />
+      <GlobalKeys onContents={openContents} onHelp={toggleHelp} enabled={!open && !helpOpen} />
     </>
   );
 }

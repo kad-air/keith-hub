@@ -1,10 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import type { Item } from "@/lib/types";
 import FeedCard from "@/components/FeedCard";
-import KeyboardHelp from "@/components/KeyboardHelp";
 import Toast from "@/components/Toast";
 import { useKeyboard } from "@/lib/useKeyboard";
 
@@ -13,10 +11,8 @@ interface SavedClientProps {
 }
 
 export default function SavedClient({ initialItems }: SavedClientProps) {
-  const router = useRouter();
   const [items, setItems] = useState<Item[]>(initialItems);
   const [focusedIndex, setFocusedIndex] = useState(0);
-  const [helpOpen, setHelpOpen] = useState(false);
   const [bskyError, setBskyError] = useState<string | null>(null);
   const SAVED_CHUNK = 30;
   const [renderedCount, setRenderedCount] = useState(SAVED_CHUNK);
@@ -190,12 +186,7 @@ export default function SavedClient({ initialItems }: SavedClientProps) {
         const it = items[focusedIndex];
         if (it) void handleDismiss(it);
       },
-      "g h": () => router.push("/"),
-      "g s": () => router.push("/saved"),
-      "g r": () => router.push("/read"),
-      "?": () => setHelpOpen((v) => !v),
     },
-    !helpOpen
   );
 
   return (
@@ -257,7 +248,6 @@ export default function SavedClient({ initialItems }: SavedClientProps) {
         />
       )}
 
-      <KeyboardHelp open={helpOpen} onClose={() => setHelpOpen(false)} />
     </div>
   );
 }
