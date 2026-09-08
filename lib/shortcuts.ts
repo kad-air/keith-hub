@@ -170,6 +170,30 @@ export function getSectionShortcuts(section: Section): ShortcutGroup[] {
   return SECTION_SHORTCUTS[section.key] ?? [];
 }
 
+/**
+ * What the chord hint shows once a prefix is down: for `g`, every section
+ * letter plus `g g` (Contents), in that order. Unknown prefixes get the raw
+ * keys with no labels.
+ */
+export function chordOptions(prefix: string, keys: string[]): ShortcutRow[] {
+  if (prefix === "g") {
+    const bySection = new Map(
+      SECTIONS.filter((s) => s.hotkey).map((s) => [s.hotkey, s.name] as const),
+    );
+    // Sections in Contents order first, `g g` (Contents) last.
+    const ordered = [...keys].sort((a, b) => {
+      const ia = a === "g" ? Infinity : SECTIONS.findIndex((s) => s.hotkey === a);
+      const ib = b === "g" ? Infinity : SECTIONS.findIndex((s) => s.hotkey === b);
+      return ia - ib;
+    });
+    return ordered.map((k) => ({
+      keys: [k],
+      label: k === "g" ? "Contents" : bySection.get(k) ?? k,
+    }));
+  }
+  return keys.map((k) => ({ keys: [k], label: k }));
+}
+
 /** The sections `[` / `]` step through, in Contents order. */
 export function adjacentSection(current: Section, dir: 1 | -1): Section {
   const list = SECTIONS.filter((s) => s.hotkey);

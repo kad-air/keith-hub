@@ -249,6 +249,12 @@ the hrefs it is given, mounted beside the tab row): Hoops Matchup/Teams/Players,
 Library/Stats/Discworld, Charts Library/Setlists, Practice Today/Fretboard/CAGED/Licks; Tune binds
 `1`/`2`/`3` to its panes itself (state, not routes). Comics binds `x` to toggle the focused issue.
 
+**Press `g` and the hub shows what can follow.** `useKeyboard` announces a pending chord prefix on
+`window` (`CHORD_EVENT`, with the keys that can complete it) and again when it resolves or times
+out (`CHORD_TIMEOUT_MS`, 2.5s); `components/ChordHint.tsx` (mounted by the Masthead) renders the
+which-key strip along the bottom from `chordOptions` in `lib/shortcuts.ts`. Nothing renders until a
+prefix is pressed, so it needs no touch/width gating.
+
 **Overlays own the keyboard while open.** Masthead sets `data-kb-modal` on `<html>` while Contents
 or the help is up, and `useKeyboard` bails when it is present — Masthead and the page are siblings,
 so this attribute is the cross-tree signal rather than a context threaded through every client.

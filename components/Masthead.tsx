@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import AppMenu from "@/components/AppMenu";
 import Contents from "@/components/Contents";
+import ChordHint from "@/components/ChordHint";
 import GlobalKeys from "@/components/GlobalKeys";
 import KeyboardHelp from "@/components/KeyboardHelp";
 import { getCurrentSection } from "@/lib/sections";
@@ -102,6 +103,7 @@ export default function Masthead() {
       <Contents open={open} onClose={close} currentKey={section.key} />
       <KeyboardHelp open={helpOpen} onClose={closeHelp} pathname={pathname} />
       <GlobalKeys onContents={openContents} onHelp={toggleHelp} enabled={!open && !helpOpen} />
+      <ChordHint />
     </>
   );
 }

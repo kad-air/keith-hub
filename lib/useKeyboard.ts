@@ -6,6 +6,17 @@ export interface ShortcutMap {
   [key: string]: KeyHandler;
 }
 
+/** How long a chord prefix (`g`) waits for its second key. */
+export const CHORD_TIMEOUT_MS = 2500;
+
+/**
+ * Fired on `window` when a chord prefix is pressed (`detail.prefix` set) and
+ * again when it resolves or times out (`detail.prefix` null). The Masthead's
+ * ChordHint listens and shows what can be pressed next.
+ */
+export const CHORD_EVENT = "hub:chord";
+export type ChordEventDetail = { prefix: string | null; keys: string[] };
+
 /**
  * Lightweight keyboard shortcut hook with single-key + chord (`g h`) support.
  *
@@ -13,8 +24,9 @@ export interface ShortcutMap {
  * lowercased. So pass `"j"`, `"k"`, `"?"`, `"Enter"`, `"Escape"`, etc.
  *
  * Chord shortcuts: use a space-separated key like `"g h"`. After the user
- * presses the first key (`g`), the next key has 1.5s to land or the chord
- * is dropped.
+ * presses the first key (`g`), the next key has `CHORD_TIMEOUT_MS` to land or
+ * the chord is dropped. The pending prefix is announced on `window` as
+ * `CHORD_EVENT` so the UI can show what can be pressed next.
  *
  * The hook ignores key events while the user is typing in an input/textarea
  * or has any modifier key (cmd/ctrl/alt) pressed, so browser shortcuts and
@@ -30,12 +42,20 @@ export function useKeyboard(shortcuts: ShortcutMap, enabled = true): void {
     let chordPrefix: string | null = null;
     let chordTimer: ReturnType<typeof setTimeout> | null = null;
 
+    function announce(prefix: string | null, keys: string[] = []) {
+      window.dispatchEvent(
+        new CustomEvent<ChordEventDetail>(CHORD_EVENT, { detail: { prefix, keys } }),
+      );
+    }
+
     function clearChord() {
+      const had = chordPrefix !== null;
       chordPrefix = null;
       if (chordTimer) {
         clearTimeout(chordTimer);
         chordTimer = null;
       }
+      if (had) announce(null);
     }
 
     function onKeyDown(e: KeyboardEvent) {
@@ -75,13 +95,14 @@ export function useKeyboard(shortcuts: ShortcutMap, enabled = true): void {
       }
 
       // Is the key the start of a chord?
-      const isChordPrefix = Object.keys(map).some((k) =>
-        k.startsWith(`${key} `)
-      );
-      if (isChordPrefix && !map[key]) {
+      const chordKeys = Object.keys(map)
+        .filter((k) => k.startsWith(`${key} `))
+        .map((k) => k.slice(key.length + 1));
+      if (chordKeys.length > 0 && !map[key]) {
         chordPrefix = key;
-        chordTimer = setTimeout(clearChord, 1500);
+        chordTimer = setTimeout(clearChord, CHORD_TIMEOUT_MS);
         e.preventDefault();
+        announce(key, chordKeys);
         return;
       }
 
