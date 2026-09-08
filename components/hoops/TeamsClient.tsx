@@ -169,6 +169,7 @@ export default function TeamsClient({
                   placement. */}
               <Link
                 href={`/hoops/teams/${t.tri}?mode=${mode}`}
+                data-kb-item
                 className="block border-b border-rule/40 py-2 transition-colors hover:bg-ink-raised/60"
               >
                 <span className="flex items-baseline gap-2">

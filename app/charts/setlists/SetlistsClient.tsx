@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import SectionTabKeys from "@/components/SectionTabKeys";
 import { useCallback, useEffect, useState } from "react";
 import type { Setlist } from "@/lib/setlists";
 
@@ -87,6 +88,8 @@ export default function SetlistsClient({ initialSetlists, readOnly }: Props) {
   );
 
   return (
+    <>
+      <SectionTabKeys hrefs={["/charts", "/charts/setlists"]} />
     <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6">
       <header className="mb-6 flex items-end justify-between gap-3">
         <div>
@@ -184,7 +187,7 @@ export default function SetlistsClient({ initialSetlists, readOnly }: Props) {
               key={s.id}
               className="flex items-center gap-2 border border-rule/60 bg-ink-raised/40 px-3 py-2.5"
             >
-              <Link href={`/charts/setlists/${s.id}`} className="min-w-0 flex-1">
+              <Link href={`/charts/setlists/${s.id}`} data-kb-item className="min-w-0 flex-1">
                 <span className="block truncate text-[0.95rem] text-cream hover:text-cat-practice">
                   {s.name}
                 </span>
@@ -208,5 +211,6 @@ export default function SetlistsClient({ initialSetlists, readOnly }: Props) {
         </ol>
       )}
     </article>
+    </>
   );
 }

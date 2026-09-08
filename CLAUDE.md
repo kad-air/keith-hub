@@ -136,8 +136,10 @@ Standard "the user reports a bug" workflow:
 - `lib/sections.ts` — single source of truth for the top-level sections that appear in `Masthead` + `Contents`. Derives the Tracking group from `TRACKER_CONFIGS` so adding a tracker updates every nav surface automatically — **currently an empty list, because `TRACKERS_ENABLED` is `false`** (see "Tracker data"). `getCurrentSection(pathname)` picks the active section for the masthead switcher.
 - `lib/groupByDate.ts` — buckets items into Today / Yesterday / This week / Earlier (preserves input order within buckets, so the caller's sort wins).
 - `lib/dismiss-outbox.ts` — the localStorage-backed dismiss queue every FeedClient dismissal rides (see "Dismissals are durable" above).
-- `lib/useKeyboard.ts` — keyboard shortcut hook with single-key + chord (`g h`) support. Ignores typing in inputs and any modifier-key combo (preserving cmd/ctrl shortcuts).
-- `components/Masthead.tsx` — sticky top header: `hub` wordmark on the left, centered section switcher (opens `Contents`), gear `AppMenu` on the right. Also hosts the global `⌘K` / `Ctrl+K` binding that opens `Contents`. Replaces the old `HeaderNav` + `BottomNav` duo (and the later `SubBar` feed-tab row — Saved/Read are plain sections now).
+- `lib/useKeyboard.ts` — keyboard shortcut hook with single-key + chord (`g h`) support. Ignores typing in inputs, any modifier-key combo (preserving cmd/ctrl shortcuts), and stands down while `<html data-kb-modal>` is set (an overlay is open).
+- `lib/shortcuts.ts` — the user-facing keyboard map: global rows, per-section rows, the section-jump rows derived from `SECTIONS`, `adjacentSection` for `[`/`]`, and the hotkey-uniqueness assertion.
+- `components/GlobalKeys.tsx` — the hub-wide bindings (section chords, `[`/`]`, `?`, `/`, roving `j`/`k`/`o` over `[data-kb-item]`), mounted by `Masthead`. `components/SectionTabKeys.tsx` — number keys for a section's tab row.
+- `components/Masthead.tsx` — sticky top header: `hub` wordmark on the left, centered section switcher (opens `Contents`), gear `AppMenu` on the right. Hosts the global `⌘K` / `Ctrl+K` binding, mounts `GlobalKeys` and the one `KeyboardHelp` instance, and flags `data-kb-modal` on `<html>` while either overlay is open. Replaces the old `HeaderNav` + `BottomNav` duo (and the later `SubBar` feed-tab row — Saved/Read are plain sections now).
 - `components/Contents.tsx` — fullscreen section-jump overlay invoked from `Masthead` or `⌘K`. Groups sections into Reading / Tracking / Library (from `lib/sections.ts`), supports filter-as-you-type + Enter-to-jump, body-scroll lock while open, and renders a chord legend at the bottom (`g h/s/r`, `?`, `⌘K`, `Esc`). This is how section navigation works on both mobile and desktop now — there is no separate bottom tab bar.
 - `components/ThemeProvider.tsx` — React context wrapping the Auto/Light/Dark theme (`data-theme` attribute + `hub-theme` localStorage key). Also keeps `<meta name="theme-color">` in sync so the iOS browser chrome matches. A tiny inline script in `app/layout.tsx` applies the saved theme before first paint to avoid a flash.
 - `components/FeedCard.tsx` — renders all item types in three magazine variants (article, bluesky post, podcast). Bluesky cards are rendered by the `BlueskyBody` subcomponent with helpers `ReplyContext`, `ImageGrid` (1/2/3/4+ layouts respecting aspect ratios), `ExternalCard`, `QuotedPost`, plus the action chips (like / repost / follow) wired to the `onBskyLike|Repost|Follow` props with optimistic flips and server-driven reverts. The `forwardRef` points to the **swipe wrapper div**, not the inner article — see "Touch UX" below. Podcasts tap to Apple Podcasts via `apple_id`. Long-press on touch fires `onClearAbove` after `LONG_PRESS_MS` (1s).
@@ -149,7 +151,7 @@ Standard "the user reports a bug" workflow:
 - `components/ComicsClient.tsx` — per-storyline issue checklist. Tapping an issue hands off to the Marvel Unlimited iOS app via `marvel.smart.link` (see the comics section below for why this specific URL form is load-bearing). Calls `/api/comics/[id]/read` + `/unread` to toggle local read state.
 - `lib/tracker-detail.ts` — helpers for the detail page: `getExternalLinkLabel` picks a friendly CTA label based on domain; `buildExtraProps` filters the Craft schema to the properties worth rendering (skips ones already shown as primary UI, hides empty values and `false` booleans).
 - `components/Toast.tsx` — undo / status toast with countdown progress bar; bottom anchor respects iOS `env(safe-area-inset-bottom)`.
-- `components/KeyboardHelp.tsx` — `?` overlay listing shortcuts. **Source of truth for the user-facing keyboard list.**
+- `components/KeyboardHelp.tsx` — the `?` overlay, one instance for the whole hub (mounted by `Masthead`), showing the current section's keys, the section jumps and the global keys. Rows come from **`lib/shortcuts.ts`, the source of truth for the user-facing keyboard list.**
 - `components/AppMenu.tsx` — gear icon dropdown with theme toggle (Auto/Light/Dark), push-notifications toggle (`Enable release alerts` / `Release alerts on` / `Blocked in system settings` — **hidden while `TRACKERS_ENABLED` is `false`**, since tracker releases are the only push sender), commit + last-merge version info baked in by `next.config.mjs`, and the Log out button (posts to `/api/auth/logout`).
 - `components/ServiceWorkerRegister.tsx` — registers the Serwist-generated SW on the client.
 
@@ -223,7 +225,48 @@ Auth
 - `POST /api/auth/logout` — clears the cookie, 303 redirects to `/login`.
 
 ### Keyboard shortcuts
-Defined in `components/FeedClient.tsx` (and subsets in `SavedClient.tsx` / `ReadClient.tsx`). Source of truth for the user-facing list is `components/KeyboardHelp.tsx`. Keys: `j`/`k` nav, `o`/`enter` open, `s` save, `x`/`e` dismiss, `c` clear-above (dismiss this card + everything above it), `r` refresh, `g h` / `g s` / `g r` go home/saved/read, `?` toggle help, `esc` closes help. The `Masthead` also binds global `⌘K` / `Ctrl+K` to open the `Contents` section-jump overlay.
+**One hub-wide layer, live on every route** (2026-09-08 refresh). `components/GlobalKeys.tsx` is
+mounted once by the `Masthead` and binds: `g <letter>` to every section (the letter is
+`Section.hotkey` in `lib/sections.ts` — `h` Feed, `s` Saved, `r` Read, `b` Books, `d` Discworld,
+`m` Comics, `n` Hoops, `p` Practice, `c` Charts, `t` Tune; `lib/shortcuts.ts` throws at load on a
+duplicate), `[` / `]` to step through the sections in Contents order, `g g` and `⌘K` / `Ctrl+K`
+for Contents, `?` for the help overlay, `/` to focus the page's search box, and roving `j` / `k` /
+`o` over any list. Sections do NOT re-declare any of these — the old copies in Feed/Saved/Read
+(and the hidden TrackerClient) were removed, so there is exactly one place a chord lives.
+
+**Roving lists are a DOM contract, not a hook.** A row that carries `data-kb-item` (an `<a>` or
+`<button>`, so it is natively focusable) is walked by `j` / `k` in document order among the visible
+rows; Enter is the browser's own activation and `o` clicks the focused row. With nothing focused,
+`j` starts at the first row at or below the top of the viewport, so a scrolled page starts where you
+are looking. Tagged today: comics storylines + issues, book covers, hoops teams + players, chart
+library rows, setlists + their songs, practice tiles + licks. Feed/Saved/Read keep their own
+`focusedIndex` navigation over cards (their cards carry no `data-kb-item`, so the global handler
+finds no rows there and stays out of the way). `data-kb-search` on an input is what `/` focuses
+(Players today); with none on the page `/` opens Contents.
+
+**Number keys switch a section's in-page tabs** via `components/SectionTabKeys.tsx` (`1`..`n` →
+the hrefs it is given, mounted beside the tab row): Hoops Matchup/Teams/Players, Books
+Library/Stats/Discworld, Charts Library/Setlists, Practice Today/Fretboard/CAGED/Licks; Tune binds
+`1`/`2`/`3` to its panes itself (state, not routes). Comics binds `x` to toggle the focused issue.
+
+**Press `g` and the hub shows what can follow.** `useKeyboard` announces a pending chord prefix on
+`window` (`CHORD_EVENT`, with the keys that can complete it) and again when it resolves or times
+out (`CHORD_TIMEOUT_MS`, 2.5s); `components/ChordHint.tsx` (mounted by the Masthead) renders the
+which-key strip along the bottom from `chordOptions` in `lib/shortcuts.ts`. Nothing renders until a
+prefix is pressed, so it needs no touch/width gating.
+
+**Overlays own the keyboard while open.** Masthead sets `data-kb-modal` on `<html>` while Contents
+or the help is up, and `useKeyboard` bails when it is present — Masthead and the page are siblings,
+so this attribute is the cross-tree signal rather than a context threaded through every client.
+The end-of-feed "Keyboard" button opens the global help through `requestKeyboardHelp()` (a window
+event) for the same reason.
+
+Section-local keys still live in their clients: Feed `j`/`k` `o`/`enter` `s` `x`/`e` `c` `r`;
+Matchup `s`/`x`/`r`; chart viewer space / ↑ / ↓ / `n`; Discworld `+` / `-` / `0` / `esc`.
+**`lib/shortcuts.ts` is the source of truth for the user-facing list** — `components/KeyboardHelp.tsx`
+renders the current section's rows, the section jumps (derived from `SECTIONS`, so they can't
+drift), and the global rows. Add a binding, add its row there. Keyboard hints stay hidden below
+`sm` (see the invariant above); Contents shows each section's chord at `sm+`.
 
 ### Source types in config
 - `type: rss` / `type: podcast` — both use the RSS fetcher; podcasts additionally parse `itunes:*` fields and store `apple_id`, `duration`, `artwork_url` in the `metadata` JSON column. RSS categories in use: `reading`, `tech_review`, `books`, `music`, `film`, `podcasts`. `tech_review` exists specifically to give Verge reviews a review-tier priority while generic Verge articles stay in `reading`.

@@ -179,6 +179,7 @@ export function LickLibraryClient({
             return (
               <li key={l.id}>
                 <Link
+                  data-kb-item
                   href={`/practice/licks/${l.id}`}
                   className="block h-full border border-rule/60 bg-ink-raised/40 p-4 transition-colors hover:border-cat-practice/60 hover:bg-ink-raised/70"
                 >

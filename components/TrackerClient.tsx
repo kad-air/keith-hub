@@ -6,7 +6,6 @@ import type { TrackerConfig, TrackerItem } from "@/lib/craft-types";
 import { useKeyboard } from "@/lib/useKeyboard";
 import TrackerCard from "@/components/TrackerCard";
 import Toast from "@/components/Toast";
-import KeyboardHelp from "@/components/KeyboardHelp";
 
 // ── Sort helpers ────────────────────────────────────────────────
 type SortKey = "release-desc" | "release-asc" | "title" | "rating";
@@ -87,7 +86,6 @@ export default function TrackerClient({
   const [activeSort, setActiveSort] = useState<SortKey>(initialSort);
   const [focusedIndex, setFocusedIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const [showHelp, setShowHelp] = useState(false);
   const TRACKER_CHUNK = 30;
   const [renderedCount, setRenderedCount] = useState(TRACKER_CHUNK);
   const gridRef = useRef<HTMLDivElement>(null);
@@ -187,15 +185,11 @@ export default function TrackerClient({
         });
       },
       k: () => setFocusedIndex((i) => Math.max(i - 1, 0)),
-      "g h": () => router.push("/"),
-      "g s": () => router.push("/saved"),
-      "g r": () => router.push("/read"),
-      "?": () => setShowHelp((v) => !v),
     }),
-    [filteredItems.length, renderedCount, router],
+    [filteredItems.length, renderedCount],
   );
 
-  useKeyboard(shortcuts, !showHelp);
+  useKeyboard(shortcuts);
 
   // Mirror filter + sort into the URL. replace() so each tap doesn't pile
   // up in browser history. Defaults are omitted to keep canonical URLs clean.
@@ -309,7 +303,6 @@ export default function TrackerClient({
       )}
 
       {/* Keyboard help */}
-      <KeyboardHelp open={showHelp} onClose={() => setShowHelp(false)} />
     </article>
   );
 }

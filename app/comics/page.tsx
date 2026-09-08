@@ -30,6 +30,7 @@ export default function ComicsIndexPage() {
             <li key={s.slug}>
               <Link
                 href={`/comics/${s.slug}`}
+                data-kb-item
                 className="block border border-rule/60 bg-ink-raised/40 px-4 py-3 transition-colors hover:border-accent/60 hover:bg-ink-raised/70"
               >
                 <div className="flex items-baseline justify-between gap-3">

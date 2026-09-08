@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useKeyboard } from "@/lib/useKeyboard";
 import type { AlgorithmConfig, AppConfig, SourceConfig } from "@/lib/config";
 
 // ── Types mirrored from the /api/tune endpoints ─────────────────────────────
@@ -155,6 +156,12 @@ function GhostButton({
 
 export default function TuneClient() {
   const [pane, setPane] = useState<Pane>("sources");
+  // 1 / 2 / 3 switch panes (lib/shortcuts.ts lists them).
+  useKeyboard({
+    "1": () => setPane("sources"),
+    "2": () => setPane("algorithm"),
+    "3": () => setPane("yaml"),
+  });
   const [data, setData] = useState<ConfigResponse | null>(null);
   const [health, setHealth] = useState<Record<string, SourceHealth>>({});
   const [status, setStatus] = useState<string | null>(null);

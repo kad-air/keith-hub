@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import SectionTabKeys from "@/components/SectionTabKeys";
 import type { Book } from "@/lib/books/store";
 
 type Item = {
@@ -70,6 +71,7 @@ function BookCard({
       </button>
       <Link
         href={`/books/${book.id}`}
+        data-kb-item
         className={`group/card group block border bg-ink-raised/40 transition-colors hover:border-accent/60 ${
           toRead ? "border-accent/50" : "border-rule/60"
         }`}
@@ -243,6 +245,8 @@ export default function BooksClient({
   }
 
   return (
+    <>
+      <SectionTabKeys hrefs={["/books", "/books/stats", "/books/discworld"]} />
     <article className="mx-auto max-w-[900px] px-4 pb-24 pt-6 sm:px-6">
       <header className="mb-6">
         <p className="font-mono text-[0.7rem] uppercase tracking-kicker text-cream-dimmer">
@@ -408,5 +412,6 @@ export default function BooksClient({
         </>
       )}
     </article>
+    </>
   );
 }

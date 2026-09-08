@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 import type { ComicIssue, Storyline } from "@/lib/comics-data";
+import { useKeyboard } from "@/lib/useKeyboard";
 
 interface Props {
   storyline: Storyline;
@@ -71,6 +72,16 @@ export default function ComicsClient({ storyline, initialReadIds }: Props) {
     [setRead],
   );
 
+  // `x` on the issue j/k landed on (the row link carries data-issue-id)
+  // flips its read state, same confirm rule as the checkbox.
+  useKeyboard({
+    x: () => {
+      const id = (document.activeElement as HTMLElement | null)?.dataset.issueId;
+      if (!id) return;
+      handleCheckboxChange(id, !readIds.has(id));
+    },
+  });
+
   const rows = useMemo(
     () =>
       storyline.issues.map((issue, idx) => {
@@ -95,6 +106,8 @@ export default function ComicsClient({ storyline, initialReadIds }: Props) {
             />
             <a
               href={url}
+              data-kb-item
+              data-issue-id={issue.id}
               rel="noopener noreferrer"
               onClick={() => handleLink(issue.id)}
               className={[

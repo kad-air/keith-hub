@@ -689,6 +689,7 @@ export default function SetlistDetailClient({
                 </span>
                 <Link
                   href={`/charts/${c.id}?setlist=${setlist.id}`}
+                  data-kb-item
                   draggable={false}
                   className="min-w-0 flex-1"
                 >

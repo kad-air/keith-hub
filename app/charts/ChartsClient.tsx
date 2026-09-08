@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import SectionTabKeys from "@/components/SectionTabKeys";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Chart } from "@/lib/charts";
@@ -325,6 +326,8 @@ export default function ChartsClient({
   }, [charts]);
 
   return (
+    <>
+      <SectionTabKeys hrefs={["/charts", "/charts/setlists"]} />
     <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6">
       <header className="mb-6 flex items-end justify-between gap-3">
         <div>
@@ -448,6 +451,7 @@ export default function ChartsClient({
               >
                 <Link
                   href={`/charts/${c.id}`}
+                  data-kb-item
                   className="min-w-0 flex-1"
                 >
                   <span className="block truncate text-[0.95rem] text-cream hover:text-cat-practice">
@@ -475,6 +479,7 @@ export default function ChartsClient({
         </>
       )}
     </article>
+    </>
   );
 }
 
