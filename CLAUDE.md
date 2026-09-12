@@ -535,6 +535,22 @@ An `.acsm` is a ~1 KB XML *download token*, not a book, and it **expires in abou
 (Google Play Books). So fulfil promptly after downloading; an expired token is refused with a
 message saying to download it again, because that is the actual fix.
 
+🔴 **`accept="…,.acsm"` alone made the file unselectable ON THE PHONE, which is where the token is
+downloaded.** iOS resolves each `accept` token to a UTType and filters the Files picker on the
+result, and a file's type there comes from its EXTENSION — no iOS app declares `.acsm`, so the
+token resolved to nothing, only `.epub` filtered, and a perfectly good fulfilment token sat in
+Files greyed out. An unregistered extension gets a dynamic UTI conforming to `public.data`, which
+is what `application/octet-stream` maps to, so that MIME type is listed alongside the extensions
+and is the thing that actually makes the file pickable. It does **not** drag the camera and
+photo-library options into the sheet the way dropping `accept` entirely would — UTType conformance
+runs one way (an image conforms to data, data does not conform to image), so the picker still opens
+straight into Files. 🔴 Because that admits anything in Files, the real gate is the server's:
+`looksLikeBook` (`prepare.ts`, beside `isAcsm` so the name rule and the sniff can't drift) takes
+the name first, then falls back to CONTENT — `isFulfillmentToken`, or the EPUB spec's STORED
+`mimetype` entry at its fixed offset. Deliberately stricter than "PK": a bare `.zip` must not
+ingest as a broken book, which is what `prepareForIngest` exists to prevent. The content half also
+means a token the phone renames is still recognised for what it is.
+
 - `lib/books/acsm.ts` — the protocol: (1) once per operator, POST credentials to `<operator>/Auth`
   then register via `<activationURL>/InitLicenseService`; (2) POST a SIGNED `<adept:fulfill>` to
   `<operator>/Fulfill`; (3) fetch and cache the licence service certificate; (4) download the epub

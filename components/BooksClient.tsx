@@ -293,10 +293,24 @@ export default function BooksClient({
             </span>
           )}
         </p>
+        {/* 🔴 `application/octet-stream` is load-bearing on the phone, and it is
+            the reason `.acsm` alone is not enough. iOS resolves every `accept`
+            token to a UTType and filters the Files picker on the result: a file's
+            type comes from its EXTENSION, and no iOS app declares `.acsm`, so the
+            token resolves to nothing and a downloaded fulfilment token sits in
+            Files greyed out — the exact bug this attribute list fixes. An
+            unregistered extension gets a dynamic UTI conforming to `public.data`,
+            which is what `application/octet-stream` maps to, so listing it is
+            what makes the file selectable at all. It does NOT drag the camera and
+            photo-library options into the sheet the way dropping `accept`
+            entirely would: UTType conformance runs the other way (an image
+            conforms to data, data does not conform to image), so the picker still
+            opens straight into Files. The server is the real gate either way —
+            see `looksLikeBook` in lib/books/prepare.ts. */}
         <input
           ref={fileRef}
           type="file"
-          accept=".epub,.acsm"
+          accept=".epub,.acsm,application/epub+zip,application/vnd.adobe.adept+xml,application/octet-stream"
           multiple
           hidden
           onChange={(e) => handleUpload(e.target.files)}
