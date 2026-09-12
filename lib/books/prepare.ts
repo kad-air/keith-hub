@@ -53,6 +53,29 @@ export function isAcsm(fileName: string, bytes: Buffer): boolean {
 }
 
 /**
+ * Is this worth handing to `prepareForIngest` at all? The upload route's gate,
+ * kept here beside `isAcsm` so the name rule and the content sniff can't drift.
+ *
+ * 🔴 The name is checked first and the sniff exists behind it because the
+ * PHONE's picker cannot be trusted to preserve one. iOS has no UTI for
+ * `.acsm`, so the upload button's `accept` list has to admit `public.data` for
+ * a fulfilment token to be selectable at all (see components/BooksClient.tsx),
+ * which means anything in Files can now arrive here. A token or an epub is
+ * recognised for what it IS; everything else is refused by name.
+ */
+export function looksLikeBook(fileName: string, bytes: Buffer): boolean {
+  if (/\.(epub|acsm)$/i.test(fileName)) return true;
+  if (isFulfillmentToken(bytes)) return true;
+  // An OCF container: the EPUB spec requires a STORED `mimetype` entry first in
+  // the zip, so its bytes land at a fixed offset. Deliberately stricter than
+  // "PK" — a bare .zip with the wrong name must not ingest as a broken book,
+  // which is the failure prepareForIngest exists to prevent. A real epub that
+  // violates the rule is unaffected: it arrives named `.epub` and never
+  // reaches this line.
+  return bytes.subarray(30, 58).toString("latin1") === "mimetypeapplication/epub+zip";
+}
+
+/**
  * Turn uploaded bytes into a clean epub ready for `ingestBook`.
  * Throws `PrepareError` when that isn't possible — the caller turns the code
  * into a per-file message; it never falls through to a partial ingest.

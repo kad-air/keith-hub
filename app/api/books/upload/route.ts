@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ingestBook } from "@/lib/books/store";
-import { PrepareError, prepareForIngest } from "@/lib/books/prepare";
+import { PrepareError, looksLikeBook, prepareForIngest } from "@/lib/books/prepare";
 
 export const dynamic = "force-dynamic";
 
@@ -23,12 +23,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     const results = [];
     for (const file of files) {
-      if (!/\.(epub|acsm)$/i.test(file.name)) {
-        results.push({ fileName: file.name, error: "not an epub" });
+      // Name OR content — the phone's picker can't be relied on for the name
+      // (iOS knows no `.acsm`), so `looksLikeBook` sniffs behind it.
+      const bytes = Buffer.from(await file.arrayBuffer());
+      if (!looksLikeBook(file.name, bytes)) {
+        results.push({ fileName: file.name, error: "not an epub or .acsm" });
         continue;
       }
       try {
-        const prepared = await prepareForIngest(Buffer.from(await file.arrayBuffer()), file.name);
+        const prepared = await prepareForIngest(bytes, file.name);
         const { book, created } = ingestBook(prepared.bytes, prepared.fileName);
         results.push({
           fileName: file.name,
