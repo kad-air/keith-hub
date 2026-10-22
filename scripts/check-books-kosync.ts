@@ -26,7 +26,7 @@ import { createHash } from "node:crypto";
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "kosync-check-"));
 process.chdir(tmp);
 
-const { createUser, authUser, putProgress, getProgress, importProgress, userCount } =
+const { createUser, authUser, putProgress, getProgress, importProgress, userCount, setPassword, firstUsername } =
   await import("../lib/books/kosync.ts");
 const { getDb } = await import("../lib/db.ts");
 
@@ -104,6 +104,19 @@ const r2 = importProgress("keith", [
 ]);
 assert(r2.imported === 1 && getProgress("keith", doc)!.progress === "even-newer",
   "a newer imported row does apply");
+
+// ── password rotation (2026-10-22) ─────────────────────────────────────────
+// The seed password must be replaceable without re-seeding: the old wire key
+// dies, the new one lives, and the single-user policy is unchanged after.
+const rotated = md5("a-new-sync-password");
+assert(firstUsername() === "keith", "firstUsername names the seeded account");
+assert(setPassword(rotated) === "keith", "setPassword rotates the single user and names it");
+assert(!authUser("keith", wireKey), "the OLD wire key is refused after rotation");
+assert(authUser("keith", rotated), "the NEW wire key is accepted after rotation");
+assert(createUser("keith", wireKey) === "exists", "re-register with the OLD key is refused after rotation");
+assert(createUser("keith", rotated) === "created", "re-register with the NEW key stays idempotent");
+assert(createUser("mallory", rotated) === "closed", "rotation does not reopen registration");
+assert(userCount() === 1, "still exactly one user after rotation");
 
 fs.rmSync(tmp, { recursive: true, force: true });
 

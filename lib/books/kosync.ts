@@ -67,6 +67,24 @@ export function createUser(
 }
 
 /**
+ * Rotate the single user's password. `wireKey` is md5(newPassword) — the same
+ * wire value the devices will send from now on. Returns the username whose
+ * key changed, or null when no device has ever registered (registration via
+ * createUser stays the only seeding path; this never invents an account).
+ * Every device keeps failing 401 until its stored password is updated — that
+ * is the point (added for the 2026-10-22 Railway breach rotation, when the
+ * sync password was still the seed default and nothing could change it).
+ */
+export function setPassword(wireKey: string): string | null {
+  const username = firstUsername();
+  if (!username) return null;
+  getDb()
+    .prepare(`UPDATE kosync_users SET key_hash = ? WHERE username = ?`)
+    .run(atRestHash(wireKey), username);
+  return username;
+}
+
+/**
  * The registered reader's username, or null before any device has registered.
  * Single-user by design (see createUser) — the hub's own writes (catch-up
  * positioning) go to this account, because it IS the account every device
