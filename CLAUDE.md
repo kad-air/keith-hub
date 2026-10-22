@@ -373,6 +373,11 @@ CrossPoint by the Stump deployment — e-readers store one URL and cannot comple
 fail-open). kosync user auth on top: `x-auth-user` + `x-auth-key` headers where the key is
 **md5(password) computed client-side** — the wire value is fixed by the KOReader protocol and must
 never be "hardened"; only the at-rest storage is (sha256 of the wire key, `kosync_users.key_hash`).
+**Rotating the sync password:** `GET/POST /api/books/kosync-password` (cookie-gated like every
+other `/api/books` route; GET names the account, POST `{password}` rotates it via
+`setPassword`). The hub renders the username nowhere else; the devices are the only other place
+the username and password live, so after a POST every reader needs its stored password
+updated. Added 2026-10-22; the gate `check:books:kosync` pins old-key-dies/new-key-lives.
 
 🔴 **`kosync_progress.progress` is OPAQUE** — an EPUB x-pointer from CrossPoint/KOReader (richer
 with char offset from Readest), stored and returned byte-exact, never parsed or normalized. This
