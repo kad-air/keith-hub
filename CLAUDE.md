@@ -29,6 +29,9 @@ npm run check:hoops:matchup      # Matchup gate: best-of-seven arithmetic vs clo
 npm run check:hoops:movers       # Team-page "what moved" gate: the biggest three are the biggest three,
                                  #   the sums and the mix identity hold, an abstained team is never
                                  #   explained, and real box scores anchor Giannis/Tatum (same)
+npm run check:hoops:scores       # Real scores gate: ESPN scoreboard / box score / standings parsers over recorded
+                                 #   responses (hoops-scores-fixture/), quarters and player lines add up to the final,
+                                 #   notable-line thresholds, Mountain-time dates, the cache policy (same)
 npm run check:tracking-hidden    # Tracking section stays hidden (needs a running server; NOT in prebuild)
 npm run check:hoops:mobile       # Hoops still fits on a phone: seven pages at 375px and 430px in the
                                  #   installed Chrome (needs a running server; NOT in prebuild)
@@ -1107,6 +1110,48 @@ Gate: `npm run check:hoops:movers` (appended to `prebuild` at the END, after `ch
 **Honesty carries that render, not tooltips:** the variance note and the "how these lines were built" caveats on every box score (`VarianceNote` / `BoxScoreCaveats`), the `run_id` + fit version + data-as-of on every result (`RunProvenance` — the fit is printed *next to* the id because a Mini push can replace the model under an old link), the ratings-mode blurb, the participant basis and omitted-player count per team, and the histogram's "the answer is a distribution" paragraph naming the actual cloud width and quartiles.
 
 **Key files:** `lib/hoops/types.ts` (the export's shapes), `blob-contract.ts` (what the engine expects the blob to be — the stale-blob guard's source of truth), `params.ts` (decode into flat `Float64Array` + stride, throws `StaleBlobError`; `expectVersion: null` is the fixture-only escape hatch), `data.ts` (read + hash the COMMITTED disk bundle — cold-start seed only, see above), `import.ts` (project either byte source into SQLite; `ensureHoopsImport`/`importHoopsData` = the disk-seed path, `importPushedBundle` = the push path), `contract.ts` (the wire-contract capability negotiation), `bundleValidation.ts` (the structural completeness gate on a pushed bundle), `pricing.ts` (the pure roster-pricing formula port, for the not-yet-assertable pricing fixture), `queries.ts` (server reads, all off the DB, never disk), `rating.ts` (**pure** — no fs/db, so the client can re-rank all three modes without a round trip), `nba-franchises.ts` (the 30 real franchises, as an external fact), `blake2b.ts` (hand-rolled because the engine runs in the browser too and Web Crypto has no blake2b; matches node:crypto on 510 inputs), `philox.ts` (Philox4x64 + numpy's `random`/`standard_normal`), `ziggurat.ts` (generated tables), `rng.ts` (coordinate-keyed streams), `engine.ts` (the possession loop), `binomial.ts` (numpy's multinomial/binomial, for the box-score allocation), `boxscore.ts` (**pure** — the two-mode box score; the studio re-runs it in the browser), `matchup.ts` (**pure** — the run_id encoding + the distribution summary), `run.ts` (the server glue: DB + engine + box score in ONE place so the routes and the SSR pages cannot drift into simulating different games). API: `app/api/hoops/import/route.ts` (the push endpoint), `app/api/hoops/teams/route.ts`, `app/api/hoops/sim/route.ts`, `app/api/hoops/boxscore/route.ts`. UI: `components/hoops/HoopsNav.tsx` (the section self-hosts its in-page nav — there is no global sub-tab bar to extend; #68's first question is answered in favour of SIBLING PAGES with an in-section switcher, so every result is linkable and server-renderable), `components/hoops/MatchupClient.tsx`, `components/hoops/BoxScoreTable.tsx` (the shared table + the three honesty blocks), `components/hoops/MarginHistogram.tsx`, `components/hoops/TeamsClient.tsx`, `components/hoops/PlayerExplain.tsx`, `app/hoops/page.tsx`, `app/hoops/game/[runId]/page.tsx`, `app/hoops/teams/*`, `app/hoops/players/[athleteId]/page.tsx`; `lib/hoops/series.ts` (best-of-seven arithmetic), `app/api/hoops/meetings/route.ts`.
+
+#### Real scores, box scores and standings (`/hoops/scores`, `/hoops/standings`) — 2026-10-22
+
+The one part of Hoops that is NOT the sim. Real NBA results, tonight's slate (tip times in
+Mountain, the network, the live clock), date navigation (`/hoops/scores/[YYYY-MM-DD]`, prev/next,
+a date picker, `p`/`n` keys), a real box score per game (`/hoops/scores/[date]/[away-home]`, e.g.
+`atl-orl` — plaintextsports' URL shape; a bare ESPN event id also resolves), notable lines for the
+day, and conference standings. Modelled on plaintextsports.com: dense, monospace, finite.
+
+🔴 **Separate on purpose (owner's instruction).** Nothing in `lib/hoops/scores/` reads the
+hoops-sim bundle, the read-model tables or the engine, and nothing there reads this; the only shared
+pieces are `nba-franchises.ts` (names, tri codes) and `HoopsNav`. `RealBoxTable` is its own
+component rather than a reuse of `BoxScoreTable`, which is shaped around SIMULATED lines.
+
+**Source: ESPN's public JSON** (`site.api.espn.com` — `scoreboard?dates=YYYYMMDD`,
+`summary?event=<id>`, `apis/v2/…/standings`). Undocumented, so the parsers (`parse.ts`, pure) read
+defensively and stat columns BY NAME, never by index; a payload with no recognisable top level
+throws rather than rendering as "no games". ESPN's short codes (GS, NO, NY, SA, UTAH, WSH) are
+mapped to the canonical tri. ESPN lists games under the US Eastern date, which equals the Mountain
+date for any NBA tip.
+
+**Caching** (`data.ts`, the only impure edge; policy in `policy.ts`, pure): parsed responses in the
+`hoops_scores_cache` table (`lib/db.ts`), keyed `v<CACHE_VERSION>:<kind>:<arg>` — bump
+`CACHE_VERSION` when a parser's output shape changes, because a FINAL row is never re-read. A past
+day whose games are all final and a final box score are cached forever; a live game 30s; today /
+tomorrow 60s; further out 15 min; an empty past day 6h; standings 5 min. 🔴 On an upstream failure
+the last copy is served with a visible "couldn't reach ESPN, showing the copy from …" line — never
+a blank day that reads as an off night. Pages with a live game (or tonight's unfinished slate)
+`router.refresh()` every 30/60s while visible (`LiveRefresh`). "Today" is `todayIn()` in
+America/Denver, never the server's UTC date.
+
+**Notable lines** (`notable.ts`): every threshold lives in `NOTABLE` and the page prints the rules
+from it. Finished games only. Career/season highs are NOT detected — the upstream carries no
+per-player history.
+
+**Gate: `npm run check:hoops:scores`** (in `prebuild`, offline) over recorded responses in
+`hoops-scores-fixture/` (opening week 2026 with three games live, a preseason OT day, a Finals
+game, an offseason day, Christmas 2025 MIN@DEN in OT, standings). Real-basketball anchors: quarters
+sum to the final, player lines sum to the team total and the final, shooting reproduces points,
+~240/265 player-minutes, Jokić 56/16/15, Mountain tip times across the DST change. Falsified 11/11
+(two only after synthetic cases were added: ESPN already lists starters first, and the opening-week
+fixture carries no season-series field).
 
 #### The player page (`/hoops/players/[athleteId]`) — how we come to a player's number (2026-09-02)
 

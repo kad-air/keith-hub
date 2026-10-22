@@ -32,6 +32,9 @@ export const HOOPS_TABS: HoopsTab[] = [
   { key: "matchup", label: "Matchup", href: "/hoops" },
   { key: "teams", label: "Teams", href: "/hoops/teams" },
   { key: "players", label: "Players", href: "/hoops/players" },
+  // Real games, off a live upstream — not the sim (lib/hoops/scores/).
+  { key: "scores", label: "Scores", href: "/hoops/scores" },
+  { key: "standings", label: "Standings", href: "/hoops/standings" },
 ];
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -61,15 +64,17 @@ export default function HoopsNav({
           </p>
         )}
       </div>
-      {/* 1 / 2 / 3 switch tabs from the keyboard (lib/shortcuts.ts lists them). */}
+      {/* 1 … 5 switch tabs from the keyboard (lib/shortcuts.ts lists them). */}
       <SectionTabKeys hrefs={HOOPS_TABS.map((t) => t.href)} />
       {HOOPS_TABS.length > 1 && (
-        <nav className="mt-3 flex gap-2 overflow-x-auto">
+        // Five tabs fit a 375px phone only with the tracking and padding
+        // tightened below `sm`; otherwise Standings sat off-screen.
+        <nav className="mt-3 flex gap-1.5 overflow-x-auto sm:gap-2">
           {HOOPS_TABS.map((t) => (
             <Link
               key={t.key}
               href={t.href}
-              className={`whitespace-nowrap border px-3 py-1 font-mono text-[0.7rem] uppercase tracking-kicker transition-colors ${
+              className={`whitespace-nowrap border px-2 py-1 font-mono text-[0.64rem] uppercase tracking-normal transition-colors sm:px-3 sm:text-[0.7rem] sm:tracking-kicker ${
                 t.key === active
                   ? "border-cat-hoops/70 text-cat-hoops"
                   : "border-rule/60 text-cream-dim hover:border-cat-hoops/40 hover:text-cream"

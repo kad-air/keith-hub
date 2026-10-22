@@ -86,6 +86,18 @@ export function getDb(): Database.Database {
       value TEXT NOT NULL
     );
 
+    -- Hoops scores (/hoops/scores, /hoops/standings): parsed responses from
+    -- ESPN's public JSON, keyed "v<N>:<kind>:<arg>". final = 1 means the
+    -- payload can never change again (a finished day / game) and is served
+    -- forever; otherwise fetched_at (epoch ms) ages it out on a short TTL.
+    -- Separate from the hoops-sim read model on purpose. lib/hoops/scores/data.ts.
+    CREATE TABLE IF NOT EXISTS hoops_scores_cache (
+      key TEXT PRIMARY KEY,
+      fetched_at INTEGER NOT NULL,
+      final INTEGER NOT NULL DEFAULT 0,
+      value TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS comic_state (
       issue_id TEXT PRIMARY KEY,
       read_at TEXT NOT NULL
