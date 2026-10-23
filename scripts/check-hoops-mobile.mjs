@@ -129,7 +129,7 @@ const WIDTHS = [
 const PAGES = [
   {
     id: "matchup",
-    path: "/hoops",
+    path: "/hoops/matchup",
     landmark: "Head to head this season",
     async prepare(page) {
       // The button counts its own games ("Sim 1,000 games"), so match the
@@ -310,6 +310,34 @@ async function waitForHydration(page, timeout = 30_000) {
     if (hydrated || Date.now() > deadline) return;
     await page.waitForTimeout(200);
   }
+}
+
+// 🔴 The first page a fresh browser context opens is not under the service
+// worker yet, and ServiceWorkerRegister RELOADS the page once the SW installs
+// and claims it (~2s in). A sim that lands before that reload is wiped by it,
+// the answer's button goes with it, and clickUntilText then waits 180s for a
+// result nobody is asking for any more. That raced on main too, and which
+// side won flipped from run to run. So on an uncontrolled page, wait out the
+// reload (a fresh document that IS controlled) before touching anything.
+// Bounded and never fatal: an origin with no SW at all just costs the timeout.
+async function waitForServiceWorker(page, landmark, timeout = 30_000) {
+  const pending = await page
+    .evaluate(() => {
+      if (!("serviceWorker" in navigator) || navigator.serviceWorker.controller) return false;
+      window.__hoopsMobilePreSw = true;
+      return true;
+    })
+    .catch(() => true); // the reload already tore this document down
+  if (!pending) return;
+  const deadline = Date.now() + timeout;
+  for (;;) {
+    const fresh = await page
+      .evaluate(() => !window.__hoopsMobilePreSw && !!navigator.serviceWorker.controller)
+      .catch(() => false);
+    if (fresh || Date.now() > deadline) break;
+    await page.waitForTimeout(250);
+  }
+  await waitForText(page, landmark, 120_000);
 }
 
 // 🔴 The landmark can be on screen a full second before the page can be
@@ -566,6 +594,7 @@ try {
         });
         await waitForText(page, spec.landmark, 120_000);
         if (spec.prepare) {
+          await waitForServiceWorker(page, spec.landmark);
           await waitForHydration(page);
           await spec.prepare(page);
         }

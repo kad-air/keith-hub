@@ -30,11 +30,12 @@ export interface HoopsTab {
 
 export const HOOPS_TABS: HoopsTab[] = [
   // Real games, off a live upstream — not the sim (lib/hoops/scores/). Listed
-  // first: the real season comes before the what-ifs.
+  // first: the real season comes before the what-ifs, and /hoops itself
+  // redirects to Scores (app/hoops/page.tsx).
   { key: "scores", label: "Scores", href: "/hoops/scores" },
   { key: "standings", label: "Standings", href: "/hoops/standings" },
-  // The sim. Matchup keeps /hoops as its route; only its tab position moved.
-  { key: "matchup", label: "Matchup", href: "/hoops" },
+  // The sim.
+  { key: "matchup", label: "Matchup", href: "/hoops/matchup" },
   { key: "teams", label: "Teams", href: "/hoops/teams" },
   { key: "players", label: "Players", href: "/hoops/players" },
 ];

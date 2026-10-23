@@ -201,7 +201,7 @@ export default function HoopsTeamPage({
 
       <div className="mt-6 grid grid-cols-2 gap-2">
         <Link
-          href={`/hoops?home=${tri}&mode=${mode}`}
+          href={`/hoops/matchup?home=${tri}&mode=${mode}`}
           className="block border border-cat-hoops/60 px-4 py-3 text-center font-mono text-[0.68rem] uppercase tracking-kicker text-cat-hoops transition-colors hover:bg-cat-hoops/10"
         >
           Sim a game at {tri} →
