@@ -245,7 +245,7 @@ UI is trusted.
 
 | Screen | Route | What you do |
 |---|---|---|
-| **Matchup** (home) | `/hoops` | Home/away pickers + neutral toggle → **Sim**. Win prob, projected spread + total, score-distribution histogram, expected box score. The core verb. |
+| **Matchup** | `/hoops/matchup` (was `/hoops`; the section landing is now Scores) | Home/away pickers + neutral toggle → **Sim**. Win prob, projected spread + total, score-distribution histogram, expected box score. The core verb. |
 | **Studio** (flagship) | `/hoops/studio` | Roster editor (remove / add real / trade / add fictional / availability / skill) with the line and win prob **re-simming live as you edit** (client-side, ~100ms). Calibrated delta + honest range. |
 | **Result** | `/hoops/game/[runId]` | One sampled game — final score, OT count, integer box lines that sum exactly, shareable `run_id` deep link. Reproducible. |
 | **Season** | `/hoops/season` | Pick a team (or league) → 82-game win-total quantiles, playoff odds, seed distribution, an interactive bracket. Runs on edited rosters too. |
@@ -284,7 +284,7 @@ UI is trusted.
    decode on build.
 2. **Engine port + fixture.** Port `rng.ts` + `engine.ts`; stand up the shared fixture in both
    repos. *Check:* the fixture (the load-bearing one — do this before any UI is trusted).
-3. **Matchup + boxscore.** `/api/hoops/sim`, `/api/hoops/boxscore`, `/hoops`, `/hoops/game/[runId]`.
+3. **Matchup + boxscore.** `/api/hoops/sim`, `/api/hoops/boxscore`, `/hoops` (now `/hoops/matchup`), `/hoops/game/[runId]`.
    *Check:* sampled box lines sum to the final score (integer identity) in a build-time assertion.
 4. **Studio (whatif).** Roster scratch state, live re-sim, calibrated delta. *Check:* an unedited
    roster is bit-identical to baseline (the delta-only invariant).

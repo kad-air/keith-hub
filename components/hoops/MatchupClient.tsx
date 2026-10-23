@@ -101,7 +101,7 @@ export default function MatchupClient({
     params.set("mode", mode);
     if (neutral) params.set("neutral", "1");
     else params.delete("neutral");
-    router.replace(`/hoops?${params.toString()}`, { scroll: false });
+    router.replace(`/hoops/matchup?${params.toString()}`, { scroll: false });
     // searchParams deliberately not a dependency: this effect WRITES it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [home, away, mode, neutral, router]);

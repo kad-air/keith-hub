@@ -89,16 +89,16 @@ const COMICS_SECTION: Section = {
   match: (p) => p.startsWith("/comics"),
 };
 
-// The section home is the Matchup screen (milestone 3, #67) — the core verb.
-// `match` covers the whole subtree, so the masthead switcher reads "Hoops" on
+// The section home is Scores (real games); /hoops redirects there too, and
+// the Matchup screen (milestone 3, #67) lives at /hoops/matchup. `match` covers the whole subtree, so the masthead switcher reads "Hoops" on
 // every hoops route.
 const HOOPS_SECTION: Section = {
   key: "hoops",
   num: "",
   name: "Hoops",
-  href: "/hoops",
+  href: "/hoops/scores",
   group: "Library",
-  desc: "NBA sim · matchup · box score · teams",
+  desc: "NBA scores · standings · sim · matchup · teams",
   hotkey: "n",
   match: (p) => p.startsWith("/hoops"),
 };

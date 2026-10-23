@@ -29,12 +29,15 @@ export interface HoopsTab {
 }
 
 export const HOOPS_TABS: HoopsTab[] = [
-  { key: "matchup", label: "Matchup", href: "/hoops" },
-  { key: "teams", label: "Teams", href: "/hoops/teams" },
-  { key: "players", label: "Players", href: "/hoops/players" },
-  // Real games, off a live upstream — not the sim (lib/hoops/scores/).
+  // Real games, off a live upstream — not the sim (lib/hoops/scores/). Listed
+  // first: the real season comes before the what-ifs, and /hoops itself
+  // redirects to Scores (app/hoops/page.tsx).
   { key: "scores", label: "Scores", href: "/hoops/scores" },
   { key: "standings", label: "Standings", href: "/hoops/standings" },
+  // The sim.
+  { key: "matchup", label: "Matchup", href: "/hoops/matchup" },
+  { key: "teams", label: "Teams", href: "/hoops/teams" },
+  { key: "players", label: "Players", href: "/hoops/players" },
 ];
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -64,11 +67,11 @@ export default function HoopsNav({
           </p>
         )}
       </div>
-      {/* 1 … 5 switch tabs from the keyboard (lib/shortcuts.ts lists them). */}
+      {/* 1 … 5 switch tabs from the keyboard, in HOOPS_TABS order (lib/shortcuts.ts lists them). */}
       <SectionTabKeys hrefs={HOOPS_TABS.map((t) => t.href)} />
       {HOOPS_TABS.length > 1 && (
         // Five tabs fit a 375px phone only with the tracking and padding
-        // tightened below `sm`; otherwise Standings sat off-screen.
+        // tightened below `sm`; otherwise the last tab sat off-screen.
         <nav className="mt-3 flex gap-1.5 overflow-x-auto sm:gap-2">
           {HOOPS_TABS.map((t) => (
             <Link

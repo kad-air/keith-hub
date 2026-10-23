@@ -80,7 +80,7 @@ export default function HoopsGamePage({
 
       <div className="flex items-baseline justify-between gap-3">
         <Link
-          href={`/hoops?home=${coords.home}&away=${coords.away}&mode=${coords.ratingMode}${coords.neutralSite ? "&neutral=1" : ""}`}
+          href={`/hoops/matchup?home=${coords.home}&away=${coords.away}&mode=${coords.ratingMode}${coords.neutralSite ? "&neutral=1" : ""}`}
           className="font-mono text-[0.68rem] uppercase tracking-kicker text-cream-dimmer transition-colors hover:text-cream-dim"
         >
           ← Matchup
@@ -122,7 +122,7 @@ export default function HoopsGamePage({
           this same game again, forever — the link <em>is</em> the game. For what a{" "}
           <em>typical</em> night looks like, the{" "}
           <Link
-            href={`/hoops?home=${coords.home}&away=${coords.away}&mode=${coords.ratingMode}`}
+            href={`/hoops/matchup?home=${coords.home}&away=${coords.away}&mode=${coords.ratingMode}`}
             className="text-cat-hoops underline decoration-cat-hoops/40 underline-offset-2"
           >
             matchup screen

@@ -248,7 +248,7 @@ finds no rows there and stays out of the way). `data-kb-search` on an input is w
 (Players today); with none on the page `/` opens Contents.
 
 **Number keys switch a section's in-page tabs** via `components/SectionTabKeys.tsx` (`1`..`n` →
-the hrefs it is given, mounted beside the tab row): Hoops Matchup/Teams/Players, Books
+the hrefs it is given, mounted beside the tab row): Hoops Scores/Standings/Matchup/Teams/Players, Books
 Library/Stats/Discworld, Charts Library/Setlists, Practice Today/Fretboard/CAGED/Licks; Tune binds
 `1`/`2`/`3` to its panes itself (state, not routes). Comics binds `x` to toggle the focused issue.
 
@@ -1028,7 +1028,7 @@ capture element, so a click handler on the `<g>` fires unreliably). `app/books/d
 `app/api/books/discworld/[nodeId]/route.ts` (POST a mark, DELETE to clear).
 
 ### Hoops — the NBA simulation studio
-An NBA sim & what-if studio as its own section, built to the plan in `HOOPS_PLAN.md` (tracking epic: GitHub #63). **Shipped so far: milestone 1, the read-model spine (#64) — `/hoops/teams` and `/hoops/teams/[tri]`; milestone 2, the RNG parity + engine port (#65, #66) — `lib/hoops/{rng,philox,blake2b,engine}.ts`; the Mac Mini PUSH endpoint (#73, wire contract kad-air/hoops-sim#24) — `POST /api/hoops/import`; milestone 3, the matchup + box score (#67) — `/hoops` and `/hoops/game/[runId]`; and the player rankings — `/hoops/players`, which is also what finally carried the bundle's offence/defence value split into the read model.** The engine now runs from a screen. Next up: the studio (#69), with the design spike (#68) ahead of it.
+An NBA sim & what-if studio as its own section, built to the plan in `HOOPS_PLAN.md` (tracking epic: GitHub #63). **Shipped so far: milestone 1, the read-model spine (#64) — `/hoops/teams` and `/hoops/teams/[tri]`; milestone 2, the RNG parity + engine port (#65, #66) — `lib/hoops/{rng,philox,blake2b,engine}.ts`; the Mac Mini PUSH endpoint (#73, wire contract kad-air/hoops-sim#24) — `POST /api/hoops/import`; milestone 3, the matchup + box score (#67) — `/hoops/matchup` (originally `/hoops`) and `/hoops/game/[runId]`; and the player rankings — `/hoops/players`, which is also what finally carried the bundle's offence/defence value split into the read model.** The engine now runs from a screen. Next up: the studio (#69), with the design spike (#68) ahead of it.
 
 **Zero runtime dependency on the Mac Mini for READS.** Same shape as `/comics`, scaled up: heavy work (fitting a possession model against a 20GB DuckDB over 8TB of parquet) runs offline in `~/Code/hoops-sim`; what ships here is a bundle plus a TypeScript port of the engine. The Mini reaches OUT to push that bundle (below) — the hub never calls back to the Mini.
 
@@ -1094,7 +1094,7 @@ Gate: `npm run check:hoops:movers` (appended to `prebuild` at the END, after `ch
 
 #### The matchup + box score (milestone 3, #67)
 
-`/hoops` is the section home: home/away pickers, a neutral-court toggle, a ratings-mode row, and one accented **Sim**. `/hoops/game/[runId]` is one sampled game.
+`/hoops/matchup` is the sim's front door: home/away pickers, a neutral-court toggle, a ratings-mode row, and one accented **Sim**. `/hoops/game/[runId]` is one sampled game. 🔴 **The section landing is Scores, not the Matchup** (2026-10-23): `/hoops` redirects to `/hoops/scores` (`app/hoops/page.tsx`), the masthead entry in `lib/sections.ts` points there, and the tab row reads Scores, Standings, Matchup, Teams, Players (`HOOPS_TABS`, which is also the 1..5 key order). An old `/hoops?home=&away=&mode=&neutral=` link still carries its pickers through to `/hoops/matchup`.
 
 🔴 **The `run_id` is self-describing, and that is load-bearing.** `DEN-OKC-hb-3f2a9c1b0d4e5f6a` encodes home, away, court (`h`/`n`) and rating mode (`r`/`o`/`b`/`n` — hub-v2 added nightly; the two `n`s live in different fixed positions), so `/hoops/game/[runId]` reproduces the game **from the URL and nothing else** (`encodeRunId`/`parseRunId`, `lib/hoops/matchup.ts`). The alternative — a random id plus a `hoops_runs` row — would make a shared link depend on this device's DB, which is the property "reproducible forever" was supposed to buy. `hoops_runs` stays reserved for sims the user deliberately saves; it is not touched by this milestone. A malformed id parses to `null` (never throws) so the page 404s rather than 500s. `/hoops/game/new?home=&away=&mode=&neutral=` mints a fresh id and redirects, so a rendered result always sits at a stable URL.
 
