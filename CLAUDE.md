@@ -248,7 +248,7 @@ finds no rows there and stays out of the way). `data-kb-search` on an input is w
 (Players today); with none on the page `/` opens Contents.
 
 **Number keys switch a section's in-page tabs** via `components/SectionTabKeys.tsx` (`1`..`n` →
-the hrefs it is given, mounted beside the tab row): Hoops Matchup/Teams/Players, Books
+the hrefs it is given, mounted beside the tab row): Hoops Scores/Standings/Matchup/Teams/Players, Books
 Library/Stats/Discworld, Charts Library/Setlists, Practice Today/Fretboard/CAGED/Licks; Tune binds
 `1`/`2`/`3` to its panes itself (state, not routes). Comics binds `x` to toggle the focused issue.
 

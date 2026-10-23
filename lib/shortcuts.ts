@@ -121,11 +121,11 @@ export const SECTION_SHORTCUTS: Record<string, ShortcutGroup[]> = {
     {
       section: "Hoops",
       rows: [
-        { keys: ["1"], label: "Matchup" },
-        { keys: ["2"], label: "Teams" },
-        { keys: ["3"], label: "Players" },
-        { keys: ["4"], label: "Scores" },
-        { keys: ["5"], label: "Standings" },
+        { keys: ["1"], label: "Scores" },
+        { keys: ["2"], label: "Standings" },
+        { keys: ["3"], label: "Matchup" },
+        { keys: ["4"], label: "Teams" },
+        { keys: ["5"], label: "Players" },
         { keys: ["s"], label: "Sim (matchup)" },
         { keys: ["x"], label: "Swap home and away (matchup)" },
         { keys: ["r"], label: "Surprise me (matchup)" },
