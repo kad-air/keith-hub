@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { Chart } from "@/lib/charts";
 import type { ChartSetlistContext } from "@/lib/setlists";
 import { parseChart, wrapBlock } from "@/lib/chord-wrap";
@@ -85,6 +86,22 @@ function getSpeechRecognitionCtor(): (new () => SpeechRecognitionLike) | null {
 // settle in before the chart starts moving.
 const AUTO_START_SECONDS = 15;
 
+// Swipe left/right between setlist songs. The stroke must be long AND flat:
+// a finger dragging down the page mid-song must never change songs. LOCK is
+// how far the finger travels before we decide the gesture is sideways (and
+// the page starts following it); COMMIT is how far it must go to change song.
+const SWIPE_LOCK_PX = 14;
+const SWIPE_COMMIT_PX = 110;
+// |dx| must beat |dy| by this factor at lock time to count as sideways.
+const SWIPE_FLATNESS = 2;
+const SWIPE_ANIM_MS = 180;
+
+// A scroll that reaches the top within this long of the last touch/wheel is
+// the user's (a fling coasts to the top after the finger lifts). Autoscroll
+// only moves down, and the play button's restart-from-top is programmatic,
+// so neither counts.
+const USER_SCROLL_GRACE_MS = 1500;
+
 export default function ChartViewerClient({
   chart: initialChart,
   setlists,
@@ -132,7 +149,18 @@ export default function ChartViewerClient({
         title: setlist.next.title,
       }
     : null;
+  const prev = setlist?.prev
+    ? {
+        href: `/charts/${setlist.prev.id}?setlist=${setlist.id}`,
+        title: setlist.prev.title,
+      }
+    : null;
   const autoStart = setlist != null;
+  // Re-arms the pre-roll countdown (scrolling back to the top mid-song).
+  const [armNonce, setArmNonce] = useState(0);
+  // document.body only exists client-side; the countdown pill portals there.
+  const [portalReady, setPortalReady] = useState(false);
+  useEffect(() => setPortalReady(true), []);
   // Hold the chart locally so an in-page edit updates the view immediately
   // without a server round-trip / route refresh.
   const [chart, setChart] = useState<Chart>(initialChart);
@@ -290,9 +318,13 @@ export default function ChartViewerClient({
   // True while a finger is on the screen during playback — the scroll loop
   // holds its travel so it doesn't fight the drag (see the nudge effect).
   const touchActiveRef = useRef(false);
+  // When the user last dragged or wheeled the page (pause-at-top).
+  const lastGestureRef = useRef(0);
   // Minimal local shape — avoids depending on WakeLock lib.dom types being
   // present, which vary by TS version.
   const wakeRef = useRef<{ release: () => Promise<void> } | null>(null);
+  const wakePendingRef = useRef(false);
+  const wakeWantedRef = useRef(false);
   const controlsRef = useRef<HTMLDivElement>(null);
 
   // Hydrate persisted prefs (speed + font size) after mount. Speed is the
@@ -389,6 +421,13 @@ export default function ChartViewerClient({
   // Screen wake lock — best effort. Keeps the phone awake while a chart
   // autoscrolls so it doesn't sleep mid-song. Not supported everywhere.
   const requestWake = useCallback(async () => {
+    // One lock at a time: a second request would orphan the first sentinel,
+    // which then outlives this page. The browser releases it on its own when
+    // the page is hidden (`released` flips), so re-request only then.
+    const held = wakeRef.current as { released?: boolean } | null;
+    if (held && !held.released) return;
+    if (wakePendingRef.current) return;
+    wakePendingRef.current = true;
     try {
       const wl = (
         navigator as unknown as {
@@ -397,12 +436,20 @@ export default function ChartViewerClient({
           };
         }
       ).wakeLock;
-      if (wl?.request) wakeRef.current = await wl.request("screen");
+      if (wl?.request) {
+        const lock = await wl.request("screen");
+        // Released (page left) while the request was in flight: let it go.
+        if (wakeWantedRef.current) wakeRef.current = lock;
+        else void lock.release();
+      }
     } catch {
       /* ignore — wake lock is a nicety, not required */
+    } finally {
+      wakePendingRef.current = false;
     }
   }, []);
   const releaseWake = useCallback(() => {
+    wakeWantedRef.current = false;
     try {
       void wakeRef.current?.release();
     } catch {
@@ -432,8 +479,7 @@ export default function ChartViewerClient({
       }
     }
     setListening(false);
-    releaseWake();
-  }, [releaseWake]);
+  }, []);
   stopListeningRef.current = stopListening;
 
   const startListening = useCallback(() => {
@@ -526,8 +572,7 @@ export default function ChartViewerClient({
       setVoiceError("Couldn't start the microphone.");
       return;
     }
-    void requestWake();
-  }, [matcher, requestWake, stopListening]);
+  }, [matcher, stopListening]);
 
   // Mic off when the component unmounts (navigating to the next song, etc.).
   useEffect(() => () => stopListeningRef.current(), []);
@@ -582,7 +627,6 @@ export default function ChartViewerClient({
       setPlaying(false);
       return;
     }
-    void requestWake();
     const step = (ts: number) => {
       if (lastTsRef.current == null) lastTsRef.current = ts;
       const dt = (ts - lastTsRef.current) / 1000;
@@ -611,24 +655,25 @@ export default function ChartViewerClient({
       rafRef.current = null;
       lastTsRef.current = null;
       accRef.current = 0;
-      releaseWake();
     };
-  }, [playing, atBottom, requestWake, releaseWake]);
+  }, [playing, atBottom]);
 
-  // Re-acquire the wake lock when returning to the tab while still playing
-  // (or voice-following) — the browser drops it automatically on visibility
-  // loss.
+  // Keep the screen awake for as long as a chart is open — not just while it
+  // scrolls. Paused, counting down, or sitting at the bottom between songs
+  // is exactly when a phone on a mic stand would otherwise dim and lock. The
+  // browser drops the lock when the page is hidden, so re-acquire on return.
   useEffect(() => {
+    wakeWantedRef.current = true;
+    void requestWake();
     const onVis = () => {
-      if (
-        (playing || listening) &&
-        document.visibilityState === "visible"
-      )
-        void requestWake();
+      if (document.visibilityState === "visible") void requestWake();
     };
     document.addEventListener("visibilitychange", onVis);
-    return () => document.removeEventListener("visibilitychange", onVis);
-  }, [playing, listening, requestWake]);
+    return () => {
+      document.removeEventListener("visibilitychange", onVis);
+      releaseWake();
+    };
+  }, [requestWake, releaseWake]);
 
   // Track scroll position for the progress bar.
   useEffect(() => {
@@ -669,7 +714,7 @@ export default function ChartViewerClient({
         autoStartTimer.current = null;
       }
     };
-  }, [autoStart, chart.id]);
+  }, [autoStart, chart.id, armNonce]);
 
   // Any manual scroll/touch on the page during the countdown means the user
   // wants to take over — cancel the pending auto-start. Touches on the control
@@ -697,7 +742,11 @@ export default function ChartViewerClient({
     }
     setPlaying((p) => {
       // Tapping play at the very bottom restarts from the top.
-      if (!p && atBottom()) window.scrollTo({ top: 0 });
+      // (Not the user's scroll — so it mustn't trip pause-at-top.)
+      if (!p && atBottom()) {
+        lastGestureRef.current = 0;
+        window.scrollTo({ top: 0 });
+      }
       return !p;
     });
   }, [atBottom, cancelAutoStart, mode, startListening, stopListening]);
@@ -734,6 +783,144 @@ export default function ChartViewerClient({
     };
   }, [playing]);
 
+  // Scrolling back to the top mid-song pauses autoscroll and (in a setlist)
+  // re-arms the same countdown as landing on the song fresh — "start this
+  // one over" in one gesture. Only the user's own scroll counts: autoscroll
+  // never moves up, and the play button's restart-from-top is programmatic.
+  useEffect(() => {
+    const mark = (e: Event) => {
+      // A tap on the control bar isn't a scroll — and Play at the bottom
+      // jumps to the top itself, which must not then pause it.
+      if (controlsRef.current?.contains(e.target as Node)) return;
+      lastGestureRef.current = Date.now();
+    };
+    // Movement only: a plain tap (cancelling the countdown, say) must not
+    // make the next programmatic jump to the top look like the user's.
+    const evs = ["touchmove", "wheel"] as const;
+    evs.forEach((e) => window.addEventListener(e, mark, { passive: true }));
+    return () => evs.forEach((e) => window.removeEventListener(e, mark));
+  }, []);
+  useEffect(() => {
+    if (!playing || mode !== "auto") return;
+    const onScroll = () => {
+      if (window.scrollY > 0) return;
+      const userScroll =
+        touchActiveRef.current ||
+        Date.now() - lastGestureRef.current < USER_SCROLL_GRACE_MS;
+      if (!userScroll) return;
+      setPlaying(false);
+      if (autoStart) setArmNonce((n) => n + 1);
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [playing, mode, autoStart]);
+
+  // Swipe left → next song, swipe right → previous (setlist mode only). The
+  // chart follows the finger once the stroke locks sideways, with the target
+  // song's title peeking in from that edge; a short or steep stroke snaps
+  // back and is left to the page. Transform is written straight to the DOM so
+  // a drag doesn't re-render the whole chart per touchmove.
+  const swipeRef = useRef<HTMLDivElement>(null);
+  const [swipePeek, setSwipePeek] = useState<"prev" | "next" | null>(null);
+  const peekRef = useRef<HTMLDivElement>(null);
+  // Keyed on the hrefs, not the objects: prev/next are rebuilt every render,
+  // and the peek label's setState re-renders mid-gesture — re-subscribing
+  // then would drop the stroke halfway through.
+  const prevHref = prev?.href ?? null;
+  const nextHref = next?.href ?? null;
+  const editing = form != null;
+  useEffect(() => {
+    if (!prevHref && !nextHref) return;
+    if (editing) return;
+    let x0 = 0;
+    let y0 = 0;
+    let state: "idle" | "tracking" | "locked" | "vertical" = "idle";
+    let dx = 0;
+    let lockedDir: "prev" | "next" = "next";
+    const el = () => swipeRef.current;
+    const setX = (x: number, animate: boolean) => {
+      const e = el();
+      if (!e) return;
+      e.style.transition = animate ? `transform ${SWIPE_ANIM_MS}ms ease-out` : "";
+      e.style.transform = x === 0 ? "" : `translateX(${x}px)`;
+      const p = peekRef.current;
+      if (p) p.style.opacity = String(Math.min(1, Math.abs(x) / SWIPE_COMMIT_PX));
+    };
+    const onStart = (e: TouchEvent) => {
+      if (e.touches.length !== 1) {
+        state = "vertical";
+        return;
+      }
+      if (controlsRef.current?.contains(e.target as Node)) {
+        state = "vertical";
+        return;
+      }
+      x0 = e.touches[0].clientX;
+      y0 = e.touches[0].clientY;
+      dx = 0;
+      state = "tracking";
+    };
+    const onMove = (e: TouchEvent) => {
+      if (state === "idle" || state === "vertical") return;
+      if (e.touches.length !== 1) {
+        state = "vertical";
+        setX(0, true);
+        setSwipePeek(null);
+        return;
+      }
+      const mx = e.touches[0].clientX - x0;
+      const my = e.touches[0].clientY - y0;
+      if (state === "tracking") {
+        if (Math.abs(mx) < SWIPE_LOCK_PX && Math.abs(my) < SWIPE_LOCK_PX) return;
+        const dir = mx < 0 ? "next" : "prev";
+        const target = dir === "next" ? nextHref : prevHref;
+        if (Math.abs(mx) < Math.abs(my) * SWIPE_FLATNESS || !target) {
+          state = "vertical";
+          return;
+        }
+        state = "locked";
+        lockedDir = dir;
+        setSwipePeek(dir);
+      }
+      // Clamp to the locked direction: a swipe toward Next that drifts back
+      // past where it started rests at 0 rather than turning into Prev.
+      dx = lockedDir === "next" ? Math.min(0, mx) : Math.max(0, mx);
+      setX(dx, false);
+    };
+    const onEnd = () => {
+      if (state !== "locked") {
+        state = "idle";
+        return;
+      }
+      state = "idle";
+      const target = lockedDir === "next" ? nextHref : prevHref;
+      if (Math.abs(dx) >= SWIPE_COMMIT_PX && target) {
+        setX(dx < 0 ? -window.innerWidth : window.innerWidth, true);
+        window.setTimeout(() => router.push(target), SWIPE_ANIM_MS);
+        // The new song remounts this page; if we're somehow still here
+        // (navigation failed), bring the chart back rather than leave it
+        // off-screen.
+        window.setTimeout(() => {
+          setX(0, true);
+          setSwipePeek(null);
+        }, 4000);
+        return;
+      }
+      setX(0, true);
+      setSwipePeek(null);
+    };
+    window.addEventListener("touchstart", onStart, { passive: true });
+    window.addEventListener("touchmove", onMove, { passive: true });
+    window.addEventListener("touchend", onEnd, { passive: true });
+    window.addEventListener("touchcancel", onEnd, { passive: true });
+    return () => {
+      window.removeEventListener("touchstart", onStart);
+      window.removeEventListener("touchmove", onMove);
+      window.removeEventListener("touchend", onEnd);
+      window.removeEventListener("touchcancel", onEnd);
+    };
+  }, [prevHref, nextHref, editing, router]);
+
   // Keyboard: space = play/pause, ↑/↓ = speed.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -752,14 +939,21 @@ export default function ChartViewerClient({
       } else if (e.key === "n" && next) {
         e.preventDefault();
         router.push(next.href);
+      } else if (e.key === "p" && prev) {
+        e.preventDefault();
+        router.push(prev.href);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [toggle, next, router]);
+  }, [toggle, next, prev, router]);
 
   return (
     <article className="mx-auto max-w-[820px] px-4 pb-40 pt-6 sm:px-6">
+      {/* The swipe layer: header + chart + end card follow the finger. The
+          fixed control bar and pills stay OUTSIDE it — a transform on an
+          ancestor would turn position:fixed into position:absolute. */}
+      <div ref={swipeRef}>
       <header className="mb-5">
         <div className="flex items-start justify-between gap-3">
           <Link
@@ -770,6 +964,16 @@ export default function ChartViewerClient({
           </Link>
           {!form && (
             <div className="flex shrink-0 items-center gap-2">
+              {prev && (
+                <Link
+                  href={prev.href}
+                  aria-label={`Previous song: ${prev.title}`}
+                  title={`Previous: ${prev.title}`}
+                  className="border border-rule/60 px-3 py-1 font-mono text-[0.65rem] uppercase tracking-kicker text-cream-dim transition-colors hover:border-cat-practice/60 hover:text-cream"
+                >
+                  ◂ Prev
+                </Link>
+              )}
               {next && (
                 // Quick jump to the next song in the setlist. Keeps the
                 // ?setlist= chain so the next song auto-starts in turn.
@@ -795,6 +999,11 @@ export default function ChartViewerClient({
             </div>
           )}
         </div>
+        {setlist && setlist.total > 0 && (
+          <p className="mt-2 font-mono text-[0.65rem] uppercase tracking-kicker text-cream-dimmer">
+            Song {setlist.position} of {setlist.total}
+          </p>
+        )}
         <h1 className="mt-2 font-display text-2xl text-cream">{chart.title}</h1>
         {chart.artist && (
           <p className="mt-0.5 font-mono text-[0.7rem] uppercase tracking-kicker text-cream-dim">
@@ -884,13 +1093,63 @@ export default function ChartViewerClient({
         </div>
       )}
 
+      {/* End of song: a modest pointer to what's next, in the flow of the
+          page so it never covers the chart — it simply comes into view as
+          the last lines scroll up. */}
+      {setlist && !form && (
+        <div className="mt-10 border-t border-rule/40 pt-4">
+          {next ? (
+            <Link
+              href={next.href}
+              className="flex items-baseline justify-between gap-3 font-mono text-[0.7rem] uppercase tracking-kicker text-cream-dim transition-colors hover:text-cream"
+            >
+              <span className="min-w-0 truncate">
+                Up next ·{" "}
+                <span className="normal-case tracking-normal text-cream">
+                  {next.title}
+                </span>
+              </span>
+              <span className="shrink-0 text-cat-practice">▸</span>
+            </Link>
+          ) : (
+            <p className="font-mono text-[0.7rem] uppercase tracking-kicker text-cream-dimmer">
+              End of {setlist.name}
+            </p>
+          )}
+        </div>
+      )}
+      </div>
+
+      {/* Swipe peek: the target song's title, fading in from the edge it's
+          coming from. Opacity is driven from the drag (see the swipe effect). */}
+      {swipePeek && (
+        <div
+          ref={peekRef}
+          aria-hidden
+          style={{ opacity: 0 }}
+          className={`pointer-events-none fixed top-1/2 z-40 max-w-[45vw] -translate-y-1/2 truncate rounded-full border border-cat-practice/60 bg-ink/90 px-3 py-1.5 font-mono text-[0.7rem] text-cream shadow-lg shadow-black/40 ${
+            swipePeek === "next" ? "right-3" : "left-3"
+          }`}
+        >
+          {swipePeek === "next"
+            ? `${next?.title ?? ""} ▸`
+            : `◂ ${prev?.title ?? ""}`}
+        </div>
+      )}
+
       {/* Pre-roll countdown — anchored at the TOP, not centered. Any scroll
           cancels the countdown, so while it's visible the page is at scroll
           top, where the viewport shows the title header — the pill sits over
           that instead of covering lyrics mid-chart. Only the pill itself is
           interactive so the chart stays readable/tappable underneath. */}
-      {autoStartIn != null && !form && (
-        <div className="pointer-events-none fixed inset-x-0 top-3 z-40 flex justify-center px-4">
+      {autoStartIn != null && !form && portalReady && createPortal(
+        // Portaled to <body>: <main> is its own stacking context (relative
+        // z-10) under the sticky masthead (z-40), so a fixed pill inside the
+        // page sat BEHIND the masthead and the countdown ran invisibly.
+        <div
+          className="pointer-events-none fixed inset-x-0 z-50 flex justify-center px-4"
+          style={{ top: "calc(env(safe-area-inset-top) + 0.75rem)" }}
+        >
           <button
             onClick={cancelAutoStart}
             className="pointer-events-auto rounded-full border border-cat-practice/60 bg-ink/90 px-4 py-2 font-mono text-[0.75rem] text-cream shadow-lg shadow-black/40 backdrop-blur transition-colors hover:bg-ink"
@@ -899,7 +1158,7 @@ export default function ChartViewerClient({
             s · tap to cancel
           </button>
         </div>
-      )}
+      , document.body)}
 
       {/* Fixed control bar — hidden while editing. */}
       {!form && (

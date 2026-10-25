@@ -110,39 +110,46 @@ export function getSetlist(
 export type ChartSetlistContext = {
   id: string;
   name: string;
+  prev: { id: string; title: string } | null;
   next: { id: string; title: string } | null;
+  // 1-based position of this chart in the setlist, and the setlist's length
+  // ("Song 4 of 12" in the viewer header).
+  position: number;
+  total: number;
 };
 
 export function getChartSetlistContexts(
   chartId: string,
 ): ChartSetlistContext[] {
   const db = getDb();
-  const rows = db
+  const setlists = db
     .prepare(
-      `SELECT s.id, s.name, nc.id AS next_id, nc.title AS next_title
+      `SELECT DISTINCT s.id, s.name, s.created_at
        FROM setlist_charts sc
        JOIN setlists s ON s.id = sc.setlist_id
-       LEFT JOIN setlist_charts nsc
-         ON nsc.setlist_id = sc.setlist_id
-        AND nsc.sort_order = (
-          SELECT MIN(x.sort_order) FROM setlist_charts x
-          WHERE x.setlist_id = sc.setlist_id AND x.sort_order > sc.sort_order
-        )
-       LEFT JOIN charts nc ON nc.id = nsc.chart_id
        WHERE sc.chart_id = ?
        ORDER BY s.created_at ASC`,
     )
-    .all(chartId) as {
-    id: string;
-    name: string;
-    next_id: string | null;
-    next_title: string | null;
-  }[];
-  return rows.map((r) => ({
-    id: r.id,
-    name: r.name,
-    next: r.next_id != null ? { id: r.next_id, title: r.next_title! } : null,
-  }));
+    .all(chartId) as { id: string; name: string }[];
+  const members = db.prepare(
+    `SELECT c.id, c.title
+     FROM setlist_charts sc
+     JOIN charts c ON c.id = sc.chart_id
+     WHERE sc.setlist_id = ?
+     ORDER BY sc.sort_order ASC`,
+  );
+  return setlists.map((s) => {
+    const list = members.all(s.id) as { id: string; title: string }[];
+    const i = list.findIndex((m) => m.id === chartId);
+    return {
+      id: s.id,
+      name: s.name,
+      prev: i > 0 ? list[i - 1] : null,
+      next: i >= 0 && i < list.length - 1 ? list[i + 1] : null,
+      position: i + 1,
+      total: list.length,
+    };
+  });
 }
 
 export function createSetlist(name: string): Setlist {
