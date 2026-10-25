@@ -155,6 +155,7 @@ export const SECTION_SHORTCUTS: Record<string, ShortcutGroup[]> = {
         { keys: ["↑"], label: "Faster (viewer)" },
         { keys: ["↓"], label: "Slower (viewer)" },
         { keys: ["n"], label: "Next song in the setlist (viewer)" },
+        { keys: ["p"], label: "Previous song in the setlist (viewer)" },
       ],
     },
   ],
