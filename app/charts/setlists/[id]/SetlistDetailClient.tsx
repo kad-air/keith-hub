@@ -170,6 +170,27 @@ export default function SetlistDetailClient({
     }
   }, [nameDraft, setlist.id, setlist.name]);
 
+  // Duplicate into a new setlist (same charts, same order) and open it.
+  const duplicateSetlist = useCallback(async () => {
+    const name = window.prompt(
+      "Name for the copy:",
+      `${setlist.name} (copy)`,
+    );
+    if (name == null || !name.trim()) return;
+    try {
+      const res = await fetch(`/api/setlists/${setlist.id}/duplicate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      if (!res.ok) throw new Error("duplicate failed");
+      const { setlist: copy } = (await res.json()) as { setlist: Setlist };
+      router.push(`/charts/setlists/${copy.id}`);
+    } catch {
+      setError("Couldn't duplicate. Try again.");
+    }
+  }, [setlist.id, setlist.name, router]);
+
   const deleteSetlist = useCallback(async () => {
     if (
       !window.confirm(
@@ -498,8 +519,10 @@ export default function SetlistDetailClient({
             </button>
           </div>
         ) : (
-          <div className="mt-1 flex items-end justify-between gap-3">
-            <h1 className="font-display text-2xl text-cream">{setlist.name}</h1>
+          // Wraps: with three buttons the row no longer fits beside a long
+          // name on a narrow phone, so the buttons drop below the title.
+          <div className="mt-1 flex flex-wrap items-end justify-between gap-x-3 gap-y-2">
+            <h1 className="min-w-0 font-display text-2xl text-cream">{setlist.name}</h1>
             {!readOnly && (
               <div className="flex shrink-0 items-center gap-2">
                 <button
@@ -512,6 +535,14 @@ export default function SetlistDetailClient({
                   className="border border-rule/60 px-2.5 py-1 font-mono text-[0.6rem] uppercase tracking-kicker text-cream-dim transition-colors hover:border-cat-practice/60 hover:text-cream disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   Rename
+                </button>
+                <button
+                  onClick={duplicateSetlist}
+                  disabled={!online}
+                  title={!online ? "Connect to duplicate" : undefined}
+                  className="border border-rule/60 px-2.5 py-1 font-mono text-[0.6rem] uppercase tracking-kicker text-cream-dim transition-colors hover:border-cat-practice/60 hover:text-cream disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Duplicate
                 </button>
                 <button
                   onClick={deleteSetlist}
