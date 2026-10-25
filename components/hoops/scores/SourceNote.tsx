@@ -1,12 +1,18 @@
-import type { Fetched } from "@/lib/hoops/scores/data";
+"use client";
+
+import { useLive } from "./LiveProvider";
+import type { SourceMeta } from "@/lib/hoops/scores/types";
 
 /** Where the numbers came from and how fresh they are — and, when the
- *  upstream failed, that this is an old copy (or that there is none). */
-export function SourceNote({ fetched }: { fetched: Fetched<unknown>[] }) {
+ *  upstream failed, that this is an old copy (or that there is none). Under a
+ *  LiveProvider the timestamp follows the live ticks. */
+export function SourceNote({ fetched }: { fetched: SourceMeta[] }) {
+  const live = useLive();
   const errors = fetched.filter((f) => f.error);
   const stale = errors.filter((f) => f.stale);
   const times = fetched.map((f) => f.fetchedAt).filter((t): t is number => t != null);
   const oldest = times.length ? Math.min(...times) : null;
+  const shown = live.fetchedAt ?? oldest;
   const at = (ms: number) =>
     new Intl.DateTimeFormat("en-US", {
       timeZone: "America/Denver",
@@ -25,7 +31,8 @@ export function SourceNote({ fetched }: { fetched: Fetched<unknown>[] }) {
       )}
       <p className="mt-8 font-mono text-[0.58rem] uppercase tracking-kicker text-cream-dimmer">
         Live data from ESPN · times Mountain
-        {oldest ? ` · updated ${at(oldest)}` : ""}
+        {shown ? ` · updated ${at(shown)}` : ""}
+        {live.error ? ` · last tick failed (${live.error})` : ""}
       </p>
     </>
   );

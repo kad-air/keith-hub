@@ -3,10 +3,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import HoopsNav from "@/components/hoops/HoopsNav";
 import GameCard from "@/components/hoops/scores/GameCard";
-import LiveRefresh from "@/components/hoops/scores/LiveRefresh";
-import RealBoxTable from "@/components/hoops/scores/RealBoxTable";
+import LiveBoxScores from "@/components/hoops/scores/LiveBoxScores";
+import LiveProvider from "@/components/hoops/scores/LiveProvider";
 import { SourceNote } from "@/components/hoops/scores/SourceNote";
-import { findGame, getBox, getScoreboard } from "@/lib/hoops/scores/data";
+import { findGame, getBox, getScoreboard, sourceMeta } from "@/lib/hoops/scores/data";
 import { isIsoDate, longDate, todayIn } from "@/lib/hoops/scores/dates";
 
 export const dynamic = "force-dynamic";
@@ -31,7 +31,7 @@ export default async function HoopsRealBoxPage({
     return (
       <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6">
         <HoopsNav active="scores" />
-        <SourceNote fetched={[sb]} />
+        <SourceNote fetched={[sourceMeta(sb)]} />
       </article>
     );
   }
@@ -46,10 +46,8 @@ export default async function HoopsRealBoxPage({
     ...game.tv.home.map((n) => `${n} (${game.home.tri})`),
   ];
 
-  return (
-    <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6">
-      <HoopsNav active="scores" />
-      {game.state === "in" && <LiveRefresh seconds={30} />}
+  const body = (
+    <>
       <p className="mb-3 font-mono text-[0.62rem] uppercase tracking-kicker text-cream-dimmer">
         <Link href={dayHref} className="text-cat-hoops hover:text-cream">
           ‹ {longDate(params.date)}
@@ -67,13 +65,27 @@ export default async function HoopsRealBoxPage({
         <p className="mt-6 font-display text-sm text-cream-dim">
           The box score fills in once the game tips off.
         </p>
-      ) : teams.length === 0 ? (
-        <p className="mt-6 font-display text-sm text-cream-dim">Box score unavailable right now.</p>
       ) : (
-        teams.map((t) => <RealBoxTable key={t.tri} team={t} />)
+        <LiveBoxScores initial={teams} />
       )}
 
-      <SourceNote fetched={box ? [sb, box] : [sb]} />
+      <SourceNote fetched={(box ? [sb, box] : [sb]).map(sourceMeta)} />
+    </>
+  );
+
+  // A game in progress (or about to tip) ticks in place: the card's clock,
+  // totals and last play every few seconds, the box score every 6s.
+  const watch = game.state === "in" || (game.state === "pre" && !game.postponed);
+  return (
+    <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6">
+      <HoopsNav active="scores" />
+      {watch ? (
+        <LiveProvider dates={[params.date]} gameId={game.id} states={{ [game.id]: game.state }}>
+          {body}
+        </LiveProvider>
+      ) : (
+        body
+      )}
     </article>
   );
 }

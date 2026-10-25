@@ -131,28 +131,41 @@ function parseTeamLine(c: J, state: GameState): TeamLine {
   };
 }
 
+/** The status block — the SAME shape in the scoreboard, the summary header
+ *  and the core `…/competitions/<id>/status` resource (`displayClock`,
+ *  `period`, `type{state, name, shortDetail…}`), so one reader serves the
+ *  slow path and the live overlay alike. */
+export function parseStatus(
+  status: J,
+): Pick<Game, "state" | "statusDetail" | "period" | "clock" | "postponed"> {
+  const type = status?.type ?? {};
+  const name = String(type.name ?? "");
+  return {
+    state: stateOf(type),
+    statusDetail: String(type.shortDetail ?? type.detail ?? type.description ?? ""),
+    period: int(status?.period),
+    clock: typeof status?.displayClock === "string" ? status.displayClock : null,
+    postponed: /POSTPONED|CANCELED|SUSPENDED/.test(name),
+  };
+}
+
 /** One competition → a Game. `event` supplies id/date/season when the
  *  competition itself doesn't (the scoreboard nests; the summary header
  *  doesn't). */
 export function parseCompetition(comp: J, event: J = {}): Game {
   const status = comp?.status ?? event?.status ?? {};
-  const type = status.type ?? {};
-  const state = stateOf(type);
+  const st = parseStatus(status);
+  const state = st.state;
   const comps: J[] = Array.isArray(comp?.competitors) ? comp.competitors : [];
   const home = comps.find((c) => c?.homeAway === "home") ?? comps[0];
   const away = comps.find((c) => c?.homeAway === "away") ?? comps[1];
   const seasonKind = seasonKindOf(event?.season?.type ?? comp?.season?.type);
   const notes: J[] = Array.isArray(comp?.notes) ? comp.notes : [];
   const note = notes.map((n) => n?.headline).find((h) => typeof h === "string" && h) ?? null;
-  const name = String(type.name ?? "");
   return {
     id: String(comp?.id ?? event?.id ?? ""),
     startUtc: String(comp?.date ?? event?.date ?? ""),
-    state,
-    statusDetail: String(type.shortDetail ?? type.detail ?? type.description ?? ""),
-    period: int(status.period),
-    clock: typeof status.displayClock === "string" ? status.displayClock : null,
-    postponed: /POSTPONED|CANCELED|SUSPENDED/.test(name),
+    ...st,
     away: parseTeamLine(away, state),
     home: parseTeamLine(home, state),
     tv: parseBroadcasts(comp?.broadcasts),

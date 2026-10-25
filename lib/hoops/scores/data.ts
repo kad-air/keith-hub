@@ -4,22 +4,47 @@
 //
 // Caching, in one place:
 //   - a finished thing (a past day whose games are all final, a final box
-//     score) is stored with final = 1 and never fetched again;
-//   - a live game: 30s; today / tomorrow and unfinished past days: 60s;
-//     further-out days: 15 min; a past day with no games: 6h (an off day
-//     doesn't change, but an empty response shouldn't be trusted forever);
-//     standings: 5 min.
+//     score, a finished game's core read) is stored with final = 1 and never
+//     fetched again;
+//   - a live game's core read (clock, totals, last play — see live.ts): 2.5s;
+//     a live day's scoreboard: 10s; a live box score: 6s; today / tomorrow
+//     and unfinished past days: 60s; further-out days: 15 min; a past day
+//     with no games: 6h (an off day doesn't change, but an empty response
+//     shouldn't be trusted forever); standings: 5 min.
+//   - concurrent readers of one key share one upstream request (the
+//     in-flight map) — the live endpoint is polled every 3s per open tab and
+//     must never fan out into N parallel ESPN fetches of the same resource.
 // 🔴 On an upstream failure the last cached copy is served, flagged stale,
 // with the error — never a blank page that reads as "no games tonight". With
 // no copy at all the page gets the error and says so.
 
 import { getDb } from "@/lib/db";
 import { espnDate, todayIn } from "./dates.ts";
+import {
+  applyLive,
+  coreUrls,
+  liveCandidates,
+  livePolicy,
+  parseCorePlay,
+  parseCoreScore,
+  parseCoreStatus,
+  playRef,
+} from "./live.ts";
 import { findNotable } from "./notable.ts";
 import { parseScoreboard, parseStandings, parseSummary } from "./parse.ts";
 import { boxPolicy, scoreboardPolicy } from "./policy.ts";
 export { findGame } from "./policy.ts";
-import type { GameBox, NotableLine, Scoreboard, Standings } from "./types.ts";
+import type {
+  CoreLive,
+  Game,
+  GameBox,
+  LiveGame,
+  LiveResponse,
+  NotableLine,
+  Scoreboard,
+  SourceMeta,
+  Standings,
+} from "./types.ts";
 
 /** Bump when a parser's OUTPUT shape changes: cached rows are parsed objects,
  *  and a final row is otherwise never re-read. */
@@ -46,6 +71,12 @@ export interface Fetched<T> {
   error: string | null;
 }
 
+/** What a page footer needs from a Fetched — never the data, which would
+ *  otherwise ride into the client bundle a second time as a prop. */
+export function sourceMeta(f: Fetched<unknown>): SourceMeta {
+  return { fetchedAt: f.fetchedAt, stale: f.stale, error: f.error };
+}
+
 interface Row {
   fetched_at: number;
   final: number;
@@ -68,14 +99,16 @@ async function getJson(url: string): Promise<unknown> {
   }
 }
 
+const inflight = new Map<string, Promise<Fetched<unknown>>>();
+
 /**
- * Read-through cache. `policy` sees the freshly parsed value and says how
- * long it stays fresh and whether it is final.
+ * Read-through cache. `load` produces the parsed value (one request or
+ * several); `policy` sees it and says how long it stays fresh and whether it
+ * is final. Concurrent callers of one key await the same load.
  */
-async function cached<T>(
+function cached<T>(
   key: string,
-  url: string,
-  parse: (raw: unknown) => T,
+  load: () => Promise<T>,
   policy: (v: T) => { ttlMs: number; final: boolean },
   now = Date.now(),
 ): Promise<Fetched<T>> {
@@ -95,46 +128,118 @@ async function cached<T>(
     if (prev !== null) {
       const { ttlMs } = policy(prev);
       if (row.final === 1 || now - row.fetched_at < ttlMs) {
-        return { data: prev, fetchedAt: row.fetched_at, stale: false, error: null };
+        return Promise.resolve({ data: prev, fetchedAt: row.fetched_at, stale: false, error: null });
       }
     }
   }
 
-  try {
-    const value = parse(await getJson(url));
-    const { final } = policy(value);
-    db.prepare(
-      `INSERT INTO hoops_scores_cache (key, fetched_at, final, value) VALUES (?, ?, ?, ?)
-       ON CONFLICT(key) DO UPDATE SET fetched_at = excluded.fetched_at,
-         final = excluded.final, value = excluded.value`,
-    ).run(fullKey, now, final ? 1 : 0, JSON.stringify(value));
-    return { data: value, fetchedAt: now, stale: false, error: null };
-  } catch (err) {
-    const msg = err instanceof Error ? (err.name === "AbortError" ? "upstream timed out" : err.message) : String(err);
-    console.error(`[hoops/scores] ${key}: ${msg}`);
-    return prev !== null && row
-      ? { data: prev, fetchedAt: row.fetched_at, stale: true, error: msg }
-      : { data: null, fetchedAt: null, stale: false, error: msg };
-  }
+  const pending = inflight.get(fullKey) as Promise<Fetched<T>> | undefined;
+  if (pending) return pending;
+
+  const run = (async (): Promise<Fetched<T>> => {
+    try {
+      const value = await load();
+      const { final } = policy(value);
+      db.prepare(
+        `INSERT INTO hoops_scores_cache (key, fetched_at, final, value) VALUES (?, ?, ?, ?)
+         ON CONFLICT(key) DO UPDATE SET fetched_at = excluded.fetched_at,
+           final = excluded.final, value = excluded.value`,
+      ).run(fullKey, now, final ? 1 : 0, JSON.stringify(value));
+      return { data: value, fetchedAt: now, stale: false, error: null };
+    } catch (err) {
+      const msg = err instanceof Error ? (err.name === "AbortError" ? "upstream timed out" : err.message) : String(err);
+      console.error(`[hoops/scores] ${key}: ${msg}`);
+      return prev !== null && row
+        ? { data: prev, fetchedAt: row.fetched_at, stale: true, error: msg }
+        : { data: null, fetchedAt: null, stale: false, error: msg };
+    } finally {
+      inflight.delete(fullKey);
+    }
+  })();
+  inflight.set(fullKey, run as Promise<Fetched<unknown>>);
+  return run;
 }
 
 export function getScoreboard(date: string, now = new Date()): Promise<Fetched<Scoreboard>> {
   const today = todayIn(now);
   return cached(
     `scoreboard:${date}`,
-    URLS.scoreboard(date),
-    (raw) => parseScoreboard(raw, date),
+    async () => parseScoreboard(await getJson(URLS.scoreboard(date)), date),
     (sb) => scoreboardPolicy(sb, today),
     now.getTime(),
   );
 }
 
 export function getBox(gameId: string): Promise<Fetched<GameBox>> {
-  return cached(`summary:${gameId}`, URLS.summary(gameId), parseSummary, boxPolicy);
+  return cached(`summary:${gameId}`, async () => parseSummary(await getJson(URLS.summary(gameId))), boxPolicy);
 }
 
 export function getStandings(): Promise<Fetched<Standings>> {
-  return cached("standings", URLS.standings(), parseStandings, () => ({ ttlMs: 5 * MIN, final: false }));
+  return cached(
+    "standings",
+    async () => parseStandings(await getJson(URLS.standings())),
+    () => ({ ttlMs: 5 * MIN, final: false }),
+  );
+}
+
+/**
+ * One game's core read: status, both totals, and the last play (two hops:
+ * situation → the play it points at). The status is the one read that MUST
+ * succeed — a game with no clock is not a live read; a missing total or play
+ * degrades to null and the scoreboard's figure stands.
+ */
+export function getLiveGame(game: Game): Promise<Fetched<CoreLive>> {
+  const urls = coreUrls(game);
+  const soft = async <T,>(f: () => Promise<T>, fallback: T): Promise<T> => {
+    try {
+      return await f();
+    } catch {
+      return fallback;
+    }
+  };
+  return cached(
+    `live:${game.id}`,
+    async () => {
+      const [status, awayScore, homeScore, situation] = await Promise.all([
+        getJson(urls.status).then(parseCoreStatus),
+        soft(() => getJson(urls.awayScore).then(parseCoreScore), null),
+        soft(() => getJson(urls.homeScore).then(parseCoreScore), null),
+        soft(() => getJson(urls.situation), null),
+      ]);
+      const ref = playRef(situation);
+      const lastPlay = ref ? await soft(() => getJson(ref).then(parseCorePlay), null) : null;
+      return { id: game.id, ...status, awayScore, homeScore, lastPlay, fetchedAt: Date.now() };
+    },
+    livePolicy,
+  );
+}
+
+/**
+ * What `/api/hoops/scores/live` returns: the day's live candidates (or the one
+ * game asked for) with the core overlay applied, and — for a single game that
+ * has tipped — its box score. A game whose core read failed outright keeps
+ * its scoreboard copy, so the page degrades to the slow path, never to a hole.
+ */
+export async function getLive(date: string, gameId: string | null, now = new Date()): Promise<Fetched<LiveResponse>> {
+  const sb = await getScoreboard(date, now);
+  if (!sb.data) return { data: null, fetchedAt: null, stale: false, error: sb.error ?? "scoreboard unavailable" };
+  const wanted = gameId
+    ? sb.data.games.filter((g) => g.id === gameId)
+    : liveCandidates(sb.data, now.getTime());
+  const reads = await Promise.all(wanted.map((g) => getLiveGame(g)));
+  const games: LiveGame[] = wanted.map((g, i) => {
+    const live = reads[i].data;
+    return live ? { game: applyLive(g, live), lastPlay: live.lastPlay } : { game: g, lastPlay: null };
+  });
+  const single = gameId ? games[0]?.game : undefined;
+  const box = single && single.state !== "pre" ? (await getBox(single.id)).data : null;
+  const failed = reads.find((r) => r.error);
+  return {
+    data: { date, games, box, fetchedAt: now.getTime() },
+    fetchedAt: now.getTime(),
+    stale: false,
+    error: failed?.error ?? null,
+  };
 }
 
 /** Notable lines for a day: every FINISHED game's box score (each cached

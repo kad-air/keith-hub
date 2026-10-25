@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import HoopsNav from "@/components/hoops/HoopsNav";
 import { SourceNote } from "@/components/hoops/scores/SourceNote";
-import { getStandings } from "@/lib/hoops/scores/data";
+import { getStandings, sourceMeta } from "@/lib/hoops/scores/data";
 
 export const dynamic = "force-dynamic";
 
@@ -75,7 +75,7 @@ export default async function HoopsStandingsPage() {
           Rules under 6th and 10th: 1–6 go straight to the playoffs, 7–10 to the play-in.
         </p>
       )}
-      <SourceNote fetched={[st]} />
+      <SourceNote fetched={[sourceMeta(st)]} />
     </article>
   );
 }

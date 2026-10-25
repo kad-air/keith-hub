@@ -1,6 +1,9 @@
+"use client";
+
 import Link from "next/link";
 import { gameSlug, tvLabel } from "@/lib/hoops/scores/parse";
 import { periodLabels, statusLabel } from "@/lib/hoops/scores/format";
+import { useLiveGame } from "./LiveProvider";
 import type { Game, TeamLine } from "@/lib/hoops/scores/types";
 
 /**
@@ -8,12 +11,18 @@ import type { Game, TeamLine } from "@/lib/hoops/scores/types";
  * live clock, or Final) with the network on the right, then a row per team —
  * tri, record, points by quarter (overtimes appended), total. Away on top,
  * the US convention. The whole card links to the box score.
+ *
+ * Renders the server's Game until a LiveProvider tick carries a fresher copy
+ * (clock, totals, state — see lib/hoops/scores/live.ts); a live game also
+ * prints its last play. Without a provider it is just the server's card.
  */
-export default function GameCard({ game, date }: { game: Game; date: string }) {
+export default function GameCard({ game: initial, date }: { game: Game; date: string }) {
+  const live = useLiveGame(initial.id);
+  const game = live?.game ?? initial;
   const n = Math.max(game.away.linescore.length, game.home.linescore.length);
   const started = game.state !== "pre" && n > 0;
   const labels = started ? periodLabels(n) : [];
-  const live = game.state === "in";
+  const inProgress = game.state === "in";
 
   const row = (t: TeamLine) => {
     const won = game.state === "post" && t.winner;
@@ -42,12 +51,20 @@ export default function GameCard({ game, date }: { game: Game; date: string }) {
       className="block border border-rule/60 px-3 py-2 transition-colors hover:border-cat-hoops/40 hover:bg-ink-raised/60"
     >
       <div className="flex items-baseline justify-between gap-2 font-mono text-[0.62rem] uppercase tracking-kicker">
-        <span className={live ? "text-cat-hoops" : "text-cream-dimmer"}>
-          {live && <span aria-hidden>● </span>}
+        <span className={inProgress ? "text-cat-hoops" : "text-cream-dimmer"}>
+          {inProgress && <span aria-hidden>● </span>}
           {statusLabel(game)}
         </span>
         <span className="truncate text-cream-dimmer">{tvLabel(game.tv)}</span>
       </div>
+      {inProgress && live?.lastPlay && (
+        <p className="mt-0.5 truncate font-mono text-[0.6rem] text-cream-dim">
+          <span className="text-cream-dimmer">
+            {live.lastPlay.clock ? `${live.lastPlay.clock} · ` : ""}
+          </span>
+          {live.lastPlay.text}
+        </p>
+      )}
       {(game.note || game.series) && (
         <p className="mt-0.5 truncate font-mono text-[0.6rem] text-cream-dimmer">
           {[game.note, game.series].filter(Boolean).join(" · ")}
