@@ -183,6 +183,30 @@ export function setSetlistOffline(id: string, offline: boolean): Setlist | null 
   return getSetlistMeta(id);
 }
 
+// A new setlist holding the same charts in the same order — the starting
+// point for "Monday's set, but swap two songs". Members are references, so
+// the copy shares the library charts (editing one still updates both). The
+// offline flag is NOT carried over: warming is a per-setlist opt-in, and a
+// scratch copy shouldn't silently start caching. Returns null if the source
+// doesn't exist.
+export function duplicateSetlist(id: string, name: string): Setlist | null {
+  const db = getDb();
+  if (!getSetlistMeta(id)) return null;
+  const now = new Date().toISOString();
+  const newId = randomUUID();
+  db.transaction(() => {
+    db.prepare(
+      `INSERT INTO setlists (id, name, offline, created_at, updated_at)
+       VALUES (?, ?, 0, ?, ?)`,
+    ).run(newId, name.trim(), now, now);
+    db.prepare(
+      `INSERT INTO setlist_charts (setlist_id, chart_id, sort_order)
+       SELECT ?, chart_id, sort_order FROM setlist_charts WHERE setlist_id = ?`,
+    ).run(newId, id);
+  })();
+  return getSetlistMeta(newId);
+}
+
 export function deleteSetlist(id: string): void {
   const db = getDb();
   // setlist_charts rows cascade away via the FK.
