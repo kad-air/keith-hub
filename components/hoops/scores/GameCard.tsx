@@ -148,13 +148,11 @@ function CardBody({ game, live, kicker }: { game: Game; live: LiveGame | null; k
         </span>
         <span className="min-w-0 text-right text-cream-dimmer">{tvLabel(game.tv)}</span>
       </div>
+      {/* The play's text only: its clock is the clock in the status line
+          above (the status and the last play come off the same read), and
+          printing it twice read as two clocks. */}
       {inProgress && live?.lastPlay && (
-        <p className="mt-0.5 line-clamp-2 font-mono text-[0.6rem] text-cream-dim">
-          <span className="text-cream-dimmer">
-            {live.lastPlay.clock ? `${live.lastPlay.clock} · ` : ""}
-          </span>
-          {live.lastPlay.text}
-        </p>
+        <p className="mt-0.5 line-clamp-2 font-mono text-[0.6rem] text-cream-dim">{live.lastPlay.text}</p>
       )}
       {(game.note || game.series) && (
         <p className="mt-0.5 font-mono text-[0.6rem] text-cream-dimmer">
