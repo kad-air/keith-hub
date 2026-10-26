@@ -6,7 +6,7 @@ import { gameSlug, tvLabel } from "@/lib/hoops/scores/parse";
 import { periodLabels, statusLabel } from "@/lib/hoops/scores/format";
 import { behindLabel, protectedStatus } from "@/lib/hoops/scores/spoiler";
 import { useLiveGame, useSpoiler } from "./LiveProvider";
-import SpoilerSheet from "./SpoilerSheet";
+import SpoilerPanel from "./SpoilerPanel";
 import { HoldBar, useLongPress } from "./useLongPress";
 import type { Game, LiveGame, TeamLine } from "@/lib/hoops/scores/types";
 
@@ -23,11 +23,13 @@ import type { Game, LiveGame, TeamLine } from "@/lib/hoops/scores/types";
  * Spoiler mode (`protect`, today's page — lib/hoops/scores/spoiler.ts): a
  * started game is VEILED until the viewer says otherwise — teams, clock and
  * quarter only, no scores, quarters, records or last play. Hold the card
- * (the feed's Clear-Above gesture, same bar) to reveal it; tap it for the
- * sheet, which also offers "I'm at <quarter> <time>" — after which the card
- * shows the score as of that moment and follows the play-by-play from there
- * (`synced`). A synced card's tap reopens the sheet rather than the live box
- * score, which would spoil it.
+ * (the feed's Clear-Above gesture, same bar) to reveal it; tap it and the
+ * options unfold INSIDE the card (SpoilerPanel) — hold-to-reveal again, or
+ * "I'm at <quarter> <time>", after which the card shows the score as of that
+ * moment and follows the play-by-play from there (`synced`). A synced card's
+ * tap unfolds the same panel rather than opening the live box score, which
+ * would spoil it. Inside the card, not a sheet: at the bottom of a long list
+ * the controls are found where the game is.
  */
 export default function GameCard({
   game: initial,
@@ -40,7 +42,7 @@ export default function GameCard({
 }) {
   const live = useLiveGame(initial.id);
   const sp = useSpoiler();
-  const [sheet, setSheet] = useState(false);
+  const [open, setOpen] = useState(false);
 
   const entry = protect ? sp.spoiler[initial.id] : undefined;
   const guarded = protect && initial.state !== "pre";
@@ -74,39 +76,37 @@ export default function GameCard({
 
   const offsetMs = entry?.mode === "synced" ? entry.offsetMs : 0;
   return (
-    <>
+    <div
+      className={`relative border px-3 py-2 transition-colors ${open ? "border-cat-hoops/60" : "border-rule/60 hover:border-cat-hoops/40"}`}
+      style={{ WebkitTouchCallout: "none", WebkitUserSelect: "none", userSelect: "none" }}
+    >
+      {mode === "veiled" && <HoldBar holding={hold.holding} />}
       <div
         role="button"
         tabIndex={0}
-        aria-label={`${game.away.tri} at ${game.home.tri}: ${mode === "veiled" ? "score hidden, hold to reveal, tap for options" : "synced view, tap for options"}`}
-        onClick={() => setSheet(true)}
+        aria-expanded={open}
+        aria-label={`${game.away.tri} at ${game.home.tri}: ${mode === "veiled" ? "score hidden — hold to reveal, tap for options" : "synced view — tap for options"}`}
+        onClick={() => setOpen((v) => !v)}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
-            setSheet(true);
+            setOpen((v) => !v);
           }
         }}
         {...hold.handlers}
-        style={{ touchAction: "pan-y", WebkitTouchCallout: "none", WebkitUserSelect: "none", userSelect: "none" }}
-        className="relative block cursor-pointer border border-rule/60 px-3 py-2 text-left transition-colors hover:border-cat-hoops/40 hover:bg-ink-raised/60 focus:outline-none focus-visible:border-cat-hoops"
+        style={{ touchAction: "pan-y" }}
+        className="cursor-pointer text-left focus:outline-none focus-visible:text-cream"
       >
-        {mode === "veiled" && <HoldBar holding={hold.holding} />}
         {mode === "veiled" ? (
-          <VeiledBody game={game} />
+          <VeiledBody game={game} hint={open ? "hold to reveal · tap to fold" : "hold to reveal · tap for options"} />
         ) : (
           <CardBody game={game} live={live} kicker={`synced · ${behindLabel(offsetMs)}`} />
         )}
       </div>
-      {sheet && (
-        <SpoilerSheet
-          game={game}
-          date={date}
-          mode={mode}
-          offsetMs={offsetMs}
-          onClose={() => setSheet(false)}
-        />
+      {open && (
+        <SpoilerPanel game={game} date={date} mode={mode} offsetMs={offsetMs} onDone={() => setOpen(false)} />
       )}
-    </>
+    </div>
   );
 }
 
@@ -129,7 +129,7 @@ function CardBody({ game, live, kicker }: { game: Game; live: LiveGame | null; k
         </td>
         <td className="pr-2 text-left text-[0.62rem] text-cream-dimmer">{t.record ?? ""}</td>
         {labels.map((_, i) => (
-          <td key={i} className="w-7 text-right text-[0.66rem] text-cream-dimmer">
+          <td key={i} className="w-7 text-right text-[0.66rem] text-cream-dimmer max-xs:hidden">
             {t.linescore[i] ?? ""}
           </td>
         ))}
@@ -146,18 +146,16 @@ function CardBody({ game, live, kicker }: { game: Game; live: LiveGame | null; k
           {statusLabel(game)}
           {kicker && <span className="text-cream-dimmer"> · {kicker}</span>}
         </span>
-        <span className="truncate text-cream-dimmer">{tvLabel(game.tv)}</span>
+        <span className="min-w-0 text-right text-cream-dimmer">{tvLabel(game.tv)}</span>
       </div>
+      {/* The play's text only: its clock is the clock in the status line
+          above (the status and the last play come off the same read), and
+          printing it twice read as two clocks. */}
       {inProgress && live?.lastPlay && (
-        <p className="mt-0.5 truncate font-mono text-[0.6rem] text-cream-dim">
-          <span className="text-cream-dimmer">
-            {live.lastPlay.clock ? `${live.lastPlay.clock} · ` : ""}
-          </span>
-          {live.lastPlay.text}
-        </p>
+        <p className="mt-0.5 line-clamp-2 font-mono text-[0.6rem] text-cream-dim">{live.lastPlay.text}</p>
       )}
       {(game.note || game.series) && (
-        <p className="mt-0.5 truncate font-mono text-[0.6rem] text-cream-dimmer">
+        <p className="mt-0.5 font-mono text-[0.6rem] text-cream-dimmer">
           {[game.note, game.series].filter(Boolean).join(" · ")}
         </p>
       )}
@@ -168,7 +166,7 @@ function CardBody({ game, live, kicker }: { game: Game; live: LiveGame | null; k
               <th className="text-left font-normal" />
               <th className="font-normal" />
               {labels.map((l) => (
-                <th key={l} className="w-7 text-right font-normal">
+                <th key={l} className="w-7 text-right font-normal max-xs:hidden">
                   {l}
                 </th>
               ))}
@@ -187,7 +185,7 @@ function CardBody({ game, live, kicker }: { game: Game; live: LiveGame | null; k
 
 /** The veiled card: the clock and quarter, the two teams, and how to see
  *  more. Nothing that could spoil — no score, quarters, record or play. */
-function VeiledBody({ game }: { game: Game }) {
+function VeiledBody({ game, hint }: { game: Game; hint: string }) {
   const inProgress = game.state === "in";
   return (
     <>
@@ -196,9 +194,9 @@ function VeiledBody({ game }: { game: Game }) {
           {inProgress && <span aria-hidden>● </span>}
           {protectedStatus(game)}
         </span>
-        <span className="truncate text-cream-dimmer">{tvLabel(game.tv)}</span>
+        <span className="min-w-0 text-right text-cream-dimmer">{tvLabel(game.tv)}</span>
       </div>
-      {game.note && <p className="mt-0.5 truncate font-mono text-[0.6rem] text-cream-dimmer">{game.note}</p>}
+      {game.note && <p className="mt-0.5 font-mono text-[0.6rem] text-cream-dimmer">{game.note}</p>}
       <table className="mt-1 w-full font-mono text-[0.78rem] tabular-nums">
         <tbody>
           {[game.away, game.home].map((t) => (
@@ -215,7 +213,7 @@ function VeiledBody({ game }: { game: Game }) {
         </tbody>
       </table>
       <p className="mt-1 font-mono text-[0.58rem] uppercase tracking-kicker text-cream-dimmer">
-        Score hidden · hold to reveal · tap for options
+        Score hidden · {hint}
       </p>
     </>
   );

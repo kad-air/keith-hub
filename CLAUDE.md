@@ -1186,9 +1186,12 @@ the same side-by-side sampling the header records; re-run it if ESPN's cadence s
 **veiled by default**: the card shows the two teams, the clock and the quarter and nothing else — no
 score, quarters, records, winner or last play, and `Final/OT` reads `Final` (overtime is a result).
 **Hold the card** (the feed's Clear-Above gesture: same 1s, same 2px accent bar — `useLongPress.tsx`
-lifts it) to reveal the score. **Tap** it for the sheet (`SpoilerSheet.tsx`): hold-to-reveal again,
-or **"I'm at <quarter> <time>"** — the hub resolves that game moment to a real-time OFFSET and the
-card then shows the score as of now − offset and follows the play-by-play from there (`synced`).
+lifts it) to reveal the score. **Tap** it and the options unfold INSIDE the card (`SpoilerPanel.tsx`
+— 🔴 part of the card, not a sheet: at the bottom of a long list the controls have to be found where
+the game is): hold-to-reveal again, or **"I'm at <quarter> <time>"** — the hub resolves that game
+moment to a real-time OFFSET and the card then shows the score as of now − offset and follows the
+play-by-play from there (`synced`). The panel stops pointer events at its edge so a press in the
+clock field never starts the card's hold.
 Yesterday's games, past days and the box-score page are untouched. 🔴 **No recorded history is
 needed: the play-by-play IS the history.** Every play ESPN ships carries `wallclock` (the real time
 it happened) plus the cumulative score, so `lib/hoops/scores/spoiler.ts` (**pure**) does it all:
@@ -1207,7 +1210,7 @@ SERVER veils or syncs each game per the viewer's choices; a synced game ships on
 box never ships its plays (`boxForWire`). Choices live per device in localStorage
 (`spoilerStore.ts`, keyed by date, other dates pruned) and ride every tick; any change kicks an
 immediate tick; a synced game whose moment reaches the final is promoted to revealed. A synced
-card's tap reopens the sheet (never the live box score — the sheet offers it with the warning
+card's tap unfolds the same panel (never the live box score — the panel offers it with the warning
 spelled out). Today's **notable lines are last night's only** — a 40-point line names the game it
 came from. Gate: section 10 of `check:hoops:scores` over two summaries recorded WITH plays
 (`summary-plays-*.json`: LAL@UTA final, IND@BKN at 6:57 4th): the final and all eight quarter
@@ -1216,6 +1219,23 @@ after its target and is exactly the last one before it), the envelope exercised,
 rule and its round trip, `ahead` on the future, the veil's touched/untouched split. 🔴 Deliberately
 NOT built: a delay knob (replaced by this design), interpolating the wall-clock between plays
 (could land ahead), spoiler protection on the box-score page.
+
+**The cover screen (2026-10-26).** The owner also reads this on the narrow outer screen of a folding
+phone, so the whole section has to hold at **280px**, not just 375. Two mechanisms: Tailwind gained
+an `xs` breakpoint (360px, `tailwind.config.ts`) so `max-xs:` can drop what cannot fit — the
+GameCard's quarter-by-quarter cells give way to the total there — and `globals.css` carries ONE
+rule: below `xs`, every `.truncate` not marked `data-truncate-ok` WRAPS instead of clipping, since
+at that width an ellipsis eats the half of a line worth reading (a surname, a team) and the gate's
+assertion (b) treats a clipped `truncate` as a failure. The card's last play is `line-clamp-2`
+(a running caption, never a clipped single line); the TV label and notes wrap; the Teams lens row
+and the players' controls wrap; the players' team `<select>` is capped at the page width (a
+`<select>` is as wide as its longest option); the standings table scrolls sideways. 🔴
+`check:hoops:mobile` now walks **four** widths — a SYNTHETIC 280 (the 320 iPhone SE profile
+squeezed), 320, 375, 430 — and **four more pages**: today's scores (its prepare taps a veiled card
+so the unfolded panel's controls are measured too), a recorded past day, a real box score, the
+standings. `CHROME_PATH=<binary>` points it at a specific Chromium where no Google Chrome is
+installed (a container; it still never downloads one). Baseline before the pass: 508 problems at
+280/320 across the sim pages, zero on the scores pages; after: zero.
 
 **Notable lines** (`notable.ts`): every threshold lives in `NOTABLE` and the page prints the rules
 from it. Finished games only. Career/season highs are NOT detected — the upstream carries no
@@ -1378,8 +1398,9 @@ page use, sorted by value a game — the older flagship per-36 no longer appears
 defaults to `http://localhost:3000`, pass `--password` or set `FEED_PASSWORD` for production, `--out`
 picks the screenshot directory). The usability pass below was judged by a human taking screenshots,
 which does not repeat — this is the runnable version. It drives the *installed* Google Chrome through
-`playwright-core` (a devDependency that never downloads a browser) at two real iPhone widths, 375 and
-430, dark, and walks seven pages: the matchup (including a sim and a best-of-seven), Teams, a team page,
+`playwright-core` (a devDependency that never downloads a browser; `CHROME_PATH` names another
+binary) at four widths — a synthetic 280 for a folding phone's cover screen, 320, 375 and 430 —
+dark, and walks eleven pages (the seven below plus the four scores pages, see "The cover screen"): the matchup (including a sim and a best-of-seven), Teams, a team page,
 the rankings, a player page, the side-by-side comparison, and a fresh game. Per page and width it asserts the page does not scroll
 sideways, that nothing carrying Tailwind's `truncate` is *actually* clipping its text (escape hatch:
 `data-truncate-ok` on the element — there are none today, adding one is a decision), that every

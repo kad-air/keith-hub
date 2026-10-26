@@ -31,6 +31,7 @@ export default async function HoopsStandingsPage() {
           {st.data.conferences.map((c) => (
             <section key={c.name}>
               <h3 className="mb-2 font-mono text-[0.68rem] uppercase tracking-kicker text-cat-hoops">{c.name}</h3>
+              <div className="overflow-x-auto">
               <table className="w-full font-mono text-[0.74rem] tabular-nums">
                 <thead>
                   <tr className="border-b border-rule/60 text-[0.58rem] uppercase tracking-kicker text-cream-dimmer">
@@ -66,6 +67,7 @@ export default async function HoopsStandingsPage() {
                   ))}
                 </tbody>
               </table>
+              </div>
             </section>
           ))}
         </div>

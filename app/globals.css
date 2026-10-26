@@ -460,6 +460,21 @@
 }
 
 @layer utilities {
+  /* The cover screen of a folding phone (~280–360px). Below Tailwind's `xs`
+     every `truncate` in the hub WRAPS instead of clipping: at that width an
+     ellipsis eats the half of a line worth reading (a surname, a team), and
+     the gate (scripts/check-hoops-mobile.mjs, assertion b) treats a clipped
+     `truncate` as a failure. `data-truncate-ok` opts a deliberately-elided
+     element back out — the same escape hatch the gate honours. */
+  @media (max-width: 359.98px) {
+    .truncate:not([data-truncate-ok]) {
+      white-space: normal;
+      overflow: visible;
+      text-overflow: clip;
+      overflow-wrap: anywhere;
+    }
+  }
+
   .small-caps {
     font-variant-caps: all-small-caps;
     letter-spacing: 0.14em;

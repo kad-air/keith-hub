@@ -25,14 +25,14 @@ export default function NotableList({
             return (
               <li key={`${n.gameId}-${n.playerId}`} className="border-b border-rule/40">
                 <Link href={n.href} className="block py-1.5 hover:bg-ink-raised/60">
-                  <div className="flex items-baseline justify-between gap-2">
-                    <span className="font-display text-sm text-cream">
+                  <div className="flex flex-wrap items-baseline justify-between gap-x-2">
+                    <span className="min-w-0 font-display text-sm text-cream">
                       {n.name}{" "}
                       <span className="font-mono text-[0.62rem] text-cream-dimmer">
                         {n.tri} v {n.opp}
                       </span>
                     </span>
-                    <span className="whitespace-nowrap font-mono text-[0.6rem] uppercase tracking-kicker text-cat-hoops">
+                    <span className="font-mono text-[0.6rem] uppercase tracking-kicker text-cat-hoops">
                       {n.reasons.join(" · ")}
                     </span>
                   </div>

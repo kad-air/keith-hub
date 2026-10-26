@@ -211,6 +211,10 @@ export default function PlayersClient({ rows, tris, meta, initialSort, initialTe
         </label>
         <select
           id="team-filter"
+          // A <select> is as wide as its longest option; on a 280px cover
+          // screen that is wider than the page. Cap it and let the text clip
+          // inside the control rather than push the page sideways.
+          style={{ maxWidth: "100%" }}
           value={team ?? ""}
           onChange={(e) => pickTeam(e.target.value)}
           className="border border-rule/60 bg-ink px-3 py-2 font-mono text-[0.7rem] uppercase tracking-kicker text-cream-dim transition-colors hover:border-cat-hoops/40"
