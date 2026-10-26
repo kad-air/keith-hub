@@ -303,19 +303,32 @@ export default function SetlistDetailClient({
   );
 
   // Copy the setlist to the clipboard as a numbered list of "Song - Artist"
-  // lines (just the song when there's no artist), in performance order. Read-only, so it works
-  // offline at a gig — no online gating. Briefly flips the label to confirm.
+  // lines (just the song when there's no artist), in performance order.
+  // Two flavours ride the one copy: plain "1. …" lines for iMessage and the
+  // like, and an HTML <ol> for rich editors — Slack's composer reads pasted
+  // "1. " lines as markdown and renders every one of them as a fresh "1.",
+  // but keeps a pasted <ol> as one list. Read-only, so it works offline at a
+  // gig — no online gating. Briefly flips the label to confirm.
   const copyError = useRef<ReturnType<typeof setTimeout> | null>(null);
   const copySetlist = useCallback(async () => {
     if (charts.length === 0) return;
-    const text = charts
-      .map(
-        (c, i) =>
-          `${i + 1}. ${c.artist ? `${c.title} - ${c.artist}` : c.title}`,
-      )
-      .join("\n");
+    const lines = charts.map((c) =>
+      c.artist ? `${c.title} - ${c.artist}` : c.title,
+    );
+    const text = lines.map((line, i) => `${i + 1}. ${line}`).join("\n");
+    const html = `<ol>${lines.map((line) => `<li>${escapeHtml(line)}</li>`).join("")}</ol>`;
     try {
-      await navigator.clipboard.writeText(text);
+      try {
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            "text/plain": new Blob([text], { type: "text/plain" }),
+            "text/html": new Blob([html], { type: "text/html" }),
+          }),
+        ]);
+      } catch {
+        // No ClipboardItem (or the rich write was refused): plain text only.
+        await navigator.clipboard.writeText(text);
+      }
       setCopied(true);
       if (copyError.current) clearTimeout(copyError.current);
       copyError.current = setTimeout(() => setCopied(false), 1500);
@@ -753,4 +766,11 @@ export default function SetlistDetailClient({
       )}
     </article>
   );
+}
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 }
