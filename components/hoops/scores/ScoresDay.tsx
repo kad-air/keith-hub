@@ -1,12 +1,12 @@
 import HoopsNav from "@/components/hoops/HoopsNav";
 import GameCard from "./GameCard";
-import LiveRefresh from "./LiveRefresh";
+import LiveProvider from "./LiveProvider";
 import NotableList from "./NotableList";
 import ScoresDayNav from "./ScoresDayNav";
 import { SourceNote } from "./SourceNote";
-import { getNotable, getScoreboard, type Fetched } from "@/lib/hoops/scores/data";
+import { getNotable, getScoreboard, sourceMeta, type Fetched } from "@/lib/hoops/scores/data";
 import { addDays, longDate, shortDate, todayIn } from "@/lib/hoops/scores/dates";
-import type { Scoreboard } from "@/lib/hoops/scores/types";
+import type { GameState, Scoreboard } from "@/lib/hoops/scores/types";
 
 function Games({
   title,
@@ -66,19 +66,13 @@ export default async function ScoresDay({ date }: { date: string }) {
   const all = [...(prior?.data?.games ?? []), ...(day.data?.games ?? [])];
   const live = all.some((g) => g.state === "in");
   const pending = isToday && (day.data?.games ?? []).some((g) => g.state !== "post" && !g.postponed);
+  // The states this render saw — the provider refreshes the page when one
+  // flips (a tip, a final) so the slow-path fields catch up.
+  const states: Record<string, GameState> = {};
+  for (const g of all) states[g.id] = g.state;
 
-  return (
-    <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6">
-      <HoopsNav active="scores" />
-      <ScoresDayNav
-        date={date}
-        today={today}
-        prev={addDays(date, -1)}
-        next={addDays(date, 1)}
-        label={isToday ? `Today · ${longDate(date)}` : longDate(date)}
-      />
-      {(live || pending) && <LiveRefresh seconds={live ? 30 : 60} />}
-
+  const body = (
+    <>
       {isToday && prior && <Games title={`Last night · ${shortDate(yesterday)}`} sb={prior} />}
       <Games title={isToday ? "Tonight" : "Games"} sb={day} />
 
@@ -90,7 +84,27 @@ export default async function ScoresDay({ date }: { date: string }) {
         />
       )}
 
-      <SourceNote fetched={[day, ...(prior ? [prior] : [])]} />
+      <SourceNote fetched={[day, ...(prior ? [prior] : [])].map(sourceMeta)} />
+    </>
+  );
+
+  return (
+    <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6">
+      <HoopsNav active="scores" />
+      <ScoresDayNav
+        date={date}
+        today={today}
+        prev={addDays(date, -1)}
+        next={addDays(date, 1)}
+        label={isToday ? `Today · ${longDate(date)}` : longDate(date)}
+      />
+      {live || pending ? (
+        <LiveProvider dates={isToday && prior ? [date, yesterday] : [date]} states={states}>
+          {body}
+        </LiveProvider>
+      ) : (
+        body
+      )}
     </article>
   );
 }

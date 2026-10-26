@@ -1139,12 +1139,48 @@ date for any NBA tip.
 **Caching** (`data.ts`, the only impure edge; policy in `policy.ts`, pure): parsed responses in the
 `hoops_scores_cache` table (`lib/db.ts`), keyed `v<CACHE_VERSION>:<kind>:<arg>` — bump
 `CACHE_VERSION` when a parser's output shape changes, because a FINAL row is never re-read. A past
-day whose games are all final and a final box score are cached forever; a live game 30s; today /
-tomorrow 60s; further out 15 min; an empty past day 6h; standings 5 min. 🔴 On an upstream failure
-the last copy is served with a visible "couldn't reach ESPN, showing the copy from …" line — never
-a blank day that reads as an off night. Pages with a live game (or tonight's unfinished slate)
-`router.refresh()` every 30/60s while visible (`LiveRefresh`). "Today" is `todayIn()` in
-America/Denver, never the server's UTC date.
+day whose games are all final, a final box score and a finished game's core read are cached
+forever; a live day's scoreboard 10s; a live box score 6s; a live game's core read 2.5s (see "The
+live overlay" below); today / tomorrow 60s; further out 15 min; an empty past day 6h; standings
+5 min. 🔴 On an upstream failure the last copy is served with a visible "couldn't reach ESPN,
+showing the copy from …" line — never a blank day that reads as an off night. Pages with a live
+game (or tonight's unfinished slate) tick in place through `LiveProvider` (the old whole-page
+`LiveRefresh` is gone). "Today" is `todayIn()` in America/Denver, never the server's UTC date.
+
+**The live overlay — the fast path (2026-10-25).** A game in progress ticks IN PLACE every 3s:
+clock, period, both totals and the last play on every card, the box score on the game page every
+6s. `lib/hoops/scores/live.ts` (**pure**) + `getLive`/`getLiveGame` in `data.ts` +
+`GET /api/hoops/scores/live?date=&game=` + `components/hoops/scores/LiveProvider.tsx` (client
+context; `GameCard`, `LiveBoxScores` and `SourceNote` read it). 🔴 **Why a second path:** ESPN's
+scoreboard is one document republished ~every 10s and its summary trails it; the per-game CORE
+resources (`sports.core.api.espn.com …/competitions/<id>/status`, `…/competitors/<teamId>/score`,
+`…/situation → lastPlay.$ref`) were **measured side by side on live games to LEAD the scoreboard by
+3–15s and the summary header by 15–20s** — the table and the method are in `live.ts`'s header; the
+old 30s cache + 30s whole-page `router.refresh()` left the phone 30–60s behind. 🔴 **It is an
+OVERLAY, never a replacement**: `applyLive` moves exactly state/detail/period/clock/postponed and
+the two totals (a null total keeps the scoreboard's; winner flags are recomputed once `post`) and
+touches nothing else — records, quarters, TV, series come from the scoreboard (now cached 10s on a
+live day), so a quarter cell may trail the total for a few seconds. **The current quarter's points
+are never inferred from the total.** 🔴 **The last play's own `awayScore`/`homeScore` are NOT a
+score source** — measured, they wobble as ESPN re-sequences plays; only its text/clock/period are
+used. `playRef` follows a `$ref` only on ESPN's core host, https. Cadence is decided by the LAST
+response (in progress → `LIVE_POLL_MS` 3s; only scheduled games → `PENDING_POLL_MS` 30s; nothing →
+stop), only while the tab is visible, one tick in flight; a STATE flip (tip, final) triggers one
+`router.refresh()` so the slow-path fields catch up. Scheduled games are probed from
+`TIP_LOOKAHEAD_MS` (5 min) before their listed tip. Server side, `cached()` now takes a loader
+(several requests per key) and dedupes concurrent readers of one key in an in-flight map, so N
+tabs cost one upstream read; a game's core read lives `LIVE_TTL_MS` (2.5s — ESPN's own max-age is
+2–4s) and is final once `post`. Cost, stated: ≤5 small requests per live game per tick, only while
+a scores page is open on a live game. 🔴 The ONLY thing that must succeed in a core read is the
+status; a missing total or play degrades to null and the scoreboard's figure stands, and a game
+whose core read failed outright keeps its scoreboard copy — the page degrades to the slow path,
+never to a hole. `SourceNote` takes `SourceMeta` (never the data) and shows the live tick's time.
+Gate: section 9 of `check:hoops:scores`, over the recorded core responses (`core-*.json`, BKN@IND
+2026-10-25): the parsers, the `$ref` host rule, the overlay's touched/untouched split, the
+candidate rule at the tip window, the policy constants' ordering. 🔴 Deliberately NOT built: a
+locally ticking clock between polls (a game clock stops constantly; a fabricated running clock is a
+confident wrong number) and a stream-delay knob (owner: not worried about spoilers). Verified by
+the same side-by-side sampling the header records; re-run it if ESPN's cadence seems to change.
 
 **Notable lines** (`notable.ts`): every threshold lives in `NOTABLE` and the page prints the rules
 from it. Finished games only. Career/season highs are NOT detected — the upstream carries no

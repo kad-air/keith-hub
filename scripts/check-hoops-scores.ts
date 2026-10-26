@@ -29,7 +29,20 @@ import {
   tvLabel,
 } from "../lib/hoops/scores/parse.ts";
 import { boxPolicy, findGame, scoreboardPolicy } from "../lib/hoops/scores/policy.ts";
-import type { Game, GameBox, PlayerBoxLine, Scoreboard } from "../lib/hoops/scores/types.ts";
+import {
+  applyLive,
+  coreUrls,
+  LIVE_POLL_MS,
+  LIVE_TTL_MS,
+  liveCandidates,
+  livePolicy,
+  parseCorePlay,
+  parseCoreScore,
+  parseCoreStatus,
+  playRef,
+  TIP_LOOKAHEAD_MS,
+} from "../lib/hoops/scores/live.ts";
+import type { CoreLive, Game, GameBox, PlayerBoxLine, Scoreboard } from "../lib/hoops/scores/types.ts";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const FIX = path.join(ROOT, "hoops-scores-fixture");
@@ -240,7 +253,7 @@ check(longDate("2026-10-21") === "Wednesday, October 21, 2026", `longDate, got $
 
 // ── 7. cache policy ──────────────────────────────────────────────────────
 const today = "2026-10-22";
-check(scoreboardPolicy(oct21, today).ttlMs === 30_000, "a day with a live game refreshes every 30s");
+check(scoreboardPolicy(oct21, today).ttlMs === 10_000, "a day with a live game refreshes every 10s (ESPN republishes ~10s)");
 const oct21Done: Scoreboard = { ...oct21, games: oct21.games.map((g) => ({ ...g, state: "post" as const })) };
 check(scoreboardPolicy(oct21Done, today).final, "a finished past day is final");
 check(!scoreboardPolicy(oct21Done, "2026-10-21").final, "today is never final, even all-final");
@@ -249,6 +262,7 @@ check(scoreboardPolicy(oct22, today).ttlMs === 60_000, "today's slate: 60s");
 check(scoreboardPolicy({ date: "2026-11-20", games: [] }, today).ttlMs === 15 * 60_000, "far future: 15 min");
 check(boxPolicy(xmas).final, "a final box score is final");
 check(!boxPolicy({ ...xmas, game: { ...xmas.game, state: "in" } }).final, "a live box score is not");
+check(boxPolicy({ ...xmas, game: { ...xmas.game, state: "in" } }).ttlMs === 6_000, "a live box score lives 6s (ESPN's own max-age)");
 check(findGame(oct21, "GSW-LAL")?.id === gswLal.id && findGame(oct21, gswLal.id)?.id === gswLal.id, "slug or id");
 check(findGame(oct21, "den-okc") === null, "a game not on that day is not found");
 
@@ -271,7 +285,77 @@ for (const c of st.conferences) {
   check(c.rows.every((x) => /^\d+-\d+$/.test(x.l10) && /^[WL-]/.test(x.streak)), `${c.name}: L10 / streak shape`);
 }
 
-// ── 9. a broken response throws instead of reading as an off day ───────
+// ── 9. the live overlay: ESPN's core resources, recorded 2026-10-25 ──────
+// BKN @ IND, 2nd quarter, 6:57 on the clock — status, both score resources,
+// the situation and the play it points at, fetched within the same minute.
+// The score resources (BKN 43, IND 44) were read a few seconds after the
+// status and the play (which still carried 39-39): the overlay moves exactly
+// these fields off their own resources, so the recordings need not agree.
+const coreStatus = parseCoreStatus(load("core-status-401909862.json"));
+check(coreStatus.state === "in" && coreStatus.period === 2, "core status: in progress, 2nd quarter");
+check(coreStatus.clock === "6:57" && coreStatus.statusDetail === "6:57 - 2nd", `core status clock/detail, got ${coreStatus.clock} / ${coreStatus.statusDetail}`);
+check(!coreStatus.postponed, "core status: not postponed");
+check(parseCoreScore(load("core-score-401909862-17.json")) === 43, "BKN (17) score resource reads 43 (shipped as 43.0)");
+check(parseCoreScore(load("core-score-401909862-11.json")) === 44, "IND (11) score resource reads 44");
+check(parseCoreScore({ value: "x" }) === null && parseCoreScore(null) === null, "an unreadable score is null, never 0");
+const situation = load("core-situation-401909862.json");
+const ref = playRef(situation);
+check(
+  ref === "https://sports.core.api.espn.com/v2/sports/basketball/leagues/nba/events/401909862/competitions/401909862/plays/401909862263?lang=en&region=us",
+  `situation → lastPlay ref (https, same host), got ${ref}`,
+);
+check(playRef({ lastPlay: { $ref: "http://evil.example/x" } }) === null, "a $ref off ESPN's core host is never followed");
+check(playRef({}) === null, "no lastPlay → no ref");
+const play = parseCorePlay(load("core-lastplay-401909862.json"));
+check(play?.text === "Obi Toppin enters the game for Pascal Siakam", `last play text, got ${play?.text}`);
+check(play?.clock === "6:57" && play?.period === 2 && play?.scoring === false, "last play clock/period/scoring");
+check(play?.teamId === "11", `last play credited to team 11 (IND), got ${play?.teamId}`);
+check(parseCorePlay({ text: "" }) === null, "a play with no text is null");
+
+// The overlay over a real live scoreboard Game (PHX@POR, 9:08 4th, from the
+// 2026-10-21 recording): moves the clock, the state and the totals; touches
+// NOTHING else.
+const before = phxPor;
+const overlay: CoreLive = {
+  id: before.id, state: "in", statusDetail: "7:50 - 4th", period: 4, clock: "7:50", postponed: false,
+  awayScore: (before.away.score ?? 0) + 3, homeScore: before.home.score, lastPlay: play, fetchedAt: 0,
+};
+const after = applyLive(before, overlay);
+check(after.clock === "7:50" && after.statusDetail === "7:50 - 4th" && after.period === 4, "overlay moves clock/detail/period");
+check(after.away.score === (before.away.score ?? 0) + 3 && after.home.score === before.home.score, "overlay moves the totals");
+const untouched = (g: Game) => JSON.stringify({ ...g, state: 0, statusDetail: 0, period: 0, clock: 0, postponed: 0, away: { ...g.away, score: 0, winner: 0 }, home: { ...g.home, score: 0, winner: 0 } });
+check(untouched(after) === untouched(before), "overlay leaves tri, names, records, quarters, TV, note, series untouched");
+check(JSON.stringify(after.home.linescore) === JSON.stringify(before.home.linescore), "quarters are never inferred from the total");
+check(applyLive(before, { ...overlay, awayScore: null }).away.score === before.away.score, "a null total keeps the scoreboard's");
+const finalOverlay: CoreLive = { ...overlay, state: "post", statusDetail: "Final", clock: "0.0", awayScore: 110, homeScore: 104 };
+const done = applyLive(before, finalOverlay);
+check(done.state === "post" && done.away.winner && !done.home.winner, "once over, the winner is recomputed from the totals");
+const sched = applyLive({ ...before, state: "pre", away: { ...before.away, score: null }, home: { ...before.home, score: null } }, { ...overlay, state: "pre", awayScore: 0, homeScore: 0 });
+check(sched.away.score === null && sched.home.score === null, "a scheduled game stays scoreless on BOTH sides (0-0 is not a score)");
+check(before.state === "in" && before.clock === "9:08", "the fixture game really was live at 9:08 (so the overlay changed something)");
+
+// Which games the live endpoint reads. 2026-10-22's slate is all scheduled;
+// CLE@PHI tips 23:00Z, DEN@OKC 01:30Z the next day.
+const t2255 = Date.parse("2026-10-22T22:55:00Z");
+const near = liveCandidates(oct22, t2255).map(gameSlug);
+check(near.includes("cle-phi") && !near.includes("den-okc"), `5 min before tip CLE@PHI is probed, DEN@OKC not — got ${near}`);
+check(liveCandidates(oct22, t2255 - TIP_LOOKAHEAD_MS - 1).length === 0, "nothing is probed before the lookahead window");
+check(liveCandidates(oct22, Date.parse("2026-10-22T23:30:00Z")).map(gameSlug).includes("cle-phi"), "a listed tip that has passed (delayed) is still probed");
+const liveOnly = liveCandidates(oct21, Date.parse("2026-10-22T03:00:00Z"));
+check(liveOnly.length > 0 && liveOnly.every((g) => g.state === "in"), "finals are never probed; every in-progress game is");
+check(liveOnly.length === oct21.games.filter((g) => g.state === "in").length, "…all of them");
+check(liveCandidates({ date: "x", games: [{ ...phxPor, postponed: true }] }, t2255).length === 0, "a postponed game is not probed");
+
+// Policy + URLs.
+check(livePolicy(overlay).ttlMs === LIVE_TTL_MS && !livePolicy(overlay).final, "a live core read lives LIVE_TTL_MS");
+check(livePolicy(finalOverlay).final, "a finished core read is final");
+check(LIVE_TTL_MS < LIVE_POLL_MS && LIVE_TTL_MS >= 2_000, "the server cache is shorter than the client tick but not below ESPN's own max-age");
+const urls = coreUrls(phxPor);
+check(urls.status.endsWith(`/events/${phxPor.id}/competitions/${phxPor.id}/status`), `status url, got ${urls.status}`);
+check(urls.awayScore.endsWith(`/competitors/${phxPor.away.espnId}/score`) && urls.homeScore.endsWith(`/competitors/${phxPor.home.espnId}/score`), "score urls use each side's ESPN team id");
+check(urls.status.startsWith("https://sports.core.api.espn.com/"), "core host");
+
+// ── 10. a broken response throws instead of reading as an off day ──────
 const throws = (f: () => unknown) => {
   try {
     f();
@@ -283,6 +367,7 @@ const throws = (f: () => unknown) => {
 check(throws(() => parseScoreboard({ error: "nope" }, today)), "scoreboard without events throws");
 check(throws(() => parseSummary({})), "summary without header throws");
 check(throws(() => parseStandings(null)), "standings without children throws");
+check(throws(() => parseCoreStatus({ clock: 1 })), "a core status without a type block throws");
 
 if (problems.length) {
   console.error(`check:hoops:scores — ${problems.length} problem(s):`);

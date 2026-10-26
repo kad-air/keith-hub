@@ -158,3 +158,61 @@ export interface NotableLine {
   /** Sort key — bigger is more notable. */
   score: number;
 }
+
+// ── Live overlay (the fast path) ────────────────────────────────────────────
+//
+// 🔴 ESPN's per-game CORE resources (sports.core.api.espn.com …/competitions/
+// <id>/status, …/competitors/<teamId>/score, …/situation → lastPlay) lead its
+// scoreboard by 3–15s and its summary header by 15–20s — measured side by
+// side on live games, 2026-10-25 (see lib/hoops/scores/live.ts). They carry
+// only the clock, the period, the state, the two totals and the last play,
+// so they are an OVERLAY on a scoreboard Game, never a replacement for it.
+
+export interface LivePlay {
+  text: string;
+  clock: string | null;
+  period: number;
+  scoring: boolean;
+  /** ESPN team id of the team the play is credited to; null for neutral
+   *  plays (end of period, timeouts the source doesn't attribute). */
+  teamId: string | null;
+}
+
+/** What the core resources say about one game, as cached server-side. */
+export interface CoreLive {
+  id: string;
+  state: GameState;
+  statusDetail: string;
+  period: number;
+  clock: string | null;
+  postponed: boolean;
+  /** null when the score resource was unreadable — the scoreboard's stands. */
+  awayScore: number | null;
+  homeScore: number | null;
+  lastPlay: LivePlay | null;
+  /** Epoch ms the core resources were read. */
+  fetchedAt: number;
+}
+
+/** One game as the live endpoint ships it: the scoreboard Game with the core
+ *  overlay applied (`applyLive`), plus the last play. */
+export interface LiveGame {
+  game: Game;
+  lastPlay: LivePlay | null;
+}
+
+/** `GET /api/hoops/scores/live?date=&game=` */
+export interface LiveResponse {
+  date: string;
+  games: LiveGame[];
+  /** Only when a single game was asked for and it has tipped. */
+  box: GameBox | null;
+  fetchedAt: number;
+}
+
+/** The part of a Fetched<T> a page footer needs — never the data. */
+export interface SourceMeta {
+  fetchedAt: number | null;
+  stale: boolean;
+  error: string | null;
+}
