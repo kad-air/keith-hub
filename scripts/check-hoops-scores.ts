@@ -42,6 +42,19 @@ import {
   playRef,
   TIP_LOOKAHEAD_MS,
 } from "../lib/hoops/scores/live.ts";
+import {
+  behindLabel,
+  clockSeconds,
+  effectiveTimes,
+  gameAtMoment,
+  momentAt,
+  offsetForMoment,
+  orderPlays,
+  periodChoices,
+  protectedStatus,
+  veilGame,
+} from "../lib/hoops/scores/spoiler.ts";
+import { parsePlays } from "../lib/hoops/scores/parse.ts";
 import type { CoreLive, Game, GameBox, PlayerBoxLine, Scoreboard } from "../lib/hoops/scores/types.ts";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -355,7 +368,118 @@ check(urls.status.endsWith(`/events/${phxPor.id}/competitions/${phxPor.id}/statu
 check(urls.awayScore.endsWith(`/competitors/${phxPor.away.espnId}/score`) && urls.homeScore.endsWith(`/competitors/${phxPor.home.espnId}/score`), "score urls use each side's ESPN team id");
 check(urls.status.startsWith("https://sports.core.api.espn.com/"), "core host");
 
-// ── 10. a broken response throws instead of reading as an off day ──────
+// ── 10. spoiler mode: the play-by-play as the history ───────────────────
+// Two summaries recorded WITH their plays on 2026-10-25: LAL @ UTA, final
+// (LAL 132, UTA 123 — quarters 29-47, 45-24, 29-29, 29-23), and IND @ BKN
+// with 6:57 left in the 4th. Real-basketball anchors first, then the rules
+// that make the mode safe: a moment can only ever stand on a play at or
+// BEFORE the target, and a typed clock resolves at or PAST it.
+const finalRaw = load("summary-plays-401909861.json");
+const finalBox: GameBox = parseSummary(finalRaw);
+const finalPlays = parsePlays(finalRaw);
+check(finalPlays.length === 512 && finalBox.plays?.length === 512, `LAL@UTA: 512 timed plays, got ${finalPlays.length}`);
+check(finalPlays.every((p) => Number.isFinite(p.wallclockMs) && p.period >= 1), "every play carries a wall-clock and a period");
+const end = momentAt(finalPlays, Infinity);
+check(end !== null && end.final, "the end of the play-by-play is the final");
+check(end?.awayScore === 132 && end?.homeScore === 123, `LAL 132, UTA 123 off the plays, got ${end?.awayScore}-${end?.homeScore}`);
+check(end?.awayScore === finalBox.game.away.score && end?.homeScore === finalBox.game.home.score, "the plays' final agrees with the same payload's header");
+check(JSON.stringify(end?.awayLinescore) === "[29,45,29,29]", `LAL quarters off the plays, got ${end?.awayLinescore}`);
+check(JSON.stringify(end?.homeLinescore) === "[47,24,29,23]", `UTA quarters off the plays, got ${end?.homeLinescore}`);
+check(sum(end?.awayLinescore ?? []) === 132 && sum(end?.homeLinescore ?? []) === 123, "derived quarters add to the final");
+
+// The envelope is exercised: ESPN's wall-clocks really do run backwards in
+// game order on this recording (15 of 512 steps), so a naive "last play with
+// wallclock ≤ target" would differ from the monotone rule somewhere.
+const orderedF = orderPlays(finalPlays);
+const effF = effectiveTimes(orderedF);
+check(orderedF.some((p, i) => i > 0 && p.wallclockMs < effF[i - 1]), "fixture has out-of-order wall-clocks (the envelope matters)");
+check(effF.every((t, i) => i === 0 || t >= effF[i - 1]), "effective times are monotone");
+
+// 🔴 The leak property, swept: at every target the moment stands on a play
+// whose effective time ≤ target, it is exactly the last such play, and the
+// score never goes down as the target advances.
+let prevA = -1;
+let prevH = -1;
+let leak = 0;
+let notLast = 0;
+let nonMono = 0;
+for (let t = effF[0] - 60_000; t <= effF[effF.length - 1] + 60_000; t += 20_000) {
+  const m = momentAt(finalPlays, t);
+  if (!m) {
+    if (t >= effF[0]) leak++;
+    continue;
+  }
+  if (m.atMs > t) leak++;
+  const expectIdx = effF.filter((e) => e <= t).length - 1;
+  if (m.atMs !== effF[expectIdx]) notLast++;
+  if (m.awayScore < prevA || m.homeScore < prevH) nonMono++;
+  prevA = m.awayScore;
+  prevH = m.homeScore;
+}
+check(leak === 0, `a moment never stands on a play after its target (${leak} leaks)`);
+check(notLast === 0, `a moment is the LAST play at or before its target (${notLast} misses)`);
+check(nonMono === 0, `scores never decrease as the target advances (${nonMono})`);
+check(momentAt(finalPlays, effF[0] - 1) === null, "a target before the first play has no moment");
+check(momentAt([], Date.now()) === null, "no plays, no moment");
+
+// Resolving "I'm at 7:32 in the 3rd" on the live game: the first play in game
+// order in the 3rd at or past 7:32 (clock ≤ 452 — the clock counts down), so
+// the view lands behind the viewer, never ahead; then the round trip.
+const liveRaw = load("summary-plays-401909862.json");
+const livePlays = parsePlays(liveRaw);
+const liveBox: GameBox = parseSummary(liveRaw);
+check(liveBox.game.state === "in" && liveBox.game.period === 4 && liveBox.game.clock === "6:57", "IND@BKN recorded live, 6:57 4th");
+const nowL = effectiveTimes(orderPlays(livePlays)).at(-1)! + 5_000;
+const res3 = offsetForMoment(livePlays, 3, 452, nowL);
+check(res3.ok, "3rd · 7:32 resolves on a game in the 4th");
+if (res3.ok) {
+  const ordered = orderPlays(livePlays);
+  const eff = effectiveTimes(ordered);
+  const idx = ordered.findIndex((p) => p.period === 3 && p.clockSec !== null && p.clockSec <= 452);
+  check(idx >= 0 && nowL - eff[idx] === res3.offsetMs, "the offset is now − the FIRST play at or past the typed clock");
+  check(ordered.slice(0, idx).every((p) => p.period < 3 || p.clockSec === null || p.clockSec > 452), "…and no earlier play in game order is at or past it");
+  const back = momentAt(livePlays, nowL - res3.offsetMs);
+  check(back?.period === 3 && back.clock === ordered[idx].clock, `the round trip lands on that play (${back?.period} ${back?.clock})`);
+  check(back !== null && (back.lastPlay?.clock === null || clockSeconds(back.lastPlay?.clock) !== null), "the synced view's clock is the play's own text");
+  check((clockSeconds(back?.clock) ?? 0) <= 452, "the synced view is at or behind the viewer, never ahead");
+}
+check(!offsetForMoment(livePlays, 4, 120, nowL).ok, "4th · 2:00 is ahead of a game at 6:57 in the 4th");
+check(!offsetForMoment(livePlays, 5, 300, nowL).ok, "overtime is ahead of a game still in the 4th");
+const r1 = offsetForMoment(livePlays, 1, 720, nowL);
+check(r1.ok && r1.period === 1 && r1.clock === "12:00", "1st · 12:00 is the opening tip");
+const r2 = offsetForMoment(livePlays, 2, 720, nowL);
+check(r2.ok && r2.period === 2, "1st quarter over → 2nd · 12:00 resolves into the 2nd");
+check(!offsetForMoment([], 1, 100, nowL).ok, "no plays → no resolution");
+const fin = offsetForMoment(finalPlays, 4, 0, nowL);
+check(fin.ok && momentAt(finalPlays, nowL - fin.offsetMs)?.final === true, "4th · 0.0 on a final resolves to the end");
+
+// The veil and the card copy: a protected card says where, never what.
+check(protectedStatus(xmas.game) === "Final", `Final/OT reads Final when veiled, got ${protectedStatus(xmas.game)}`);
+check(protectedStatus(phxPor) === "9:08 - 4th", "a live clock passes through the veil");
+const veiled = veilGame(xmas.game);
+check(veiled.away.score === null && veiled.home.score === null, "veiled: no scores");
+check(veiled.away.linescore.length === 0 && veiled.home.linescore.length === 0, "veiled: no quarters");
+check(veiled.away.record === null && !veiled.away.winner && !veiled.home.winner, "veiled: no records, no winner");
+check(veiled.statusDetail === "Final" && veiled.state === "post", "veiled: the OT suffix is gone, the state stays");
+check(veiled.away.tri === "MIN" && veiled.home.name === xmas.game.home.name && veiled.startUtc === xmas.game.startUtc, "veiled: teams, names, tip untouched");
+const synced = gameAtMoment(liveBox.game, momentAt(livePlays, nowL - (res3.ok ? res3.offsetMs : 0))!);
+check(synced.state === "in" && synced.period === 3 && synced.away.score !== null && synced.away.linescore.length === 3, "synced card: 3rd quarter, three quarter cells");
+check(synced.statusDetail.endsWith("- 3rd"), `synced status reads the moment, got ${synced.statusDetail}`);
+const atEnd = gameAtMoment(finalBox.game, end!);
+check(atEnd.state === "post" && atEnd.away.winner && !atEnd.home.winner && atEnd.statusDetail === "Final", "a synced view that reaches the end is a final with a winner");
+
+check(clockSeconds("7:32") === 452 && clockSeconds("12:00") === 720 && clockSeconds("24.7") === 24.7, "clock text parses");
+check(clockSeconds("abc") === null && clockSeconds("") === null && clockSeconds(null) === null, "non-clocks are null");
+check(behindLabel(0) === "0:00 behind" && behindLabel(65_000) === "1:05 behind" && behindLabel(3_900_000) === "1h 05m behind", "behind labels");
+check(periodChoices(2).length === 4 && periodChoices(6).at(-1)?.label === "2OT", "period choices");
+
+// The impure half can't run here (SQLite), so pin its two rules statically:
+// getLive veils through the one veil, and the box never ships its plays.
+const dataSrc = fs.readFileSync(path.join(ROOT, "lib/hoops/scores/data.ts"), "utf8");
+check(/veilGame\(g\)/.test(dataSrc), "getLive veils with veilGame");
+check(/\{ game: b\.game, teams: b\.teams \}/.test(dataSrc), "the wire box is built without plays");
+
+// ── 11. a broken response throws instead of reading as an off day ──────
 const throws = (f: () => unknown) => {
   try {
     f();

@@ -6,22 +6,34 @@ import ScoresDayNav from "./ScoresDayNav";
 import { SourceNote } from "./SourceNote";
 import { getNotable, getScoreboard, sourceMeta, type Fetched } from "@/lib/hoops/scores/data";
 import { addDays, longDate, shortDate, todayIn } from "@/lib/hoops/scores/dates";
+import { veilGame } from "@/lib/hoops/scores/spoiler";
 import type { GameState, Scoreboard } from "@/lib/hoops/scores/types";
 
 function Games({
   title,
   sb,
+  protect = false,
 }: {
   title: string;
   sb: Fetched<Scoreboard>;
+  /** Spoiler mode: every started game is veiled BEFORE it is handed to the
+   *  client component, so today's scores are in neither the HTML nor the
+   *  RSC payload until the viewer reveals them. */
+  protect?: boolean;
 }) {
   const games = sb.data?.games ?? [];
+  const started = games.filter((g) => g.state !== "pre").length;
   return (
     <section className="mt-6 first:mt-0">
       <h3 className="mb-2 font-mono text-[0.68rem] uppercase tracking-kicker text-cat-hoops">
         {title}
         {games.length > 0 && <span className="text-cream-dimmer"> · {games.length}</span>}
       </h3>
+      {protect && started > 0 && (
+        <p className="mb-2 font-mono text-[0.6rem] uppercase tracking-kicker text-cream-dimmer">
+          Scores hidden · hold a game to reveal it · tap to sync to where you are
+        </p>
+      )}
       {!sb.data ? (
         <p className="font-display text-sm text-cream-dim">Scores unavailable right now.</p>
       ) : games.length === 0 ? (
@@ -29,7 +41,12 @@ function Games({
       ) : (
         <div className="grid gap-2 sm:grid-cols-2">
           {games.map((g) => (
-            <GameCard key={g.id} game={g} date={sb.data!.date} />
+            <GameCard
+              key={g.id}
+              game={protect && g.state !== "pre" ? veilGame(g) : g}
+              date={sb.data!.date}
+              protect={protect}
+            />
           ))}
         </div>
       )}
@@ -56,9 +73,10 @@ export default async function ScoresDay({ date }: { date: string }) {
     isToday ? getScoreboard(yesterday) : Promise.resolve(null),
   ]);
 
-  // Today's notable is last night's: tonight's lines aren't finished yet
-  // (any that are get folded in too).
-  const notableDays = [prior, day].filter((s): s is Fetched<Scoreboard> => !!s?.data);
+  // Today's notable is last night's. Tonight's finished games are NOT folded
+  // in: today's page is spoiler-protected, and a 40-point line names the
+  // game it came from. They show up tomorrow, as last night's.
+  const notableDays = (isToday ? [prior] : [day]).filter((s): s is Fetched<Scoreboard> => !!s?.data);
   const notable = await Promise.all(notableDays.map((s) => getNotable(s.data!)));
   const lines = notable.flatMap((n) => n.lines).sort((a, b) => b.score - a.score);
   const missing = notable.reduce((s, n) => s + n.missing, 0);
@@ -74,13 +92,13 @@ export default async function ScoresDay({ date }: { date: string }) {
   const body = (
     <>
       {isToday && prior && <Games title={`Last night · ${shortDate(yesterday)}`} sb={prior} />}
-      <Games title={isToday ? "Tonight" : "Games"} sb={day} />
+      <Games title={isToday ? "Tonight" : "Games"} sb={day} protect={isToday} />
 
-      {(lines.length > 0 || all.some((g) => g.state === "post")) && (
+      {(lines.length > 0 || (isToday ? prior?.data?.games ?? [] : all).some((g) => g.state === "post")) && (
         <NotableList
           lines={lines}
           missing={missing}
-          title={isToday ? "Notable · last night & today" : "Notable"}
+          title={isToday ? "Notable · last night" : "Notable"}
         />
       )}
 
@@ -98,8 +116,8 @@ export default async function ScoresDay({ date }: { date: string }) {
         next={addDays(date, 1)}
         label={isToday ? `Today · ${longDate(date)}` : longDate(date)}
       />
-      {live || pending ? (
-        <LiveProvider dates={isToday && prior ? [date, yesterday] : [date]} states={states}>
+      {live || pending || isToday ? (
+        <LiveProvider dates={isToday && prior ? [date, yesterday] : [date]} states={states} protect={isToday}>
           {body}
         </LiveProvider>
       ) : (

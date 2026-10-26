@@ -33,6 +33,7 @@ import {
 import { findNotable } from "./notable.ts";
 import { parseScoreboard, parseStandings, parseSummary } from "./parse.ts";
 import { boxPolicy, scoreboardPolicy } from "./policy.ts";
+import { gameAtMoment, momentAt, offsetForMoment, veilGame } from "./spoiler.ts";
 export { findGame } from "./policy.ts";
 import type {
   CoreLive,
@@ -44,11 +45,12 @@ import type {
   Scoreboard,
   SourceMeta,
   Standings,
+  SyncResolution,
 } from "./types.ts";
 
 /** Bump when a parser's OUTPUT shape changes: cached rows are parsed objects,
  *  and a final row is otherwise never re-read. */
-const CACHE_VERSION = 1;
+const CACHE_VERSION = 2; // 2: GameBox gained `plays` (spoiler mode)
 
 const BASE = "https://site.api.espn.com/apis";
 const URLS = {
@@ -214,32 +216,88 @@ export function getLiveGame(game: Game): Promise<Fetched<CoreLive>> {
   );
 }
 
+/** Spoiler mode, as the client states it on each tick (lib/hoops/scores/
+ *  spoiler.ts). `protect` is on for TODAY's page: every started game not
+ *  named in `reveal` and not in `sync` is veiled server-side, so no score for
+ *  it ever reaches the wire; a synced game ships only its moment. */
+export interface SpoilerRequest {
+  protect: boolean;
+  reveal: ReadonlySet<string>;
+  /** game id → real-time offset in ms. */
+  sync: ReadonlyMap<string, number>;
+}
+
+const NO_SPOILER: SpoilerRequest = { protect: false, reveal: new Set(), sync: new Map() };
+
+/** The box score without its play-by-play — the plays never go to the client. */
+const boxForWire = (b: GameBox | null): GameBox | null => (b ? { game: b.game, teams: b.teams } : null);
+
 /**
  * What `/api/hoops/scores/live` returns: the day's live candidates (or the one
  * game asked for) with the core overlay applied, and — for a single game that
  * has tipped — its box score. A game whose core read failed outright keeps
  * its scoreboard copy, so the page degrades to the slow path, never to a hole.
+ * Under `protect` the day's finals join the list too, since a revealed final
+ * needs its score and a veiled one needs its veil.
  */
-export async function getLive(date: string, gameId: string | null, now = new Date()): Promise<Fetched<LiveResponse>> {
+export async function getLive(
+  date: string,
+  gameId: string | null,
+  now = new Date(),
+  spoiler: SpoilerRequest = NO_SPOILER,
+): Promise<Fetched<LiveResponse>> {
   const sb = await getScoreboard(date, now);
   if (!sb.data) return { data: null, fetchedAt: null, stale: false, error: sb.error ?? "scoreboard unavailable" };
+  const nowMs = now.getTime();
   const wanted = gameId
     ? sb.data.games.filter((g) => g.id === gameId)
-    : liveCandidates(sb.data, now.getTime());
-  const reads = await Promise.all(wanted.map((g) => getLiveGame(g)));
-  const games: LiveGame[] = wanted.map((g, i) => {
-    const live = reads[i].data;
-    return live ? { game: applyLive(g, live), lastPlay: live.lastPlay } : { game: g, lastPlay: null };
-  });
-  const single = gameId ? games[0]?.game : undefined;
-  const box = single && single.state !== "pre" ? (await getBox(single.id)).data : null;
-  const failed = reads.find((r) => r.error);
+    : spoiler.protect
+      ? sb.data.games.filter((g) => g.state !== "pre" || liveCandidates({ ...sb.data!, games: [g] }, nowMs).length > 0)
+      : liveCandidates(sb.data, nowMs);
+  // The core read only for games still going; a final's scoreboard copy is final.
+  const reads = await Promise.all(wanted.map((g) => (g.state === "post" ? null : getLiveGame(g))));
+  const games: LiveGame[] = await Promise.all(
+    wanted.map(async (g, i) => {
+      const live = reads[i]?.data ?? null;
+      const current: LiveGame = live
+        ? { game: applyLive(g, live), lastPlay: live.lastPlay }
+        : { game: g, lastPlay: null };
+      if (!spoiler.protect || g.state === "pre") return current;
+      if (spoiler.reveal.has(g.id)) return current;
+      const offset = spoiler.sync.get(g.id);
+      if (offset !== undefined) {
+        const box = (await getBox(g.id)).data;
+        const moment = box?.plays?.length ? momentAt(box.plays, nowMs - offset) : null;
+        return moment
+          ? { game: gameAtMoment(g, moment), lastPlay: moment.lastPlay, moment }
+          : { game: veilGame(g), lastPlay: null, veiled: true, moment: null };
+      }
+      return { game: veilGame(g), lastPlay: null, veiled: true };
+    }),
+  );
+  const single = gameId ? games[0] : undefined;
+  const showBox = single && single.game.state !== "pre" && !single.veiled && !single.moment;
+  const box = showBox ? boxForWire((await getBox(single.game.id)).data) : null;
+  const failed = reads.find((r) => r?.error);
   return {
-    data: { date, games, box, fetchedAt: now.getTime() },
-    fetchedAt: now.getTime(),
+    data: { date, games, box, fetchedAt: nowMs },
+    fetchedAt: nowMs,
     stale: false,
     error: failed?.error ?? null,
   };
+}
+
+/** "I'm at `clockSec` left in `period`" for one game → the offset to view
+ *  at, off the play-by-play (the box score's cache, 6s while live). */
+export async function resolveSync(
+  gameId: string,
+  period: number,
+  clockSec: number,
+  now = new Date(),
+): Promise<SyncResolution> {
+  const box = (await getBox(gameId)).data;
+  if (!box?.plays?.length) return { ok: false, reason: "no-plays" };
+  return offsetForMoment(box.plays, period, clockSec, now.getTime());
 }
 
 /** Notable lines for a day: every FINISHED game's box score (each cached

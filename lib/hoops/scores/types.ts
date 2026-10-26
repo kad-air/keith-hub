@@ -119,6 +119,10 @@ export interface GameBox {
   game: Game;
   /** [away, home]. Empty before tip. */
   teams: TeamBoxScore[];
+  /** The play-by-play, in the source's order (spoiler mode reads it; see
+   *  `Play`). Absent on rows cached before it was parsed, and stripped from
+   *  anything sent to the client. */
+  plays?: Play[];
 }
 
 export interface StandingRow {
@@ -199,6 +203,12 @@ export interface CoreLive {
 export interface LiveGame {
   game: Game;
   lastPlay: LivePlay | null;
+  /** Spoiler mode: the game is veiled (today's page, not revealed, not
+   *  synced) — `game` carries no scores, quarters, records or winner. */
+  veiled?: boolean;
+  /** Spoiler mode: the game as of now − the viewer's offset, off the
+   *  play-by-play. null when the offset reaches before the first play. */
+  moment?: MomentSnapshot | null;
 }
 
 /** `GET /api/hoops/scores/live?date=&game=` */
@@ -208,6 +218,8 @@ export interface LiveResponse {
   /** Only when a single game was asked for and it has tipped. */
   box: GameBox | null;
   fetchedAt: number;
+  /** Only when `?at=P:SS` was asked. */
+  resolution?: SyncResolution | null;
 }
 
 /** The part of a Fetched<T> a page footer needs — never the data. */
@@ -216,3 +228,50 @@ export interface SourceMeta {
   stale: boolean;
   error: string | null;
 }
+
+// ── Spoiler mode (today's page) ────────────────────────────────────────────
+//
+// One play of ESPN's play-by-play, as the summary ships it. 🔴 `wallclockMs`
+// is what makes "I'm at 7:32 in the 3rd" resolvable: every play carries the
+// real time it happened, so a game moment maps to a real-time offset and the
+// card can follow the play-by-play from there — no recorded history needed.
+export interface Play {
+  id: string;
+  sequence: number;
+  period: number;
+  /** "7:32", "24.7" — the source's text. */
+  clock: string | null;
+  /** Seconds left in the period, parsed from `clock`; null when unparseable. */
+  clockSec: number | null;
+  wallclockMs: number;
+  awayScore: number;
+  homeScore: number;
+  text: string;
+  scoring: boolean;
+  teamId: string | null;
+}
+
+/** The game as of one real-time instant, read off the play-by-play. */
+export interface MomentSnapshot {
+  period: number;
+  clock: string | null;
+  awayScore: number;
+  homeScore: number;
+  /** Points per period up to and including `period`, derived from the
+   *  cumulative score at each period's last play — never inferred. */
+  awayLinescore: number[];
+  homeLinescore: number[];
+  lastPlay: LivePlay | null;
+  /** The moment is the end of the game. */
+  final: boolean;
+  /** Effective real time of the play this snapshot stands on. */
+  atMs: number;
+}
+
+/** What `?at=P:SS` resolved to. */
+export type SyncResolution =
+  | { ok: true; offsetMs: number; period: number; clock: string | null }
+  | { ok: false; reason: "ahead" | "no-plays" };
+
+/** The per-device choice for one protected game (localStorage). */
+export type SpoilerEntry = { mode: "revealed" } | { mode: "synced"; offsetMs: number };

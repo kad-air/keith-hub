@@ -18,6 +18,7 @@ import type {
   Game,
   GameBox,
   GameState,
+  Play,
   PlayerBoxLine,
   SeasonKind,
   StandingRow,
@@ -239,6 +240,44 @@ function parsePlayer(a: J, names: string[]): PlayerBoxLine {
   };
 }
 
+/** "7:32" → 452, "24.7" → 24.7, anything else → null. The one parser for a
+ *  game clock's text — the play-by-play, the spoiler sheet's input and the
+ *  gate all go through it. */
+export function clockSeconds(text: unknown): number | null {
+  const s = String(text ?? "").trim();
+  const m = /^(\d{1,2}):(\d{2})(?:\.(\d+))?$/.exec(s);
+  if (m) return Number(m[1]) * 60 + Number(m[2]) + (m[3] ? Number(`0.${m[3]}`) : 0);
+  return /^\d{1,3}(?:\.\d+)?$/.test(s) ? Number(s) : null;
+}
+
+/** The summary's play-by-play. A play without a wall-clock or a period is
+ *  dropped — it cannot be placed in time, which is the one thing spoiler mode
+ *  needs from it. */
+export function parsePlays(raw: J): Play[] {
+  const list: J[] = Array.isArray(raw?.plays) ? raw.plays : [];
+  const out: Play[] = [];
+  for (const p of list) {
+    const wall = Date.parse(String(p?.wallclock ?? ""));
+    const period = int(p?.period?.number);
+    if (!Number.isFinite(wall) || period <= 0) continue;
+    const clock = typeof p?.clock?.displayValue === "string" ? p.clock.displayValue : null;
+    out.push({
+      id: String(p?.id ?? ""),
+      sequence: int(p?.sequenceNumber),
+      period,
+      clock,
+      clockSec: clockSeconds(clock),
+      wallclockMs: wall,
+      awayScore: int(p?.awayScore),
+      homeScore: int(p?.homeScore),
+      text: String(p?.text ?? p?.shortText ?? "").trim(),
+      scoring: p?.scoringPlay === true,
+      teamId: p?.team?.id != null ? String(p.team.id) : null,
+    });
+  }
+  return out;
+}
+
 export function parseSummary(raw: J): GameBox {
   const comp = raw?.header?.competitions?.[0];
   if (!comp) throw new Error("summary: no header competition — not a summary response");
@@ -273,7 +312,7 @@ export function parseSummary(raw: J): GameBox {
     teams.push({ tri, name: nameFor(tri, block?.team?.displayName), homeAway, players, totals });
   }
   teams.sort((a, b) => (a.homeAway === b.homeAway ? 0 : a.homeAway === "away" ? -1 : 1));
-  return { game, teams };
+  return { game, teams, plays: parsePlays(raw) };
 }
 
 export function parseStandings(raw: J): Standings {

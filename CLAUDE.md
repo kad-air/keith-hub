@@ -1182,6 +1182,41 @@ locally ticking clock between polls (a game clock stops constantly; a fabricated
 confident wrong number) and a stream-delay knob (owner: not worried about spoilers). Verified by
 the same side-by-side sampling the header records; re-run it if ESPN's cadence seems to change.
 
+**Spoiler mode — today's page (2026-10-26, owner's design).** On TODAY's page every started game is
+**veiled by default**: the card shows the two teams, the clock and the quarter and nothing else — no
+score, quarters, records, winner or last play, and `Final/OT` reads `Final` (overtime is a result).
+**Hold the card** (the feed's Clear-Above gesture: same 1s, same 2px accent bar — `useLongPress.tsx`
+lifts it) to reveal the score. **Tap** it for the sheet (`SpoilerSheet.tsx`): hold-to-reveal again,
+or **"I'm at <quarter> <time>"** — the hub resolves that game moment to a real-time OFFSET and the
+card then shows the score as of now − offset and follows the play-by-play from there (`synced`).
+Yesterday's games, past days and the box-score page are untouched. 🔴 **No recorded history is
+needed: the play-by-play IS the history.** Every play ESPN ships carries `wallclock` (the real time
+it happened) plus the cumulative score, so `lib/hoops/scores/spoiler.ts` (**pure**) does it all:
+`momentAt(plays, targetMs)` (the game as of an instant, quarters DERIVED from each period's last
+play, never inferred), `offsetForMoment(plays, period, clockSec, now)`, `veilGame`, `gameAtMoment`,
+`protectedStatus`. `parseSummary` now also parses `plays` into `GameBox.plays` (`CACHE_VERSION` 2).
+🔴 **Everything errs toward showing LESS**: wall-clocks are NOT monotone in game order (ESPN
+re-sequences; measured 15 of 512 steps on a real final), so each play's EFFECTIVE time is the
+running max in game order and a moment is "the last play with effective time ≤ target" — at or
+BEFORE the truth; a typed clock resolves to the first play AT OR PAST it (clock ≤ typed), so the
+view lands a few game-seconds behind the viewer's stream, never ahead; the synced clock is the
+play's own text and steps play to play — nothing is ticked locally. 🔴 **No hidden score is ever on
+the wire**: `ScoresDay` veils today's started games BEFORE handing them to the client card (so the
+HTML and the RSC payload carry none), and the live endpoint takes `protect=1&reveal=&sync=` so the
+SERVER veils or syncs each game per the viewer's choices; a synced game ships only its moment; the
+box never ships its plays (`boxForWire`). Choices live per device in localStorage
+(`spoilerStore.ts`, keyed by date, other dates pruned) and ride every tick; any change kicks an
+immediate tick; a synced game whose moment reaches the final is promoted to revealed. A synced
+card's tap reopens the sheet (never the live box score — the sheet offers it with the warning
+spelled out). Today's **notable lines are last night's only** — a 40-point line names the game it
+came from. Gate: section 10 of `check:hoops:scores` over two summaries recorded WITH plays
+(`summary-plays-*.json`: LAL@UTA final, IND@BKN at 6:57 4th): the final and all eight quarter
+figures off the plays, the leak property swept over the whole game (a moment never stands on a play
+after its target and is exactly the last one before it), the envelope exercised, the first-at-or-past
+rule and its round trip, `ahead` on the future, the veil's touched/untouched split. 🔴 Deliberately
+NOT built: a delay knob (replaced by this design), interpolating the wall-clock between plays
+(could land ahead), spoiler protection on the box-score page.
+
 **Notable lines** (`notable.ts`): every threshold lives in `NOTABLE` and the page prints the rules
 from it. Finished games only. Career/season highs are NOT detected — the upstream carries no
 per-player history.
