@@ -302,14 +302,17 @@ export default function SetlistDetailClient({
     [setlist.id, router],
   );
 
-  // Copy the setlist to the clipboard as plain "Song - Artist" lines (just the
-  // song when there's no artist), in performance order. Read-only, so it works
+  // Copy the setlist to the clipboard as a numbered list of "Song - Artist"
+  // lines (just the song when there's no artist), in performance order. Read-only, so it works
   // offline at a gig — no online gating. Briefly flips the label to confirm.
   const copyError = useRef<ReturnType<typeof setTimeout> | null>(null);
   const copySetlist = useCallback(async () => {
     if (charts.length === 0) return;
     const text = charts
-      .map((c) => (c.artist ? `${c.title} - ${c.artist}` : c.title))
+      .map(
+        (c, i) =>
+          `${i + 1}. ${c.artist ? `${c.title} - ${c.artist}` : c.title}`,
+      )
       .join("\n");
     try {
       await navigator.clipboard.writeText(text);
@@ -602,7 +605,7 @@ export default function SetlistDetailClient({
             title={
               charts.length === 0
                 ? "Nothing to copy yet"
-                : "Copy as Song - Artist lines"
+                : "Copy as a numbered Song - Artist list"
             }
             className="border border-rule/60 px-3 py-1.5 font-mono text-[0.7rem] uppercase tracking-kicker text-cream-dim transition-colors hover:border-cat-practice/60 hover:text-cream disabled:cursor-not-allowed disabled:opacity-50"
           >
