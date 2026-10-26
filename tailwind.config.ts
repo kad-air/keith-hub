@@ -8,6 +8,13 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      // One breakpoint BELOW a normal phone: `max-xs:` is for the narrow cover
+      // screen of a folding phone (~280–360px), where a quarter-by-quarter
+      // line score has to give way to the total. Everything else still keys
+      // off `sm`.
+      screens: {
+        xs: "360px",
+      },
       colors: {
         ink: {
           DEFAULT: "rgb(var(--ink) / <alpha-value>)",

@@ -69,7 +69,9 @@ export default function TeamsClient({
 
   return (
     <>
-      <div className="flex gap-2">
+      {/* Four lenses in one row on a phone; on a cover screen they wrap two by
+          two rather than push the fourth off the right edge. */}
+      <div className="flex flex-wrap gap-2">
         {modes.map((m) => (
           <button
             key={m}

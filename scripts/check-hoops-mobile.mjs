@@ -114,8 +114,21 @@ function resolveDevice(names, expectedWidth) {
   );
 }
 
+// The cover screen of a folding phone is narrower than any phone Playwright
+// ships a profile for, so the narrowest width is SYNTHETIC: the 320-wide
+// iPhone SE profile squeezed to 280 CSS px. 280 is the floor every hoops
+// page has to clear; 320 is the original SE, the narrowest real phone.
+function narrowed(base, width) {
+  return {
+    name: `${base.name} squeezed to ${width}px`,
+    device: { ...base.device, viewport: { ...base.device.viewport, width } },
+  };
+}
+const se320 = resolveDevice(["iPhone SE", "iPhone 5"], 320);
 const WIDTHS = [
-  resolveDevice(["iPhone SE (3rd gen)", "iPhone SE", "iPhone 8"], 375),
+  narrowed(se320, 280),
+  se320,
+  resolveDevice(["iPhone SE (3rd gen)", "iPhone 8"], 375),
   resolveDevice(["iPhone 14 Pro Max", "iPhone 15 Pro Max"], 430),
 ];
 
@@ -171,6 +184,28 @@ const PAGES = [
     path: "/hoops/game/new?home=DEN&away=OKC",
     landmark: "one simulated game",
   },
+  // The REAL scores section (lib/hoops/scores/). Today's page is spoiler-
+  // protected: when a game has started, its card is veiled and a tap unfolds
+  // the options INSIDE the card — the prepare step opens one so the quarter
+  // select, the clock field and the buttons are measured on screen too. On a
+  // day with nothing started there is nothing to unfold, and that is fine.
+  {
+    id: "scores-today",
+    path: "/hoops/scores",
+    landmark: "Live data from ESPN",
+    async prepare(page) {
+      await waitForHydration(page);
+      const veiled = page.getByRole("button", { name: /score hidden/i }).first();
+      if ((await veiled.count()) > 0) {
+        await clickUntilText(page, veiled, "Hold to reveal the score");
+      }
+    },
+  },
+  // Opening week 2026, recorded in hoops-scores-fixture/: a full slate with
+  // finals, so the quarter-by-quarter line scores render.
+  { id: "scores-day", path: "/hoops/scores/2026-10-21", landmark: "Live data from ESPN" },
+  { id: "scores-game", path: "/hoops/scores/2026-10-21/atl-orl", landmark: "Atlanta Hawks" },
+  { id: "standings", path: "/hoops/standings", landmark: "Live data from ESPN" },
 ];
 
 // ── login (the check:tracking-hidden pattern) ──────────────────────────────
@@ -546,9 +581,14 @@ try {
   fail(`could not authenticate against ${FEED_BASE}: ${err.message}`);
 }
 
+// CHROME_PATH points at a specific Chrome/Chromium binary (a CI box or a
+// container with Playwright's own Chromium and no Google Chrome); unset, the
+// installed Google Chrome is used as before. Still never downloads anything.
 let browser;
 try {
-  browser = await chromium.launch({ channel: "chrome" });
+  browser = process.env.CHROME_PATH
+    ? await chromium.launch({ executablePath: process.env.CHROME_PATH })
+    : await chromium.launch({ channel: "chrome" });
 } catch (err) {
   console.log(
     `\n${c.red(c.bold("FAILED"))} — could not launch the installed Google Chrome: ${err.message}\n` +

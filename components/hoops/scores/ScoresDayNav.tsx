@@ -45,7 +45,7 @@ export default function ScoresDayNav({
           <span className="max-sm:hidden">Next</span> ›
         </Link>
       </div>
-      <div className="mt-2 flex items-center justify-center gap-3">
+      <div className="mt-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
         <label className="flex items-center gap-2 font-mono text-[0.62rem] uppercase tracking-kicker text-cream-dimmer">
           Go to
           <input
