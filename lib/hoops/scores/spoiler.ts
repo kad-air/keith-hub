@@ -31,7 +31,7 @@
 
 import { statusLabel } from "./format.ts";
 import { clockSeconds } from "./parse.ts";
-import type { Game, LivePlay, MomentSnapshot, Play, SyncResolution } from "./types.ts";
+import type { Game, LivePlay, MomentSnapshot, Play, SyncResolution, WirePlay } from "./types.ts";
 export { clockSeconds };
 
 /** Same hold as the feed's Clear-Above — the gesture is borrowed outright. */
@@ -85,13 +85,22 @@ function linescoresThrough(ordered: Play[], upto: number): { away: number[]; hom
   return { away, home };
 }
 
+/** Index (into game order) of the last play whose effective time ≤ target;
+ *  −1 when the target precedes the first play. The ONE rule for "where is the
+ *  game at this instant" — the synced card and the synced play-by-play both
+ *  stand on it, so they can never disagree about which play is the last. */
+function momentIndex(eff: number[], targetMs: number): number {
+  let idx = -1;
+  for (let i = 0; i < eff.length; i++) if (eff[i] <= targetMs) idx = i;
+  return idx;
+}
+
 /** The game as of `targetMs`, or null when the target precedes the first
  *  play (the viewer is behind the tip itself). */
 export function momentAt(plays: Play[], targetMs: number): MomentSnapshot | null {
   const ordered = orderPlays(plays);
   const eff = effectiveTimes(ordered);
-  let idx = -1;
-  for (let i = 0; i < ordered.length; i++) if (eff[i] <= targetMs) idx = i;
+  const idx = momentIndex(eff, targetMs);
   if (idx < 0) return null;
   const p = ordered[idx];
   const lines = linescoresThrough(ordered, idx);
@@ -105,6 +114,30 @@ export function momentAt(plays: Play[], targetMs: number): MomentSnapshot | null
     lastPlay: toLivePlay(p),
     final: isGameEnd(p) || (idx === ordered.length - 1 && ordered.some(isGameEnd)),
     atMs: eff[idx],
+  };
+}
+
+/** The play-by-play as of `targetMs`: every play in game order up to and
+ *  including the one `momentAt` stands on, and NOTHING after it — not the
+ *  next play, not a count, not a later quarter's header. Empty when the
+ *  target precedes the first play. Pass Infinity for the whole game. */
+export function playsAt(plays: Play[], targetMs: number): Play[] {
+  const ordered = orderPlays(plays);
+  return ordered.slice(0, momentIndex(effectiveTimes(ordered), targetMs) + 1);
+}
+
+/** A play as the play-by-play tab ships it: what the row prints, nothing it
+ *  doesn't (no wall-clock, no sequence). */
+export function wirePlay(p: Play): WirePlay {
+  return {
+    id: p.id,
+    period: p.period,
+    clock: p.clock,
+    text: p.text,
+    awayScore: p.awayScore,
+    homeScore: p.homeScore,
+    scoring: p.scoring,
+    teamId: p.teamId,
   };
 }
 

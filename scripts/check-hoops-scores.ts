@@ -53,12 +53,15 @@ import {
   orderPlays,
   periodChoices,
   periodLengthSec,
+  playsAt,
   protectedStatus,
   typedClockSeconds,
   veilGame,
+  wirePlay,
 } from "../lib/hoops/scores/spoiler.ts";
+import { boxFromPlays } from "../lib/hoops/scores/boxAt.ts";
 import { parsePlays } from "../lib/hoops/scores/parse.ts";
-import type { CoreLive, Game, GameBox, PlayerBoxLine, Scoreboard } from "../lib/hoops/scores/types.ts";
+import type { CoreLive, Game, GameBox, PlayerBoxLine, Scoreboard, TeamTotals } from "../lib/hoops/scores/types.ts";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const FIX = path.join(ROOT, "hoops-scores-fixture");
@@ -492,6 +495,105 @@ check(periodChoices(2).length === 4 && periodChoices(6).at(-1)?.label === "2OT",
 const dataSrc = fs.readFileSync(path.join(ROOT, "lib/hoops/scores/data.ts"), "utf8");
 check(/veilGame\(g\)/.test(dataSrc), "getLive veils with veilGame");
 check(/\{ game: b\.game, teams: b\.teams \}/.test(dataSrc), "the wire box is built without plays");
+
+// ── 12. the game page held to the moment: play-by-play and box score ────
+// Spoiler mode on the game page (owner, 2026-10-28): a synced game's
+// play-by-play tab shows the plays up to the moment and nothing after, and
+// its box score is REBUILT from those plays. Anchors: rebuilt from all of
+// its plays, LAL@UTA's box equals ESPN's own, every player, every counting
+// column, both team rows; IND@BKN (recorded live) equals ESPN's box once the
+// box's one-play lag behind the plays is allowed for — measured: ESPN's team
+// row already counts the last play (a defensive rebound), its player row
+// doesn't yet, so players are compared one play back, the team row at the end.
+const COLS = ["pts", "reb", "oreb", "dreb", "ast", "stl", "blk", "to", "pf", "fgm", "fga", "tpm", "tpa", "ftm", "fta"] as const;
+const boxDiffs = (live: GameBox["teams"], held: GameBox["teams"], rows: "all" | "players" | "teams" = "all"): string[] => {
+  const out: string[] = [];
+  live.forEach((t, ti) => {
+    for (const p of rows === "teams" ? [] : t.players) {
+      const h = held[ti].players.find((x) => x.id === p.id);
+      if (!h) {
+        out.push(`${p.name} missing`);
+        continue;
+      }
+      if (h.dnp !== p.dnp) out.push(`${p.name} played ${!p.dnp}, rebuilt ${!h.dnp}`);
+      for (const c of COLS) if (p[c] !== h[c]) out.push(`${p.name} ${c} ${p[c]} vs ${h[c]}`);
+    }
+    if (rows !== "players") for (const c of COLS) if (t.totals[c] !== held[ti].totals[c]) out.push(`${t.tri} team ${c} ${t.totals[c]} vs ${held[ti].totals[c]}`);
+  });
+  return out;
+};
+const allF = playsAt(finalPlays, Infinity);
+check(allF.length === finalPlays.length && allF.every((p, i) => p === orderedF[i]), "playsAt(∞) is the whole game in game order");
+check(playsAt(finalPlays, effF[0] - 1).length === 0, "before the first play there are no plays");
+const dF = boxDiffs(finalBox.teams, boxFromPlays(finalBox.teams, allF));
+check(dF.length === 0, `LAL@UTA rebuilt from its plays equals ESPN's box (${dF.slice(0, 4).join("; ")})`);
+const orderedL = orderPlays(livePlays);
+const dL = boxDiffs(liveBox.teams, boxFromPlays(liveBox.teams, orderedL.slice(0, -1)), "players");
+check(dL.length === 0, `IND@BKN players rebuilt equal ESPN's live lines, which trail the plays by one (${dL.slice(0, 4).join("; ")})`);
+const dLT = boxDiffs(liveBox.teams, boxFromPlays(liveBox.teams, orderedL), "teams");
+check(dLT.length === 0, `IND@BKN team rows rebuilt from every play equal ESPN's (${dLT.slice(0, 4).join("; ")})`);
+check(boxDiffs(liveBox.teams, boxFromPlays(liveBox.teams, orderedL), "players").length > 0, "…and the lag is real: the last play is one the player lines haven't counted");
+
+// Threes come off the play's attempt value: not every three says so in its
+// text, and a missed end-of-period heave isn't a field-goal attempt.
+check(finalPlays.some((p) => p.pointsAttempted === 3 && !/three point/i.test(p.text)), "fixture has a three whose text doesn't say so");
+check(finalPlays.some((p) => /misses heave/i.test(p.text)), "fixture has a missed heave");
+
+// 🔴 The leak property for the page, swept over the whole game: at every
+// target the plays are exactly the prefix the card's moment stands on, no
+// play from after it, no later period; the held box's team points ARE the
+// moment's score; every rebuilt stat only grows and never passes the final;
+// minutes and +/- are never shown; nobody shows as in the game before they are.
+let prefixMiss = 0;
+let boxMiss = 0;
+let shrink = 0;
+let beyond = 0;
+let blankMiss = 0;
+let prevLen = 0;
+let prevHeld: Map<string, TeamTotals> = new Map();
+const finalById = new Map(finalBox.teams.flatMap((t) => t.players.map((p) => [p.id, p] as const)));
+for (let t = effF[0] - 60_000; t <= effF[effF.length - 1] + 60_000; t += 20_000) {
+  const m = momentAt(finalPlays, t);
+  const cut = playsAt(finalPlays, t);
+  if (!m) {
+    if (cut.length !== 0) prefixMiss++;
+    continue;
+  }
+  const last = cut.at(-1);
+  if (!last || last.text !== m.lastPlay?.text || last.clock !== m.clock || last.period !== m.period) prefixMiss++;
+  if (cut.some((p, i) => p !== orderedF[i] || effF[i] > t || p.period > m.period)) prefixMiss++;
+  if (cut.length < prevLen) prefixMiss++;
+  prevLen = cut.length;
+  const held = boxFromPlays(finalBox.teams, cut);
+  if (held[0].totals.pts !== m.awayScore || held[1].totals.pts !== m.homeScore) boxMiss++;
+  const now = new Map<string, TeamTotals>();
+  for (const p of held.flatMap((x) => x.players)) {
+    now.set(p.id, p);
+    const before = prevHeld.get(p.id);
+    const fin = finalById.get(p.id)!;
+    for (const c of COLS) {
+      if (before && p[c] < before[c]) shrink++;
+      if (p[c] > fin[c]) beyond++;
+    }
+    if (p.min !== 0 || p.plusMinus !== null || p.ejected || p.dnpReason !== null) blankMiss++;
+    if (!p.dnp && !p.starter && !cut.some((x) => x.text.includes(p.name))) blankMiss++;
+  }
+  prevHeld = now;
+}
+check(prefixMiss === 0, `the plays are exactly the prefix the moment stands on (${prefixMiss})`);
+check(boxMiss === 0, `the held box's team points are the moment's score (${boxMiss})`);
+check(shrink === 0, `a held stat never goes down as the moment advances (${shrink})`);
+check(beyond === 0, `a held stat never passes the final (${beyond})`);
+check(blankMiss === 0, `held lines carry no minutes, +/-, reason or ejection, and nobody is in before they are (${blankMiss})`);
+const w = wirePlay(finalPlays[0]) as unknown as Record<string, unknown>;
+check(!("wallclockMs" in w) && !("sequence" in w) && w.text === finalPlays[0].text, "a wire play carries what the row prints, nothing else");
+
+// The impure half, pinned statically: the synced box is the rebuilt one, off
+// the same cut as the plays, and a veiled game gets neither.
+check(/boxFromPlays\(full\.teams, upTo\)/.test(dataSrc), "getLive's synced box is rebuilt from the cut plays");
+check(/single && single\.game\.state !== "pre" && !single\.veiled/.test(dataSrc), "getLive sends no box or plays for a veiled game");
+const pageSrc = fs.readFileSync(path.join(ROOT, "components/hoops/scores/GamePage.tsx"), "utf8");
+check(/game\.state === "pre" \|\| guarded \? null : await getBox/.test(pageSrc), "the guarded game page reads no box for its server render");
 
 // ── 11. a broken response throws instead of reading as an off day ──────
 const throws = (f: () => unknown) => {

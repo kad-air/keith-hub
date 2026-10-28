@@ -205,6 +205,9 @@ const PAGES = [
   // finals, so the quarter-by-quarter line scores render.
   { id: "scores-day", path: "/hoops/scores/2026-10-21", landmark: "Live data from ESPN" },
   { id: "scores-game", path: "/hoops/scores/2026-10-21/atl-orl", landmark: "Atlanta Hawks" },
+  // The game page's play-by-play tab: a long text column beside a clock, a
+  // team and a running score — the row that has to wrap, not clip, at 280.
+  { id: "scores-plays", path: "/hoops/scores/2026-10-21/atl-orl/plays", landmark: "1st quarter" },
   { id: "standings", path: "/hoops/standings", landmark: "Live data from ESPN" },
 ];
 

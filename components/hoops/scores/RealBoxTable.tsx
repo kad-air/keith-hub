@@ -9,6 +9,12 @@ import type { PlayerBoxLine, TeamBoxScore, TeamTotals } from "@/lib/hoops/scores
  * Every column is kept at every width and the table scrolls sideways on a
  * phone, with the name column pinned — a real box score is read across, and
  * dropping FT or +/- would lose the line. Names go first-initial below `sm`.
+ *
+ * `held` (spoiler mode, a synced game): the lines were rebuilt from the
+ * play-by-play up to the viewer's moment (lib/hoops/scores/boxAt.ts), which
+ * settles every counting stat but not minutes or plus-minus — so those two
+ * columns are dropped rather than shown live, and the not-yet-played list
+ * reads "Not in yet" rather than DNP.
  */
 function shortName(name: string): string {
   const parts = name.trim().split(/\s+/);
@@ -20,8 +26,10 @@ const pm = (v: number | null) => (v == null ? "" : v > 0 ? `+${v}` : String(v));
 
 const HEAD = ["MIN", "PTS", "REB", "AST", "STL", "BLK", "TO", "FG", "3P", "FT", "+/-"];
 
-function cells(p: TeamTotals & { min?: number; plusMinus?: number | null }): string[] {
-  return [
+const HELD_HEAD = HEAD.filter((h) => h !== "MIN" && h !== "+/-");
+
+function cells(p: TeamTotals & { min?: number; plusMinus?: number | null }, held = false): string[] {
+  const all = [
     p.min == null ? "" : String(p.min),
     String(p.pts),
     String(p.reb),
@@ -34,11 +42,14 @@ function cells(p: TeamTotals & { min?: number; plusMinus?: number | null }): str
     `${p.ftm}-${p.fta}`,
     p.plusMinus === undefined ? "" : pm(p.plusMinus),
   ];
+  return held ? all.slice(1, -1) : all;
 }
 
 const pct = (m: number, a: number) => (a ? `${((m / a) * 100).toFixed(1)}%` : "–");
 
-export default function RealBoxTable({ team }: { team: TeamBoxScore }) {
+export default function RealBoxTable({ team, held = false }: { team: TeamBoxScore; held?: boolean }) {
+  const head = held ? HELD_HEAD : HEAD;
+  const ptsCol = head.indexOf("PTS");
   const played = team.players.filter((p) => !p.dnp);
   const dnp = team.players.filter((p) => p.dnp);
   const firstBench = played.findIndex((p) => !p.starter);
@@ -54,10 +65,10 @@ export default function RealBoxTable({ team }: { team: TeamBoxScore }) {
         {p.starter && <span className="ml-1 font-mono text-[0.55rem] text-cream-dimmer">S</span>}
         {p.ejected && <span className="ml-1 font-mono text-[0.55rem] text-cat-hoops">EJ</span>}
       </td>
-      {cells(p).map((c, j) => (
+      {cells(p, held).map((c, j) => (
         <td
           key={j}
-          className={`px-1.5 text-right text-[0.72rem] ${j === 1 ? "text-cream" : "text-cream-dim"}`}
+          className={`px-1.5 text-right text-[0.72rem] ${j === ptsCol ? "text-cream" : "text-cream-dim"}`}
         >
           {c}
         </td>
@@ -75,7 +86,7 @@ export default function RealBoxTable({ team }: { team: TeamBoxScore }) {
           <thead>
             <tr className="border-b border-rule/60 text-[0.58rem] uppercase tracking-kicker text-cream-dimmer">
               <th className="sticky left-0 bg-ink pb-1 text-left font-normal">Player</th>
-              {HEAD.map((h) => (
+              {head.map((h) => (
                 <th key={h} className="px-1.5 pb-1 text-right font-normal">
                   {h}
                 </th>
@@ -88,7 +99,7 @@ export default function RealBoxTable({ team }: { team: TeamBoxScore }) {
               <td className="sticky left-0 bg-ink py-1.5 text-left text-[0.6rem] uppercase tracking-kicker text-cream-dimmer">
                 Team
               </td>
-              {cells({ ...team.totals, min: undefined, plusMinus: undefined }).map((c, j) => (
+              {cells({ ...team.totals, min: undefined, plusMinus: undefined }, held).map((c, j) => (
                 <td key={j} className="px-1.5 text-right text-[0.72rem] text-cream">
                   {c}
                 </td>
@@ -103,7 +114,7 @@ export default function RealBoxTable({ team }: { team: TeamBoxScore }) {
       </p>
       {dnp.length > 0 && (
         <p className="mt-1 font-mono text-[0.6rem] text-cream-dimmer">
-          DNP: {dnp.map((p) => (p.dnpReason ? `${p.name} (${p.dnpReason.toLowerCase()})` : p.name)).join(", ")}
+          {held ? "Not in yet" : "DNP"}: {dnp.map((p) => (p.dnpReason ? `${p.name} (${p.dnpReason.toLowerCase()})` : p.name)).join(", ")}
         </p>
       )}
     </section>

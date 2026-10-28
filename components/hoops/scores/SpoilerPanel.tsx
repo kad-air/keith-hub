@@ -12,8 +12,8 @@ import type { Game } from "@/lib/hoops/scores/types";
  * The options for a veiled or synced game, INSIDE the card (a tap unfolds it
  * under the teams): hold to reveal the score, or say where you are
  * ("3rd · 7:32") and watch from there. For a synced game the same form moves
- * the moment, and the live box score is offered with its warning spelled out
- * — the one way out that can spoil. Part of the card rather than a sheet so
+ * the moment, and the game page's box score and play-by-play are offered —
+ * both held to the same moment (GamePage). Part of the card rather than a sheet so
  * it is found where the game is, not somewhere else on the screen.
  */
 export default function SpoilerPanel({
@@ -173,8 +173,12 @@ export default function SpoilerPanel({
           >
             Hide again
           </button>
+          {/* Both hold to the synced moment (GamePage) — neither spoils. */}
           <Link href={`/hoops/scores/${date}/${gameSlug(game)}`} className="text-cream-dimmer hover:text-cream">
-            Box score › <span className="normal-case tracking-normal">(live — will spoil)</span>
+            Box score ›
+          </Link>
+          <Link href={`/hoops/scores/${date}/${gameSlug(game)}/plays`} className="text-cream-dimmer hover:text-cream">
+            Play-by-play ›
           </Link>
         </div>
       )}
