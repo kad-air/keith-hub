@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { gameSlug } from "@/lib/hoops/scores/parse";
-import { behindLabel, clockSeconds, periodChoices } from "@/lib/hoops/scores/spoiler";
+import { behindLabel, clockLabel, periodChoices, periodLengthSec, typedClockSeconds } from "@/lib/hoops/scores/spoiler";
 import { useSpoiler } from "./LiveProvider";
 import { HoldBar, useLongPress } from "./useLongPress";
 import type { Game } from "@/lib/hoops/scores/types";
@@ -35,22 +35,27 @@ export default function SpoilerPanel({
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [ahead, setAhead] = useState(false);
+  // Digits read as m:ss ("732" → 7:32); the reading shows beside the field.
+  const typed = typedClockSeconds(clock);
   const hold = useLongPress(() => {
     sp.reveal(game.id);
     onDone();
   });
 
   const submit = async () => {
-    const sec = clockSeconds(clock);
-    if (sec === null || sec > 12 * 60) {
-      setNote("Enter the clock as it reads on screen, like 7:32 or 24.7.");
+    if (typed === null) {
+      setNote("Type the clock's digits, like 732 for 7:32, or 24.7 under a minute.");
+      return;
+    }
+    if (typed > periodLengthSec(period)) {
+      setNote(`A ${period > 4 ? "overtime" : "quarter"} starts at ${clockLabel(periodLengthSec(period))}.`);
       return;
     }
     setBusy(true);
     setNote(null);
     setAhead(false);
     try {
-      const r = await sp.resolve(game.id, period, sec);
+      const r = await sp.resolve(game.id, period, typed);
       if (r.ok) {
         sp.syncTo(game.id, r.offsetMs);
         onDone();
@@ -124,10 +129,15 @@ export default function SpoilerPanel({
             value={clock}
             onChange={(e) => setClock(e.target.value)}
             inputMode="decimal"
-            placeholder="7:32"
+            placeholder="732"
             aria-label="Time remaining"
             className={`${field} w-[4.5rem] tabular-nums placeholder:text-cream-dimmer`}
           />
+          {clock.trim() !== "" && (
+            <span aria-live="polite" className="font-mono text-[0.72rem] tabular-nums text-cream-dim">
+              {typed === null ? "?" : `= ${clockLabel(typed)}`}
+            </span>
+          )}
           <button type="submit" disabled={busy} className={btn}>
             {busy ? "…" : mode === "synced" ? "Move" : "Sync"}
           </button>

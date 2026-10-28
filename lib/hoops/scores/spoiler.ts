@@ -176,6 +176,42 @@ export function periodChoices(maxPeriod: number): { value: number; label: string
   return out;
 }
 
+/** How long a period runs: 12:00 for a quarter, 5:00 for an overtime. */
+export function periodLengthSec(period: number): number {
+  return period > 4 ? 5 * 60 : 12 * 60;
+}
+
+/** The clock the viewer TYPED → seconds left, or null. The phone's keypad
+ *  has digits and a dot but no colon, so digits alone read as m:ss with the
+ *  last two as seconds: "732" → 7:32, "1045" → 10:45, "45" → 0:45, "5" → 0:05.
+ *  A dot with one digit after it is the under-a-minute clock as the screen
+ *  shows it ("24.7"); a dot with two after it stands in for the colon
+ *  ("7.32" → 7:32). A typed colon still works. Seconds past 59 are null —
+ *  "790" is a typo, not 8:30. Distinct from `clockSeconds`, which reads
+ *  ESPN's display clock, where a bare number IS seconds. */
+export function typedClockSeconds(text: unknown): number | null {
+  const s = String(text ?? "").replace(/\s+/g, "");
+  const mmss = (min: string, sec: string, tenths = "0") =>
+    Number(sec) > 59 ? null : Number(min || 0) * 60 + Number(sec) + Number(tenths) / 10;
+  let m = /^(\d{1,4})$/.exec(s);
+  if (m) return mmss(m[1].slice(0, -2), m[1].slice(-2));
+  m = /^(\d{1,2})[:.](\d{2})$/.exec(s);
+  if (m) return mmss(m[1], m[2]);
+  m = /^(\d{1,2}):(\d{2})\.(\d)$/.exec(s);
+  if (m) return mmss(m[1], m[2], m[3]);
+  m = /^(\d{1,2})\.(\d)$/.exec(s);
+  if (m) return mmss("", m[1], m[2]);
+  return null;
+}
+
+/** How a typed clock was read, the way the game clock shows it: "7:32",
+ *  "0:05", and under a minute with tenths "24.7". */
+export function clockLabel(sec: number): string {
+  if (sec < 60 && !Number.isInteger(sec)) return sec.toFixed(1);
+  const whole = Math.floor(sec);
+  return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, "0")}`;
+}
+
 /** "0:42 behind", "12:07 behind", "1h 05m behind" — how far a synced view
  *  trails live, from its real-time offset. */
 export function behindLabel(offsetMs: number): string {
