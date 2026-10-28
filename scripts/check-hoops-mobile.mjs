@@ -209,6 +209,11 @@ const PAGES = [
   // team and a running score — the row that has to wrap, not clip, at 280.
   { id: "scores-plays", path: "/hoops/scores/2026-10-21/atl-orl/plays", landmark: "1st quarter" },
   { id: "standings", path: "/hoops/standings", landmark: "Live data from ESPN" },
+  // The nightly rest-of-season projection. "Rest of season" is the page's own
+  // heading and renders in BOTH states — with a projection (two ten-column
+  // tables that must scroll, not clip, at 280) and without one (the empty
+  // state, which is what a dev DB that has never received a push shows).
+  { id: "projections", path: "/hoops/projections", landmark: "Rest of season" },
 ];
 
 // ── login (the check:tracking-hidden pattern) ──────────────────────────────
