@@ -230,6 +230,22 @@ export function getDb(): Database.Database {
       PRIMARY KEY (username, document)
     );
 
+    -- Old document keys of a book whose FILE was edited in place (a new cover,
+    -- a fixed title — lib/books/store.ts replaceBookFile). The edit changes the
+    -- bytes, so it changes the partial MD5 every device keys progress on; a
+    -- device still holding the old file keeps syncing under the old key. Each
+    -- row says "alias is now document": kosync GET/PUT resolve through it, so
+    -- old and new copies read and write ONE position. Always flat (an alias
+    -- points at the current key, never at another alias) and a current key is
+    -- never itself an alias — replaceBookFile keeps both true on every edit,
+    -- including a restore to an earlier version.
+    CREATE TABLE IF NOT EXISTS kosync_aliases (
+      alias TEXT PRIMARY KEY,
+      document TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_kosync_aliases_doc ON kosync_aliases(document);
+
     -- Append-only reading history — the ONLY source of reading statistics.
     --
     -- 🔴 It exists because kosync_progress cannot answer a single historical

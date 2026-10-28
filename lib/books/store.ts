@@ -10,15 +10,21 @@ import { extractEpubMeta } from "./epubMeta.ts";
 import { countEpubWords } from "./epubText.ts";
 import { normalizeMeta } from "./normalize.ts";
 import { checkEpubHealth } from "./health.ts";
+import { rekeyDocument } from "./kosync.ts";
+import { openEpub, spinePaths } from "./epubEdit.ts";
 
-// File storage: data/books/<id>/book.epub (+ cover.<ext>). One directory per
-// book id — ids are stable under metadata edits, unlike titles.
+// File storage: data/books/<id>/book.epub (+ cover.<ext>, + versions/<sha256>.epub
+// for every file a book has replaced). One directory per book id — ids are
+// stable under metadata edits AND file replacements, unlike titles.
 //
-// 🔴 The stored epub is IMMUTABLE (BOOKS_PLAN §4). The kosync document key is
-// a partial MD5 of the bytes every device computes independently; a rewrite
-// (metadata edit, "optimization", re-compression) silently detaches progress
-// on every device at once. Metadata edits touch only the DB row. If a file
-// must genuinely change, that is a NEW book id.
+// 🔴 The stored epub is never rewritten in passing (BOOKS_PLAN §4). The kosync
+// document key is a partial MD5 of the bytes every device computes
+// independently; a rewrite (metadata edit, "optimization", re-compression)
+// silently detaches progress on every device at once. Metadata edits touch
+// only the DB row. There is exactly ONE path that changes a book's bytes —
+// replaceBookFile, below — and it exists to do the rekeying such a change
+// needs: progress moves to the new key and the old key becomes an alias of
+// it, so devices holding either copy keep syncing one position.
 
 export type Book = {
   id: string;
@@ -308,6 +314,200 @@ export function updateBook(id: string, edit: BookEdit): Book | null {
       id,
     );
   return getBook(id);
+}
+
+export type ReplaceErrorCode = "not-found" | "same-file" | "duplicate" | "no-version";
+
+export class ReplaceError extends Error {
+  // No TS parameter properties: the gates run under node's type stripping.
+  code: ReplaceErrorCode;
+  constructor(code: ReplaceErrorCode, message: string) {
+    super(message);
+    this.name = "ReplaceError";
+    this.code = code;
+  }
+}
+
+export type ReplaceResult = {
+  book: Book;
+  previous: { sha256: string; partialMd5: string };
+  /** false when every spine document is byte-identical — positions are then
+   *  exact on both copies. true means the TEXT changed (a different edition,
+   *  a re-flowed chapter): progress still carries, but an x-pointer from the
+   *  old copy may land near, not on, the same sentence. null = couldn't tell. */
+  textChanged: boolean | null;
+};
+
+/** sha256 over the spine (paths + each document's bytes) — what an x-pointer depends on. */
+function spineFingerprint(bytes: Buffer): string | null {
+  try {
+    const { entries, opf, opfPath } = openEpub(bytes);
+    const h = createHash("sha256");
+    for (const p of spinePaths(opf, opfPath)) {
+      h.update(p).update("\0");
+      const e = entries.find((x) => x.name === p);
+      h.update(e ? e.data : Buffer.from("<missing>")).update("\0");
+    }
+    return h.digest("hex");
+  } catch {
+    return null;
+  }
+}
+
+function versionsDir(id: string): string {
+  return path.join(booksDir(), id, "versions");
+}
+
+/**
+ * Swap a book's file for new bytes WITHOUT losing anyone's place — the one
+ * path that changes a stored epub (see the header). Same book id, so the
+ * OPDS entry, the To Read flag and the hub's history all stay put.
+ *
+ *  1. the current file is archived to versions/<sha256>.epub (restoreVersion
+ *     puts it back — every replacement is reversible)
+ *  2. the new bytes go in by write-then-rename
+ *  3. ONE transaction: the books row (sha256, partial_md5, size, cover, word
+ *     count, health, updated_at) and rekeyDocument(old key → new key), so
+ *     progress, reading history and every older alias move together
+ *  4. a DB failure puts the old file back
+ *
+ * Metadata: by default the DB row's title/author/series are KEPT (they may
+ * carry edits made in the UI); `edit` overlays new values (the edit-file
+ * path, where the OPF and the row change together); `metadataFromFile`
+ * re-reads them from the new OPF instead.
+ *
+ * The caller is responsible for the bytes being a clean epub (the routes run
+ * prepareForIngest or produce them with epubEdit).
+ */
+export function replaceBookFile(
+  id: string,
+  bytes: Buffer,
+  opts: { edit?: BookEdit; metadataFromFile?: boolean } = {},
+): ReplaceResult {
+  const db = getDb();
+  const book = getBook(id);
+  if (!book) throw new ReplaceError("not-found", "no such book");
+  const sha256 = createHash("sha256").update(bytes).digest("hex");
+  if (sha256 === book.sha256) throw new ReplaceError("same-file", "the new file is identical to the current one");
+  const key = partialMd5(bytes);
+  const clash = db
+    .prepare(`SELECT id, title FROM books WHERE (sha256 = ? OR partial_md5 = ?) AND id != ?`)
+    .get(sha256, key, id) as { id: string; title: string } | undefined;
+  if (clash) {
+    throw new ReplaceError("duplicate", `those bytes are already another book ("${clash.title}")`);
+  }
+
+  const dir = path.join(booksDir(), id);
+  const current = bookFilePath(book);
+  const oldBytes = fs.existsSync(current) ? fs.readFileSync(current) : null;
+  fs.mkdirSync(versionsDir(id), { recursive: true });
+  const archived = path.join(versionsDir(id), `${book.sha256}.epub`);
+  if (oldBytes && !fs.existsSync(archived)) fs.writeFileSync(archived, oldBytes);
+
+  const textChanged = (() => {
+    if (!oldBytes) return null;
+    const a = spineFingerprint(oldBytes);
+    const b = spineFingerprint(bytes);
+    return a && b ? a !== b : null;
+  })();
+
+  const tmp = path.join(dir, "book.epub.tmp");
+  fs.writeFileSync(tmp, bytes);
+  fs.renameSync(tmp, current);
+
+  const raw = extractEpubMeta(bytes);
+  let coverName: string | null = null;
+  if (raw.cover) {
+    coverName = `cover.${raw.cover.ext}`;
+    fs.writeFileSync(path.join(dir, `${coverName}.tmp`), raw.cover.bytes);
+  }
+
+  let meta: BookEdit = {};
+  if (opts.metadataFromFile) {
+    const existingAuthors = (
+      db.prepare(`SELECT DISTINCT author FROM books WHERE author IS NOT NULL AND id != ?`).all(id) as Array<{
+        author: string;
+      }>
+    ).map((r) => r.author);
+    const n = normalizeMeta(raw, book.title, existingAuthors);
+    meta = { ...n, language: raw.language, description: raw.description };
+  }
+  const next = { ...book, ...meta, ...(opts.edit ?? {}) };
+  const now = new Date().toISOString();
+  const wordCount = countEpubWords(bytes) ?? 0;
+  let healthJson: string | null = null;
+  try {
+    healthJson = JSON.stringify({ ...checkEpubHealth(bytes), checkedAt: now });
+  } catch {
+    healthJson = null;
+  }
+
+  try {
+    db.transaction(() => {
+      db.prepare(
+        `UPDATE books SET title = ?, author = ?, series = ?, series_index = ?, language = ?,
+                description = ?, file_size = ?, sha256 = ?, partial_md5 = ?, cover_name = ?,
+                word_count = ?, health_json = ?, updated_at = ?
+          WHERE id = ?`,
+      ).run(
+        next.title,
+        next.author,
+        next.series,
+        next.seriesIndex,
+        next.language,
+        next.description,
+        bytes.length,
+        sha256,
+        key,
+        coverName,
+        wordCount,
+        healthJson,
+        now,
+        id,
+      );
+      rekeyDocument(book.partialMd5, key);
+    })();
+  } catch (err) {
+    if (oldBytes) fs.writeFileSync(current, oldBytes);
+    if (coverName) fs.rmSync(path.join(dir, `${coverName}.tmp`), { force: true });
+    throw err;
+  }
+
+  // Covers last: the old one goes only once the row no longer names it.
+  if (book.coverName && book.coverName !== coverName) {
+    fs.rmSync(path.join(dir, book.coverName), { force: true });
+  }
+  if (coverName) fs.renameSync(path.join(dir, `${coverName}.tmp`), path.join(dir, coverName));
+
+  return {
+    book: getBook(id)!,
+    previous: { sha256: book.sha256, partialMd5: book.partialMd5 },
+    textChanged,
+  };
+}
+
+export type BookVersion = { sha256: string; size: number; archivedAt: string };
+
+/** Earlier files of a book (newest first) — what restoreVersion can put back. */
+export function listVersions(id: string): BookVersion[] {
+  const dir = versionsDir(id);
+  if (!fs.existsSync(dir)) return [];
+  return fs
+    .readdirSync(dir)
+    .filter((f) => /^[0-9a-f]{64}\.epub$/.test(f))
+    .map((f) => {
+      const st = fs.statSync(path.join(dir, f));
+      return { sha256: f.slice(0, 64), size: st.size, archivedAt: st.mtime.toISOString() };
+    })
+    .sort((a, b) => b.archivedAt.localeCompare(a.archivedAt));
+}
+
+/** Put an archived file back — itself a replacement, so the current file is archived too. */
+export function restoreVersion(id: string, sha256: string, opts: { metadataFromFile?: boolean } = {}): ReplaceResult {
+  if (!/^[0-9a-f]{64}$/.test(sha256)) throw new ReplaceError("no-version", "not a version id");
+  const p = path.join(versionsDir(id), `${sha256}.epub`);
+  if (!fs.existsSync(p)) throw new ReplaceError("no-version", "no such version of this book");
+  return replaceBookFile(id, fs.readFileSync(p), opts);
 }
 
 export function deleteBook(id: string): boolean {

@@ -106,9 +106,85 @@ export function authUser(username: string | null, wireKey: string | null): boole
   return row != null && row.key_hash === atRestHash(wireKey);
 }
 
+/**
+ * The key a document's position is stored under. Usually the key itself; for
+ * the OLD key of a book whose file was edited in place (replaceBookFile), the
+ * book's current key — so a device still holding the old copy keeps reading
+ * and writing the same position as one holding the new copy. One lookup: the
+ * alias table is kept flat (see rekeyDocument).
+ */
+export function resolveDocument(document: string): string {
+  const row = getDb()
+    .prepare(`SELECT document FROM kosync_aliases WHERE alias = ?`)
+    .get(document) as { document: string } | undefined;
+  return row?.document ?? document;
+}
+
+/** Every key that resolves to `document` other than itself (oldest first). */
+export function aliasesOf(document: string): string[] {
+  return (
+    getDb()
+      .prepare(`SELECT alias FROM kosync_aliases WHERE document = ? ORDER BY created_at, alias`)
+      .all(document) as Array<{ alias: string }>
+  ).map((r) => r.alias);
+}
+
+/**
+ * Move everything keyed on `from` to `to`, and make `from` an alias of `to`.
+ * Called by replaceBookFile when a book's bytes change; the caller runs it
+ * inside the same transaction as the books-row update.
+ *
+ *   - kosync_progress: the row moves to the new key. If one already exists
+ *     there (only possible if a device synced the new file before this ran),
+ *     the NEWER of the two wins — never roll a reader back.
+ *   - reading_events: re-keyed, so the stats page and the book's history keep
+ *     one continuous record (they join on books.partial_md5, which is about to
+ *     become `to`). Only the key column changes; no event is added, removed or
+ *     altered, which is what "append-only" protects.
+ *   - kosync_aliases: anything that pointed at `from` now points at `to`; `to`
+ *     stops being an alias if it was one (a restore to an earlier version);
+ *     `from` → `to` is added. Flat after every call, never a self-alias.
+ */
+export function rekeyDocument(from: string, to: string): void {
+  if (from === to) return;
+  const db = getDb();
+  const rows = db
+    .prepare(`SELECT * FROM kosync_progress WHERE document = ?`)
+    .all(from) as Array<KosyncProgress & { username: string }>;
+  for (const r of rows) {
+    const there = db
+      .prepare(`SELECT timestamp FROM kosync_progress WHERE username = ? AND document = ?`)
+      .get(r.username, to) as { timestamp: number } | undefined;
+    if (there && there.timestamp >= r.timestamp) {
+      db.prepare(`DELETE FROM kosync_progress WHERE username = ? AND document = ?`).run(r.username, from);
+    } else {
+      db.prepare(`DELETE FROM kosync_progress WHERE username = ? AND document = ?`).run(r.username, to);
+      db.prepare(`UPDATE kosync_progress SET document = ? WHERE username = ? AND document = ?`).run(
+        to,
+        r.username,
+        from,
+      );
+    }
+  }
+  db.prepare(`UPDATE reading_events SET document = ? WHERE document = ?`).run(to, from);
+  db.prepare(`DELETE FROM kosync_aliases WHERE alias = ?`).run(to);
+  db.prepare(`UPDATE kosync_aliases SET document = ? WHERE document = ?`).run(to, from);
+  db.prepare(
+    `INSERT INTO kosync_aliases (alias, document, created_at) VALUES (?, ?, ?)
+       ON CONFLICT (alias) DO UPDATE SET document = excluded.document`,
+  ).run(from, to, new Date().toISOString());
+}
+
+/**
+ * Store a device's position.
+ *
+ * 🔴 The device's key goes through resolveDocument first, and the response
+ * echoes the key the DEVICE sent — a client that compares the echoed
+ * document to its own hash must never see a key it doesn't know.
+ */
 export function putProgress(
   username: string,
-  p: {
+  input: {
     document: string;
     progress: string;
     percentage: number;
@@ -118,6 +194,7 @@ export function putProgress(
 ): { document: string; timestamp: number } {
   const timestamp = Math.floor(Date.now() / 1000);
   const db = getDb();
+  const p = { ...input, document: resolveDocument(input.document) };
 
   // Read the outgoing position BEFORE the upsert destroys it — it is the only
   // thing that makes this sync interpretable as movement rather than a bare
@@ -149,17 +226,18 @@ export function putProgress(
     console.error("[books] reading history not recorded (the sync itself is fine):", err);
   }
 
-  return { document: p.document, timestamp };
+  return { document: input.document, timestamp };
 }
 
+/** A device's stored position — through resolveDocument, echoing the key it asked with. */
 export function getProgress(username: string, document: string): KosyncProgress | null {
   const row = getDb()
     .prepare(
       `SELECT document, progress, percentage, device, device_id, timestamp
        FROM kosync_progress WHERE username = ? AND document = ?`,
     )
-    .get(username, document) as KosyncProgress | undefined;
-  return row ?? null;
+    .get(username, resolveDocument(document)) as KosyncProgress | undefined;
+  return row ? { ...row, document } : null;
 }
 
 /** All progress rows for a user — the UI joins them to books on partial_md5. */
@@ -187,7 +265,8 @@ export function importProgress(
   let imported = 0;
   let skipped = 0;
   const tx = db.transaction(() => {
-    for (const r of rows) {
+    for (const row of rows) {
+      const r = { ...row, document: resolveDocument(row.document) };
       const existing = db
         .prepare(`SELECT timestamp FROM kosync_progress WHERE username = ? AND document = ?`)
         .get(username, r.document) as { timestamp: number } | undefined;
