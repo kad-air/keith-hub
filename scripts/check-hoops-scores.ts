@@ -44,6 +44,7 @@ import {
 } from "../lib/hoops/scores/live.ts";
 import {
   behindLabel,
+  clockLabel,
   clockSeconds,
   effectiveTimes,
   gameAtMoment,
@@ -51,7 +52,9 @@ import {
   offsetForMoment,
   orderPlays,
   periodChoices,
+  periodLengthSec,
   protectedStatus,
+  typedClockSeconds,
   veilGame,
 } from "../lib/hoops/scores/spoiler.ts";
 import { parsePlays } from "../lib/hoops/scores/parse.ts";
@@ -470,6 +473,17 @@ check(atEnd.state === "post" && atEnd.away.winner && !atEnd.home.winner && atEnd
 
 check(clockSeconds("7:32") === 452 && clockSeconds("12:00") === 720 && clockSeconds("24.7") === 24.7, "clock text parses");
 check(clockSeconds("abc") === null && clockSeconds("") === null && clockSeconds(null) === null, "non-clocks are null");
+// The typed clock: the phone keypad has no colon, so digits read as m:ss
+// with the last two as seconds; a dot with one digit is the screen's tenths.
+const typedCases: [string, number | null][] = [
+  ["732", 452], ["1045", 645], ["1200", 720], ["45", 45], ["5", 5], ["0", 0], ["100", 60],
+  ["7:32", 452], ["0:05", 5], ["7.32", 452], ["24.7", 24.7], ["5.3", 5.3], ["0:24.7", 24.7], [" 7 32 ", 452],
+  ["790", null], ["060", null], ["12345", null], ["7:3", null], ["75.3", null], ["abc", null], ["", null], ["7:", null],
+];
+for (const [t, want] of typedCases) check(typedClockSeconds(t) === want, `typed clock "${t}" → ${want}, got ${typedClockSeconds(t)}`);
+check(typedClockSeconds(null) === null, "a null typed clock is null");
+check(clockLabel(452) === "7:32" && clockLabel(5) === "0:05" && clockLabel(24.7) === "24.7" && clockLabel(720) === "12:00", "typed clock labels");
+check(periodLengthSec(4) === 720 && periodLengthSec(5) === 300 && periodLengthSec(6) === 300, "quarters run 12:00, overtimes 5:00");
 check(behindLabel(0) === "0:00 behind" && behindLabel(65_000) === "1:05 behind" && behindLabel(3_900_000) === "1h 05m behind", "behind labels");
 check(periodChoices(2).length === 4 && periodChoices(6).at(-1)?.label === "2OT", "period choices");
 
