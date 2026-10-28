@@ -507,6 +507,46 @@ export interface RawLinesFile {
 }
 
 // ---------------------------------------------------------------------------
+// projections.json — the nightly rest-of-season projection (season_projection)
+// ---------------------------------------------------------------------------
+
+/**
+ * One team's rest-of-season projection. Every `*_pct` is a probability in
+ * [0, 1], and they NEST: title <= finals <= conf_finals <= playoff, and
+ * top6 <= playoff. `playoff_pct` means "a top-6 seed, or won the play-in";
+ * `playin_pct` is the chance of landing in the 7-10 play-in at all (not of
+ * winning it), so top6 + playin <= 1. See lib/hoops/projections.ts for the
+ * validator, which is where these rules are enforced.
+ */
+export interface RawProjectionTeam {
+  team: string;
+  conference: "East" | "West";
+  wins: number;
+  losses: number;
+  proj_wins: number;
+  proj_losses: number;
+  wins_p10: number;
+  wins_p90: number;
+  playoff_pct: number;
+  playin_pct: number;
+  top6_pct: number;
+  conf_finals_pct: number;
+  finals_pct: number;
+  title_pct: number;
+}
+
+export interface RawProjectionsFile {
+  season_start_year: number;
+  /** Date (Mountain) of the last completed game the projection stands on. */
+  as_of_date: string;
+  generated_at: string;
+  replicates: number;
+  /** Short plain-English description of how it was made; rendered verbatim. */
+  method: string;
+  teams: RawProjectionTeam[];
+}
+
+// ---------------------------------------------------------------------------
 // The bundle
 // ---------------------------------------------------------------------------
 
@@ -517,6 +557,9 @@ export interface HoopsBundle {
   schedule: RawScheduleFile;
   results: RawResultsFile;
   lines: RawLinesFile;
+  /** Present only on a push that declares `season_projection`; the committed
+   *  disk seed never carries one. Already validated by the time it is here. */
+  projections?: RawProjectionsFile | null;
 }
 
 // ---------------------------------------------------------------------------

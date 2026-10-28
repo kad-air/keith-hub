@@ -34,6 +34,10 @@ export const HOOPS_TABS: HoopsTab[] = [
   // redirects to Scores (app/hoops/page.tsx).
   { key: "scores", label: "Scores", href: "/hoops/scores" },
   { key: "standings", label: "Standings", href: "/hoops/standings" },
+  // Where the real season is headed: hoops-sim's nightly rest-of-season
+  // projection (season_projection), sitting between the real standings it
+  // starts from and the sim screens it is built with.
+  { key: "projections", label: "Projections", href: "/hoops/projections" },
   // The sim.
   { key: "matchup", label: "Matchup", href: "/hoops/matchup" },
   { key: "teams", label: "Teams", href: "/hoops/teams" },
@@ -67,11 +71,13 @@ export default function HoopsNav({
           </p>
         )}
       </div>
-      {/* 1 … 5 switch tabs from the keyboard, in HOOPS_TABS order (lib/shortcuts.ts lists them). */}
+      {/* 1 … 6 switch tabs from the keyboard, in HOOPS_TABS order (lib/shortcuts.ts lists them). */}
       <SectionTabKeys hrefs={HOOPS_TABS.map((t) => t.href)} />
       {HOOPS_TABS.length > 1 && (
         // Five tabs fit a 375px phone only with the tracking and padding
-        // tightened below `sm`; otherwise the last tab sat off-screen.
+        // tightened below `sm`; otherwise the last tab sat off-screen. Six
+        // (Projections, 2026-10-28) scroll sideways on the narrowest widths —
+        // the row is a horizontal scroller, which check:hoops:mobile allows.
         <nav className="mt-3 flex gap-1.5 overflow-x-auto sm:gap-2">
           {HOOPS_TABS.map((t) => (
             <Link

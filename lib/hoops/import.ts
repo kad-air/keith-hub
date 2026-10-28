@@ -35,6 +35,7 @@ import { getDb } from "@/lib/db";
 import { bundleHash, loadBundle, readParamsBlobText } from "./data";
 import { decodeParams } from "./params";
 import { playerRowsFromBundle } from "./playervalue.ts";
+import { writeProjection } from "./projectionStore.ts";
 import type { HoopsBundle } from "./types";
 
 export type ImportSource = "seed" | "push";
@@ -366,6 +367,17 @@ function writeBundle(db: Database.Database, bundle: HoopsBundle, meta: WriteMeta
         l.n_books_spread ?? null,
         l.n_books_total ?? null,
       );
+    }
+
+    // THE REST-OF-SEASON PROJECTION (season_projection). Written in the SAME
+    // transaction, so it can never land without the bundle it came with — and
+    // deliberately NOT truncated above with the six read-model tables: a push
+    // without one (every bundle before the sender flips the token, and any
+    // later one that omits it) leaves the last projection standing, dated on
+    // the page by its own as_of_date. Already validated by the route
+    // (lib/hoops/projections.ts) before it got here.
+    if (bundle.projections) {
+      writeProjection(db, bundle.projections, now);
     }
   });
 

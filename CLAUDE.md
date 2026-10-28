@@ -32,6 +32,10 @@ npm run check:hoops:movers       # Team-page "what moved" gate: the biggest thre
 npm run check:hoops:scores       # Real scores gate: ESPN scoreboard / box score / standings parsers over recorded
                                  #   responses (hoops-scores-fixture/), quarters and player lines add up to the final,
                                  #   notable-line thresholds, Mountain-time dates, the cache policy (same)
+npm run check:hoops:projections  # Rest-of-season projection gate: the season_projection contract fixture is accepted,
+                                 #   27 damage patterns refused (missing/duplicate team, prob > 1, title > finals, bad
+                                 #   date, wrong conference, league sums off…), the table order is by projected wins, a
+                                 #   bundle without the token still imports, the importer keeps the latest projection (same)
 npm run check:tracking-hidden    # Tracking section stays hidden (needs a running server; NOT in prebuild)
 npm run check:hoops:mobile       # Hoops still fits on a phone: seven pages at 375px and 430px in the
                                  #   installed Chrome (needs a running server; NOT in prebuild)
@@ -219,6 +223,7 @@ Comics
 Hoops
 - `GET /api/hoops/teams?mode=results|roster|blend` — 30 teams ranked by net rating (`off - def`), each with roster size and the |results − roster| disagreement, plus the league disagreement summary and the bundle's provenance (`PARAM_VERSION`, data-as-of, row counts). An unknown `mode` falls back to `blend`. Triggers the lazy import on first call.
 - `POST /api/hoops/sim` — body `{ home, away, neutral?, mode?, nSims?, nonce?, runId? }`. Runs the possession engine and returns `{ summary, box, meta, elapsedMs }`: win probability, the home spread (market convention — a favourite is negative), total, margin/total quantiles, a margin histogram, **and the expected box score off the SAME replicates** (one simulation, not two — otherwise the histogram and the box score would describe different sets of games). `nonce` is what makes two taps different games; omit it and the same body replays the same games. ~370ms for 1,000 replicates.
+- `GET /api/hoops/import` — **discovery** (same bearer token as the POST): what this receiver accepts, read off `lib/hoops/contract.ts`'s real tables — `{ wire_version, pricing_version, features: [...], required_constants, feature_constants, feature_files, stored: { generated_at, content_hash, import_source, projection: { as_of_date, generated_at } | null } | null }`. The sender probes this before adding a feature token to its own list (receiver first); the 400 body on a contract rejection carries the same object as `accepts`.
 - `POST /api/hoops/boxscore` — body `{ home, away, mode, ratingMode?, neutral?, runId?, nSims? }`. `mode: "expected"` is the mean line over replicates; `mode: "sample"` is ONE specific night with integer lines. In sample mode a `runId` alone is sufficient and **wins over any teams in the body** — the id is self-describing, so honouring a mismatched pair would silently return a game the id doesn't name.
 
 Push
@@ -252,7 +257,7 @@ finds no rows there and stays out of the way). `data-kb-search` on an input is w
 (Players today); with none on the page `/` opens Contents.
 
 **Number keys switch a section's in-page tabs** via `components/SectionTabKeys.tsx` (`1`..`n` →
-the hrefs it is given, mounted beside the tab row): Hoops Scores/Standings/Matchup/Teams/Players, Books
+the hrefs it is given, mounted beside the tab row): Hoops Scores/Standings/Projections/Matchup/Teams/Players, Books
 Library/Stats/Discworld, Charts Library/Setlists, Practice Today/Fretboard/CAGED/Licks; Tune binds
 `1`/`2`/`3` to its panes itself (state, not routes). Comics binds `x` to toggle the focused issue.
 
@@ -1113,6 +1118,7 @@ Three things the site had never had, all gated on `contract.features`, all taugh
 | `split_off_def` | v2: price it per side, from `value_off_per36`/`value_def_per36` |
 | `depth_chart_minutes` | v2: allocate minutes off the fitted rotation curve, not proportionally |
 | `nightly_strength` | v2: prefer the last-ten-games team read when pricing a game |
+| `season_projection` | 2026-10-28: the bundle carries `projections.json`, hoops-sim's nightly rest-of-season projection; `/hoops/projections` renders it. Display only — nothing is priced off it. See "The rest-of-season projection" below |
 | `goto_scorer` | v3 (2026-09-06, hoops-sim issue #73): a team built around one big scorer is worth more than its five men summed — add `star_goto_premium × (clamp(leading scorer's share of projected points, star_goto_share_band) − star_goto_league_share)` to a roster's raw strength, the share projected from each man's `pts_per36` over his allocated minutes, summed in ascending order. Net only; the tilt (game totals) never moves. Seven fixture cases (`v3 goto …`), including one that proves the port charges NOTHING when the token is absent. `pts_per36` ships on every player but is not stored in `hoops_players` yet — nothing on the site prices at runtime; the site's team ratings are transported from hoops-sim, which carries the term once its `FEATURES` flips |
 
 `SUPPORTED_PRICING_VERSION` is 3 since the go-to round (was 2). Rule 4 is one-directional, so **every bundle hoops-sim sends today still imports and is still priced the v1 way** — which it will be until the flip lands. Two negotiation rules were added, both about a bundle being ACCEPTED and then priced wrongly (the failure nobody sees on screen): `checkFeatureCoherence` refuses `symmetric_off_def` and `split_off_def` together, and `checkFeatureConstants` refuses a DECLARED feature whose constants are absent while never demanding an undeclared one's (`FEATURE_CONSTANTS`) — which is what keeps a v1 bundle importable forever.
@@ -1143,7 +1149,7 @@ Gate: `npm run check:hoops:movers` (appended to `prebuild` at the END, after `ch
 
 #### The matchup + box score (milestone 3, #67)
 
-`/hoops/matchup` is the sim's front door: home/away pickers, a neutral-court toggle, a ratings-mode row, and one accented **Sim**. `/hoops/game/[runId]` is one sampled game. 🔴 **The section landing is Scores, not the Matchup** (2026-10-23): `/hoops` redirects to `/hoops/scores` (`app/hoops/page.tsx`), the masthead entry in `lib/sections.ts` points there, and the tab row reads Scores, Standings, Matchup, Teams, Players (`HOOPS_TABS`, which is also the 1..5 key order). An old `/hoops?home=&away=&mode=&neutral=` link still carries its pickers through to `/hoops/matchup`.
+`/hoops/matchup` is the sim's front door: home/away pickers, a neutral-court toggle, a ratings-mode row, and one accented **Sim**. `/hoops/game/[runId]` is one sampled game. 🔴 **The section landing is Scores, not the Matchup** (2026-10-23): `/hoops` redirects to `/hoops/scores` (`app/hoops/page.tsx`), the masthead entry in `lib/sections.ts` points there, and the tab row reads Scores, Standings, Projections, Matchup, Teams, Players (`HOOPS_TABS`, which is also the 1..6 key order). An old `/hoops?home=&away=&mode=&neutral=` link still carries its pickers through to `/hoops/matchup`.
 
 🔴 **The `run_id` is self-describing, and that is load-bearing.** `DEN-OKC-hb-3f2a9c1b0d4e5f6a` encodes home, away, court (`h`/`n`) and rating mode (`r`/`o`/`b`/`n` — hub-v2 added nightly; the two `n`s live in different fixed positions), so `/hoops/game/[runId]` reproduces the game **from the URL and nothing else** (`encodeRunId`/`parseRunId`, `lib/hoops/matchup.ts`). The alternative — a random id plus a `hoops_runs` row — would make a shared link depend on this device's DB, which is the property "reproducible forever" was supposed to buy. `hoops_runs` stays reserved for sims the user deliberately saves; it is not touched by this milestone. A malformed id parses to `null` (never throws) so the page 404s rather than 500s. `/hoops/game/new?home=&away=&mode=&neutral=` mints a fresh id and redirects, so a rendered result always sits at a stable URL.
 
@@ -1164,6 +1170,78 @@ Gate: `npm run check:hoops:movers` (appended to `prebuild` at the END, after `ch
 **Honesty carries that render, not tooltips:** the variance note and the "how these lines were built" caveats on every box score (`VarianceNote` / `BoxScoreCaveats`), the `run_id` + fit version + data-as-of on every result (`RunProvenance` — the fit is printed *next to* the id because a Mini push can replace the model under an old link), the ratings-mode blurb, the participant basis and omitted-player count per team, and the histogram's "the answer is a distribution" paragraph naming the actual cloud width and quartiles.
 
 **Key files:** `lib/hoops/types.ts` (the export's shapes), `blob-contract.ts` (what the engine expects the blob to be — the stale-blob guard's source of truth), `params.ts` (decode into flat `Float64Array` + stride, throws `StaleBlobError`; `expectVersion: null` is the fixture-only escape hatch), `data.ts` (read + hash the COMMITTED disk bundle — cold-start seed only, see above), `import.ts` (project either byte source into SQLite; `ensureHoopsImport`/`importHoopsData` = the disk-seed path, `importPushedBundle` = the push path), `contract.ts` (the wire-contract capability negotiation), `bundleValidation.ts` (the structural completeness gate on a pushed bundle), `pricing.ts` (the pure roster-pricing formula port, for the not-yet-assertable pricing fixture), `queries.ts` (server reads, all off the DB, never disk), `rating.ts` (**pure** — no fs/db, so the client can re-rank all three modes without a round trip), `nba-franchises.ts` (the 30 real franchises, as an external fact), `blake2b.ts` (hand-rolled because the engine runs in the browser too and Web Crypto has no blake2b; matches node:crypto on 510 inputs), `philox.ts` (Philox4x64 + numpy's `random`/`standard_normal`), `ziggurat.ts` (generated tables), `rng.ts` (coordinate-keyed streams), `engine.ts` (the possession loop), `binomial.ts` (numpy's multinomial/binomial, for the box-score allocation), `boxscore.ts` (**pure** — the two-mode box score; the studio re-runs it in the browser), `matchup.ts` (**pure** — the run_id encoding + the distribution summary), `run.ts` (the server glue: DB + engine + box score in ONE place so the routes and the SSR pages cannot drift into simulating different games). API: `app/api/hoops/import/route.ts` (the push endpoint), `app/api/hoops/teams/route.ts`, `app/api/hoops/sim/route.ts`, `app/api/hoops/boxscore/route.ts`. UI: `components/hoops/HoopsNav.tsx` (the section self-hosts its in-page nav — there is no global sub-tab bar to extend; #68's first question is answered in favour of SIBLING PAGES with an in-section switcher, so every result is linkable and server-renderable), `components/hoops/MatchupClient.tsx`, `components/hoops/BoxScoreTable.tsx` (the shared table + the three honesty blocks), `components/hoops/MarginHistogram.tsx`, `components/hoops/TeamsClient.tsx`, `components/hoops/PlayerExplain.tsx`, `app/hoops/page.tsx`, `app/hoops/game/[runId]/page.tsx`, `app/hoops/teams/*`, `app/hoops/players/[athleteId]/page.tsx`; `lib/hoops/series.ts` (best-of-seven arithmetic), `app/api/hoops/meetings/route.ts`.
+
+#### The rest-of-season projection (`/hoops/projections`) — 2026-10-28
+
+Keith's ask: "new projections for the rest of the season based on the games played heretofore this
+year", updating daily with no hand in it. hoops-sim (the sender, on the Mini) simulates the remaining
+schedule nightly and publishes the result inside the same push as everything else; this is the
+receiver half, and per both repos' rule it SHIPPED FIRST — the sender adds the token only after
+probing `GET /api/hoops/import` and seeing it listed.
+
+**The contract.** Feature token **`season_projection`**; bundle file **`projections.json`**:
+`{ season_start_year, as_of_date (YYYY-MM-DD, Mountain, the last completed game), generated_at,
+replicates, method (plain English, rendered verbatim), teams: [ { team, conference, wins, losses,
+proj_wins, proj_losses, wins_p10, wins_p90, playoff_pct, playin_pct, top6_pct, conf_finals_pct,
+finals_pct, title_pct } × 30 ] }`, every `*_pct` a fraction in [0, 1]; `playoff_pct` = a top-6 seed
+or won the play-in, `playin_pct` = landed in the 7–10 play-in at all. 🔴 **Gated on the TOKEN, not
+the file** (`checkFeatureFiles` in `contract.ts`, the file analogue of `FEATURE_CONSTANTS`): a
+declared token with no `projections.json` rejects the push naming both; an undeclared file is
+ignored exactly as any unlisted file in `files` always was, because the sender has not said it is
+fit to show. A bundle without the token imports exactly as it did before.
+
+🔴 **Validated as NBA arithmetic, not just shape** (`lib/hoops/projections.ts`, pure): 30
+franchises each once, in the conference `nba-franchises.ts` already knows; 82 games a team and
+`proj_wins ≥ wins`; `wins_p10 ≤ proj_wins ≤ wins_p90`; `title ≤ finals ≤ conf_finals ≤ playoff`,
+`top6 ≤ playoff ≤ top6 + playin`, `top6 + playin ≤ 1`; and the league identities — one champion
+(Σ title = 1), two finalists, four conference finalists, per conference eight playoff teams, six
+top-6 seeds and four play-in teams, 1,230 projected wins, league wins = league losses so far. The
+sum tolerances (`SUM_TOLERANCE`) cover the sender's rounding and nothing else; a percentage shipped
+where a fraction was promised is a factor of 100 off and is refused before anything is written, with
+the first problem named. `NEST_EPS` (0.002) is the only slack on the inequalities, for two figures
+that were equal before independent rounding.
+
+**Storage** (`lib/db.ts`: `hoops_projection_meta` singleton + `hoops_projections`, one row a team;
+`lib/hoops/projectionStore.ts` is the one writer/reader pair, taking the DB handle so the gate drives
+the real pair). 🔴 **Written INSIDE `writeBundle`'s transaction but NOT truncated with the six
+read-model tables — keep the latest.** A push without a projection (every bundle until the sender
+flips, and any later one that omits it) leaves the last projection standing, dated on the page by
+its own `as_of_date`; a push with one replaces it whole. The committed disk seed never writes here.
+The route's rule-6 no-op gained a `projectionSettled` marker: a same-hash push carrying a projection
+whose `generated_at` differs from the stored one still falls through to the write, so a sender whose
+`content_hash` scope forgot the file cannot publish a fresh projection every night that never lands.
+
+**The page.** East and West tables in `ProjectionTable.tsx`, the `/hoops/standings` shape, ordered
+by **projected wins** (`orderForTable`/`conferenceTable` in the pure module — the page and the table
+never sort on their own, asserted): W-L now, Proj (one decimal), the 80% win band, Playoffs, Title;
+Play-in, Conf F and Finals fold away below `sm`. "as of <date>" from the sender's `as_of_date`, then
+what it is ("Simulated N times from the standings after the games of <date>…", the sender's
+`method` verbatim), how to read the columns, and that the rules under 6th/10th are by projected
+wins only. Honest empty state when nothing has been received. The tab sits between Standings and
+Matchup; number key 3 (the sim tabs shift to 4–6). `check:hoops:mobile` walks it (landmark "Rest
+of season", rendered in both states).
+
+**The gate: `npm run check:hoops:projections`** (appended to `prebuild` at the END, after
+`check:hoops:scores`). Over `hoops-data/hoops_projections_fixture.json` — a synthetic file shaped
+exactly to the contract, built once by a throwaway script with every league identity holding — it
+first re-derives those identities LONGHAND over the raw JSON (not via the validator) so the fixture
+is anchored on facts independent of the code, then: the contract (token accepted, file demanded
+with it, a v1 bundle untouched, `describeContract()` lists both), the validator accepting the
+fixture and refusing **27 damage patterns** each for its named reason, the order (by projected wins,
+pinned on a pair whose record and projection disagree so the test cannot be vacuous), the
+formatting, and in a throwaway DB the real schema, the store round trip field by field, and the
+**real `importPushedBundle` over the committed bundle** three times — without a projection (stored
+one stands), with a newer one (replaced), without again (latest kept). Falsified at merge
+**13/13**: duplicate-team rule removed, title≤finals removed, probability bound loosened to 100,
+calendar-date rule removed, team-count + missing-franchise removed, league sums removed, ordered by
+the record, ordered ascending, projection truncated with the read model, projection never written,
+token dropped from `SUPPORTED_FEATURES`, file no longer demanded, route storing it unvalidated.
+
+**Key files:** `lib/hoops/projections.ts` (**pure** — validator, order, formatting),
+`lib/hoops/projectionStore.ts` (the SQLite edge), `lib/hoops/contract.ts` (`FEATURE_FILES`,
+`checkFeatureFiles`, `describeContract`), `app/api/hoops/import/route.ts` (GET discovery + the
+token-gated validation), `app/hoops/projections/page.tsx`, `components/hoops/ProjectionTable.tsx`,
+`scripts/check-hoops-projections.ts`, `hoops-data/hoops_projections_fixture.json`.
 
 #### Real scores, box scores and standings (`/hoops/scores`, `/hoops/standings`) — 2026-10-22
 
