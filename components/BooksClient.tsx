@@ -80,7 +80,7 @@ function BookCard({
           {book.coverName ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={`/api/books/${book.id}/cover`}
+              src={`/api/books/${book.id}/cover?v=${book.sha256.slice(0, 12)}`}
               alt=""
               className="h-full w-full object-cover"
               loading="lazy"

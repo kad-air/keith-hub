@@ -39,6 +39,9 @@ npm run check:books:bytes        # Books byte-identity gate: partialMd5 vs offli
 npm run check:books:opds         # Books OPDS device-contract gate: CrossPoint parser constraints + the To Read shelf, anchored on Stump's device-proven feed (same)
 npm run check:books:kosync       # Books kosync protocol gate: md5 wire auth, opaque progress round-trip, no-rollback import (same)
 npm run check:books:metadata     # Books metadata gate: an edit never touches the file/sha256/partial_md5 (same)
+npm run check:books:edit         # Books file-edit gate: an OPF/cover edit changes nothing else (spine + chapters byte-identical),
+                                 #   progress/history/aliases follow the new sync key, old AND new keys read+write one position,
+                                 #   restore is flat (no self-alias), a DB failure puts the old file back (same)
 npm run check:books:stats        # Books reading-stats gate: word count vs. Python, real DST calendar, sync survives a stats failure (same)
 npm run check:books:drm          # Books DRM gate: an ADEPT epub is decrypted-or-refused (never the 34-page ghost); a clean epub passes through byte-identical (same)
 npm run check:books:acsm         # Books ACSM gate: the ADEPT canonicalisation + signature match an independent Python implementation byte-for-byte (same)
@@ -359,7 +362,9 @@ Railway volume; `/Volumes/HDD/Books` on the Mini remains the master copy/backup.
 🔴 **The invariant everything rests on: byte identity** (`BOOKS_PLAN.md` §4). The kosync document
 key is a partial MD5 of the FILE BYTES (`lib/books/partialMd5.ts` — offsets `1024 << 2i`,
 i = −1..10, 1024 bytes each), computed independently by every device. Consequences: the stored
-epub is IMMUTABLE (metadata edits touch only the DB row; a changed file is a NEW book id), the
+epub is never rewritten in passing (metadata edits touch only the DB row; the ONE path that
+changes a book's bytes is `replaceBookFile`, which re-keys progress — see "Editing the file
+itself" below), the
 download routes serve bytes untouched (no compression/rewrite middleware may ever wrap them), and
 a *different copy* of the same title (re-rip, Calibre re-export) silently never syncs. Breakage
 here has NO error surface — both devices keep reporting success against different keys.
@@ -459,6 +464,48 @@ columns only and can never change the file, its sha256, or its `partial_md5`, so
 you're currently reading cannot lose your place. (Falsification-tested by making `updateBook`
 touch the file.) `SERIES_OVERRIDES` in `normalize.ts` handles the case where a re-ingested file
 should get its series back automatically; one-off corrections belong in the UI, not in that table.
+
+**Editing the file itself — a new cover, a fixed title — without losing anyone's place.** A DB
+edit changes the hub and the OPDS listing, but once a book is on a device the reader shows the
+FILE's own OPF title and cover. Changing those changes the bytes, so it changes the partial MD5
+every device keys progress on — done naively, every position silently strands on a key no file
+has. The path that does it safely (added 2026-10-28):
+- `lib/books/epubEdit.ts` (**pure**) rewrites the OPF `<metadata>` (dc:title, dc:creator — drops
+  the stale `opf:file-as` — calibre series metas / EPUB3 belongs-to-collection) and the cover
+  image (in place when the format matches; renamed with references followed when it doesn't; a
+  new manifest item + `<meta name="cover">` when the book had none). 🔴 **Never the spine, never a
+  chapter, never `dc:identifier`** (font obfuscation keys off it): an x-pointer is DocFragment[N]
+  over the spine plus an element path inside one chapter, so an edit that leaves both alone means
+  every saved position is exact in the new file. It re-checks the spine on the way out and throws
+  rather than emit a moved one. Images are sniffed by magic number. Refuses ADEPT. Deterministic.
+- `replaceBookFile` (`store.ts`) swaps the bytes under the SAME book id (OPDS entry id, To Read,
+  history all stay): archives the old file to `data/books/<id>/versions/<sha256>.epub`, writes the
+  new one, then ONE transaction updates the row and calls `rekeyDocument(old, new)` (`kosync.ts`):
+  the progress row and `reading_events` move to the new key (only the key column — no event is
+  added or altered) and `kosync_aliases` gets old → new. 🔴 **kosync GET/PUT resolve the device's
+  key through `resolveDocument` and ECHO the key the device sent**, so a device still holding the
+  old copy reads and writes the same position as one holding the new copy, until it re-downloads.
+  Aliases are kept flat and a current key is never an alias (a restore to an earlier version
+  un-aliases it). A DB failure puts the old file back. `restoreVersion` undoes any replacement.
+  `textChanged` in the result says whether the chapters differ (false for every epubEdit edit;
+  true means a different text — progress carries but may land near, not on, the sentence; a new
+  edition is better uploaded as a new book).
+- Routes (cookie-gated): `POST /api/books/[id]/edit-file` (multipart `title/author/series/
+  seriesIndex/cover`, or JSON without cover — the row gets the same values so listing and file
+  agree), `POST /api/books/[id]/replace-file` (a file edited elsewhere; through
+  `prepareForIngest` like an upload; `metadata=file` to take the row from the new OPF),
+  `GET/POST /api/books/[id]/versions` (list / restore — a restore takes the row's metadata back
+  from the restored OPF unless `metadata: "keep"`). **`scripts/edit-book.mjs`** drives them —
+  `find`, `show`, `edit <id> --title … --cover img`, `replace`, `restore`, `download` — this is the
+  tool for "put a new cover on X" / "fix this title" (FEED_BASE + FEED_PASSWORD, like push-books).
+- OPDS cover hrefs carry `?v=<sha256 prefix>` (the route ignores it) so a client that cached the
+  old cover for its hour sees a new URL. Each entry's `<updated>` moves with the replace; Sheafs
+  uses entry id + `<updated>` to offer "Update" on a book it downloaded from the catalog.
+- **The gate: `npm run check:books:edit`** (in `prebuild`). Falsification-tested 10/10: GET or PUT
+  without alias resolution, GET not echoing the device's key, reading history not re-keyed, the
+  self-alias kept on restore, aliases not flattened, the rollback removed, cover references
+  rewritten by basename instead of resolved path, a chapter touched by the rewrite, a cover page
+  added to the spine (caught by the gate's own spine assertion with the module's guard disabled).
 
 **DRM: every upload is brought into the clear before it is ingested, or it is refused.** The
 upload route runs `prepareForIngest` (`lib/books/prepare.ts`) on the raw bytes FIRST; nothing
@@ -731,7 +778,8 @@ list is the seven it can name, not the seven that exist.
 **Key files:** `lib/books/partialMd5.ts` (the hash — do not touch), `epubMeta.ts` (regex OPF
 extraction; failure falls back to filename, never fails ingest), `normalize.ts` (author/series
 rules + `SERIES_OVERRIDES`, ported from `~/Stump/organize-books.py`), `store.ts` (CRUD + ingest,
-content-addressed dedupe on sha256), `opds.ts` (pure XML emitters), `kosync.ts` (protocol
+content-addressed dedupe on sha256; `replaceBookFile`/`restoreVersion`, the one bytes-changing
+path), `epubEdit.ts` (**pure** — OPF + cover rewrite, never the spine), `opds.ts` (pure XML emitters), `kosync.ts` (protocol
 semantics), `apiKey.ts` (the credential gate); `store.ts` also carries `listToRead`/`setToRead` for
 the To Read shelf. File health: `health.ts` (**pure** — the checker), `language.ts` (**pure**, imports
 NOTHING — the function-word language detector; asserted, the `pages.ts` lesson),

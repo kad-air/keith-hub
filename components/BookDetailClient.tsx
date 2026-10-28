@@ -199,7 +199,7 @@ export default function BookDetailClient({ book, sync, history, health }: Props)
           <div className="aspect-[2/3] overflow-hidden border border-rule/60 bg-ink-raised">
             {book.coverName ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={`/api/books/${book.id}/cover`} alt="" className="h-full w-full object-cover" />
+              <img src={`/api/books/${book.id}/cover?v=${book.sha256.slice(0, 12)}`} alt="" className="h-full w-full object-cover" />
             ) : (
               <div className="flex h-full items-center justify-center p-2 text-center font-display text-sm text-cream-dim">
                 {book.title}

@@ -48,7 +48,7 @@ export function fileSegment(book: Pick<Book, "title" | "fileName">): string {
   return `${encodeURIComponent(base || "book")}.epub`;
 }
 
-function coverMime(coverName: string): string {
+export function coverMime(coverName: string): string {
   return coverName.endsWith(".png")
     ? "image/png"
     : coverName.endsWith(".gif")
@@ -68,8 +68,11 @@ export function bookEntry(book: Book, base: string): string {
   ];
   if (book.coverName) {
     const mime = coverMime(book.coverName);
-    links.push({ rel: IMAGE_REL, type: mime, href: `${base}/books/${book.id}/cover` });
-    links.push({ rel: THUMB_REL, type: mime, href: `${base}/books/${book.id}/cover` });
+    // ?v= is the file's identity: the route ignores it, but a client that
+    // cached the old cover (max-age=3600) sees a new URL after replaceBookFile.
+    const cover = `${base}/books/${book.id}/cover?v=${book.sha256.slice(0, 12)}`;
+    links.push({ rel: IMAGE_REL, type: mime, href: cover });
+    links.push({ rel: THUMB_REL, type: mime, href: cover });
   }
   const series =
     book.series != null

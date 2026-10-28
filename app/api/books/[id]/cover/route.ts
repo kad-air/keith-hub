@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import { bookCoverPath, getBook } from "@/lib/books/store";
+import { coverMime } from "@/lib/books/opds";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +17,7 @@ export async function GET(
   if (!fs.existsSync(p)) return new NextResponse(null, { status: 404 });
   return new NextResponse(new Uint8Array(fs.readFileSync(p)), {
     headers: {
-      "Content-Type": book.coverName.endsWith(".png") ? "image/png" : "image/jpeg",
+      "Content-Type": coverMime(book.coverName),
       "Cache-Control": "private, max-age=3600",
     },
   });

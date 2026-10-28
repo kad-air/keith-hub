@@ -15,6 +15,7 @@ import {
   SEARCH_TYPE,
   bookEntry,
   feed,
+  coverMime,
   fileSegment,
   navEntry,
   openSearchDescription,
@@ -240,7 +241,7 @@ export async function GET(
     if (path[2] === "cover" && book.coverName) {
       const p = bookCoverPath({ id: book.id, coverName: book.coverName });
       if (!fs.existsSync(p)) return notFound();
-      const mime = book.coverName.endsWith(".png") ? "image/png" : "image/jpeg";
+      const mime = coverMime(book.coverName);
       return new NextResponse(new Uint8Array(fs.readFileSync(p)), {
         headers: { "Content-Type": mime, "Cache-Control": "private, max-age=3600" },
       });
