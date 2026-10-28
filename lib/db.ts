@@ -447,6 +447,40 @@ export function getDb(): Database.Database {
       saved_at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_hoops_runs_saved ON hoops_runs(saved_at DESC);
+
+    -- THE NIGHTLY REST-OF-SEASON PROJECTION (wire token season_projection,
+    -- file projections.json; lib/hoops/projections.ts validates, the importer
+    -- writes). Read-model family, but NOT truncated with the six bundle
+    -- tables: a push that carries no projection leaves the last one standing
+    -- (the page dates it by as_of_date), and a push that carries one replaces
+    -- it whole, inside the same transaction as the rest of the bundle. The
+    -- committed disk seed never writes here. Singleton meta + one row a team.
+    CREATE TABLE IF NOT EXISTS hoops_projection_meta (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      season_start_year INTEGER NOT NULL,
+      as_of_date TEXT NOT NULL,
+      generated_at TEXT NOT NULL,
+      received_at TEXT NOT NULL,
+      replicates INTEGER NOT NULL,
+      method TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS hoops_projections (
+      tri TEXT PRIMARY KEY,
+      conference TEXT NOT NULL,
+      wins INTEGER NOT NULL,
+      losses INTEGER NOT NULL,
+      proj_wins REAL NOT NULL,
+      proj_losses REAL NOT NULL,
+      wins_p10 INTEGER NOT NULL,
+      wins_p90 INTEGER NOT NULL,
+      playoff_pct REAL NOT NULL,
+      playin_pct REAL NOT NULL,
+      top6_pct REAL NOT NULL,
+      conf_finals_pct REAL NOT NULL,
+      finals_pct REAL NOT NULL,
+      title_pct REAL NOT NULL
+    );
   `);
 
   // Additive migrations — CREATE IF NOT EXISTS above never alters existing

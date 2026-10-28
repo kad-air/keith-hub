@@ -25,15 +25,19 @@ import {
   ContractRejection,
   checkFeatureCoherence,
   checkFeatureConstants,
+  checkFeatureFiles,
   checkFeatures,
   checkPricingVersion,
   checkRequiredConstants,
   computeContentHash,
+  describeContract,
   resolveContract,
 } from "@/lib/hoops/contract";
 import { importPushedBundle } from "@/lib/hoops/import";
 import { decodeParams, StaleBlobError } from "@/lib/hoops/params";
 import { BundleRejection, validatePushedBundle } from "@/lib/hoops/bundleValidation";
+import { ProjectionRejection, validateProjections } from "@/lib/hoops/projections";
+import { storedProjectionGeneratedAt } from "@/lib/hoops/projectionStore";
 import { getDb } from "@/lib/db";
 import type {
   HoopsBundle,
@@ -73,6 +77,42 @@ function isAuthorized(req: NextRequest): boolean {
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+/**
+ * GET /api/hoops/import — DISCOVERY. What this receiver accepts, so the
+ * sender can ask before it declares a token (the "receiver first" deploy
+ * order: a token this receiver has never heard of rejects the whole push,
+ * so hoops-sim probes this and only adds a token it sees listed). Same
+ * bearer auth as the POST — the shape is not a secret, but the endpoint
+ * must not become a public fingerprint of the deployment either. Also
+ * reports what is currently stored, so the sender can tell whether its
+ * last publish landed without reading the site.
+ */
+export async function GET(req: NextRequest): Promise<NextResponse> {
+  if (!isAuthorized(req)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const db = getDb();
+  const stored = db
+    .prepare(`SELECT generated_at, content_hash, import_source FROM hoops_params WHERE id = 1`)
+    .get() as { generated_at: string; content_hash: string; import_source: string } | undefined;
+  const projection = db
+    .prepare(`SELECT as_of_date, generated_at FROM hoops_projection_meta WHERE id = 1`)
+    .get() as { as_of_date: string; generated_at: string } | undefined;
+  return NextResponse.json({
+    ...describeContract(),
+    stored: stored
+      ? {
+          generated_at: stored.generated_at,
+          content_hash: stored.content_hash,
+          import_source: stored.import_source,
+          projection: projection
+            ? { as_of_date: projection.as_of_date, generated_at: projection.generated_at }
+            : null,
+        }
+      : null,
+  });
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
@@ -159,11 +199,34 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     checkRequiredConstants(constants);
     // Feature-scoped, so a v1 bundle is untouched — see FEATURE_CONSTANTS.
     checkFeatureConstants(contract.features, constants);
+    // Same again for files: `season_projection` demands projections.json.
+    checkFeatureFiles(contract.features, files);
   } catch (err) {
     if (err instanceof ContractRejection) {
-      return NextResponse.json({ error: err.message }, { status: 400 });
+      // The rejection body carries what IS accepted, so a sender that gets
+      // refused for a token can read the answer off the refusal as well as
+      // off the GET.
+      return NextResponse.json({ error: err.message, accepts: describeContract() }, { status: 400 });
     }
     throw err;
+  }
+
+  // THE REST-OF-SEASON PROJECTION. Gated on the token, not on the file: a
+  // sender that has not declared `season_projection` has not said the file is
+  // fit to show, so an undeclared projections.json is ignored exactly as every
+  // other unlisted file in `files` always has been. A DECLARED one is validated
+  // in full (lib/hoops/projections.ts — the shape, the nesting, the league
+  // identities) and a failure refuses the whole push, naming the first
+  // problem, before anything is written.
+  if (contract.features.includes("season_projection")) {
+    try {
+      bundle.projections = validateProjections(files["projections.json"]);
+    } catch (err) {
+      if (err instanceof ProjectionRejection) {
+        return NextResponse.json({ error: `invalid projection: ${err.message}` }, { status: 400 });
+      }
+      throw err;
+    }
   }
 
   // content_hash: the sender's own if it supplied one, else computed here —
@@ -205,7 +268,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   ).some((t) => t.nightly != null);
   const nightlySettled = !bundleCarriesNightly || storedNightly > 0;
 
-  if (existing && existing.content_hash === contentHash && splitSettled && nightlySettled) {
+  // And once more for the projection: if THIS push carries one that the
+  // stored copy does not match, a same-hash short-circuit must not drop it
+  // (a sender whose content_hash scope forgot to include projections.json
+  // would otherwise publish a fresh projection every night that never lands).
+  const projectionSettled =
+    !bundle.projections || storedProjectionGeneratedAt(db) === bundle.projections.generated_at;
+
+  if (existing && existing.content_hash === contentHash && splitSettled && nightlySettled && projectionSettled) {
     return NextResponse.json({
       imported: false,
       reason: "unchanged",
@@ -263,6 +333,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       contentHash: summary.contentHash,
       counts: summary.counts,
       contractUsedFallback: contract.usedFallback,
+      projection: bundle.projections
+        ? { as_of_date: bundle.projections.as_of_date, generated_at: bundle.projections.generated_at }
+        : null,
     });
   } catch (err) {
     // A malformed teams/players/schedule/results/lines file throws here

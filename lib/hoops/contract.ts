@@ -51,6 +51,15 @@ export const SUPPORTED_PRICING_VERSION = 3;
  *                       projected points) - star_goto_league_share) to the raw
  *                       strength, the share projected from each man's
  *                       pts_per36 over his allocated minutes
+ *   season_projection   2026-10-28 — the bundle carries `projections.json`,
+ *                       a nightly rest-of-season projection (projected
+ *                       record, 80% win band, playoff/play-in/title odds per
+ *                       team) that /hoops/projections renders. Display only:
+ *                       nothing is priced off it. The file is REQUIRED when
+ *                       the token is declared (FEATURE_FILES) and validated
+ *                       by lib/hoops/projections.ts before anything is
+ *                       written; without the token the file is ignored and
+ *                       the import is exactly what it was before.
  */
 export const SUPPORTED_FEATURES: ReadonlySet<string> = new Set([
   "symmetric_off_def",
@@ -60,7 +69,19 @@ export const SUPPORTED_FEATURES: ReadonlySet<string> = new Set([
   "absorption",
   "fictional_values",
   "goto_scorer",
+  "season_projection",
 ]);
+
+/**
+ * Files a declared feature CANNOT be honoured without, keyed like
+ * FEATURE_CONSTANTS. The six read-model files (lib/hoops/data.ts's
+ * BUNDLE_FILES) are demanded of every bundle regardless; this table adds to
+ * them only for the features actually on the wire, so a bundle that does
+ * not declare `season_projection` is never asked for `projections.json`.
+ */
+export const FEATURE_FILES: Readonly<Record<string, readonly string[]>> = {
+  season_projection: ["projections.json"],
+};
 
 /**
  * Constants a declared feature CANNOT be honoured without.
@@ -254,6 +275,51 @@ export function checkFeatureConstants(
       }
     }
   }
+}
+
+/**
+ * Rule 3 again, for FILES: a file that a DECLARED feature cannot be honoured
+ * without -> REJECT, naming both. Mirrors checkFeatureConstants, and for the
+ * same reason — demanding projections.json of every bundle would reject every
+ * bundle the sender publishes today.
+ */
+export function checkFeatureFiles(features: string[], files: Record<string, unknown>): void {
+  for (const feature of features) {
+    for (const name of FEATURE_FILES[feature] ?? []) {
+      if (!(name in files) || files[name] === null || files[name] === undefined) {
+        throw new ContractRejection(
+          `feature "${feature}" is declared but required file "${name}" is missing`,
+        );
+      }
+    }
+  }
+}
+
+/**
+ * What this receiver accepts, as one JSON-able object — the DISCOVERY
+ * mechanism the sender probes (GET /api/hoops/import) before it adds a
+ * feature token to its own list. The whole "receiver first" deploy order
+ * rests on the sender being able to ask rather than guess; this is the
+ * answer. Every list here is read off the real tables above, never retyped.
+ */
+export function describeContract(): {
+  wire_version: number;
+  pricing_version: number;
+  features: string[];
+  required_constants: string[];
+  feature_constants: Record<string, string[]>;
+  feature_files: Record<string, string[]>;
+} {
+  return {
+    wire_version: SUPPORTED_WIRE_VERSION,
+    pricing_version: SUPPORTED_PRICING_VERSION,
+    features: [...SUPPORTED_FEATURES],
+    required_constants: [...REQUIRED_CONSTANTS],
+    feature_constants: Object.fromEntries(
+      Object.entries(FEATURE_CONSTANTS).map(([k, v]) => [k, [...v]]),
+    ),
+    feature_files: Object.fromEntries(Object.entries(FEATURE_FILES).map(([k, v]) => [k, [...v]])),
+  };
 }
 
 /** Rule 4: pricing_version higher than supported -> REJECT. Lower is fine. */

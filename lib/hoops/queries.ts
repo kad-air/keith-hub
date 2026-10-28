@@ -5,6 +5,7 @@
 
 import { getDb } from "@/lib/db";
 import type { BoxPlayer } from "./boxscore";
+import { readProjection, type Projection } from "./projectionStore.ts";
 import { ensureHoopsImport } from "./import";
 import type { ImportSource } from "./import";
 import { meetingsBetween } from "./matchup";
@@ -519,6 +520,18 @@ export function getRosterSizes(): Map<string, number> {
     .all() as Array<{ tri: string; n: number }>;
   return new Map(rows.map((r) => [r.tri, r.n]));
 }
+
+/**
+ * The nightly rest-of-season projection (`season_projection`), or null when
+ * no push has ever carried one — the page shows an honest empty state then.
+ * Read off SQLite only; the committed disk seed never has a projection.
+ */
+export function getProjection(): Projection | null {
+  ensureHoopsImport();
+  return readProjection(getDb());
+}
+
+export type { Projection, ProjectionMeta } from "./projectionStore.ts";
 
 export interface HoopsMeta {
   paramVersion: string;
