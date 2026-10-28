@@ -27,8 +27,8 @@ import type { Game, LiveGame, TeamLine } from "@/lib/hoops/scores/types";
  * options unfold INSIDE the card (SpoilerPanel) — hold-to-reveal again, or
  * "I'm at <quarter> <time>", after which the card shows the score as of that
  * moment and follows the play-by-play from there (`synced`). A synced card's
- * tap unfolds the same panel rather than opening the live box score, which
- * would spoil it. Inside the card, not a sheet: at the bottom of a long list
+ * tap unfolds the same panel (which links the game page's box score and
+ * play-by-play, both held to the same moment). Inside the card, not a sheet: at the bottom of a long list
  * the controls are found where the game is.
  */
 export default function GameCard({

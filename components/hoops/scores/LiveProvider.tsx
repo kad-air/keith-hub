@@ -12,11 +12,16 @@ import {
 import { useRouter } from "next/navigation";
 import { LIVE_POLL_MS, PENDING_POLL_MS } from "@/lib/hoops/scores/live";
 import { loadSpoiler, saveSpoiler, type SpoilerMap } from "@/lib/hoops/scores/spoilerStore";
-import type { GameBox, GameState, LiveGame, LiveResponse, SyncResolution } from "@/lib/hoops/scores/types";
+import type { GameBox, GameState, LiveGame, LiveResponse, SyncResolution, WirePlay } from "@/lib/hoops/scores/types";
 
 interface LiveState {
   games: Record<string, LiveGame>;
   box: GameBox | null;
+  /** The box is held to a synced moment (counting stats only). */
+  held: boolean;
+  /** The game page's play-by-play tab, as the last tick cut it; null when
+   *  not asked for, veiled, or before tip. */
+  plays: WirePlay[] | null;
   /** Epoch ms of the last successful tick; null until one lands. */
   fetchedAt: number | null;
   /** The last tick failed (the cards keep showing what they had). */
@@ -34,7 +39,7 @@ interface SpoilerApi {
   resolve: (id: string, period: number, clockSec: number) => Promise<SyncResolution>;
 }
 
-const EMPTY: LiveState = { games: {}, box: null, fetchedAt: null, error: null };
+const EMPTY: LiveState = { games: {}, box: null, held: false, plays: null, fetchedAt: null, error: null };
 const NO_SPOILER: SpoilerApi = {
   protect: false,
   spoiler: {},
@@ -56,6 +61,24 @@ export function useLive(): LiveState {
 
 export function useSpoiler(): SpoilerApi {
   return useContext(SpoilerCtx);
+}
+
+/** How the game page may show one game, from the viewer's choice as the
+ *  server last applied it: `pending` until the first tick lands under
+ *  protection (the server render carries nothing to show), then `veiled`,
+ *  `synced` (held to the moment) or `open`. `early` is a synced view whose
+ *  moment is still before the opening tip. Unprotected pages are `open`. */
+export type GameView = "open" | "pending" | "veiled" | "early" | "synced";
+
+export function useGameView(id: string, guarded: boolean): GameView {
+  const state = useContext(Ctx);
+  const sp = useContext(SpoilerCtx);
+  if (!guarded) return "open";
+  const lg = state.games[id];
+  if (!lg) return state.fetchedAt === null ? "pending" : "veiled";
+  if (lg.veiled) return sp.spoiler[id]?.mode === "synced" && lg.moment === null ? "early" : "veiled";
+  if (lg.moment && !lg.moment.final) return "synced";
+  return "open";
 }
 
 /**
@@ -83,6 +106,7 @@ export default function LiveProvider({
   gameId = null,
   states,
   protect = false,
+  plays = false,
   children,
 }: {
   /** The day(s) whose games this page shows — today's page also lists last
@@ -94,6 +118,8 @@ export default function LiveProvider({
    *  tick triggers one router.refresh(). */
   states: Record<string, GameState>;
   protect?: boolean;
+  /** The game page's play-by-play tab: ask for the plays with each tick. */
+  plays?: boolean;
   children: ReactNode;
 }) {
   const router = useRouter();
@@ -124,6 +150,7 @@ export default function LiveProvider({
       const qs = new URLSearchParams();
       for (const d of dates) qs.append("date", d);
       if (gameId) qs.set("game", gameId);
+      if (gameId && plays) qs.set("plays", "1");
       if (protect) {
         qs.set("protect", "1");
         const sp = spoilerRef.current;
@@ -152,7 +179,14 @@ export default function LiveProvider({
           promoted = { ...(promoted ?? spoilerRef.current), [lg.game.id]: { mode: "revealed" } };
         }
       }
-      setState({ games, box: body.box ?? null, fetchedAt: body.fetchedAt, error: body.error ?? null });
+      setState({
+        games,
+        box: body.box ?? null,
+        held: body.held === true,
+        plays: body.plays ?? null,
+        fetchedAt: body.fetchedAt,
+        error: body.error ?? null,
+      });
       if (promoted) {
         spoilerRef.current = promoted;
         setSpoilerState(promoted);
@@ -169,7 +203,7 @@ export default function LiveProvider({
       busy.current = false;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dates.join(","), gameId, protect, router, date]);
+  }, [dates.join(","), gameId, protect, plays, router, date]);
 
   useEffect(() => {
     alive.current = true;

@@ -1241,7 +1241,8 @@ the game is): hold-to-reveal again, or **"I'm at <quarter> <time>"** — the hub
 moment to a real-time OFFSET and the card then shows the score as of now − offset and follows the
 play-by-play from there (`synced`). The panel stops pointer events at its edge so a press in the
 clock field never starts the card's hold.
-Yesterday's games, past days and the box-score page are untouched. 🔴 **No recorded history is
+Yesterday's games and past days are untouched; the game page follows the same rule (see "The game
+page under spoiler mode" below). 🔴 **No recorded history is
 needed: the play-by-play IS the history.** Every play ESPN ships carries `wallclock` (the real time
 it happened) plus the cumulative score, so `lib/hoops/scores/spoiler.ts` (**pure**) does it all:
 `momentAt(plays, targetMs)` (the game as of an instant, quarters DERIVED from each period's last
@@ -1267,7 +1268,38 @@ figures off the plays, the leak property swept over the whole game (a moment nev
 after its target and is exactly the last one before it), the envelope exercised, the first-at-or-past
 rule and its round trip, `ahead` on the future, the veil's touched/untouched split. 🔴 Deliberately
 NOT built: a delay knob (replaced by this design), interpolating the wall-clock between plays
-(could land ahead), spoiler protection on the box-score page.
+(could land ahead).
+
+**The game page under spoiler mode — box score and play-by-play (2026-10-28, owner).** The game page
+has two tabs, sibling routes: the box score (`/hoops/scores/[date]/[game]`) and the **play-by-play**
+(`…/plays`), both rendered by `components/hoops/scores/GamePage.tsx`. On TODAY's date a started game
+is `guarded` exactly as its card is: the server renders the card veiled and NEITHER the box nor the
+plays (it can't know this device's choice — the guarded render doesn't even read the summary), and the
+first live tick (`LiveProvider` with `protect` + `gameId`, `plays=1` on the plays tab) fills them in
+per the viewer's choice. Veiled → nothing. **Synced → the plays up to the moment and the box score
+REBUILT from those plays**; revealed → the live box and every play. 🔴 All three (card, box, plays)
+are cut from ONE summary read per request in `getLive`, so they stand on the same play;
+`playsAt(plays, t)` (`spoiler.ts`) is the prefix the moment stands on and shares `momentIndex` with
+`momentAt`, so the list ships nothing after the moment — no later play, no later period header, no
+count or scroll length that gives the result away. The plays tab lists newest first, a section per
+period, with period links to jump down; a wire play (`wirePlay`) carries only what a row prints.
+**The held box** (`lib/hoops/scores/boxAt.ts`, pure): every counting stat is a sentence in a play, the
+actor matched by the line's leading words against the box's own roster names (longest name first —
+"Jaren Jackson Jr."); threes off the play's `pointsAttempted` (most threes say "three point", not all —
+`Play` gained the field, `CACHE_VERSION` 3); a MISSED heave is not a field-goal attempt (ESPN's box
+leaves it out), a made one is. 🔴 **MIN and +/- are not rebuilt and a held box drops those columns**
+(`RealBoxTable held`): the feed carries no lineups at a period's start, so who was on the floor is an
+inference. Bench players are listed in the order they first appear in the plays (the live box's bench
+order can reflect minutes played later) and anyone not yet in reads "Not in yet", never the live box's
+reason or a later ejection. The SpoilerPanel's synced links (Box score, Play-by-play) no longer warn:
+both hold. Gate: section 12 of `check:hoops:scores` — LAL@UTA rebuilt from all 512 plays equals
+ESPN's box in every counting column for every player and both team rows; IND@BKN (recorded live)
+equals ESPN's player lines one play back (measured: ESPN's team row already counted the last play, its
+player row hadn't) and its team rows at the end; then the sweep: the plays are exactly the moment's
+prefix, the held team points ARE the moment's score, no held stat shrinks or passes the final, no held
+line carries minutes, +/-, a reason or an ejection, nobody is in before they are. Falsified: dropping
+the heave rule, the attempt-value rule, the not-yet-in rule, or cutting one play past the moment each
+fails it.
 
 **The cover screen (2026-10-26).** The owner also reads this on the narrow outer screen of a folding
 phone, so the whole section has to hold at **280px**, not just 375. Two mechanisms: Tailwind gained
@@ -1280,8 +1312,8 @@ assertion (b) treats a clipped `truncate` as a failure. The card's last play is 
 and the players' controls wrap; the players' team `<select>` is capped at the page width (a
 `<select>` is as wide as its longest option); the standings table scrolls sideways. 🔴
 `check:hoops:mobile` now walks **four** widths — a SYNTHETIC 280 (the 320 iPhone SE profile
-squeezed), 320, 375, 430 — and **four more pages**: today's scores (its prepare taps a veiled card
-so the unfolded panel's controls are measured too), a recorded past day, a real box score, the
+squeezed), 320, 375, 430 — and **five more pages** (the play-by-play tab joined 2026-10-28): today's scores (its prepare taps a veiled card
+so the unfolded panel's controls are measured too), a recorded past day, a real box score, its play-by-play, the
 standings. `CHROME_PATH=<binary>` points it at a specific Chromium where no Google Chrome is
 installed (a container; it still never downloads one). Baseline before the pass: 508 problems at
 280/320 across the sim pages, zero on the scores pages; after: zero.
@@ -1449,7 +1481,7 @@ picks the screenshot directory). The usability pass below was judged by a human 
 which does not repeat — this is the runnable version. It drives the *installed* Google Chrome through
 `playwright-core` (a devDependency that never downloads a browser; `CHROME_PATH` names another
 binary) at four widths — a synthetic 280 for a folding phone's cover screen, 320, 375 and 430 —
-dark, and walks eleven pages (the seven below plus the four scores pages, see "The cover screen"): the matchup (including a sim and a best-of-seven), Teams, a team page,
+dark, and walks twelve pages (the seven below plus the five scores pages, see "The cover screen"): the matchup (including a sim and a best-of-seven), Teams, a team page,
 the rankings, a player page, the side-by-side comparison, and a fresh game. Per page and width it asserts the page does not scroll
 sideways, that nothing carrying Tailwind's `truncate` is *actually* clipping its text (escape hatch:
 `data-truncate-ok` on the element — there are none today, adding one is a decision), that every

@@ -9,7 +9,7 @@ const ID = /^\d{1,12}$/;
 
 /**
  * GET /api/hoops/scores/live?date=YYYY-MM-DD[&date=YYYY-MM-DD][&game=<espn id>]
- *                           [&protect=1&reveal=<id,id>&sync=<id:ms,id:ms>][&at=P:SS]
+ *                           [&protect=1&reveal=<id,id>&sync=<id:ms,id:ms>][&at=P:SS][&plays=1]
  *
  * The fast path the scores pages tick on (components/hoops/scores/
  * LiveProvider.tsx): the day's in-progress and about-to-tip games with the
@@ -27,6 +27,10 @@ const ID = /^\d{1,12}$/;
  * leaves the server; a synced game ships the play-by-play moment at
  * now − offset instead of the live score. `at=P:SS` (with `game`) resolves
  * "I'm at SS seconds left in period P" to an offset off the play-by-play.
+ *
+ * `plays=1` (with `game`, the game page's play-by-play tab) adds the plays
+ * under the same rule as the box: all of them for an open game, only those up
+ * to the moment for a synced one, none for a veiled one.
  */
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -50,6 +54,7 @@ export async function GET(request: Request) {
         .map(([id, ms]) => [id, Number(ms)] as [string, number]),
     ),
   };
+  const withPlays = q.get("plays") === "1" && game !== null;
   const at = q.get("at");
   let resolution: LiveResponse["resolution"] = null;
   if (at !== null) {
@@ -59,7 +64,9 @@ export async function GET(request: Request) {
   }
   const now = new Date();
   const results = await Promise.all(
-    dates.map((d, i) => getLive(d, i === 0 ? game : null, now, i === 0 ? spoiler : { ...spoiler, protect: false })),
+    dates.map((d, i) =>
+      getLive(d, i === 0 ? game : null, now, i === 0 ? spoiler : { ...spoiler, protect: false }, i === 0 && withPlays),
+    ),
   );
   const ok = results.filter((r) => r.data);
   if (ok.length === 0) return NextResponse.json({ error: results[0].error ?? "unavailable" }, { status: 503 });
@@ -67,6 +74,8 @@ export async function GET(request: Request) {
     date: dates[0],
     games: ok.flatMap((r) => r.data!.games),
     box: ok[0].data!.box,
+    held: ok[0].data!.held,
+    plays: ok[0].data!.plays ?? null,
     fetchedAt: Date.now(),
     resolution,
     error: results.find((r) => r.error)?.error ?? null,

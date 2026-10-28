@@ -215,11 +215,19 @@ export interface LiveGame {
 export interface LiveResponse {
   date: string;
   games: LiveGame[];
-  /** Only when a single game was asked for and it has tipped. */
+  /** Only when a single game was asked for and it has tipped — and, under
+   *  spoiler mode, isn't veiled. */
   box: GameBox | null;
+  /** The box is a SYNCED game's, rebuilt from the plays up to its moment
+   *  (lib/hoops/scores/boxAt.ts): counting stats only, no minutes or +/-. */
+  held?: boolean;
   fetchedAt: number;
   /** Only when `?at=P:SS` was asked. */
   resolution?: SyncResolution | null;
+  /** Only when `?plays=1` was asked with one game (the play-by-play tab): the
+   *  plays in game order — all of them for an open game, only those up to the
+   *  moment for a synced one, null for a veiled one or before tip. */
+  plays?: WirePlay[] | null;
 }
 
 /** The part of a Fetched<T> a page footer needs — never the data. */
@@ -247,6 +255,23 @@ export interface Play {
   awayScore: number;
   homeScore: number;
   text: string;
+  scoring: boolean;
+  /** What the attempt was worth (3 for a three, 1 for a free throw); null on
+   *  a play that isn't a shot. The held box score reads threes off it — the
+   *  text says "three point" on most threes, not all ("25-foot jump bank
+   *  shot"). Absent on rows cached before it was parsed. */
+  pointsAttempted?: number | null;
+  teamId: string | null;
+}
+
+/** One row of the game page's play-by-play tab, as it goes over the wire. */
+export interface WirePlay {
+  id: string;
+  period: number;
+  clock: string | null;
+  text: string;
+  awayScore: number;
+  homeScore: number;
   scoring: boolean;
   teamId: string | null;
 }

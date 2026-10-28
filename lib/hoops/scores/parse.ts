@@ -272,6 +272,7 @@ export function parsePlays(raw: J): Play[] {
       homeScore: int(p?.homeScore),
       text: String(p?.text ?? p?.shortText ?? "").trim(),
       scoring: p?.scoringPlay === true,
+      pointsAttempted: Number.isFinite(Number(p?.pointsAttempted)) && p?.pointsAttempted != null ? Number(p.pointsAttempted) : null,
       teamId: p?.team?.id != null ? String(p.team.id) : null,
     });
   }
