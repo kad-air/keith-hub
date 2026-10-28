@@ -473,6 +473,13 @@ export function getReadComicIds(): Set<string> {
   return new Set(rows.map((r) => r.issue_id));
 }
 
+export function getComicReadState(): { id: string; read_at: string }[] {
+  const db = getDb();
+  return db
+    .prepare(`SELECT issue_id AS id, read_at FROM comic_state ORDER BY read_at`)
+    .all() as { id: string; read_at: string }[];
+}
+
 export function markComicRead(issueId: string): void {
   const db = getDb();
   db.prepare(`
