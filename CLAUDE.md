@@ -214,6 +214,7 @@ Trackers — **all 404 while `TRACKERS_ENABLED` is `false`** (see "Tracker data"
 Comics
 - `POST /api/comics/[id]/read` — mark a Marvel Unlimited issue as read (`comic_state` row).
 - `POST /api/comics/[id]/unread` — delete the row.
+- `GET  /api/comics/state` — every read issue as `{ read: [{ id, read_at }] }`. MU Shelf (Keith's iOS web-reader app, `~/Code/mu-shelf`) pulls this and pushes marks through the two routes above; it authenticates by POSTing the feed password to `/api/auth/login` and keeping the `hub-auth` cookie.
 
 Hoops
 - `GET /api/hoops/teams?mode=results|roster|blend` — 30 teams ranked by net rating (`off - def`), each with roster size and the |results − roster| disagreement, plus the league disagreement summary and the bundle's provenance (`PARAM_VERSION`, data-as-of, row counts). An unknown `mode` falls back to `blend`. Triggers the lazy import on first call.
@@ -345,7 +346,7 @@ A static catalog of Hickman-era reading orders (X-Men, Avengers/Secret Wars), ea
 
 **Catalog is static, generated offline.** `lib/comics-data.ts` is auto-generated and committed; the app does not fetch from Marvel at runtime. Source data and the scraping/generation pipeline live in the sibling repo `~/Code/mu-reading-lists` — see `scripts/comics-data-pipeline.md` for how the per-issue `digitalBookId`, `drn`, and `sourceId` are sourced from the marvel.com sitemap, page HTML, and `bifrost.marvel.com/unison/legacy`. To regenerate after adding a storyline or refreshing data: `node scripts/generate-comics-data.mjs`. The script skips storylines whose applinks/drns aren't fully populated yet (resumable scrapes) so partial regenerations can't ship broken data.
 
-**Read state lives in SQLite.** Table `comic_state` has one row per read issue (`issue_id` PK = `digitalBookId`, `read_at`). Routes: `POST /api/comics/[id]/read` and `POST /api/comics/[id]/unread`. The `/comics` index calls `getReadComicIds()` from `lib/queries.ts` to compute `read / total` per storyline.
+**Read state lives in SQLite.** Table `comic_state` has one row per read issue (`issue_id` PK = `digitalBookId`, `read_at`). Routes: `POST /api/comics/[id]/read`, `POST /api/comics/[id]/unread`, and `GET /api/comics/state` (the full read set, for MU Shelf's two-way sync). The `/comics` index calls `getReadComicIds()` from `lib/queries.ts` to compute `read / total` per storyline.
 
 **The Marvel Unlimited handoff is the load-bearing UX trick.** `read.marvel.com/#/book/{digitalBookId}` is the obvious URL but it's useless from inside the PWA — iOS routes `target="_blank"` clicks through SFSafariViewController, which doesn't honor universal links. The fix in `components/ComicsClient.tsx` is to link to `marvel.smart.link/fiir7ec77?type=issue&drn={drn}&sourceId={sourceId}` (Marvel's Branch.io deep-link host) **as a plain `<a>` with no `target` and no `preventDefault`**. iOS treats that as a top-level navigation and hands off to the app via the smart.link's app-claim. The PWA gets backgrounded; swiping back returns to the same scroll position.
 
