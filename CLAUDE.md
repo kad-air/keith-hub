@@ -47,6 +47,8 @@ npm run check:books:edit         # Books file-edit gate: an OPF/cover edit chang
                                  #   progress/history/aliases follow the new sync key, old AND new keys read+write one position,
                                  #   restore is flat (no self-alias), a DB failure puts the old file back (same)
 npm run check:books:stats        # Books reading-stats gate: word count vs. Python, real DST calendar, sync survives a stats failure (same)
+npm run check:books:pagetext     # Books current-page gate: Sheafs' own paragraph reference + device pointers land on their paragraph,
+                                 #   text() offsets name their word, unresolvable pointers fall back to the percentage, paging shows every word once (same)
 npm run check:books:drm          # Books DRM gate: an ADEPT epub is decrypted-or-refused (never the 34-page ghost); a clean epub passes through byte-identical (same)
 npm run check:books:acsm         # Books ACSM gate: the ADEPT canonicalisation + signature match an independent Python implementation byte-for-byte (same)
 npm run check:books:health       # Books file-health gate: clean epub → zero findings, each damage pattern → exactly its finding,
@@ -437,6 +439,37 @@ no credentials.
   fail (the last one needed the half-misheard assertion — the milder damaged phrase passed on
   exact words alone, which is exactly the kind of vacuous check the falsification run exists to
   catch).
+
+**The current page, for Audible's camera (`/books/[id]/current`).** The other direction from
+catch-up: Keith reads in Sheafs and listens in Audible on the SAME phone, so Audible's camera
+page-sync can't see the page. This view shows the epub's own text at the latest synced position —
+large serif, dark on `paper` (a fixed token, light in every theme, because the camera is tuned for
+print) — on a second screen, a page's worth at a time with prev/next (and ←/→), following each new
+sync on its own (polls every 10 s and on tab focus; a new sync replaces even a nudged page). Linked
+from the book page as "Current page" once a position exists.
+- 🔴 `lib/books/pageText.ts` is the one place a DEVICE-written pointer is PARSED. It is read,
+  resolved for display, and discarded — never written, normalized or stored, so the opacity rule
+  above still holds for everything kosync stores. A pointer it can't resolve degrades to the synced
+  percentage (held inside the pointer's chapter when that chapter exists), never an error.
+- What it reads: Sheafs pushes `/body/DocFragment[N]/<path>/text().OFF` (OFF = UTF-16 offset into
+  the BLOCK's whitespace-collapsed text — Sheafs' convention), CrossPoint the paragraph alone
+  (opens on its first word), Readest/KOReader `text()[k].OFF` (read as an offset into the block;
+  can land a few words early when k > 1). Blocks mirror SheafsKit's `ElementRole` (p/h1–6/li/pre/
+  figcaption/caption/dt/dd/tr own text; text directly in a container is an implicit block with the
+  container's path; split pieces keep counting via `base`). Paths: same walk as `xpointer.ts`.
+- Sheafs pushes 20 s after the last page turn and immediately when it backgrounds — so switching
+  to Audible on the phone is itself the sync this page picks up.
+- A page opens at the paragraph holding the position (or its sentence, deep in a long paragraph)
+  and underlines the synced word. Parsed books are cached by sha256 (4 entries) so the poll doesn't
+  re-unzip; a replaced file is a new sha, never stale. Route: `GET /api/books/[id]/current-text`
+  (`?from=N` = a page from word N), cookie-gated, read-only.
+- **The gate: `npm run check:books:pagetext`** (in `prebuild`). `books-fixture/sheafs-alice.epub` +
+  `sheafs-alice-reference.json` are copied from the Sheafs repo, where they are the reference
+  Sheafs' converter is tested against: all 40 sampled pointers (Sheafs' `text().0` form and the
+  index-less form) must land on the paragraph with that text; the device-validated pointers in
+  `expected.json` must open on their paragraph; offsets/inline/split-container/fallback cases on a
+  built epub; paging forward shows every word once in order. Falsification-tested: all-sibling
+  indexing, ignoring the offset, 0-based DocFragment all fail it.
 
 **CrossPoint parser constraints** (each a silent failure; asserted by `check:books:opds`, whose
 assertions are ported from `~/Stump/healthcheck.sh` and anchored on a committed snapshot of

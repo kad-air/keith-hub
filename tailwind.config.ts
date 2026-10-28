@@ -34,6 +34,13 @@ const config: Config = {
           DEFAULT: "rgb(var(--accent) / <alpha-value>)",
           soft: "rgb(var(--accent-soft) / <alpha-value>)",
         },
+        // The current-page view's reading surface (/books/[id]/current): fixed
+        // dark-on-paper in every theme, because its reader is Audible's camera
+        // page-sync, which is tuned for printed pages.
+        paper: {
+          DEFAULT: "#fbf8f1",
+          ink: "#14110d",
+        },
         cat: {
           podcasts: "rgb(var(--cat-podcasts) / <alpha-value>)",
           music: "rgb(var(--cat-music) / <alpha-value>)",

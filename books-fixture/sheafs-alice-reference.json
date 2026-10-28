@@ -1,0 +1,243 @@
+{
+ "comment": "Paragraph samples for sheafs-alice.epub, copied from Sheafs (kad-air/sheafs, Packages/SheafsKit/Tests/SheafsKitTests/Fixtures/chapter-reference.json, the reference Sheafs' own XHTMLConverter is tested against). path = the CREngine element path Sheafs writes in its kosync pointers; text = that paragraph's text. check:books:pagetext asserts each pointer lands in the paragraph with this text.",
+ "documents": [
+  {
+   "spineIndex": 1,
+   "path": "OEBPS/4040227324556390537_11-h-0.htm.xhtml",
+   "samples": [
+    {
+     "path": "/body/header[1]/div[2]/p[1]",
+     "text": "Title : Alice's Adventures in Wonderland"
+    },
+    {
+     "path": "/body/header[1]/div[2]/p[5]",
+     "text": "Credits : Arthur DiBianca and David Widger"
+    }
+   ]
+  },
+  {
+   "spineIndex": 2,
+   "path": "OEBPS/4040227324556390537_11-h-1.htm.xhtml",
+   "samples": [
+    {
+     "path": "/body/div[1]/p[1]",
+     "text": "Alice was beginning to get very tired of sitting by her sister on the bank, and of having nothing to do: once or twice she had peeped into the book her sister was reading, but it had no pictures or conversations in it, “and what is the use of a book,” thought Alice “without pictures or conversations?”"
+    },
+    {
+     "path": "/body/div[1]/p[26]",
+     "text": "* * * * * * * * * * * * * * * * * * * *"
+    }
+   ]
+  },
+  {
+   "spineIndex": 3,
+   "path": "OEBPS/4040227324556390537_11-h-2.htm.xhtml",
+   "samples": [
+    {
+     "path": "/body/div[1]/p[1]",
+     "text": "“Curiouser and curiouser!” cried Alice (she was so much surprised, that for the moment she quite forgot how to speak good English); “now I’m opening out like the largest telescope that ever was! Good-bye, feet!” (for when she looked down at her feet, they seemed to be almost out of sight, they were getting so far off). “Oh, my poor little feet, I wonder who will put on your shoes and stockings for you now, dears? I’m sure I shan’t be able! I shall be a great deal too far off to trouble myself about you: you must manage the best way you can;—but I must be kind to them,” thought Alice, “or perhaps they won’t walk the way I want to go! Let me see: I’ll give them a new pair of boots every Christmas.”"
+    },
+    {
+     "path": "/body/div[1]/p[24]",
+     "text": "It was high time to go, for the pool was getting quite crowded with the birds and animals that had fallen into it: there were a Duck and a Dodo, a Lory and an Eaglet, and several other curious creatures. Alice led the way, and the whole party swam to the shore."
+    }
+   ]
+  },
+  {
+   "spineIndex": 4,
+   "path": "OEBPS/4040227324556390537_11-h-3.htm.xhtml",
+   "samples": [
+    {
+     "path": "/body/div[1]/p[1]",
+     "text": "They were indeed a queer-looking party that assembled on the bank—the birds with draggled feathers, the animals with their fur clinging close to them, and all dripping wet, cross, and uncomfortable."
+    },
+    {
+     "path": "/body/div[1]/p[38]",
+     "text": "“I shall do nothing of the sort,” said the Mouse, getting up and walking away. “You insult me by talking such nonsense!”"
+    },
+    {
+     "path": "/body/div[1]/p[47]",
+     "text": "“I wish I hadn’t mentioned Dinah!” she said to herself in a melancholy tone. “Nobody seems to like her, down here, and I’m sure she’s the best cat in the world! Oh, my dear Dinah! I wonder if I shall ever see you any more!” And here poor Alice began to cry again, for she felt very lonely and low-spirited. In a little while, however, she again heard a little pattering of footsteps in the distance, and she looked up eagerly, half hoping that the Mouse had changed his mind, and was coming back to finish his story."
+    }
+   ]
+  },
+  {
+   "spineIndex": 5,
+   "path": "OEBPS/4040227324556390537_11-h-4.htm.xhtml",
+   "samples": [
+    {
+     "path": "/body/div[1]/p[1]",
+     "text": "It was the White Rabbit, trotting slowly back again, and looking anxiously about as it went, as if it had lost something; and she heard it muttering to itself “The Duchess! The Duchess! Oh my dear paws! Oh my fur and whiskers! She’ll get me executed, as sure as ferrets are ferrets! Where can I have dropped them, I wonder?” Alice guessed in a moment that it was looking for the fan and the pair of white kid gloves, and she very good-naturedly began hunting about for them, but they were nowhere to be seen—everything seemed to have changed since her swim in the pool, and the great hall, with the glass table and the little door, had vanished completely."
+    },
+    {
+     "path": "/body/div[1]/p[38]",
+     "text": "Hardly knowing what she did, she picked up a little bit of stick, and held it out to the puppy; whereupon the puppy jumped into the air off all its feet at once, with a yelp of delight, and rushed at the stick, and made believe to worry it; then Alice dodged behind a great thistle, to keep herself from being run over; and the moment she appeared on the other side, the puppy made another rush at the stick, and tumbled head over heels in its hurry to get hold of it; then Alice, thinking it was very like having a game of play with a cart-horse, and expecting every moment to be trampled under its feet, ran round the thistle again; then the puppy began a series of short charges at the stick, running a very little way forwards each time and a long way back, and barking hoarsely all the while, till at last it sat down a good way off, panting, with its tongue hanging out of its mouth, and its great eyes half shut."
+    },
+    {
+     "path": "/body/div[1]/p[42]",
+     "text": "She stretched herself up on tiptoe, and peeped over the edge of the mushroom, and her eyes immediately met those of a large blue caterpillar, that was sitting on the top with its arms folded, quietly smoking a long hookah, and taking not the smallest notice of her or of anything else."
+    }
+   ]
+  },
+  {
+   "spineIndex": 6,
+   "path": "OEBPS/4040227324556390537_11-h-5.htm.xhtml",
+   "samples": [
+    {
+     "path": "/body/div[1]/p[1]",
+     "text": "The Caterpillar and Alice looked at each other for some time in silence: at last the Caterpillar took the hookah out of its mouth, and addressed her in a languid, sleepy voice."
+    },
+    {
+     "path": "/body/div[1]/p[38]",
+     "text": "“It is a very good height indeed!” said the Caterpillar angrily, rearing itself upright as it spoke (it was exactly three inches high)."
+    },
+    {
+     "path": "/body/div[1]/p[69]",
+     "text": "It was so long since she had been anything near the right size, that it felt quite strange at first; but she got used to it in a few minutes, and began talking to herself, as usual. “Come, there’s half my plan done now! How puzzling all these changes are! I’m never sure what I’m going to be, from one minute to another! However, I’ve got back to my right size: the next thing is, to get into that beautiful garden—how is that to be done, I wonder?” As she said this, she came suddenly upon an open place, with a little house in it about four feet high. “Whoever lives there,” thought Alice, “it’ll never do to come upon them this size: why, I should frighten them out of their wits!” So she began nibbling at the righthand bit again, and did not venture to go near the house till she had brought herself down to nine inches high."
+    }
+   ]
+  },
+  {
+   "spineIndex": 7,
+   "path": "OEBPS/4040227324556390537_11-h-6.htm.xhtml",
+   "samples": [
+    {
+     "path": "/body/div[1]/p[1]",
+     "text": "For a minute or two she stood looking at the house, and wondering what to do next, when suddenly a footman in livery came running out of the wood—(she considered him to be a footman because he was in livery: otherwise, judging by his face only, she would have called him a fish)—and rapped loudly at the door with his knuckles. It was opened by another footman in livery, with a round face, and large eyes like a frog; and both footmen, Alice noticed, had powdered hair that curled all over their heads. She felt very curious to know what it was all about, and crept a little way out of the wood to listen."
+    },
+    {
+     "path": "/body/div[1]/p[38]",
+     "text": "“Wow! wow! wow!”"
+    },
+    {
+     "path": "/body/div[1]/p[75]",
+     "text": "Alice waited a little, half expecting to see it again, but it did not appear, and after a minute or two she walked on in the direction in which the March Hare was said to live. “I’ve seen hatters before,” she said to herself; “the March Hare will be much the most interesting, and perhaps as this is May it won’t be raving mad—at least not so mad as it was in March.” As she said this, she looked up, and there was the Cat again, sitting on a branch of a tree."
+    },
+    {
+     "path": "/body/div[1]/p[80]",
+     "text": "She had not gone much farther before she came in sight of the house of the March Hare: she thought it must be the right house, because the chimneys were shaped like ears and the roof was thatched with fur. It was so large a house, that she did not like to go nearer till she had nibbled some more of the lefthand bit of mushroom, and raised herself to about two feet high: even then she walked up towards it rather timidly, saying to herself “Suppose it should be raving mad after all! I almost wish I’d gone to see the Hatter instead!”"
+    }
+   ]
+  },
+  {
+   "spineIndex": 8,
+   "path": "OEBPS/4040227324556390537_11-h-7.htm.xhtml",
+   "samples": [
+    {
+     "path": "/body/div[1]/p[1]",
+     "text": "There was a table set out under a tree in front of the house, and the March Hare and the Hatter were having tea at it: a Dormouse was sitting between them, fast asleep, and the other two were using it as a cushion, resting their elbows on it, and talking over its head. “Very uncomfortable for the Dormouse,” thought Alice; “only, as it’s asleep, I suppose it doesn’t mind.”"
+    },
+    {
+     "path": "/body/div[1]/p[38]",
+     "text": "Alice sighed wearily. “I think you might do something better with the time,” she said, “than waste it in asking riddles that have no answers.”"
+    },
+    {
+     "path": "/body/div[1]/p[75]",
+     "text": "Alice tried to fancy to herself what such an extraordinary way of living would be like, but it puzzled her too much, so she went on: “But why did they live at the bottom of a well?”"
+    },
+    {
+     "path": "/body/div[1]/p[105]",
+     "text": "Once more she found herself in the long hall, and close to the little glass table. “Now, I’ll manage better this time,” she said to herself, and began by taking the little golden key, and unlocking the door that led into the garden. Then she went to work nibbling at the mushroom (she had kept a piece of it in her pocket) till she was about a foot high: then she walked down the little passage: and then —she found herself at last in the beautiful garden, among the bright flower-beds and the cool fountains."
+    }
+   ]
+  },
+  {
+   "spineIndex": 9,
+   "path": "OEBPS/4040227324556390537_11-h-8.htm.xhtml",
+   "samples": [
+    {
+     "path": "/body/div[1]/p[1]",
+     "text": "A large rose-tree stood near the entrance of the garden: the roses growing on it were white, but there were three gardeners at it, busily painting them red. Alice thought this a very curious thing, and she went nearer to watch them, and just as she came up to them she heard one of them say, “Look out now, Five! Don’t go splashing paint over me like that!”"
+    },
+    {
+     "path": "/body/div[1]/p[38]",
+     "text": "“Did you say ‘What a pity!’?” the Rabbit asked."
+    },
+    {
+     "path": "/body/div[1]/p[71]",
+     "text": "The Cat’s head began fading away the moment he was gone, and, by the time he had come back with the Duchess, it had entirely disappeared; so the King and the executioner ran wildly up and down looking for it, while the rest of the party went back to the game."
+    }
+   ]
+  },
+  {
+   "spineIndex": 10,
+   "path": "OEBPS/4040227324556390537_11-h-9.htm.xhtml",
+   "samples": [
+    {
+     "path": "/body/div[1]/p[1]",
+     "text": "“You can’t think how glad I am to see you again, you dear old thing!” said the Duchess, as she tucked her arm affectionately into Alice’s, and they walked off together."
+    },
+    {
+     "path": "/body/div[1]/p[38]",
+     "text": "“No,” said Alice. “I don’t even know what a Mock Turtle is.”"
+    },
+    {
+     "path": "/body/div[1]/p[75]",
+     "text": "The Gryphon lifted up both its paws in surprise. “What! Never heard of uglifying!” it exclaimed. “You know what to beautify is, I suppose?”"
+    },
+    {
+     "path": "/body/div[1]/p[92]",
+     "text": "“That’s enough about lessons,” the Gryphon interrupted in a very decided tone: “tell her something about the games now.”"
+    }
+   ]
+  },
+  {
+   "spineIndex": 11,
+   "path": "OEBPS/4040227324556390537_11-h-10.htm.xhtml",
+   "samples": [
+    {
+     "path": "/body/div[1]/p[1]",
+     "text": "The Mock Turtle sighed deeply, and drew the back of one flapper across his eyes. He looked at Alice, and tried to speak, but for a minute or two sobs choked his voice. “Same as if he had a bone in his throat,” said the Gryphon: and it set to work shaking him and punching him in the back. At last the Mock Turtle recovered his voice, and, with tears running down his cheeks, he went on again:—"
+    },
+    {
+     "path": "/body/div[1]/p[38]",
+     "text": "Alice looked down at them, and considered a little before she gave her answer. “They’re done with blacking, I believe.”"
+    },
+    {
+     "path": "/body/div[1]/p[75]",
+     "text": "“What trial is it?” Alice panted as she ran; but the Gryphon only answered “Come on!” and ran the faster, while more and more faintly came, carried on the breeze that followed them, the melancholy words:—"
+    },
+    {
+     "path": "/body/div[1]/p[76]",
+     "text": "“Soo—oop of the e—e—evening, Beautiful, beautiful Soup!”"
+    }
+   ]
+  },
+  {
+   "spineIndex": 12,
+   "path": "OEBPS/4040227324556390537_11-h-11.htm.xhtml",
+   "samples": [
+    {
+     "path": "/body/div[1]/p[1]",
+     "text": "The King and Queen of Hearts were seated on their throne when they arrived, with a great crowd assembled about them—all sorts of little birds and beasts, as well as the whole pack of cards: the Knave was standing before them, in chains, with a soldier on each side to guard him; and near the King was the White Rabbit, with a trumpet in one hand, and a scroll of parchment in the other. In the very middle of the court was a table, with a large dish of tarts upon it: they looked so good, that it made Alice quite hungry to look at them—“I wish they’d get the trial done,” she thought, “and hand round the refreshments!” But there seemed to be no chance of this, so she began looking at everything about her, to pass away the time."
+    },
+    {
+     "path": "/body/div[1]/p[38]",
+     "text": "“The twinkling of the what? ” said the King."
+    },
+    {
+     "path": "/body/div[1]/p[74]",
+     "text": "Alice watched the White Rabbit as he fumbled over the list, feeling very curious to see what the next witness would be like, “—for they haven’t got much evidence yet ,” she said to herself. Imagine her surprise, when the White Rabbit read out, at the top of his shrill little voice, the name “Alice!”"
+    }
+   ]
+  },
+  {
+   "spineIndex": 13,
+   "path": "OEBPS/4040227324556390537_11-h-12.htm.xhtml",
+   "samples": [
+    {
+     "path": "/body/div[1]/p[1]",
+     "text": "“Here!” cried Alice, quite forgetting in the flurry of the moment how large she had grown in the last few minutes, and she jumped up in such a hurry that she tipped over the jury-box with the edge of her skirt, upsetting all the jurymen on to the heads of the crowd below, and there they lay sprawling about, reminding her very much of a globe of goldfish she had accidentally upset the week before."
+    },
+    {
+     "path": "/body/div[1]/p[38]",
+     "text": "The White Rabbit put on his spectacles. “Where shall I begin, please your Majesty?” he asked."
+    },
+    {
+     "path": "/body/div[1]/p[66]",
+     "text": "Lastly, she pictured to herself how this same little sister of hers would, in the after-time, be herself a grown woman; and how she would keep, through all her riper years, the simple and loving heart of her childhood: and how she would gather about her other little children, and make their eyes bright and eager with many a strange tale, perhaps even with the dream of Wonderland of long ago: and how she would feel with all their simple sorrows, and find a pleasure in all their simple joys, remembering her own child-life, and the happy summer days."
+    }
+   ]
+  }
+ ]
+}
