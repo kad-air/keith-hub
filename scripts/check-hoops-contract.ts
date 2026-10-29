@@ -250,6 +250,9 @@ function negotiate(
     "absorption",
     "fictional_values",
     "goto_scorer",
+    // 2026-10-28: the sender declares this on every push of a slate the
+    // league has not finished drawing (the NBA Cup knockout week).
+    "partial_schedule",
   ];
   for (const token of SENDER_VOCABULARY) {
     check(
