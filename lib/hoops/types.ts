@@ -466,7 +466,22 @@ export interface RawScheduleFile {
   generated_at: string;
   season_start_year: number;
   n_games: number;
+  /** Real fixtures only — never a placeholder for a game the league has not
+   *  drawn yet. */
   games: RawScheduleGame[];
+  /**
+   * `partial_schedule` (2026-10-28): present when the bundle declares that
+   * token, and read ONLY then (lib/hoops/schedule.ts). A slate the league has
+   * not finished drawing — the NBA Cup knockout week is drawn from the group
+   * results, so the first 1,200 of 1,230 games are real weeks before the last
+   * 30 exist — ships the real fixtures plus an account of what is missing:
+   * `n_pending` games, `pending_per_team` for all 30, and the window they
+   * fall in. The receiver demands that the arithmetic closes to 82 a team.
+   */
+  complete?: boolean;
+  n_pending?: number;
+  pending_per_team?: Record<string, number>;
+  pending_window?: { from: string; to: string; why: string } | null;
 }
 
 export interface RawResultGame extends RawScheduleGame {

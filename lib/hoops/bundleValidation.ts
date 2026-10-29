@@ -16,6 +16,7 @@
 // one. This module is what catches that case now.
 
 import { FRANCHISES } from "./nba-franchises.ts";
+import { validateSchedule } from "./schedule.ts";
 import type { HoopsBundle } from "./types";
 
 export class BundleRejection extends Error {}
@@ -26,15 +27,21 @@ const MIN_PLAYERS_PER_TEAM = 8; // an NBA team carries >= 14 under contract; 8 i
 // real roster can fall below on a healthy night, chosen with margin below check-hoops.ts's
 // own stricter 10-player floor over the COMMITTED bundle (this gate runs on every push, not
 // just at merge time, so it stays intentionally a little more permissive).
-const N_SCHEDULE_GAMES = (N_TEAMS * 82) / 2; // 30 teams x 82 games / 2 -- an exact NBA fact.
 
 function fail(msg: string): never {
   throw new BundleRejection(msg);
 }
 
+export interface ValidateOptions {
+  /** The bundle declared `partial_schedule`: hoops_schedule.json may be short
+   *  of 1,230 games if it accounts for every missing one. Default false — the
+   *  exact rule every bundle before 2026-10-28 was held to. */
+  partialSchedule?: boolean;
+}
+
 /** Throws BundleRejection, naming the problem, on anything that looks like a
  *  truncated or structurally incomplete bundle. Never mutates its input. */
-export function validatePushedBundle(bundle: HoopsBundle): void {
+export function validatePushedBundle(bundle: HoopsBundle, opts: ValidateOptions = {}): void {
   const teamTris = Object.keys(bundle.teams?.teams ?? {});
   if (teamTris.length !== N_TEAMS) {
     fail(`hoops_teams.json: expected ${N_TEAMS} teams, got ${teamTris.length}`);
@@ -62,11 +69,14 @@ export function validatePushedBundle(bundle: HoopsBundle): void {
     );
   }
 
-  const games = bundle.schedule?.games ?? [];
-  if (games.length !== N_SCHEDULE_GAMES) {
-    fail(
-      `hoops_schedule.json: ${games.length} games, an NBA regular season is ${N_SCHEDULE_GAMES}`,
-    );
+  // The schedule's rules live in lib/hoops/schedule.ts (pure, gate-driven):
+  // exactly 1,230 games without `partial_schedule`, or every missing game
+  // accounted for with it. Its rejection is re-thrown as this module's so
+  // the route's error prefix stays "invalid bundle:".
+  try {
+    validateSchedule(bundle.schedule, { partial: opts.partialSchedule === true });
+  } catch (err) {
+    fail(err instanceof Error ? err.message : String(err));
   }
 
   const results = bundle.results?.games ?? [];

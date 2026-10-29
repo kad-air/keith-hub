@@ -100,6 +100,23 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const projection = db
     .prepare(`SELECT as_of_date, generated_at FROM hoops_projection_meta WHERE id = 1`)
     .get() as { as_of_date: string; generated_at: string } | undefined;
+  // How whole the stored schedule is, so the sender can see whether its
+  // partial slate landed (and how many games it still owes). NULL columns
+  // mean a row from before `partial_schedule` existed: complete by the old
+  // exact-1,230 rule.
+  const sched = db
+    .prepare(
+      `SELECT schedule_complete, schedule_n_pending, schedule_season_start_year
+         FROM hoops_params WHERE id = 1`,
+    )
+    .get() as
+    | {
+        schedule_complete: number | null;
+        schedule_n_pending: number | null;
+        schedule_season_start_year: number | null;
+      }
+    | undefined;
+  const scheduled = (db.prepare(`SELECT COUNT(*) AS n FROM hoops_schedule`).get() as { n: number }).n;
   return NextResponse.json({
     ...describeContract(),
     stored: stored
@@ -110,6 +127,12 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
           projection: projection
             ? { as_of_date: projection.as_of_date, generated_at: projection.generated_at }
             : null,
+          schedule: {
+            season_start_year: sched?.schedule_season_start_year ?? null,
+            n_games: scheduled,
+            complete: sched?.schedule_complete == null ? true : sched.schedule_complete === 1,
+            n_pending: sched?.schedule_n_pending ?? 0,
+          },
         }
       : null,
   });
@@ -268,6 +291,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   ).some((t) => t.nightly != null);
   const nightlySettled = !bundleCarriesNightly || storedNightly > 0;
 
+  // PARTIAL SCHEDULE (`partial_schedule`): whether this bundle may be short
+  // of 1,230 games. Decided by the TOKEN, never by the file's own fields —
+  // validatePushedBundle below holds the schedule to the exact rule without
+  // it, and to the per-team arithmetic with it (lib/hoops/schedule.ts).
+  const partialSchedule = contract.features.includes("partial_schedule");
+
   // And once more for the projection: if THIS push carries one that the
   // stored copy does not match, a same-hash short-circuit must not drop it
   // (a sender whose content_hash scope forgot to include projections.json
@@ -275,7 +304,16 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const projectionSettled =
     !bundle.projections || storedProjectionGeneratedAt(db) === bundle.projections.generated_at;
 
-  if (existing && existing.content_hash === contentHash && splitSettled && nightlySettled && projectionSettled) {
+  // And for the schedule status: a row written before the hub stored how
+  // whole its schedule was has NULL there, and a same-hash re-POST must fall
+  // through once so the columns stop reading NULL (the importer's seed-path
+  // marker, mirrored here for the push path exactly as splitSettled is).
+  const storedSchedule = db
+    .prepare(`SELECT schedule_complete FROM hoops_params WHERE id = 1`)
+    .get() as { schedule_complete: number | null } | undefined;
+  const scheduleSettled = storedSchedule?.schedule_complete != null;
+
+  if (existing && existing.content_hash === contentHash && splitSettled && nightlySettled && scheduleSettled && projectionSettled) {
     return NextResponse.json({
       imported: false,
       reason: "unchanged",
@@ -311,7 +349,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // AMOUNT of content — a bundle truncated to 5 players parsed fine and
   // passed decodeParams. This is what catches that BEFORE the transaction.
   try {
-    validatePushedBundle(bundle);
+    validatePushedBundle(bundle, { partialSchedule });
   } catch (err) {
     const message = err instanceof BundleRejection || err instanceof Error ? err.message : String(err);
     return NextResponse.json({ error: `invalid bundle: ${message}` }, { status: 400 });
@@ -336,6 +374,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       projection: bundle.projections
         ? { as_of_date: bundle.projections.as_of_date, generated_at: bundle.projections.generated_at }
         : null,
+      schedule: {
+        n_games: bundle.schedule.games.length,
+        complete: partialSchedule ? bundle.schedule.complete === true : true,
+        n_pending: partialSchedule ? (bundle.schedule.n_pending ?? 0) : 0,
+      },
     });
   } catch (err) {
     // A malformed teams/players/schedule/results/lines file throws here

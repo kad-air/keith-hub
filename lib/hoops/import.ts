@@ -36,6 +36,7 @@ import { bundleHash, loadBundle, readParamsBlobText } from "./data";
 import { decodeParams } from "./params";
 import { playerRowsFromBundle } from "./playervalue.ts";
 import { writeProjection } from "./projectionStore.ts";
+import { scheduleStatusOf } from "./schedule.ts";
 import type { HoopsBundle } from "./types";
 
 export type ImportSource = "seed" | "push";
@@ -102,12 +103,18 @@ interface StoredState {
    *  on `hoops_params` alongside `hca_pts` but arrived in a LATER migration.
    *  Read directly off `hoops_params`, not derived from `hasScalars`. */
   hasReplacementTilt: boolean;
+  /** And a ninth, for the schedule status (`partial_schedule`, 2026-10-28):
+   *  false when `schedule_complete` is NULL, i.e. the row was written before
+   *  the hub could say whether its schedule was whole. Read off
+   *  `hoops_params` like hasReplacementTilt, for the same reason. */
+  hasScheduleStatus: boolean;
 }
 
 function currentState(db: Database.Database): StoredState | null {
   const row = db
     .prepare(
-      `SELECT content_hash, generated_at, import_source, hca_pts, replacement_tilt_per36
+      `SELECT content_hash, generated_at, import_source, hca_pts, replacement_tilt_per36,
+              schedule_complete
          FROM hoops_params WHERE id = 1`,
     )
     .get() as
@@ -117,6 +124,7 @@ function currentState(db: Database.Database): StoredState | null {
         import_source: ImportSource;
         hca_pts: number | null;
         replacement_tilt_per36: number | null;
+        schedule_complete: number | null;
       }
     | undefined;
   if (!row) return null;
@@ -166,6 +174,7 @@ function currentState(db: Database.Database): StoredState | null {
     hasMovers: movers > 0,
     hasAboveReplacement: aboveReplacement > 0,
     hasReplacementTilt: row.replacement_tilt_per36 !== null,
+    hasScheduleStatus: row.schedule_complete !== null,
   };
 }
 
@@ -189,6 +198,21 @@ interface WriteMeta {
 function writeBundle(db: Database.Database, bundle: HoopsBundle, meta: WriteMeta): void {
   const now = new Date().toISOString();
 
+  // HOW WHOLE THE SCHEDULE IS (`partial_schedule`). On a PUSH, read off the
+  // file ONLY when the bundle declared the token — the route has validated
+  // the arithmetic by then — and "complete" otherwise, which is what the old
+  // exact-1,230 rule guaranteed. The disk SEED has no contract block (its
+  // `features` here is null), so the file's own `n_pending` is the only
+  // declaration there is; scripts/check-hoops.ts holds a committed partial
+  // slate to the same arithmetic at build time, so it is never trusted
+  // unvalidated either.
+  const schedule = scheduleStatusOf(
+    bundle.schedule,
+    meta.features
+      ? meta.features.includes("partial_schedule")
+      : typeof bundle.schedule.n_pending === "number",
+  );
+
   const tx = db.transaction(() => {
     // Read-model only. hoops_scratch / hoops_runs are deliberately absent.
     db.exec(`
@@ -205,8 +229,10 @@ function writeBundle(db: Database.Database, bundle: HoopsBundle, meta: WriteMeta
          (id, param_version, blob, generated_at, imported_at, content_hash, import_source,
           hca_pts, replacement_per36, value_as_of, pricing_version, features_json, constants_json,
           nightly_as_of, nightly_value_source, nightly_last_n_games, nightly_priced,
-          explain_model_json, nightly_league_typical_shift, replacement_tilt_per36)
-       VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          explain_model_json, nightly_league_typical_shift, replacement_tilt_per36,
+          schedule_complete, schedule_n_pending, schedule_pending_from, schedule_pending_to,
+          schedule_pending_why, schedule_season_start_year)
+       VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
       bundle.params.parameter_set.param_version,
       meta.paramsBlobText,
@@ -242,6 +268,15 @@ function writeBundle(db: Database.Database, bundle: HoopsBundle, meta: WriteMeta
       // way every other player's net splits into off/def. NULL on a bundle
       // that predates it — every reader must fall back to the old rendering.
       bundle.players.replacement_tilt_per36 ?? null,
+      // PARTIAL SCHEDULE: 1/0 never NULL from here on — NULL is reserved for
+      // a row written before the column existed, which the no-op marker
+      // (hasScheduleStatus) reads to force the one backfilling rewrite.
+      schedule.complete ? 1 : 0,
+      schedule.nPending,
+      schedule.pendingWindow?.from ?? null,
+      schedule.pendingWindow?.to ?? null,
+      schedule.pendingWindow?.why ?? null,
+      bundle.schedule.season_start_year ?? null,
     );
 
     const insTeam = db.prepare(
@@ -496,6 +531,12 @@ export function importHoopsData(force = false): ImportSummary {
   const bundleHasReplacementTilt = bundle.players.replacement_tilt_per36 != null;
   const replacementTiltSettled = !bundleHasReplacementTilt || state?.hasReplacementTilt === true;
 
+  // A ninth time, for the schedule status (`partial_schedule`, 2026-10-28).
+  // Every bundle has a schedule, so this is demanded unconditionally: a
+  // settled volume whose row predates the columns rewrites once and then
+  // reads "complete" instead of NULL.
+  const scheduleSettled = state?.hasScheduleStatus === true;
+
   if (
     !force &&
     state &&
@@ -508,7 +549,8 @@ export function importHoopsData(force = false): ImportSummary {
     explainSettled &&
     moversSettled &&
     aboveReplacementSettled &&
-    replacementTiltSettled
+    replacementTiltSettled &&
+    scheduleSettled
   ) {
     return {
       imported: false,

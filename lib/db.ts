@@ -715,6 +715,31 @@ export function getDb(): Database.Database {
     dbInstance.exec(`ALTER TABLE hoops_params ADD COLUMN replacement_tilt_per36 REAL`);
   }
 
+  // PARTIAL SCHEDULE (`partial_schedule`, 2026-10-28). How whole the stored
+  // schedule is: the NBA Cup knockout week is drawn weeks into the season, so
+  // the real slate arrives 30 games short and the pages have to be able to
+  // say so rather than print 1,200 as if it were the season. Same additive,
+  // nullable shape as every hoops_params migration; NULL on a row written
+  // before this existed means "complete by the old exact-1,230 rule", which
+  // is what every such row was. The importer's ninth no-op marker
+  // (hasScheduleStatus) forces the one rewrite that backfills a settled
+  // volume. Written only by lib/hoops/import.ts, read by
+  // lib/hoops/queries.ts's getHoopsMeta.
+  const hoopsParamsSchedCols = (
+    dbInstance.prepare(`PRAGMA table_info(hoops_params)`).all() as Array<{ name: string }>
+  ).map((c) => c.name);
+  const addSchedCol = (name: string, ddl: string): void => {
+    if (!hoopsParamsSchedCols.includes(name)) {
+      dbInstance!.exec(`ALTER TABLE hoops_params ADD COLUMN ${ddl}`);
+    }
+  };
+  addSchedCol("schedule_complete", `schedule_complete INTEGER`);
+  addSchedCol("schedule_n_pending", `schedule_n_pending INTEGER`);
+  addSchedCol("schedule_pending_from", `schedule_pending_from TEXT`);
+  addSchedCol("schedule_pending_to", `schedule_pending_to TEXT`);
+  addSchedCol("schedule_pending_why", `schedule_pending_why TEXT`);
+  addSchedCol("schedule_season_start_year", `schedule_season_start_year INTEGER`);
+
   return dbInstance;
 }
 
