@@ -1,72 +1,35 @@
 import HoopsNav from "@/components/hoops/HoopsNav";
-import GameCard from "./GameCard";
+import GamesSection from "./GamesSection";
+import LastNight from "./LastNight";
 import LiveProvider from "./LiveProvider";
 import NotableList from "./NotableList";
 import ScoresDayNav from "./ScoresDayNav";
 import { SourceNote } from "./SourceNote";
 import { getNotable, getScoreboard, sourceMeta, type Fetched } from "@/lib/hoops/scores/data";
-import { addDays, longDate, shortDate, todayIn } from "@/lib/hoops/scores/dates";
-import { veilGame } from "@/lib/hoops/scores/spoiler";
+import { addDays, lastNightUntil, longDate, shortDate, todayIn } from "@/lib/hoops/scores/dates";
 import type { GameState, Scoreboard } from "@/lib/hoops/scores/types";
-
-function Games({
-  title,
-  sb,
-  protect = false,
-}: {
-  title: string;
-  sb: Fetched<Scoreboard>;
-  /** Spoiler mode: every started game is veiled BEFORE it is handed to the
-   *  client component, so today's scores are in neither the HTML nor the
-   *  RSC payload until the viewer reveals them. */
-  protect?: boolean;
-}) {
-  const games = sb.data?.games ?? [];
-  const started = games.filter((g) => g.state !== "pre").length;
-  return (
-    <section className="mt-6 first:mt-0">
-      <h3 className="mb-2 font-mono text-[0.68rem] uppercase tracking-kicker text-cat-hoops">
-        {title}
-        {games.length > 0 && <span className="text-cream-dimmer"> · {games.length}</span>}
-      </h3>
-      {protect && started > 0 && (
-        <p className="mb-2 font-mono text-[0.6rem] uppercase tracking-kicker text-cream-dimmer">
-          Scores hidden · hold a game to reveal it · tap to sync to where you are
-        </p>
-      )}
-      {!sb.data ? (
-        <p className="font-display text-sm text-cream-dim">Scores unavailable right now.</p>
-      ) : games.length === 0 ? (
-        <p className="font-display text-sm text-cream-dim">No NBA games.</p>
-      ) : (
-        <div className="grid gap-2 sm:grid-cols-2">
-          {games.map((g) => (
-            <GameCard
-              key={g.id}
-              game={protect && g.state !== "pre" ? veilGame(g) : g}
-              date={sb.data!.date}
-              protect={protect}
-            />
-          ))}
-        </div>
-      )}
-    </section>
-  );
-}
 
 /**
  * One day of real NBA games. On TODAY it is the morning read: last night's
  * finals first, then tonight's slate (tip times in Mountain, the network, the
- * live score once a game starts), then last night's notable lines. Any other
- * day is just that day's games and its notable lines.
+ * live score once a game starts), then last night's notable lines. At noon
+ * Mountain last night lets go: its notable lines and live polling stop, and
+ * its list keeps only games the viewer is still synced to (LastNight.tsx).
+ * Any other day is just that day's games and its notable lines.
  *
  * Separate from the sim on purpose: nothing here reads the hoops-sim bundle,
  * the read model or the engine.
  */
 export default async function ScoresDay({ date }: { date: string }) {
-  const today = todayIn(new Date());
+  const now = new Date();
+  const today = todayIn(now);
   const isToday = date === today;
   const yesterday = addDays(date, -1);
+  const until = lastNightUntil(date);
+  // Last night is still this page's business (before noon). Past noon it is
+  // still read — a settled day is cached for good — for the games the viewer
+  // may still be synced to, but nothing else of it shows or polls.
+  const lastNight = isToday && now.getTime() < until;
 
   const [day, prior] = await Promise.all([
     getScoreboard(date),
@@ -76,12 +39,12 @@ export default async function ScoresDay({ date }: { date: string }) {
   // Today's notable is last night's. Tonight's finished games are NOT folded
   // in: today's page is spoiler-protected, and a 40-point line names the
   // game it came from. They show up tomorrow, as last night's.
-  const notableDays = (isToday ? [prior] : [day]).filter((s): s is Fetched<Scoreboard> => !!s?.data);
+  const notableDays = (isToday ? (lastNight ? [prior] : []) : [day]).filter((s): s is Fetched<Scoreboard> => !!s?.data);
   const notable = await Promise.all(notableDays.map((s) => getNotable(s.data!)));
   const lines = notable.flatMap((n) => n.lines).sort((a, b) => b.score - a.score);
   const missing = notable.reduce((s, n) => s + n.missing, 0);
 
-  const all = [...(prior?.data?.games ?? []), ...(day.data?.games ?? [])];
+  const all = [...(lastNight ? prior?.data?.games ?? [] : []), ...(day.data?.games ?? [])];
   const live = all.some((g) => g.state === "in");
   const pending = isToday && (day.data?.games ?? []).some((g) => g.state !== "post" && !g.postponed);
   // The states this render saw — the provider refreshes the page when one
@@ -91,10 +54,23 @@ export default async function ScoresDay({ date }: { date: string }) {
 
   const body = (
     <>
-      {isToday && prior && <Games title={`Last night · ${shortDate(yesterday)}`} sb={prior} />}
-      <Games title={isToday ? "Tonight" : "Games"} sb={day} protect={isToday} />
+      {isToday && prior && (
+        <LastNight
+          title={`Last night · ${shortDate(yesterday)}`}
+          date={yesterday}
+          games={prior.data?.games ?? null}
+          until={until}
+          pastAtRender={!lastNight}
+        />
+      )}
+      <GamesSection
+        title={isToday ? "Tonight" : "Games"}
+        date={day.data?.date ?? date}
+        games={day.data?.games ?? null}
+        protect={isToday}
+      />
 
-      {(lines.length > 0 || (isToday ? prior?.data?.games ?? [] : all).some((g) => g.state === "post")) && (
+      {(lines.length > 0 || (isToday ? (lastNight ? prior?.data?.games ?? [] : []) : all).some((g) => g.state === "post")) && (
         <NotableList
           lines={lines}
           missing={missing}
@@ -102,7 +78,7 @@ export default async function ScoresDay({ date }: { date: string }) {
         />
       )}
 
-      <SourceNote fetched={[day, ...(prior ? [prior] : [])].map(sourceMeta)} />
+      <SourceNote fetched={[day, ...(prior && lastNight ? [prior] : [])].map(sourceMeta)} />
     </>
   );
 
@@ -117,7 +93,7 @@ export default async function ScoresDay({ date }: { date: string }) {
         label={isToday ? `Today · ${longDate(date)}` : longDate(date)}
       />
       {live || pending || isToday ? (
-        <LiveProvider dates={isToday && prior ? [date, yesterday] : [date]} states={states} protect={isToday}>
+        <LiveProvider dates={lastNight && prior ? [date, yesterday] : [date]} states={states} protect={isToday}>
           {body}
         </LiveProvider>
       ) : (

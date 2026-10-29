@@ -1,11 +1,14 @@
 // The per-device record of which of today's games the viewer has revealed or
 // synced (components/hoops/scores/LiveProvider.tsx reads and writes it).
 // localStorage, keyed by date, so a reveal survives a reload and yesterday's
-// choices never leak into today — every other date's key is pruned on save.
+// choices never leak into today. On save every key older than the day before
+// is pruned: yesterday's is kept so a game still synced from last night stays
+// on today's page past noon (keepLastNight below).
 // Every access is wrapped: storage can be absent, full or blocked (private
 // mode, cleared site data), and the page must simply behave as if nothing
 // had been revealed.
 
+import { addDays } from "./dates.ts";
 import type { SpoilerEntry } from "./types.ts";
 
 const PREFIX = "hoops-spoiler:";
@@ -37,11 +40,27 @@ export function saveSpoiler(date: string, map: SpoilerMap): void {
     const ls = window.localStorage;
     for (let i = ls.length - 1; i >= 0; i--) {
       const k = ls.key(i);
-      if (k && k.startsWith(PREFIX) && k !== PREFIX + date) ls.removeItem(k);
+      if (k && staleSpoilerKey(k, date)) ls.removeItem(k);
     }
     if (Object.keys(map).length === 0) ls.removeItem(PREFIX + date);
     else ls.setItem(PREFIX + date, JSON.stringify(map));
   } catch {
     /* storage unavailable — the choice lives for this page only */
   }
+}
+
+/** A stored key saving `date` drops: any other date's except the day before. */
+export function staleSpoilerKey(key: string, date: string): boolean {
+  if (!key.startsWith(PREFIX)) return false;
+  const d = key.slice(PREFIX.length);
+  return d !== date && d !== addDays(date, -1);
+}
+
+/** Which of last night's games today's page still lists. Before the noon
+ *  cutoff, all of them; after it, only those the viewer synced last night
+ *  and hasn't watched to the final (a synced game that reaches the final is
+ *  promoted to revealed, which lets it go). */
+export function keepLastNight(ids: string[], lastNight: SpoilerMap, pastCutoff: boolean): string[] {
+  if (!pastCutoff) return ids;
+  return ids.filter((id) => lastNight[id]?.mode === "synced");
 }
