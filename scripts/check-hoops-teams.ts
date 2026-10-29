@@ -32,7 +32,19 @@ import {
   teamFromSlug,
   triForEspnId,
 } from "../lib/hoops/scores/teams.ts";
-import { averages, guardGames, guardLog, guardRoster, isGuardedGame, teamRecord } from "../lib/hoops/scores/guard.ts";
+import {
+  averages,
+  guardGames,
+  guardLog,
+  guardRoster,
+  isGuardedGame,
+  openLines,
+  resultFor,
+  tally,
+  teamRecord,
+  unlockedLines,
+} from "../lib/hoops/scores/guard.ts";
+import { gameAtMoment, veilGame } from "../lib/hoops/scores/spoiler.ts";
 import { FRANCHISES } from "../lib/hoops/nba-franchises.ts";
 import { gameSlug } from "../lib/hoops/scores/parse.ts";
 
@@ -170,6 +182,34 @@ for (const [label, now] of [
   );
 }
 check(guardRoster(roster, all, AT_7AM).heldInjuries === 0, "7 AM: no injury held");
+// ── 5b. an unlocked game counts again ─────────────────────────────────────
+// The page adds back each held game the viewer's live tick shows unlocked
+// (TeamRecordLine.tsx): the result comes off that tick's Game, never the
+// server's veiled copy.
+{
+  const rec = teamRecord(all, "UTA", AT_2AM);
+  check(
+    rec.heldGames.length === 1 && rec.heldGames[0].id === "401909890" && rec.heldGames[0].home,
+    "2 AM: the held game is listed with its side, for adding back",
+  );
+  check(rec.results.length === 4, "2 AM: four results counted without it");
+  check(spurs !== undefined && resultFor(spurs, "UTA") === false, "Utah lost to the Spurs");
+  check(spurs !== undefined && resultFor(veilGame(spurs), "UTA") === null, "a veiled copy carries no result to add");
+  const midGame = spurs && gameAtMoment(spurs, {
+    atMs: 0, period: 3, clock: "5:00", awayScore: 80, homeScore: 70,
+    awayLinescore: [], homeLinescore: [], final: false, lastPlay: null,
+  });
+  check(midGame !== undefined && resultFor(midGame, "UTA") === null, "a synced game short of the final adds nothing");
+  const opened = tally([...rec.results, { home: true, won: false }], 0);
+  check(
+    opened.wins === 1 && opened.losses === 4 && opened.streak === "L3" && opened.recent.join("") === "LWLLL",
+    `unlocked: the record is the full 1-4, L3, LWLLL again, got ${opened.wins}-${opened.losses} ${opened.streak}`,
+  );
+  check(opened.home[0] === 1 && opened.home[1] === 3 && opened.held === 0, "unlocked: home 1-3, nothing held");
+  const still = tally(rec.results, rec.heldGames.length);
+  check(still.wins === 1 && still.losses === 3 && still.held === 1, "still locked: 1-3 with one held");
+}
+
 const undated = {
   ...roster,
   players: roster.players.map((p, i) => (i === 0 ? { ...p, injury: { status: "Out", dateUtc: null } } : p)),
@@ -236,6 +276,21 @@ for (const [label, now] of [
   check(avg?.gp === 4, `${label}: averages over the four shown regular-season games, got ${avg?.gp}`);
 }
 check(guardLog(klog.games, AT_7AM).every((s) => !s.hidden), "7 AM: no line hidden");
+// An unlocked guarded line comes back whole and counts in the averages; any
+// other id unlocks nothing, and nothing is "unlocked" once the window ends.
+{
+  const back = unlockedLines(klog.games, AT_2AM, new Set(["401909892"]));
+  check(back.length === 1 && back[0].gameId === "401909892" && back[0].opp === "LAC", "2 AM: the unlocked Clippers line comes back");
+  check(back[0]?.pts === 11 && back[0]?.result === "W", "the unlocked line is whole (11 points, a win)");
+  check(unlockedLines(klog.games, AT_2AM, new Set(["401909880", "999"])).length === 0, "unlocking an open or unknown game returns nothing");
+  check(unlockedLines(klog.games, AT_7AM, new Set(["401909892"])).length === 0, "7 AM: nothing guarded, nothing to unlock");
+  const merged = openLines(guardLog(klog.games, AT_2AM), back);
+  check(merged.every((s) => !s.hidden), "merged: no line left hidden");
+  check(averages(merged)?.gp === 5, `merged: averages over all five regular-season games, got ${averages(merged)?.gp}`);
+  const none = openLines(guardLog(klog.games, AT_2AM), []);
+  check(none.filter((s) => s.hidden).length === 1 && averages(none)?.gp === 4, "nothing unlocked: still four games");
+}
+
 check(
   guardLog([{ ...klog.games[0], date: "" }], AT_7AM)[0].hidden,
   "a line with no readable date is hidden, not guessed open",
@@ -263,6 +318,13 @@ for (const page of [
 check(/teamRecord\(/.test(code("app/hoops/scores/teams/[tri]/page.tsx")), "the team page counts its own record");
 check(/guardRoster\(/.test(code("app/hoops/scores/teams/[tri]/page.tsx")), "the team page guards injuries");
 check(/guardLog\(/.test(code("app/hoops/scores/players/[id]/page.tsx")), "the player page guards the log");
+check(/tally\(/.test(code("components/hoops/scores/TeamRecordLine.tsx")), "the record line re-tallies with unlocked games");
+check(/lg\.veiled/.test(code("components/hoops/scores/TeamRecordLine.tsx")), "the record line skips games the tick still veils");
+check(
+  /unlockedLines\(/.test(code("app/api/hoops/scores/players/[id]/log/route.ts")),
+  "the log route returns only unlocked guarded lines",
+);
+check(/m\?\.final/.test(code("app/api/hoops/scores/players/[id]/log/route.ts")), "a synced game unlocks its line only at the final");
 
 // ── 9. broken payloads throw rather than render empty ────────────────────
 const throws = (f: () => unknown): boolean => {

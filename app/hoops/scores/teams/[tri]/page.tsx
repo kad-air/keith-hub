@@ -5,6 +5,7 @@ import HoopsNav from "@/components/hoops/HoopsNav";
 import LiveProvider from "@/components/hoops/scores/LiveProvider";
 import { SourceNote } from "@/components/hoops/scores/SourceNote";
 import TeamGameRow from "@/components/hoops/scores/TeamGameRow";
+import TeamRecordLine from "@/components/hoops/scores/TeamRecordLine";
 import { FRANCHISES } from "@/lib/hoops/nba-franchises";
 import { getRoster, getTeamGames, sourceMeta } from "@/lib/hoops/scores/data";
 import { addDays, isGuardedDate, todayIn } from "@/lib/hoops/scores/dates";
@@ -33,9 +34,9 @@ const RECENT_N = 5;
  * Mountain) ships veiled, and the record, home/road split, streak and
  * last-five strip are counted WITHOUT it. Under a LiveProvider the rows pick
  * up the viewer's reveal or sync from this device, as the scores list's cards
- * do; the record stays the server's (it can't see that choice), so it keeps
- * leaving the game out and says so. An injury stamped since the guarded tip
- * is held too.
+ * do, and the record adds back every guarded game that tick shows unlocked
+ * (revealed, or synced through the final — TeamRecordLine.tsx). An injury
+ * stamped since the guarded tip is held until the window ends.
  */
 export default async function HoopsScoresTeamPage({ params }: { params: { tri: string } }) {
   const tri = teamFromSlug(params.tri);
@@ -83,8 +84,40 @@ export default async function HoopsScoresTeamPage({ params }: { params: { tri: s
 
   const row = (g: Game) => <TeamGameRow key={g.id} game={g} tri={tri} guarded={guarded.has(g.id)} />;
 
+  // The header rides inside the provider too: the record adds back each
+  // guarded game the viewer has unlocked, off the same live tick as the rows.
   const body = (
     <>
+      <header>
+        <h2 className="font-display text-lg text-cream">
+          <span className="font-mono text-[0.72rem] text-cat-hoops">{tri}</span> {team.name}
+        </h2>
+        <p className="mt-0.5 font-mono text-[0.62rem] uppercase tracking-kicker text-cream-dimmer">
+          {team.conference} · {team.division}
+          {sched.season && ` · ${sched.season}`}
+        </p>
+        {headline && (
+          <TeamRecordLine
+            tri={tri}
+            label={headline.label}
+            results={headline.rec.results}
+            held={headline.rec.heldGames}
+            recentN={RECENT_N}
+          />
+        )}
+        <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 font-mono text-[0.62rem] uppercase tracking-kicker">
+          <Link href={`/hoops/scores/teams/${slug}/schedule`} className="text-cat-hoops hover:text-cream">
+            Schedule
+          </Link>
+          <Link href="/hoops/scores/standings" className="text-cat-hoops hover:text-cream">
+            Standings
+          </Link>
+          <Link href={`/hoops/sim/teams/${tri}`} className="text-cat-hoops hover:text-cream">
+            In the sim →
+          </Link>
+        </p>
+      </header>
+
       <section className="mt-6">
         <h3 className="mb-1 font-mono text-[0.68rem] uppercase tracking-kicker text-cat-hoops">Next</h3>
         {upcoming.length ? (
@@ -116,27 +149,6 @@ export default async function HoopsScoresTeamPage({ params }: { params: { tri: s
         </Link>
       </p>
 
-      <header>
-        <h2 className="font-display text-lg text-cream">
-          <span className="font-mono text-[0.72rem] text-cat-hoops">{tri}</span> {team.name}
-        </h2>
-        <p className="mt-0.5 font-mono text-[0.62rem] uppercase tracking-kicker text-cream-dimmer">
-          {team.conference} · {team.division}
-          {sched.season && ` · ${sched.season}`}
-        </p>
-        {headline && <RecordLine label={headline.label} rec={headline.rec} />}
-        <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 font-mono text-[0.62rem] uppercase tracking-kicker">
-          <Link href={`/hoops/scores/teams/${slug}/schedule`} className="text-cat-hoops hover:text-cream">
-            Schedule
-          </Link>
-          <Link href="/hoops/scores/standings" className="text-cat-hoops hover:text-cream">
-            Standings
-          </Link>
-          <Link href={`/hoops/sim/teams/${tri}`} className="text-cat-hoops hover:text-cream">
-            In the sim →
-          </Link>
-        </p>
-      </header>
 
       {days.length ? (
         <LiveProvider dates={days} states={states} guarded={days}>
@@ -208,43 +220,5 @@ export default async function HoopsScoresTeamPage({ params }: { params: { tri: s
 
       <SourceNote fetched={[...sched.fetched, rosterF].map(sourceMeta)} />
     </article>
-  );
-}
-
-function RecordLine({ label, rec }: { label: string | null; rec: TeamRecord }) {
-  const split = (s: [number, number]) => `${s[0]}-${s[1]}`;
-  return (
-    <div className="mt-2 font-mono text-[0.72rem] tabular-nums text-cream-dim">
-      <p>
-        {label && <span className="text-cream-dimmer">{label} </span>}
-        <span className="text-base text-cream">
-          {rec.wins}-{rec.losses}
-        </span>
-        <span className="text-cream-dimmer"> · home </span>
-        {split(rec.home)}
-        <span className="text-cream-dimmer"> · road </span>
-        {split(rec.road)}
-        {rec.streak && (
-          <>
-            <span className="text-cream-dimmer"> · </span>
-            {rec.streak}
-          </>
-        )}
-        {rec.recent.length > 0 && (
-          <span className="ml-2 tracking-[0.15em]">
-            {rec.recent.map((r, i) => (
-              <span key={i} className={r === "W" ? "text-cat-hoops" : "text-cream-dimmer"}>
-                {r}
-              </span>
-            ))}
-          </span>
-        )}
-      </p>
-      {rec.held > 0 && (
-        <p className="mt-0.5 text-[0.62rem] text-cream-dimmer">
-          Leaves out {rec.held === 1 ? "a game" : `${rec.held} games`} under spoiler protection until 3 AM.
-        </p>
-      )}
-    </div>
   );
 }

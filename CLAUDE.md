@@ -1546,9 +1546,14 @@ home/road, streak and last-five (`teamRecord`, which counts what it `held`), a p
 (`averages` over `guardLog`'s shown lines; a guarded log line ships date and opponent only), and
 the roster's injury notes (`guardRoster` holds any stamped at or after the guarded tip, or
 undated). The parsers deliberately skip `recordSummary`, `standingSummary`, `statsSummary` and the
-game log's `summary`/`totals` — the gate checks it. The server can't see a reveal made on the
-device, so the record, averages and log line keep leaving a revealed game out until 3 AM, and say
-so. **`/hoops/scores/standings` is NOT guarded** (the source's own records, last night included) —
+game log's `summary`/`totals` — the gate checks it. 🔴 **An unlocked game counts again (owner,
+2026-10-29).** Once the viewer has revealed a game on this device, or synced it through the final,
+it goes back into the team record, the player's averages and the game log: the record line
+(`TeamRecordLine.tsx`) re-tallies with each held game the live tick shows unveiled and final
+(`tally`, `resultFor`), and the player page (`PlayerLogView.tsx`) reads the spoiler store and asks
+`GET /api/hoops/scores/players/[id]/log?reveal=&sync=` for just those lines (`unlockedLines`; a
+synced one only once its moment is final). A game still locked never leaves the server. Injury
+notes stay held until 3 AM either way. **`/hoops/scores/standings` is NOT guarded** (the source's own records, last night included) —
 unchanged from before the split.
 
 **Gate: `npm run check:hoops:teams`** (in `prebuild`, offline) over `hoops-teams-fixture/` (Utah's

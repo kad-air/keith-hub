@@ -9,7 +9,10 @@
 // endpoint for the viewer's view of it, exactly as the scores list does.
 //
 // Everything else a result could leak through is computed here from the
-// games that are NOT guarded, never read off the source's own summary:
+// games that are NOT guarded, never read off the source's own summary (and
+// the pages add back each guarded game the viewer has UNLOCKED on this
+// device — revealed, or synced through the final — once that game's own
+// result reaches the client the same way the scores list's does):
 //   - a team's record, home/road split, streak and last-five strip;
 //   - a player's per-game averages and game-log lines (a guarded line
 //     ships as a bare row: date and opponent, no result, no stats);
@@ -64,10 +67,55 @@ export interface TeamRecord {
   held: number;
 }
 
+/** One finished game, from the team's side, as a record counts it. */
+export interface RecordResult {
+  home: boolean;
+  won: boolean;
+}
+
+/** A guarded game the record left out, in tip order — what the page needs to
+ *  add it back once the viewer has unlocked it (and nothing about how it
+ *  went: the result arrives with the viewer's own live tick). */
+export interface HeldGame {
+  id: string;
+  home: boolean;
+}
+
+/** The record's figures from its finished games, oldest first. */
+export function tally(results: RecordResult[], held: number, recentN = 5): TeamRecord {
+  const rec: TeamRecord = { wins: 0, losses: 0, home: [0, 0], road: [0, 0], streak: null, recent: [], held };
+  for (const r of results) {
+    if (r.won) rec.wins++;
+    else rec.losses++;
+    const split = r.home ? rec.home : rec.road;
+    split[r.won ? 0 : 1]++;
+  }
+  if (results.length) {
+    const last = results[results.length - 1].won;
+    let n = 0;
+    for (let i = results.length - 1; i >= 0 && results[i].won === last; i--) n++;
+    rec.streak = `${last ? "W" : "L"}${n}`;
+  }
+  rec.recent = results.slice(-recentN).map((r) => (r.won ? "W" : "L"));
+  return rec;
+}
+
+/** Did `tri` win this finished game? null when it isn't final, or the source
+ *  gives neither a winner nor both scores. */
+export function resultFor(g: Game, tri: string): boolean | null {
+  const side = sideOf(g, tri);
+  if (!side || g.state !== "post" || g.postponed) return null;
+  const us = g[side];
+  const them = g[side === "home" ? "away" : "home"];
+  return us.winner ? true : them.winner ? false : us.score !== null && them.score !== null ? us.score > them.score : null;
+}
+
 /**
  * A team's record from its own finished games of one season type, leaving out
  * every guarded game. `games` is the UNVEILED list (the veil strips the
- * winner flag this needs); guarded games are skipped here by the same rule.
+ * winner flag this needs); guarded games are skipped here by the same rule
+ * and listed in `heldGames`, so the page can add back the ones the viewer has
+ * unlocked on this device (`tally` over `results` plus those).
  */
 export function teamRecord(
   games: Game[],
@@ -75,38 +123,23 @@ export function teamRecord(
   now: Date,
   kind: Game["seasonKind"] = "regular",
   recentN = 5,
-): TeamRecord {
-  const rec: TeamRecord = { wins: 0, losses: 0, home: [0, 0], road: [0, 0], streak: null, recent: [], held: 0 };
-  const results: ("W" | "L")[] = [];
+): TeamRecord & { results: RecordResult[]; heldGames: HeldGame[] } {
+  const results: RecordResult[] = [];
+  const heldGames: HeldGame[] = [];
   for (const g of [...games].sort((a, b) => a.startUtc.localeCompare(b.startUtc))) {
     if (g.seasonKind !== kind) continue;
     const side = sideOf(g, tri);
     if (!side) continue;
     if (isGuardedGame(g, now)) {
-      rec.held++;
+      heldGames.push({ id: g.id, home: side === "home" });
       continue;
     }
-    if (g.state !== "post" || g.postponed) continue;
-    const us = g[side];
-    const them = g[side === "home" ? "away" : "home"];
-    // The winner flag, else the score; a final with neither is skipped
-    // rather than guessed.
-    const won = us.winner ? true : them.winner ? false : us.score !== null && them.score !== null ? us.score > them.score : null;
+    // A final with neither a winner nor both scores is skipped rather than guessed.
+    const won = resultFor(g, tri);
     if (won === null) continue;
-    results.push(won ? "W" : "L");
-    if (won) rec.wins++;
-    else rec.losses++;
-    const split = side === "home" ? rec.home : rec.road;
-    split[won ? 0 : 1]++;
+    results.push({ home: side === "home", won });
   }
-  if (results.length) {
-    const last = results[results.length - 1];
-    let n = 0;
-    for (let i = results.length - 1; i >= 0 && results[i] === last; i--) n++;
-    rec.streak = `${last}${n}`;
-  }
-  rec.recent = results.slice(-recentN);
-  return rec;
+  return { ...tally(results, heldGames.length, recentN), results, heldGames };
 }
 
 /** A game-log line as it may ship: the whole line, or — guarded — only what
@@ -132,6 +165,31 @@ export function guardLog(lines: PlayerGameLine[], now: Date): ShownLine[] {
           },
         },
   );
+}
+
+/**
+ * The guarded lines the viewer has unlocked on this device: games revealed,
+ * or synced to a moment that has reached the final. Only lines that are
+ * still guarded are returned (the rest already ship in full).
+ */
+export function unlockedLines(
+  lines: PlayerGameLine[],
+  now: Date,
+  unlocked: ReadonlySet<string>,
+): PlayerGameLine[] {
+  return guardLog(lines, now)
+    .filter((s) => s.hidden && unlocked.has(s.line.gameId))
+    .map((s) => lines.find((l) => l.gameId === s.line.gameId)!)
+    .filter(Boolean);
+}
+
+/** Merge unlocked full lines into what shipped, keeping its order. */
+export function openLines(shown: ShownLine[], unlocked: PlayerGameLine[]): ShownLine[] {
+  const byId = new Map(unlocked.map((l) => [l.gameId, l]));
+  return shown.map((s) => {
+    const l = s.hidden ? byId.get(s.line.gameId) : undefined;
+    return l ? { hidden: false, line: l } : s;
+  });
 }
 
 export interface Averages {
