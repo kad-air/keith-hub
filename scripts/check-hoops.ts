@@ -326,10 +326,37 @@ function checkSchedule(file: any): any {
   const games = file.games ?? [];
 
   // EXTERNAL: an NBA regular season is 82 games each, 1,230 in total.
+  //
+  // PARTIAL SLATE (2026-10-28): the NBA Cup knockout week is drawn from the
+  // group results, so a schedule exported before the draw is real-fixtures
+  // short. A committed file that says so (`n_pending`, `pending_per_team`)
+  // is held to the same arithmetic the push path is (lib/hoops/schedule.ts,
+  // written here a second time): scheduled + pending == 1,230 overall and
+  // == 82 a team. A file that says nothing is held to the exact rule.
+  const partial = typeof file.n_pending === "number";
+  const nPending: number = partial ? file.n_pending : 0;
+  const pendingPerTeam: Record<string, number> = partial ? (file.pending_per_team ?? {}) : {};
   check(
-    games.length === N_SCHEDULE_GAMES,
-    `hoops_schedule.json: ${games.length} games, an NBA regular season is ${N_SCHEDULE_GAMES}`,
+    games.length + nPending === N_SCHEDULE_GAMES,
+    `hoops_schedule.json: ${games.length} games${partial ? ` + ${nPending} pending` : ""}, ` +
+      `an NBA regular season is ${N_SCHEDULE_GAMES}`,
   );
+  if (partial) {
+    check(file.complete === (nPending === 0), `hoops_schedule.json: complete=${file.complete} with n_pending=${nPending}`);
+    check(
+      Object.keys(pendingPerTeam).length === TRIS.length && TRIS.every((t: string) => Number.isInteger(pendingPerTeam[t])),
+      "hoops_schedule.json: pending_per_team does not name all 30 teams",
+    );
+    const sum = Object.values(pendingPerTeam).reduce((a, b) => a + b, 0);
+    check(sum === 2 * nPending, `hoops_schedule.json: pending_per_team sums to ${sum}, expected ${2 * nPending}`);
+    if (nPending > 0) {
+      const w = file.pending_window;
+      check(
+        w && typeof w.from === "string" && typeof w.to === "string" && w.from <= w.to,
+        "hoops_schedule.json: n_pending > 0 without a pending_window",
+      );
+    }
+  }
 
   const ids = new Set<string>();
   const played: Record<string, number> = {};
@@ -346,10 +373,12 @@ function checkSchedule(file: any): any {
     played[g.home] = (played[g.home] ?? 0) + 1;
     played[g.away] = (played[g.away] ?? 0) + 1;
   }
-  const wrong = TRIS.filter((t: any) => played[t] !== GAMES_PER_TEAM);
+  const wrong = TRIS.filter((t: any) => (played[t] ?? 0) + (pendingPerTeam[t] ?? 0) !== GAMES_PER_TEAM);
   check(
     wrong.length === 0,
-    `hoops_schedule.json: ${wrong.map((t: any) => `${t}=${played[t] ?? 0}`).join(", ")} — every team plays ${GAMES_PER_TEAM}`,
+    `hoops_schedule.json: ${wrong
+      .map((t: any) => `${t}=${played[t] ?? 0}${partial ? `+${pendingPerTeam[t] ?? 0} pending` : ""}`)
+      .join(", ")} — every team plays ${GAMES_PER_TEAM}`,
   );
 
   return { ids, byId: new Map(games.map((g: any) => [g.game_id, g])) };

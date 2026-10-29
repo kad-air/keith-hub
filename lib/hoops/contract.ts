@@ -60,6 +60,16 @@ export const SUPPORTED_PRICING_VERSION = 3;
  *                       by lib/hoops/projections.ts before anything is
  *                       written; without the token the file is ignored and
  *                       the import is exactly what it was before.
+ *   partial_schedule    2026-10-28 — hoops_schedule.json may carry FEWER than
+ *                       1,230 games, provided it accounts for every missing
+ *                       one (`n_pending`, `pending_per_team` for all 30,
+ *                       `pending_window`) and the arithmetic closes to 82 a
+ *                       team (lib/hoops/schedule.ts). No new file. Exists
+ *                       because the NBA Cup knockout week is drawn weeks
+ *                       into the season, so the real 2026-27 slate was 1,200
+ *                       games and the exact-1,230 rule kept the hub on LAST
+ *                       season's schedule. Without the token the exact rule
+ *                       stands, unchanged.
  */
 export const SUPPORTED_FEATURES: ReadonlySet<string> = new Set([
   "symmetric_off_def",
@@ -70,6 +80,7 @@ export const SUPPORTED_FEATURES: ReadonlySet<string> = new Set([
   "fictional_values",
   "goto_scorer",
   "season_projection",
+  "partial_schedule",
 ]);
 
 /**

@@ -36,6 +36,10 @@ npm run check:hoops:projections  # Rest-of-season projection gate: the season_pr
                                  #   27 damage patterns refused (missing/duplicate team, prob > 1, title > finals, bad
                                  #   date, wrong conference, league sums off…), the table order is by projected wins, a
                                  #   bundle without the token still imports, the importer keeps the latest projection (same)
+npm run check:hoops:partial-schedule  # Partial-schedule gate: a 1,200-game slate that accounts for every missing game
+                                 #   (`partial_schedule`) is accepted, 20 damage patterns refused for their named reason,
+                                 #   the exact-1,230 rule still holds without the token, the real importer stores the
+                                 #   status and ignores the fields without the token (same)
 npm run check:tracking-hidden    # Tracking section stays hidden (needs a running server; NOT in prebuild)
 npm run check:hoops:mobile       # Hoops still fits on a phone: seven pages at 375px and 430px in the
                                  #   installed Chrome (needs a running server; NOT in prebuild)
@@ -1153,6 +1157,7 @@ Three things the site had never had, all gated on `contract.features`, all taugh
 | `nightly_strength` | v2: prefer the last-ten-games team read when pricing a game |
 | `season_projection` | 2026-10-28: the bundle carries `projections.json`, hoops-sim's nightly rest-of-season projection; `/hoops/projections` renders it. Display only — nothing is priced off it. See "The rest-of-season projection" below |
 | `goto_scorer` | v3 (2026-09-06, hoops-sim issue #73): a team built around one big scorer is worth more than its five men summed — add `star_goto_premium × (clamp(leading scorer's share of projected points, star_goto_share_band) − star_goto_league_share)` to a roster's raw strength, the share projected from each man's `pts_per36` over his allocated minutes, summed in ascending order. Net only; the tilt (game totals) never moves. Seven fixture cases (`v3 goto …`), including one that proves the port charges NOTHING when the token is absent. `pts_per36` ships on every player but is not stored in `hoops_players` yet — nothing on the site prices at runtime; the site's team ratings are transported from hoops-sim, which carries the term once its `FEATURES` flips |
+| `partial_schedule` | 2026-10-28: `hoops_schedule.json` may carry FEWER than 1,230 games if it accounts for every missing one (`n_pending`, `pending_per_team` × 30, `pending_window`) and the arithmetic closes to 82 a team. No new file. Without the token the exact-1,230 rule stands. See "The partial schedule" below |
 
 `SUPPORTED_PRICING_VERSION` is 3 since the go-to round (was 2). Rule 4 is one-directional, so **every bundle hoops-sim sends today still imports and is still priced the v1 way** — which it will be until the flip lands. Two negotiation rules were added, both about a bundle being ACCEPTED and then priced wrongly (the failure nobody sees on screen): `checkFeatureCoherence` refuses `symmetric_off_def` and `split_off_def` together, and `checkFeatureConstants` refuses a DECLARED feature whose constants are absent while never demanding an undeclared one's (`FEATURE_CONSTANTS`) — which is what keeps a v1 bundle importable forever.
 
@@ -1275,6 +1280,80 @@ token dropped from `SUPPORTED_FEATURES`, file no longer demanded, route storing 
 `checkFeatureFiles`, `describeContract`), `app/api/hoops/import/route.ts` (GET discovery + the
 token-gated validation), `app/hoops/projections/page.tsx`, `components/hoops/ProjectionTable.tsx`,
 `scripts/check-hoops-projections.ts`, `hoops-data/hoops_projections_fixture.json`.
+
+#### The partial schedule (`partial_schedule`) — 2026-10-28
+
+Keith's ask: "Fix the hub first." The receiver demanded exactly 1,230 games of every push, and that
+one rule kept the hub on LAST season's schedule for all of October 2026: the real 2026-27 slate
+hoops-sim could send had 1,200 fixtures, every team at exactly 80, because the **NBA Cup knockout
+week is drawn from the group results** and the league had not drawn it yet. The sender deliberately
+never pads with placeholders (a placeholder is a lie the matchup page would print as a meeting with
+a date), so the contract gained a token instead. Receiver first, as always: this shipped before
+hoops-sim added the token to its list.
+
+**The contract.** Feature token **`partial_schedule`**, no new file (`feature_files` is unchanged;
+the discovery GET lists the token under `features`). When declared, `hoops_schedule.json` carries
+`complete`, `n_pending`, `pending_per_team` (exactly the 30 franchise keys, each an int ≥ 0) and
+`pending_window: { from, to, why }` (required while `n_pending > 0`; may be null or absent when it
+is 0), and `games` holds real fixtures only. 🔴 **Validated as NBA arithmetic, fail-closed**
+(`lib/hoops/schedule.ts`, pure): `games.length + n_pending == 1,230`; for all 30 teams
+`scheduled + pending_per_team[team] == 82`; `Σ pending_per_team == 2 × n_pending` (implied by the
+first two, kept as the contract's restatement — the gate says so); `complete == (n_pending == 0)`;
+window dates are real calendar dates with `from ≤ to`; `n_games == games.length`. Token or not, the
+fixtures themselves are now checked too: known franchises only, nobody plays itself, no duplicate
+`game_id`, calendar dates. 🔴 **Decided by the TOKEN, never by the file's fields** (the
+`season_projection` precedent): without the token the exact-1,230 rule and the 82-a-team rule stand
+exactly as before and the partial fields are ignored, so every bundle today's sender publishes
+imports unchanged — `check:hoops:partial-schedule` pins both directions. `validatePushedBundle`
+takes `{ partialSchedule }` and delegates its schedule rule to the pure module; the route passes
+`contract.features.includes("partial_schedule")`.
+
+**Storage.** Six nullable columns on `hoops_params` (`schedule_complete`, `schedule_n_pending`,
+`schedule_pending_from/to/why`, `schedule_season_start_year`; additive migration in `lib/db.ts`),
+written by `writeBundle` from `scheduleStatusOf(file, partial)` — the ONE reader of the fields,
+beside the validator so the two can't drift. A **ninth** no-op marker (`hasScheduleStatus` on the
+seed path, `scheduleSettled` in the route's rule 6) forces the one rewrite that backfills a settled
+volume; NULL on a row from before the columns reads **complete**, which the old exact rule made it.
+The disk SEED has no contract block, so there the file's own `n_pending` is the declaration and
+`scripts/check-hoops.ts` holds a committed partial slate to the same arithmetic at build time (so a
+regenerated `hoops-data/` from the 2026-27 slate still builds). `getHoopsMeta()` exposes
+`schedule: ScheduleStatus` + `seasonStartYear`; the discovery GET's `stored` block gains
+`schedule: { season_start_year, n_games, complete, n_pending }` so the sender can see its slate
+landed and how many games it still owes.
+
+**The pages.** Every note is worded from the STORED count and dates through `pendingNote()`
+("30 games not scheduled yet (Dec 4 to 8)"), never hardcoded — the sender said its window is derived
+from ESPN's TBD rows and can change, and the gate greps both components for a literal count or
+month. Teams: the Rows line reads "1200 games scheduled" and a mono footnote adds the note plus the
+sender's `why` verbatim. Matchup: the head-to-head section renders the note (even with no meetings
+listed) because a meeting between the two may not exist in the schedule yet. Standings, Scores and
+Projections never read `hoops_schedule` (ESPN and `projections.json` respectively), and `getMeetings`
+is a plain filter, so 1,200 rows mis-state nothing there.
+
+**The gate: `npm run check:hoops:partial-schedule`** (appended to `prebuild` at the END, after
+`check:hoops:projections`). Over `hoops-data/hoops_partial_schedule_fixture.json` — the committed
+1,230-game schedule with a 30-game cycle removed (team *i* vs team *i*+1), so every team is 80
+scheduled + 2 pending, built once by a throwaway script — it first re-derives the arithmetic
+LONGHAND over the raw JSON, then: the contract (token accepted, no file demanded, the v1 block
+untouched), the validator accepting the fixture and a whole 1,230 slate under the token (window null
+or absent), refusing the 1,200 file WITHOUT the token by the exact rule, refusing **20 damage
+patterns** each for its named reason (wrong total, a team at 81 + 2, pending sum off, `complete`
+lying both ways, a missing/unknown/negative team key, duplicate `game_id`, a team playing itself, an
+unknown franchise, a bad or backwards or missing window, an empty `why`, `n_games` off, a
+non-calendar date, the token without the fields, a string count), the real `validatePushedBundle`
+with and without the option, the formatter on the sender's real window, and in a throwaway DB the
+real `importPushedBundle` three ways (partial with the token → 1,200 rows + the status; the same
+file WITHOUT the token → complete; whole under the token → complete). Falsified at merge **19/20**:
+the one miss is the implied sum rule above. 🔴 The importer-trusts-the-fields probe initially went
+UNDETECTED — the gate's "without the token" push used the FULL file, which has no fields to
+mistrust — and the check was repaired to push the partial file.
+
+**Key files:** `lib/hoops/schedule.ts` (**pure** — `validateSchedule`, `scheduleStatusOf`,
+`pendingNote`, `fmtPendingWindow`, `COMPLETE_SCHEDULE`), `lib/hoops/bundleValidation.ts`,
+`lib/hoops/contract.ts`, `lib/hoops/import.ts`, `lib/hoops/queries.ts` (`scheduleStatusFromRow`),
+`app/api/hoops/import/route.ts`, `components/hoops/TeamsClient.tsx`,
+`components/hoops/MatchupClient.tsx`, `scripts/check-hoops-partial-schedule.ts`,
+`hoops-data/hoops_partial_schedule_fixture.json`.
 
 #### Real scores, box scores and standings (`/hoops/scores`, `/hoops/standings`) — 2026-10-22
 

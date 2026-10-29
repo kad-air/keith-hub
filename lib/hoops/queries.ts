@@ -14,6 +14,8 @@ import { decodeParams } from "./params";
 import type { DecodedParams } from "./params";
 import { availableRatingModes as availableModesOf, modeDisagreement, rankTeams } from "./rating";
 import type { ModeDisagreement } from "./rating";
+import { COMPLETE_SCHEDULE } from "./schedule.ts";
+import type { ScheduleStatus } from "./schedule.ts";
 import type {
   ExplainModel,
   PlayerRow,
@@ -569,6 +571,18 @@ export interface HoopsMeta {
   scheduledGames: number;
   results: number;
   lines: number;
+  /**
+   * How whole the schedule is (`partial_schedule`, 2026-10-28). The NBA Cup
+   * knockout week is drawn weeks into the season, so the real slate can be
+   * stored 30 games short; every surface that counts or lists scheduled games
+   * reads this rather than treating `scheduledGames` as the season. A row
+   * from before the columns existed reads complete, which is what the old
+   * exact-1,230 rule made it.
+   */
+  schedule: ScheduleStatus;
+  /** The schedule file's own season (its `season_start_year`), null on a
+   *  row from before it was stored. */
+  seasonStartYear: number | null;
 }
 
 /**
@@ -589,7 +603,9 @@ export function getHoopsMeta(): HoopsMeta {
   const row = db
     .prepare(
       `SELECT param_version, blob, generated_at, imported_at, import_source,
-              hca_pts, replacement_per36, replacement_tilt_per36, value_as_of
+              hca_pts, replacement_per36, replacement_tilt_per36, value_as_of,
+              schedule_complete, schedule_n_pending, schedule_pending_from,
+              schedule_pending_to, schedule_pending_why, schedule_season_start_year
        FROM hoops_params WHERE id = 1`,
     )
     .get() as
@@ -603,6 +619,12 @@ export function getHoopsMeta(): HoopsMeta {
         replacement_per36: number;
         replacement_tilt_per36: number | null;
         value_as_of: string;
+        schedule_complete: number | null;
+        schedule_n_pending: number | null;
+        schedule_pending_from: string | null;
+        schedule_pending_to: string | null;
+        schedule_pending_why: string | null;
+        schedule_season_start_year: number | null;
       }
     | undefined;
   if (!row) throw new Error("hoops_params is empty — the import did not run");
@@ -636,5 +658,35 @@ export function getHoopsMeta(): HoopsMeta {
     scheduledGames: count("hoops_schedule"),
     results: count("hoops_results"),
     lines: count("hoops_lines"),
+    schedule: scheduleStatusFromRow(row),
+    seasonStartYear: row.schedule_season_start_year ?? null,
+  };
+}
+
+/** The stored schedule status. NULL `schedule_complete` is a row from before
+ *  `partial_schedule` existed — every such bundle passed the exact-1,230 rule,
+ *  so it is complete. A pending window is reported only when all of it is
+ *  there and something is actually pending. */
+export function scheduleStatusFromRow(row: {
+  schedule_complete: number | null;
+  schedule_n_pending: number | null;
+  schedule_pending_from: string | null;
+  schedule_pending_to: string | null;
+  schedule_pending_why: string | null;
+}): ScheduleStatus {
+  if (row.schedule_complete == null) return COMPLETE_SCHEDULE;
+  const nPending = row.schedule_n_pending ?? 0;
+  const hasWindow =
+    nPending > 0 && row.schedule_pending_from != null && row.schedule_pending_to != null;
+  return {
+    complete: row.schedule_complete === 1 && nPending === 0,
+    nPending,
+    pendingWindow: hasWindow
+      ? {
+          from: row.schedule_pending_from!,
+          to: row.schedule_pending_to!,
+          why: row.schedule_pending_why ?? "",
+        }
+      : null,
   };
 }

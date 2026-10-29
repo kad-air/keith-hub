@@ -14,6 +14,7 @@ import type { BoxscoreResult } from "@/lib/hoops/boxscore";
 import type { Meeting, SimSummary } from "@/lib/hoops/matchup";
 import type { FormSummary, HoopsMeta } from "@/lib/hoops/queries";
 import { MODE_COPY, fmtSigned, rankTeams, teamName, teamNickname } from "@/lib/hoops/rating";
+import { pendingNote } from "@/lib/hoops/schedule";
 import { seriesLengthDistribution, seriesWinProb } from "@/lib/hoops/series";
 import type { RankedTeam, RatingMode, TeamRow } from "@/lib/hoops/types";
 import { useKeyboard } from "@/lib/useKeyboard";
@@ -206,6 +207,8 @@ export default function MatchupClient({
   // line vs the market" sentence. A meeting where the other team hosted has
   // its spread flipped to this side.
   const lastLined = [...meetings].reverse().find((m) => m.homeSpread != null);
+  // "30 games not scheduled yet (Dec 4 to 8)", or null when the slate is whole.
+  const scheduleNote = pendingNote(meta.schedule);
   const lastLineFromHome =
     lastLined && lastLined.homeSpread != null
       ? lastLined.home === home
@@ -324,11 +327,20 @@ export default function MatchupClient({
       )}
 
       {/* ── Head to head this season ─────────────────────────────────── */}
-      {!sameTeam && meetings.length > 0 && (
+      {/* PARTIAL SCHEDULE: when the league has not drawn every game yet (the
+          NBA Cup knockout week), a meeting between these two may not exist in
+          the schedule at all, so the list says so — from the stored count and
+          window, never hardcoded — even when it would otherwise be empty. */}
+      {!sameTeam && (meetings.length > 0 || scheduleNote) && (
         <section className="mt-6">
           <h2 className="font-mono text-[0.62rem] uppercase tracking-kicker text-cream-dimmer">
             Head to head this season
           </h2>
+          {scheduleNote && (
+            <p className="mt-1 font-mono text-[0.65rem] text-cream-dimmer">
+              {scheduleNote}, so a meeting between these two may be missing here.
+            </p>
+          )}
           <ol className="mt-1">
             {meetings.map((m) => (
               <li
