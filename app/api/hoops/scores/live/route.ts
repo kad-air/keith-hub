@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getLive, resolveSync, type SpoilerRequest } from "@/lib/hoops/scores/data";
-import { isIsoDate } from "@/lib/hoops/scores/dates";
+import { isGuardedDate, isIsoDate } from "@/lib/hoops/scores/dates";
 import type { LiveResponse } from "@/lib/hoops/scores/types";
 
 export const dynamic = "force-dynamic";
@@ -22,10 +22,12 @@ const ID = /^\d{1,12}$/;
  * tip listed under the prior Eastern date can still be in progress past
  * midnight Mountain. `game` applies to the FIRST date.
  *
- * Spoiler mode (today's page): with `protect=1` every started game of the
- * FIRST date not listed in `reveal` and not in `sync` is veiled before it
- * leaves the server; a synced game ships the play-by-play moment at
- * now − offset instead of the live score. `at=P:SS` (with `game`) resolves
+ * Spoiler mode (today's page): with `protect=1` every started game of a
+ * GUARDED date (today, and yesterday until 3 AM Mountain — dates.ts
+ * isGuardedDate, on the server's clock) not listed in `reveal` and not in
+ * `sync` is veiled before it leaves the server; a synced game ships the
+ * play-by-play moment at now − offset instead of the live score. Game ids are
+ * unique across days, so one `reveal` and one `sync` list serve both dates. `at=P:SS` (with `game`) resolves
  * "I'm at SS seconds left in period P" to an offset off the play-by-play.
  *
  * `plays=1` (with `game`, the game page's play-by-play tab) adds the plays
@@ -65,7 +67,13 @@ export async function GET(request: Request) {
   const now = new Date();
   const results = await Promise.all(
     dates.map((d, i) =>
-      getLive(d, i === 0 ? game : null, now, i === 0 ? spoiler : { ...spoiler, protect: false }, i === 0 && withPlays),
+      getLive(
+        d,
+        i === 0 ? game : null,
+        now,
+        { ...spoiler, protect: spoiler.protect && isGuardedDate(d, now) },
+        i === 0 && withPlays,
+      ),
     ),
   );
   const ok = results.filter((r) => r.data);

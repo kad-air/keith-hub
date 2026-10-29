@@ -8,7 +8,7 @@ import LivePlays from "./LivePlays";
 import LiveProvider from "./LiveProvider";
 import { SourceNote } from "./SourceNote";
 import { findGame, getBox, getScoreboard, sourceMeta } from "@/lib/hoops/scores/data";
-import { isIsoDate, longDate, todayIn } from "@/lib/hoops/scores/dates";
+import { isGuardedDate, isIsoDate, longDate, todayIn } from "@/lib/hoops/scores/dates";
 import { gameSlug } from "@/lib/hoops/scores/parse";
 import { playsAt, veilGame, wirePlay } from "@/lib/hoops/scores/spoiler";
 
@@ -22,8 +22,11 @@ import { playsAt, veilGame, wirePlay } from "@/lib/hoops/scores/spoiler";
  * can't know this device's choice — and the first live tick (which carries
  * the viewer's reveal/sync) fills them in: nothing while veiled; the box
  * rebuilt from the plays up to the synced moment and only those plays while
- * synced; the live box and every play once revealed. Another day's game, or
- * one not started, renders straight from the server as before.
+ * synced; the live box and every play once revealed. Last night's game stays
+ * guarded the same way until 3 AM Mountain (dates.ts isGuardedDate), so a
+ * game synced last night is still held to its moment here after midnight.
+ * Another day's game, or one not started, renders straight from the server
+ * as before.
  */
 export default async function GamePage({
   date,
@@ -36,8 +39,10 @@ export default async function GamePage({
 }) {
   if (!isIsoDate(date)) notFound();
   const sb = await getScoreboard(date);
-  const today = todayIn(new Date());
+  const now = new Date();
+  const today = todayIn(now);
   const isToday = date === today;
+  const guardDay = isGuardedDate(date, now);
   const dayHref = isToday ? "/hoops/scores" : `/hoops/scores/${date}`;
 
   if (!sb.data) {
@@ -51,7 +56,7 @@ export default async function GamePage({
   const game = findGame(sb.data, slug);
   if (!game) notFound();
 
-  const guarded = isToday && game.state !== "pre";
+  const guarded = guardDay && game.state !== "pre";
   // Under guard nothing past the veil is read for the render at all.
   const box = game.state === "pre" || guarded ? null : await getBox(game.id);
   const teams = box?.data?.teams ?? [];
@@ -73,7 +78,7 @@ export default async function GamePage({
       <h2 className="mb-3 font-display text-lg text-cream">
         {game.away.name} <span className="text-cream-dimmer">at</span> {game.home.name}
       </h2>
-      <GameCard game={guarded ? veilGame(game) : game} date={date} protect={isToday} />
+      <GameCard game={guarded ? veilGame(game) : game} date={date} protect={guardDay} />
       {tv.length > 0 && (
         <p className="mt-2 font-mono text-[0.6rem] text-cream-dimmer">TV: {tv.join(", ")}</p>
       )}
@@ -113,7 +118,7 @@ export default async function GamePage({
           dates={[date]}
           gameId={game.id}
           states={{ [game.id]: game.state }}
-          protect={isToday}
+          guarded={guardDay ? [date] : []}
           plays={tab === "plays"}
         >
           {body}

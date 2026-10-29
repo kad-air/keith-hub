@@ -29,14 +29,18 @@ interface LiveState {
 }
 
 interface SpoilerApi {
-  /** Today's page: started games are veiled unless revealed or synced. */
+  /** Some day on this page is guarded: its started games are veiled unless
+   *  revealed or synced. */
   protect: boolean;
+  /** Every guarded day's choices in one map (game ids are unique across days). */
   spoiler: SpoilerMap;
-  reveal: (id: string) => void;
-  syncTo: (id: string, offsetMs: number) => void;
-  unsync: (id: string) => void;
+  /** Each takes the day the game is listed under: the choice is stored with
+   *  that day, so last night's sync stays last night's. */
+  reveal: (id: string, date: string) => void;
+  syncTo: (id: string, offsetMs: number, date: string) => void;
+  unsync: (id: string, date: string) => void;
   /** "I'm at `clockSec` left in `period`" → the server's resolution. */
-  resolve: (id: string, period: number, clockSec: number) => Promise<SyncResolution>;
+  resolve: (id: string, period: number, clockSec: number, date: string) => Promise<SyncResolution>;
 }
 
 const EMPTY: LiveState = { games: {}, box: null, held: false, plays: null, fetchedAt: null, error: null };
@@ -94,18 +98,19 @@ export function useGameView(id: string, guarded: boolean): GameView {
  * once so everything the overlay doesn't carry (winner, records, the notable
  * list) catches up through the slow path.
  *
- * Spoiler mode (`protect`, today's page): the viewer's reveals and syncs live
- * in localStorage (spoilerStore.ts) and ride every tick as `reveal=` and
- * `sync=`, so the SERVER veils what hasn't been revealed — no hidden score is
- * ever on the wire. A synced game whose moment reaches the final is promoted
- * to revealed (there is nothing left to protect). Any change of choice kicks
- * an immediate tick.
+ * Spoiler mode (`guarded`: today, and last night until 3 AM Mountain —
+ * dates.ts isGuardedDate): the viewer's reveals and syncs live in
+ * localStorage (spoilerStore.ts), one map per day, and ride every tick as
+ * `reveal=` and `sync=`, so the SERVER veils what hasn't been revealed — no
+ * hidden score is ever on the wire. A synced game whose moment reaches the
+ * final is promoted to revealed (there is nothing left to protect). Any change
+ * of choice kicks an immediate tick.
  */
 export default function LiveProvider({
   dates,
   gameId = null,
   states,
-  protect = false,
+  guarded = [],
   plays = false,
   children,
 }: {
@@ -117,7 +122,8 @@ export default function LiveProvider({
   /** The states the server rendered with, keyed by game id — a change on a
    *  tick triggers one router.refresh(). */
   states: Record<string, GameState>;
-  protect?: boolean;
+  /** The days of `dates` under spoiler mode, as the server rendered them. */
+  guarded?: string[];
   /** The game page's play-by-play tab: ask for the plays with each tick. */
   plays?: boolean;
   children: ReactNode;
@@ -125,23 +131,27 @@ export default function LiveProvider({
   const router = useRouter();
   const [state, setState] = useState<LiveState>(EMPTY);
   const [spoiler, setSpoilerState] = useState<SpoilerMap>({});
+  // Per day, as stored; `spoiler` above is their merge, for the cards.
+  const byDayRef = useRef<Record<string, SpoilerMap>>({});
   const spoilerRef = useRef<SpoilerMap>({});
   const statesRef = useRef(states);
   const busy = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const alive = useRef(true);
   const loopRef = useRef<() => void>(() => {});
-  const date = dates[0];
+  const guardKey = guarded.join(",");
+  const protect = guarded.length > 0;
 
-  const setSpoiler = useCallback(
-    (next: SpoilerMap) => {
-      spoilerRef.current = next;
-      setSpoilerState(next);
-      saveSpoiler(date, next);
-      loopRef.current();
-    },
-    [date],
-  );
+  const merge = useCallback(() => {
+    const next: SpoilerMap = Object.assign({}, ...guarded.map((d) => byDayRef.current[d] ?? {}));
+    spoilerRef.current = next;
+    setSpoilerState(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [guardKey]);
+
+  // A day not guarded here keeps its choice under the page's first guarded
+  // day rather than dropping it.
+  const home = (day: string) => (guarded.includes(day) ? day : (guarded[0] ?? day));
 
   const tick = useCallback(async (): Promise<number | null> => {
     if (busy.current) return LIVE_POLL_MS;
@@ -167,7 +177,7 @@ export default function LiveProvider({
       if (!alive.current) return null;
       const games: Record<string, LiveGame> = {};
       let flipped = false;
-      let promoted: SpoilerMap | null = null;
+      const promoted: string[] = [];
       for (const lg of body.games) {
         games[lg.game.id] = lg;
         const was = statesRef.current[lg.game.id];
@@ -175,9 +185,7 @@ export default function LiveProvider({
         // game only when veiled (state is kept); a synced copy's is the moment's.
         if (!lg.moment && was !== undefined && was !== lg.game.state) flipped = true;
         if (!lg.moment) statesRef.current[lg.game.id] = lg.game.state;
-        if (lg.moment?.final && spoilerRef.current[lg.game.id]?.mode === "synced") {
-          promoted = { ...(promoted ?? spoilerRef.current), [lg.game.id]: { mode: "revealed" } };
-        }
+        if (lg.moment?.final && spoilerRef.current[lg.game.id]?.mode === "synced") promoted.push(lg.game.id);
       }
       setState({
         games,
@@ -187,11 +195,16 @@ export default function LiveProvider({
         fetchedAt: body.fetchedAt,
         error: body.error ?? null,
       });
-      if (promoted) {
-        spoilerRef.current = promoted;
-        setSpoilerState(promoted);
-        saveSpoiler(date, promoted);
+      for (const d of guarded) {
+        const map = byDayRef.current[d] ?? {};
+        const here = promoted.filter((id) => map[id]?.mode === "synced");
+        if (here.length === 0) continue;
+        const next = { ...map };
+        for (const id of here) next[id] = { mode: "revealed" };
+        byDayRef.current = { ...byDayRef.current, [d]: next };
+        saveSpoiler(d, next);
       }
+      if (promoted.length) merge();
       if (flipped) router.refresh();
       const anyLive = body.games.some((g) => g.game.state === "in" || (g.moment && !g.moment.final));
       const anyPending = body.games.some((g) => g.game.state === "pre" && !g.game.postponed);
@@ -203,15 +216,14 @@ export default function LiveProvider({
       busy.current = false;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dates.join(","), gameId, protect, plays, router, date]);
+  }, [dates.join(","), gameId, guardKey, plays, router, merge]);
 
   useEffect(() => {
     alive.current = true;
-    if (protect) {
-      const stored = loadSpoiler(date);
-      spoilerRef.current = stored;
-      setSpoilerState(stored);
-    }
+    const stored: Record<string, SpoilerMap> = {};
+    for (const d of guarded) stored[d] = loadSpoiler(d);
+    byDayRef.current = stored;
+    merge();
     const clear = () => {
       if (timer.current) clearTimeout(timer.current);
       timer.current = null;
@@ -235,20 +247,29 @@ export default function LiveProvider({
       clear();
       document.removeEventListener("visibilitychange", onVis);
     };
-  }, [tick, protect, date]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tick, guardKey, merge]);
+
+  /** Store one choice with its day, show the merge, tick at once. */
+  const choose = (id: string, day: string, entry: SpoilerMap[string] | null) => {
+    const d = home(day);
+    const next = { ...(byDayRef.current[d] ?? {}) };
+    if (entry) next[id] = entry;
+    else delete next[id];
+    byDayRef.current = { ...byDayRef.current, [d]: next };
+    saveSpoiler(d, next);
+    merge();
+    loopRef.current();
+  };
 
   const api: SpoilerApi = {
     protect,
     spoiler,
-    reveal: (id) => setSpoiler({ ...spoilerRef.current, [id]: { mode: "revealed" } }),
-    syncTo: (id, offsetMs) => setSpoiler({ ...spoilerRef.current, [id]: { mode: "synced", offsetMs } }),
-    unsync: (id) => {
-      const next = { ...spoilerRef.current };
-      delete next[id];
-      setSpoiler(next);
-    },
-    resolve: async (id, period, clockSec) => {
-      const qs = new URLSearchParams({ date, game: id, at: `${period}:${clockSec}`, protect: "1" });
+    reveal: (id, day) => choose(id, day, { mode: "revealed" }),
+    syncTo: (id, offsetMs, day) => choose(id, day, { mode: "synced", offsetMs }),
+    unsync: (id, day) => choose(id, day, null),
+    resolve: async (id, period, clockSec, day) => {
+      const qs = new URLSearchParams({ date: day, game: id, at: `${period}:${clockSec}`, protect: "1" });
       const res = await fetch(`/api/hoops/scores/live?${qs}`, { cache: "no-store" });
       if (!res.ok) throw new Error(`live ${res.status}`);
       const body = (await res.json()) as LiveResponse;

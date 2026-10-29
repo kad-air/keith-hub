@@ -219,9 +219,10 @@ export function getLiveGame(game: Game): Promise<Fetched<CoreLive>> {
 }
 
 /** Spoiler mode, as the client states it on each tick (lib/hoops/scores/
- *  spoiler.ts). `protect` is on for TODAY's page: every started game not
- *  named in `reveal` and not in `sync` is veiled server-side, so no score for
- *  it ever reaches the wire; a synced game ships only its moment. */
+ *  spoiler.ts). `protect` is on for a guarded day (today, and yesterday
+ *  until 3 AM — dates.ts isGuardedDate): every started game not named in
+ *  `reveal` and not in `sync` is veiled server-side, so no score for it ever
+ *  reaches the wire; a synced game ships only its moment. */
 export interface SpoilerRequest {
   protect: boolean;
   reveal: ReadonlySet<string>;

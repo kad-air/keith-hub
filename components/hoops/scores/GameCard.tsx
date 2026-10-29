@@ -20,7 +20,8 @@ import type { Game, LiveGame, TeamLine } from "@/lib/hoops/scores/types";
  * (clock, totals, state — see lib/hoops/scores/live.ts); a live game also
  * prints its last play. Without a provider it is just the server's card.
  *
- * Spoiler mode (`protect`, today's page — lib/hoops/scores/spoiler.ts): a
+ * Spoiler mode (`protect`: today's games, and last night's until 3 AM —
+ * lib/hoops/scores/spoiler.ts, dates.ts isGuardedDate): a
  * started game is VEILED until the viewer says otherwise — teams, clock and
  * quarter only, no scores, quarters, records or last play. Hold the card
  * (the feed's Clear-Above gesture, same bar) to reveal it; tap it and the
@@ -61,7 +62,7 @@ export default function GameCard({
         : "veiled";
 
   const game = live?.game ?? initial;
-  const hold = useLongPress(() => sp.reveal(initial.id), mode === "veiled");
+  const hold = useLongPress(() => sp.reveal(initial.id, date), mode === "veiled");
 
   if (mode === "open") {
     return (

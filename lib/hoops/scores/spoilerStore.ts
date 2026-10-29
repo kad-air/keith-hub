@@ -2,13 +2,15 @@
 // synced (components/hoops/scores/LiveProvider.tsx reads and writes it).
 // localStorage, keyed by date, so a reveal survives a reload and yesterday's
 // choices never leak into today. On save every key older than the day before
-// is pruned: yesterday's is kept so a game still synced from last night stays
-// on today's page past noon (keepLastNight below).
+// the saved date is pruned: yesterday's is kept so last night's games keep
+// their veil or sync until 3 AM (dates.ts isGuardedDate) and a game still
+// synced from last night stays on today's page past noon (keepLastNight
+// below); saving yesterday's map never touches today's.
 // Every access is wrapped: storage can be absent, full or blocked (private
 // mode, cleared site data), and the page must simply behave as if nothing
 // had been revealed.
 
-import { addDays } from "./dates.ts";
+import { addDays, isIsoDate } from "./dates.ts";
 import type { SpoilerEntry } from "./types.ts";
 
 const PREFIX = "hoops-spoiler:";
@@ -49,11 +51,12 @@ export function saveSpoiler(date: string, map: SpoilerMap): void {
   }
 }
 
-/** A stored key saving `date` drops: any other date's except the day before. */
+/** A stored key saving `date` drops: any date's older than the day before
+ *  (a later date's — today's, when last night's map is saved — stays). */
 export function staleSpoilerKey(key: string, date: string): boolean {
   if (!key.startsWith(PREFIX)) return false;
   const d = key.slice(PREFIX.length);
-  return d !== date && d !== addDays(date, -1);
+  return !isIsoDate(d) || d < addDays(date, -1);
 }
 
 /** Which of last night's games today's page still lists. Before the noon

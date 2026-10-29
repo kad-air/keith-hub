@@ -110,3 +110,22 @@ export const LAST_NIGHT_UNTIL_HOUR = 12;
 export function lastNightUntil(today: string, tz: string = SCORES_TZ): number {
   return wallClockAt(today, LAST_NIGHT_UNTIL_HOUR, tz);
 }
+
+/** Spoiler mode outlives its day by a few hours: a game the viewer left
+ *  veiled or synced stays that way past midnight, until 3 AM Mountain on the
+ *  next day, and then the scores just show (owner, 2026-10-28). */
+export const SPOILER_UNTIL_HOUR = 3;
+
+/** The instant `today`'s page stops guarding last night's games. */
+export function spoilerUntil(today: string, tz: string = SCORES_TZ): number {
+  return wallClockAt(today, SPOILER_UNTIL_HOUR, tz);
+}
+
+/** Whether `date`'s started games are under spoiler mode at `now`: today's
+ *  always, yesterday's until 3 AM. The one rule the pages and the live
+ *  endpoint share, so the server never ships what the page would veil. */
+export function isGuardedDate(date: string, now: Date, tz: string = SCORES_TZ): boolean {
+  const today = todayIn(now, tz);
+  if (date === today) return true;
+  return date === addDays(today, -1) && now.getTime() < spoilerUntil(today, tz);
+}
