@@ -11,6 +11,7 @@ import {
   teamName,
 } from "@/lib/hoops/rating";
 import type { FormSummary, HoopsMeta, NightlyMeta } from "@/lib/hoops/queries";
+import { pendingNote } from "@/lib/hoops/schedule";
 import type { RatingMode, TeamRow } from "@/lib/hoops/types";
 
 interface Props {
@@ -259,8 +260,19 @@ export default function TeamsClient({
         <dt>Rows</dt>
         <dd className="text-right text-cream-dim">
           {meta.teams} teams · {meta.players} players · {meta.scheduledGames} games
+          {!meta.schedule.complete && " scheduled"}
         </dd>
       </dl>
+      {/* PARTIAL SCHEDULE: the league draws the NBA Cup knockout week from the
+          group results, so the stored slate can be short. Worded from the
+          stored count and dates (lib/hoops/schedule.ts's pendingNote), never
+          hardcoded — the sender's own `why` follows it verbatim. */}
+      {pendingNote(meta.schedule) && (
+        <p className="mt-2 font-mono text-[0.65rem] text-cream-dimmer">
+          Schedule: {pendingNote(meta.schedule)}
+          {meta.schedule.pendingWindow?.why ? ` — ${meta.schedule.pendingWindow.why}` : ""}.
+        </p>
+      )}
     </>
   );
 }
