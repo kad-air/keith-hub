@@ -17,7 +17,16 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { FRANCHISES } from "../lib/hoops/nba-franchises.ts";
-import { addDays, isIsoDate, longDate, tipTime, todayIn } from "../lib/hoops/scores/dates.ts";
+import {
+  addDays,
+  isIsoDate,
+  lastNightUntil,
+  longDate,
+  tipTime,
+  todayIn,
+  wallClockAt,
+} from "../lib/hoops/scores/dates.ts";
+import { keepLastNight, staleSpoilerKey } from "../lib/hoops/scores/spoilerStore.ts";
 import { periodLabels, statusLabel } from "../lib/hoops/scores/format.ts";
 import { findNotable, NOTABLE, notableReasons } from "../lib/hoops/scores/notable.ts";
 import {
@@ -269,6 +278,38 @@ check(tipTime("2026-10-23T01:00:00Z") === "7:00 PM", "MDT tip");
 check(addDays("2026-12-31", 1) === "2027-01-01" && addDays("2026-03-01", -1) === "2026-02-28", "addDays");
 check(isIsoDate("2026-10-21") && !isIsoDate("2026-02-30") && !isIsoDate("20261021") && !isIsoDate("x"), "isIsoDate");
 check(longDate("2026-10-21") === "Wednesday, October 21, 2026", `longDate, got ${longDate("2026-10-21")}`);
+
+// Last night lets go of today's page at noon MOUNTAIN, whatever the server's
+// zone: 18:00Z under MDT, 19:00Z under MST, and right on both DST Sundays.
+const noonZ = (d: string) => new Date(lastNightUntil(d)).toISOString();
+check(noonZ("2026-10-29") === "2026-10-29T18:00:00.000Z", `noon MDT, got ${noonZ("2026-10-29")}`);
+check(noonZ("2026-12-15") === "2026-12-15T19:00:00.000Z", `noon MST, got ${noonZ("2026-12-15")}`);
+check(noonZ("2026-11-01") === "2026-11-01T19:00:00.000Z", `noon on the day DST ends, got ${noonZ("2026-11-01")}`);
+check(noonZ("2027-03-14") === "2027-03-14T18:00:00.000Z", `noon on the day DST starts, got ${noonZ("2027-03-14")}`);
+check(todayIn(new Date(lastNightUntil("2026-10-29"))) === "2026-10-29", "the cutoff falls on the page's own day");
+check(
+  new Date(wallClockAt("2026-10-29", 0)).toISOString() === "2026-10-29T06:00:00.000Z",
+  "wallClockAt: Mountain midnight",
+);
+check(
+  new Date(wallClockAt("2026-10-29", 12, "America/New_York")).toISOString() === "2026-10-29T16:00:00.000Z",
+  "wallClockAt honours the zone it is given",
+);
+
+// Past noon only a game still synced from last night stays; a revealed one
+// (or one watched to the final, which promotes to revealed) and an untouched
+// one go. Before noon everything stays.
+const ln = ["1", "2", "3"];
+const lnSpoiler = { "1": { mode: "synced" as const, offsetMs: 60_000 }, "2": { mode: "revealed" as const } };
+check(keepLastNight(ln, lnSpoiler, false).join() === "1,2,3", "before noon all of last night stays");
+check(keepLastNight(ln, lnSpoiler, true).join() === "1", "after noon only the synced game stays");
+check(keepLastNight(ln, {}, true).length === 0, "after noon with nothing synced, last night is gone");
+// Saving today keeps yesterday's choices (the synced games above) and prunes
+// anything older, plus never touches another app's keys.
+check(!staleSpoilerKey("hoops-spoiler:2026-10-29", "2026-10-29"), "today's spoiler key is kept");
+check(!staleSpoilerKey("hoops-spoiler:2026-10-28", "2026-10-29"), "yesterday's spoiler key is kept");
+check(staleSpoilerKey("hoops-spoiler:2026-10-27", "2026-10-29"), "the day before yesterday's key is pruned");
+check(!staleSpoilerKey("feed-outbox", "2026-10-29"), "keys outside the spoiler store are left alone");
 
 // ── 7. cache policy ──────────────────────────────────────────────────────
 const today = "2026-10-22";

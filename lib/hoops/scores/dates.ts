@@ -76,3 +76,37 @@ export function shortDate(iso: string): string {
     day: "numeric",
   }).format(new Date(Date.UTC(y, m - 1, d, 12)));
 }
+
+/** The epoch ms at which the wall clock in `tz` reads `hour`:00 on `iso`.
+ *  Found by correcting a UTC guess by the zone's offset at that guess, twice
+ *  so a DST change between the guess and the answer settles. */
+export function wallClockAt(iso: string, hour: number, tz: string = SCORES_TZ): number {
+  const [y, m, d] = iso.split("-").map(Number);
+  const want = Date.UTC(y, m - 1, d, hour);
+  const fmt = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz,
+    hourCycle: "h23",
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+    hour: "numeric",
+    minute: "numeric",
+  });
+  const wall = (t: number): number => {
+    const p: Record<string, number> = {};
+    for (const part of fmt.formatToParts(new Date(t))) p[part.type] = Number(part.value);
+    return Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute);
+  };
+  let t = want;
+  for (let i = 0; i < 2; i++) t += want - wall(t);
+  return t;
+}
+
+/** Today's page carries last night's games until noon Mountain, then lets
+ *  them go (a game the viewer is still synced to stays — spoilerStore.ts). */
+export const LAST_NIGHT_UNTIL_HOUR = 12;
+
+/** The instant `today`'s page stops showing last night's games. */
+export function lastNightUntil(today: string, tz: string = SCORES_TZ): number {
+  return wallClockAt(today, LAST_NIGHT_UNTIL_HOUR, tz);
+}
