@@ -43,6 +43,26 @@ const nextConfig = {
     NEXT_PUBLIC_GIT_LAST_MERGE_TS: GIT_LAST_MERGE_TS,
     NEXT_PUBLIC_VAPID_PUBLIC_KEY: process.env.VAPID_PUBLIC_KEY || "",
   },
+  // Hoops split into two areas (2026-10-29): the real games under
+  // /hoops/scores and the hoops-sim studio under /hoops/sim. The sim pages
+  // and the standings used to sit directly under /hoops, so their old URLs
+  // (bookmarks, shared sim runs, links the Mac Mini prints) redirect here.
+  // Query strings ride along. Temporary (307), so a later move can't be
+  // pinned by a browser's redirect cache.
+  async redirects() {
+    const moved = [
+      ["/hoops/matchup", "/hoops/sim/matchup"],
+      ["/hoops/teams", "/hoops/sim/teams"],
+      ["/hoops/players", "/hoops/sim/players"],
+      ["/hoops/game", "/hoops/sim/game"],
+      ["/hoops/projections", "/hoops/sim/projections"],
+      ["/hoops/standings", "/hoops/scores/standings"],
+    ];
+    return moved.flatMap(([from, to]) => [
+      { source: from, destination: to, permanent: false },
+      { source: `${from}/:path*`, destination: `${to}/:path*`, permanent: false },
+    ]);
+  },
   webpack: (config, { isServer }) => {
     if (!isServer) {
       // Don't bundle server-only modules on client

@@ -117,21 +117,29 @@ export const SECTION_SHORTCUTS: Record<string, ShortcutGroup[]> = {
       ],
     },
   ],
-  hoops: [
+  "hoops-scores": [
     {
-      section: "Hoops",
+      section: "Scores",
       rows: [
         { keys: ["1"], label: "Scores" },
         { keys: ["2"], label: "Standings" },
-        { keys: ["3"], label: "Projections" },
-        { keys: ["4"], label: "Matchup" },
-        { keys: ["5"], label: "Teams" },
-        { keys: ["6"], label: "Players" },
+        { keys: ["3"], label: "Teams" },
+        { keys: ["p"], label: "Previous day (scores)" },
+        { keys: ["n"], label: "Next day (scores)" },
+      ],
+    },
+  ],
+  "hoops-sim": [
+    {
+      section: "Sim",
+      rows: [
+        { keys: ["1"], label: "Projections" },
+        { keys: ["2"], label: "Matchup" },
+        { keys: ["3"], label: "Teams" },
+        { keys: ["4"], label: "Players" },
         { keys: ["s"], label: "Sim (matchup)" },
         { keys: ["x"], label: "Swap home and away (matchup)" },
         { keys: ["r"], label: "Surprise me (matchup)" },
-        { keys: ["p"], label: "Previous day (scores)" },
-        { keys: ["n"], label: "Next day (scores)" },
       ],
     },
   ],

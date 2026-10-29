@@ -35,7 +35,7 @@ export default function HoopsTeamsPage({
 
   return (
     <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6">
-      <HoopsNav active="teams" through={getResultsWindow()?.to ?? null} />
+      <HoopsNav area="sim" active="teams" through={getResultsWindow()?.to ?? null} />
       <Suspense>
         <TeamsClient
           rows={rows.map((r) => ({ ...r, nightly_movers_json: null }))}

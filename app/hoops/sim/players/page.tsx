@@ -29,7 +29,7 @@ export default function HoopsPlayersPage({
 
   return (
     <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6">
-      <HoopsNav active="players" through={getResultsWindow()?.to ?? null} />
+      <HoopsNav area="sim" active="players" through={getResultsWindow()?.to ?? null} />
       <Suspense>
         <PlayersClient
           rows={rows}

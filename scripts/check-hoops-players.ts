@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 //
 // The player-rankings gate. Runs as `prebuild`, so `npm run build` is also the
-// gate for /hoops/players.
+// gate for /hoops/sim/players.
 //
 //   npm run check:hoops:players   (standalone)
 //   npm run build                 (runs this first via prebuild)
@@ -24,7 +24,7 @@
 //      about the NBA, external to the bundle entirely.
 //
 //   3. THE SPLIT SURVIVES THE TRIP INTO SQLITE. This is the specific bug
-//      /hoops/players exists downstream of: the exporter had been shipping
+//      /hoops/sim/players exists downstream of: the exporter had been shipping
 //      value_off_per36/value_def_per36 all along and the importer dropped
 //      both on the floor, so the read model simply did not have them. The
 //      check drives the REAL projection (playerRowsFromBundle) and the REAL
@@ -136,7 +136,7 @@ function checkSplitIdentity(rows: ReturnType<typeof playerRowsFromBundle>): void
   check(
     split.length > 0,
     "hoops_players.json: not one player carries value_off_per36/value_def_per36 — " +
-      "/hoops/players has nothing to render. Re-export from hoops-sim.",
+      "/hoops/sim/players has nothing to render. Re-export from hoops-sim.",
   );
   if (split.length === 0) return;
 
@@ -290,7 +290,7 @@ async function checkReadModelRoundTrip(
     check(
       cols.includes(c),
       `lib/hoops/import.ts: the hoops_players INSERT does not write ${c} — that field ` +
-        `would be dropped on import, the exact bug /hoops/players fixed for the off/def split.`,
+        `would be dropped on import, the exact bug /hoops/sim/players fixed for the off/def split.`,
     );
   }
 
@@ -443,7 +443,7 @@ function checkRanking(rows: ReturnType<typeof playerRowsFromBundle>): void {
   const floor = paramsConstants?.absorption_rotation_floor_minutes ?? null;
   check(
     floor != null,
-    "hoops_params.json: no absorption_rotation_floor_minutes constant — /hoops/players cannot " +
+    "hoops_params.json: no absorption_rotation_floor_minutes constant — /hoops/sim/players cannot " +
       "offer its rotation lens, and would have to invent a threshold instead.",
   );
 

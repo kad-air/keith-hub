@@ -19,7 +19,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Hoops · Matchup — hub" };
 
 /**
- * The core verb: pick two teams, tap Sim. Lives at /hoops/matchup since
+ * The core verb: pick two teams, tap Sim. Lives at /hoops/sim/matchup since
  * Scores became the section landing (/hoops redirects there).
  *
  * Deliberately does NOT simulate on load. A sim is ~600ms of CPU and the
@@ -34,7 +34,7 @@ export default function HoopsMatchupPage({
 }) {
   const rows = getTeamRows();
   const meta = getHoopsMeta();
-  // Same lenses, same default, as /hoops/teams — the matchup used to offer
+  // Same lenses, same default, as /hoops/sim/teams — the matchup used to offer
   // three lenses and default to the blend while the teams page offered four
   // and defaulted to the nightly read the sim actually prices with.
   const modes = availableRatingModes(rows);
@@ -56,7 +56,7 @@ export default function HoopsMatchupPage({
 
   return (
     <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6">
-      <HoopsNav active="matchup" through={getResultsWindow()?.to ?? null} />
+      <HoopsNav area="sim" active="matchup" through={getResultsWindow()?.to ?? null} />
       <Suspense>
         <MatchupClient
           teams={rows.map((r) => ({ ...r, nightly_movers_json: null }))}

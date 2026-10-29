@@ -262,7 +262,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     .get() as { content_hash: string; generated_at: string } | undefined;
 
   // Rule 6's no-op has ONE exception, mirroring lib/hoops/import.ts's seed-path
-  // `splitSettled` guard (added with /hoops/players): if the stored read model
+  // `splitSettled` guard (added with /hoops/sim/players): if the stored read model
   // predates the off/def split columns (every value NULL) but this bundle
   // carries them, an unchanged content hash must NOT freeze the columns NULL
   // forever -- fall through to the real write exactly once. Found live

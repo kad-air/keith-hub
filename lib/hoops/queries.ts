@@ -270,7 +270,7 @@ export function getExplainModel(): ExplainModel | null {
 }
 
 /**
- * Every rostered player in the league, for /hoops/players.
+ * Every rostered player in the league, for /hoops/sim/players.
  *
  * Deliberately unordered-by-value: the ranking is done by the pure
  * lib/hoops/playervalue.ts so the client can re-sort net/off/def without a
@@ -559,7 +559,7 @@ export interface HoopsMeta {
    * that project stops treating a player as a rotation piece. Read by name off
    * the blob's constants block, never hardcoded (lib/hoops/pricing.ts's rule),
    * and null if a bundle somehow doesn't carry it — in which case
-   * /hoops/players simply doesn't offer the rotation lens rather than inventing
+   * /hoops/sim/players simply doesn't offer the rotation lens rather than inventing
    * a threshold of its own.
    */
   rotationFloorMinutes: number | null;

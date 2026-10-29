@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { PlayerBoxLine, TeamBoxScore, TeamTotals } from "@/lib/hoops/scores/types";
 
 /**
@@ -60,8 +61,18 @@ export default function RealBoxTable({ team, held = false }: { team: TeamBoxScor
       className={`border-b border-rule/40 ${i === firstBench && i > 0 ? "border-t border-t-rule" : ""}`}
     >
       <td className="sticky left-0 whitespace-nowrap bg-ink py-1.5 pr-3 text-left font-display text-sm text-cream">
-        <span className="sm:hidden">{shortName(p.name)}</span>
-        <span className="max-sm:hidden">{p.name}</span>
+        {/* The real player page (bio, game log) — same upstream, same guard. */}
+        {p.id ? (
+          <Link href={`/hoops/scores/players/${p.id}`} className="hover:text-cat-hoops">
+            <span className="sm:hidden">{shortName(p.name)}</span>
+            <span className="max-sm:hidden">{p.name}</span>
+          </Link>
+        ) : (
+          <>
+            <span className="sm:hidden">{shortName(p.name)}</span>
+            <span className="max-sm:hidden">{p.name}</span>
+          </>
+        )}
         {p.starter && <span className="ml-1 font-mono text-[0.55rem] text-cream-dimmer">S</span>}
         {p.ejected && <span className="ml-1 font-mono text-[0.55rem] text-cat-hoops">EJ</span>}
       </td>
@@ -79,7 +90,9 @@ export default function RealBoxTable({ team, held = false }: { team: TeamBoxScor
   return (
     <section className="mt-6">
       <h3 className="font-display text-lg text-cream">
-        <span className="font-mono text-[0.72rem] text-cat-hoops">{team.tri}</span> {team.name}
+        <Link href={`/hoops/scores/teams/${team.tri.toLowerCase()}`} className="hover:text-cat-hoops">
+          <span className="font-mono text-[0.72rem] text-cat-hoops">{team.tri}</span> {team.name}
+        </Link>
       </h3>
       <div className="mt-2 overflow-x-auto">
         <table className="w-full whitespace-nowrap font-mono tabular-nums">

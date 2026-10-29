@@ -1,4 +1,4 @@
-// Shapes for the REAL scores section (/hoops/scores, /hoops/standings).
+// Shapes for the REAL scores section (/hoops/scores, /hoops/scores/standings).
 //
 // 🔴 Deliberately separate from everything else in lib/hoops/: these come
 // from a live upstream (ESPN's public JSON), not from the hoops-sim bundle,
@@ -300,3 +300,105 @@ export type SyncResolution =
 
 /** The per-device choice for one protected game (localStorage). */
 export type SpoilerEntry = { mode: "revealed" } | { mode: "synced"; offsetMs: number };
+
+// ── Teams, players, schedules (/hoops/scores/teams, /hoops/scores/players) ──
+//
+// Off the same upstream as the scores pages (ESPN's site API: a team's
+// roster and schedule, an athlete and their game log). Results in these are
+// guarded exactly like the scores pages' — see lib/hoops/scores/guard.ts.
+
+export interface RosterInjury {
+  /** "Out", "Day-To-Day" — the source's own word. */
+  status: string;
+  /** When the source last stamped it, ISO UTC; null when not given. */
+  dateUtc: string | null;
+}
+
+export interface RosterPlayer {
+  id: string;
+  name: string;
+  jersey: string | null;
+  /** "G", "F", "C" — the source's abbreviation. */
+  pos: string | null;
+  height: string | null;
+  weight: string | null;
+  age: number | null;
+  /** Seasons in the league before this one (0 = rookie). */
+  experience: number | null;
+  college: string | null;
+  injury: RosterInjury | null;
+}
+
+export interface Roster {
+  tri: string;
+  espnId: string;
+  /** "2026-27". */
+  season: string | null;
+  players: RosterPlayer[];
+  coach: string | null;
+}
+
+/** A team's games for one season type, each a scoreboard-shaped Game (so the
+ *  game page's URL, the veil and the status line all apply unchanged). */
+export interface TeamSchedule {
+  tri: string;
+  espnId: string;
+  season: string | null;
+  games: Game[];
+}
+
+export interface PlayerBio {
+  id: string;
+  name: string;
+  /** "15". */
+  jersey: string | null;
+  /** "C". */
+  pos: string | null;
+  /** "Center". */
+  posName: string | null;
+  team: { tri: string; espnId: string; name: string } | null;
+  height: string | null;
+  weight: string | null;
+  age: number | null;
+  /** "12th Season". */
+  experience: string | null;
+  /** "2014: Rd 2, Pk 41 (DEN)". */
+  draft: string | null;
+  birthPlace: string | null;
+  active: boolean;
+}
+
+export interface PlayerGameLine {
+  gameId: string;
+  startUtc: string;
+  /** The Mountain date the game is listed under (the scores URL's date). */
+  date: string;
+  seasonKind: SeasonKind;
+  /** The player's team for this game (they may have been traded since). */
+  tri: string;
+  home: boolean;
+  opp: string;
+  /** "W" / "L" from the player's side; null when the source has none. */
+  result: "W" | "L" | null;
+  teamScore: number | null;
+  oppScore: number | null;
+  min: number;
+  pts: number;
+  reb: number;
+  ast: number;
+  stl: number;
+  blk: number;
+  to: number;
+  pf: number;
+  fgm: number;
+  fga: number;
+  tpm: number;
+  tpa: number;
+  ftm: number;
+  fta: number;
+}
+
+export interface PlayerLog {
+  /** Newest first, every season type the source returns for the season. */
+  games: PlayerGameLine[];
+}

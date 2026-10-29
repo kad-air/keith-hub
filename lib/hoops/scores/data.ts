@@ -32,6 +32,7 @@ import {
 } from "./live.ts";
 import { findNotable } from "./notable.ts";
 import { parseScoreboard, parseStandings, parseSummary } from "./parse.ts";
+import { ESPN_TEAM_IDS, mergeSchedules, parseAthlete, parseGamelog, parseRoster, parseTeamSchedule } from "./teams.ts";
 import { boxPolicy, scoreboardPolicy } from "./policy.ts";
 import { boxFromPlays } from "./boxAt.ts";
 import { gameAtMoment, momentAt, offsetForMoment, playsAt, veilGame, wirePlay } from "./spoiler.ts";
@@ -45,8 +46,12 @@ import type {
   NotableLine,
   Scoreboard,
   SourceMeta,
+  PlayerBio,
+  PlayerLog,
+  Roster,
   Standings,
   SyncResolution,
+  TeamSchedule,
   WirePlay,
 } from "./types.ts";
 
@@ -55,11 +60,18 @@ import type {
 const CACHE_VERSION = 3; // 2: GameBox gained `plays` (spoiler mode); 3: Play gained `pointsAttempted`
 
 const BASE = "https://site.api.espn.com/apis";
+// The athlete pages live on ESPN's "web" API host, same shape conventions.
+const WEB_BASE = "https://site.web.api.espn.com/apis";
 const URLS = {
   scoreboard: (date: string) =>
     `${BASE}/site/v2/sports/basketball/nba/scoreboard?dates=${espnDate(date)}`,
   summary: (id: string) => `${BASE}/site/v2/sports/basketball/nba/summary?event=${encodeURIComponent(id)}`,
   standings: () => `${BASE}/v2/sports/basketball/nba/standings`,
+  roster: (teamId: string) => `${BASE}/site/v2/sports/basketball/nba/teams/${teamId}/roster`,
+  schedule: (teamId: string, seasonType: number) =>
+    `${BASE}/site/v2/sports/basketball/nba/teams/${teamId}/schedule?seasontype=${seasonType}`,
+  athlete: (id: string) => `${WEB_BASE}/common/v3/sports/basketball/nba/athletes/${encodeURIComponent(id)}`,
+  gamelog: (id: string) => `${WEB_BASE}/common/v3/sports/basketball/nba/athletes/${encodeURIComponent(id)}/gamelog`,
 };
 
 const SEC = 1000;
@@ -183,6 +195,79 @@ export function getStandings(): Promise<Fetched<Standings>> {
     "standings",
     async () => parseStandings(await getJson(URLS.standings())),
     () => ({ ttlMs: 5 * MIN, final: false }),
+  );
+}
+
+// ── Teams, players, schedules ──────────────────────────────────────────────
+// TTLs: a roster or a bio changes a few times a season (trades, injuries) —
+// 30 min; a schedule with a game in progress 30s, with a game today 2 min,
+// else 30 min; a game log 2 min while the player's team has a game today,
+// else 15 min. None is ever final: a season keeps moving.
+
+/** ESPN season types: 1 preseason, 2 regular season, 3 postseason. */
+export const SEASON_TYPES = [1, 2, 3] as const;
+
+export function getRoster(tri: string): Promise<Fetched<Roster>> {
+  const id = ESPN_TEAM_IDS[tri];
+  return cached(
+    `roster:${tri}`,
+    async () => parseRoster(await getJson(URLS.roster(id)), tri),
+    () => ({ ttlMs: 30 * MIN, final: false }),
+  );
+}
+
+export function getTeamSchedule(tri: string, seasonType: number, now = new Date()): Promise<Fetched<TeamSchedule>> {
+  const id = ESPN_TEAM_IDS[tri];
+  const today = todayIn(now);
+  return cached(
+    `schedule:${tri}:${seasonType}`,
+    async () => parseTeamSchedule(await getJson(URLS.schedule(id, seasonType)), tri),
+    (s) => ({
+      ttlMs: s.games.some((g) => g.state === "in")
+        ? 30 * SEC
+        : s.games.some((g) => todayIn(new Date(g.startUtc)) === today)
+          ? 2 * MIN
+          : 30 * MIN,
+      final: false,
+    }),
+    now.getTime(),
+  );
+}
+
+/**
+ * A team's whole season so far, every type the source has: preseason and
+ * regular season always, the postseason once the regular season's last game
+ * is behind us (before then the source has nothing to give and may error).
+ * Games come back unveiled — the page runs them through guard.ts.
+ */
+export async function getTeamGames(
+  tri: string,
+  now = new Date(),
+): Promise<{ games: Game[]; season: string | null; fetched: Fetched<TeamSchedule>[] }> {
+  const [pre, reg] = await Promise.all([getTeamSchedule(tri, 1, now), getTeamSchedule(tri, 2, now)]);
+  const fetched = [pre, reg];
+  const regular = reg.data?.games ?? [];
+  const lastRegular = regular.reduce((m, g) => (g.startUtc > m ? g.startUtc : m), "");
+  if (lastRegular && todayIn(new Date(lastRegular)) < todayIn(now)) {
+    fetched.push(await getTeamSchedule(tri, 3, now));
+  }
+  const parts = fetched.map((f) => f.data).filter((d): d is TeamSchedule => d !== null);
+  return { games: mergeSchedules(parts), season: reg.data?.season ?? pre.data?.season ?? null, fetched };
+}
+
+export function getAthlete(id: string): Promise<Fetched<PlayerBio>> {
+  return cached(
+    `athlete:${id}`,
+    async () => parseAthlete(await getJson(URLS.athlete(id))),
+    () => ({ ttlMs: 30 * MIN, final: false }),
+  );
+}
+
+export function getGamelog(id: string, busyToday = false): Promise<Fetched<PlayerLog>> {
+  return cached(
+    `gamelog:${id}`,
+    async () => parseGamelog(await getJson(URLS.gamelog(id))),
+    () => ({ ttlMs: busyToday ? 2 * MIN : 15 * MIN, final: false }),
   );
 }
 

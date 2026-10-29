@@ -102,7 +102,7 @@ export default function PlayersClient({ rows, tris, meta, initialSort, initialTe
         if (next.team) params.set("team", next.team);
         else params.delete("team");
       }
-      router.replace(`/hoops/players?${params.toString()}`, { scroll: false });
+      router.replace(`/hoops/sim/players?${params.toString()}`, { scroll: false });
     },
     [router, searchParams],
   );
@@ -159,7 +159,7 @@ export default function PlayersClient({ rows, tris, meta, initialSort, initialTe
         </p>
       )}
       {/* Where the number comes from, folded under a visible summary line —
-          the same shape /hoops/teams uses for "How this rating is built".
+          the same shape /hoops/sim/teams uses for "How this rating is built".
           Three explanatory blocks before rank 1 was most of a phone screen.
           The summary still carries the two facts that date and qualify every
           row below it: when the model last looked, and how many men it could
@@ -323,7 +323,7 @@ export default function PlayersClient({ rows, tris, meta, initialSort, initialTe
         Tap any row for that player&rsquo;s team. A player&rsquo;s offence and defence <em>add</em>{" "}
         to his net, and a positive defence is{" "}
         <em>good</em> defence — points he stops. That is the opposite of the team ratings on{" "}
-        <Link href="/hoops/teams" className="underline hover:text-cream-dim">
+        <Link href="/hoops/sim/teams" className="underline hover:text-cream-dim">
           Teams
         </Link>
         , where a positive defence means points allowed. Both conventions come straight from
@@ -385,7 +385,7 @@ function PlayerLine({ p, sort }: { p: RankedPlayer; sort: PlayerSort }) {
   return (
     <li>
       <Link
-        href={`/hoops/players/${p.athlete_id}`}
+        href={`/hoops/sim/players/${p.athlete_id}`}
         data-kb-item
         className="block border-b border-rule/40 py-2 transition-colors hover:bg-ink-raised/60"
       >

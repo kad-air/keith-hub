@@ -1,6 +1,6 @@
 import { TRACKER_CONFIGS, TRACKERS_ENABLED } from "@/lib/tracker-config";
 
-export type SectionGroup = "Reading" | "Tracking" | "Library" | "Guitar" | "System";
+export type SectionGroup = "Reading" | "Tracking" | "Library" | "Hoops" | "Guitar" | "System";
 
 export type Section = {
   key: string;
@@ -89,18 +89,33 @@ const COMICS_SECTION: Section = {
   match: (p) => p.startsWith("/comics"),
 };
 
-// The section home is Scores (real games); /hoops redirects there too, and
-// the Matchup screen (milestone 3, #67) lives at /hoops/matchup. `match` covers the whole subtree, so the masthead switcher reads "Hoops" on
-// every hoops route.
-const HOOPS_SECTION: Section = {
-  key: "hoops",
+// Hoops is its own group in Contents (2026-10-29, owner), split into two
+// areas that never share data: Scores — the real NBA, off ESPN
+// (lib/hoops/scores/) — and Sim — the hoops-sim studio (the bundle, the
+// engine). Each area is a section of its own, so the masthead switcher reads
+// "Scores" or "Sim" and `[` / `]` step between them. /hoops itself redirects
+// to Scores (app/hoops/page.tsx); the sim pages' and standings' old URLs
+// redirect into their area (next.config.mjs).
+const HOOPS_SCORES_SECTION: Section = {
+  key: "hoops-scores",
   num: "",
-  name: "Hoops",
+  name: "Scores",
   href: "/hoops/scores",
-  group: "Library",
-  desc: "NBA scores · standings · sim · matchup · teams",
+  group: "Hoops",
+  desc: "Games · box scores · standings · teams · players",
   hotkey: "n",
-  match: (p) => p.startsWith("/hoops"),
+  match: (p) => p === "/hoops" || p.startsWith("/hoops/scores"),
+};
+
+const HOOPS_SIM_SECTION: Section = {
+  key: "hoops-sim",
+  num: "",
+  name: "Sim",
+  href: "/hoops/sim",
+  group: "Hoops",
+  desc: "Projections · matchup · sim teams · sim players",
+  hotkey: "i",
+  match: (p) => p.startsWith("/hoops/sim"),
 };
 
 const PRACTICE_SECTION: Section = {
@@ -163,7 +178,8 @@ export const SECTIONS: Section[] = (() => {
     DISCWORLD_SECTION,
     BOOKS_SECTION,
     COMICS_SECTION,
-    HOOPS_SECTION,
+    HOOPS_SCORES_SECTION,
+    HOOPS_SIM_SECTION,
     PRACTICE_SECTION,
     CHARTS_SECTION,
     TUNE_SECTION,

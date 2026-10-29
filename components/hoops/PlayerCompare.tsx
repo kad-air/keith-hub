@@ -65,12 +65,12 @@ function PlayerColumn({
   return (
     <div className="min-w-0">
       <p className="truncate font-mono text-[0.6rem] uppercase tracking-kicker text-cream-dimmer">
-        <Link href={`/hoops/teams/${r.tri}`} className="hover:underline">
+        <Link href={`/hoops/sim/teams/${r.tri}`} className="hover:underline">
           {r.tri} · {teamName(r.tri)}
         </Link>
       </p>
       <h3 className={`mt-0.5 font-display text-lg leading-tight ${tone}`}>
-        <Link href={`/hoops/players/${r.athlete_id}`} className="hover:underline">
+        <Link href={`/hoops/sim/players/${r.athlete_id}`} className="hover:underline">
           {r.name}
         </Link>
       </h3>

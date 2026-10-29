@@ -274,7 +274,7 @@ if (levels) {
 
 // ── 1b. the side-by-side comparison ───────────────────────────────────────
 //
-// /hoops/players/compare says, in one sentence, who is rated higher and what
+// /hoops/sim/players/compare says, in one sentence, who is rated higher and what
 // the single biggest reason is. Two ways that sentence can lie:
 //
 //   • it names a reason that is not actually the biggest gap between the two

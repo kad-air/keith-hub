@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "check:hoops": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-hoops.ts",
-    "prebuild": "npm run check:hoops && npm run check:hoops:fixture && npm run check:hoops:pricing-fixture && npm run check:hoops:multinomial && npm run check:hoops:boxscore && npm run check:hoops:players && npm run check:books:bytes && npm run check:books:opds && npm run check:books:kosync && npm run check:books:metadata && npm run check:books:edit && npm run check:books:stats && npm run check:books:xpointer && npm run check:books:pagetext && npm run check:books:drm && npm run check:books:acsm && npm run check:books:health && npm run check:books:discworld && npm run check:hoops:contract && npm run check:hoops:nightly && npm run check:hoops:explain && npm run check:hoops:matchup && npm run check:hoops:movers && npm run check:feed && npm run check:hoops:scores && npm run check:hoops:projections && npm run check:hoops:partial-schedule",
+    "prebuild": "npm run check:hoops && npm run check:hoops:fixture && npm run check:hoops:pricing-fixture && npm run check:hoops:multinomial && npm run check:hoops:boxscore && npm run check:hoops:players && npm run check:books:bytes && npm run check:books:opds && npm run check:books:kosync && npm run check:books:metadata && npm run check:books:edit && npm run check:books:stats && npm run check:books:xpointer && npm run check:books:pagetext && npm run check:books:drm && npm run check:books:acsm && npm run check:books:health && npm run check:books:discworld && npm run check:hoops:contract && npm run check:hoops:nightly && npm run check:hoops:explain && npm run check:hoops:matchup && npm run check:hoops:movers && npm run check:feed && npm run check:hoops:scores && npm run check:hoops:teams && npm run check:hoops:projections && npm run check:hoops:partial-schedule",
     "check:books:bytes": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-books-bytes.ts",
     "check:books:opds": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-books-opds.ts",
     "check:books:kosync": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-books-kosync.ts",
@@ -34,6 +34,7 @@
     "check:hoops:matchup": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-hoops-matchup.ts",
     "check:hoops:movers": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-hoops-movers.ts",
     "check:hoops:scores": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-hoops-scores.ts",
+    "check:hoops:teams": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-hoops-teams.ts",
     "check:hoops:projections": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/lib/ts-resolve-hooks.mjs scripts/check-hoops-projections.ts",
     "check:hoops:partial-schedule": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/lib/ts-resolve-hooks.mjs scripts/check-hoops-partial-schedule.ts",
     "check:feed": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/lib/ts-resolve-hooks.mjs scripts/check-feed-dedup.ts"

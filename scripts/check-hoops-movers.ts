@@ -531,7 +531,7 @@ const tris = Object.keys(teamsFile.teams).sort();
   );
 
   const page = fs.readFileSync(
-    path.join(ROOT, "app/hoops/teams/[tri]/page.tsx"),
+    path.join(ROOT, "app/hoops/sim/teams/[tri]/page.tsx"),
     "utf-8",
   );
   check(

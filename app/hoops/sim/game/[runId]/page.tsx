@@ -16,7 +16,7 @@ import { runSampledGame, UnknownTeamError } from "@/lib/hoops/run";
 export const dynamic = "force-dynamic";
 
 /**
- * `/hoops/game/new?home=&away=&mode=&neutral=` mints a fresh run_id and
+ * `/hoops/sim/game/new?home=&away=&mode=&neutral=` mints a fresh run_id and
  * redirects to it, so a rendered result ALWAYS sits at a stable, shareable
  * URL. Without this the "sim one night" action would either need a POST (not
  * linkable) or would render at a URL that re-rolls on refresh.
@@ -51,7 +51,7 @@ export default function HoopsGamePage({
       // DIFFERENT game. The id it lands on is then permanent.
       `${Date.now()}`,
     );
-    redirect(`/hoops/game/${runId}`);
+    redirect(`/hoops/sim/game/${runId}`);
   }
 
   const coords = parseRunId(params.runId);
@@ -71,16 +71,16 @@ export default function HoopsGamePage({
     box.nOt === 0 || box.nOt === null ? "Final" : box.nOt === 1 ? "Final / OT" : `Final / ${box.nOt}OT`;
 
   const rerollHref =
-    `/hoops/game/new?home=${coords.home}&away=${coords.away}&mode=${coords.ratingMode}` +
+    `/hoops/sim/game/new?home=${coords.home}&away=${coords.away}&mode=${coords.ratingMode}` +
     (coords.neutralSite ? "&neutral=1" : "");
 
   return (
     <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6">
-      <HoopsNav active="matchup" through={getResultsWindow()?.to ?? null} />
+      <HoopsNav area="sim" active="matchup" through={getResultsWindow()?.to ?? null} />
 
       <div className="flex items-baseline justify-between gap-3">
         <Link
-          href={`/hoops/matchup?home=${coords.home}&away=${coords.away}&mode=${coords.ratingMode}${coords.neutralSite ? "&neutral=1" : ""}`}
+          href={`/hoops/sim/matchup?home=${coords.home}&away=${coords.away}&mode=${coords.ratingMode}${coords.neutralSite ? "&neutral=1" : ""}`}
           className="font-mono text-[0.68rem] uppercase tracking-kicker text-cream-dimmer transition-colors hover:text-cream-dim"
         >
           ← Matchup
@@ -122,7 +122,7 @@ export default function HoopsGamePage({
           this same game again, forever — the link <em>is</em> the game. For what a{" "}
           <em>typical</em> night looks like, the{" "}
           <Link
-            href={`/hoops/matchup?home=${coords.home}&away=${coords.away}&mode=${coords.ratingMode}`}
+            href={`/hoops/sim/matchup?home=${coords.home}&away=${coords.away}&mode=${coords.ratingMode}`}
             className="text-cat-hoops underline decoration-cat-hoops/40 underline-offset-2"
           >
             matchup screen

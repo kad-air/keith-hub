@@ -61,7 +61,7 @@ export default function TeamsClient({
       setMode(m);
       const params = new URLSearchParams(searchParams.toString());
       params.set("mode", m);
-      router.replace(`/hoops/teams?${params.toString()}`, { scroll: false });
+      router.replace(`/hoops/sim/teams?${params.toString()}`, { scroll: false });
     },
     [router, searchParams],
   );
@@ -171,7 +171,7 @@ export default function TeamsClient({
                   line below that — same information at every width, different
                   placement. */}
               <Link
-                href={`/hoops/teams/${t.tri}?mode=${mode}`}
+                href={`/hoops/sim/teams/${t.tri}?mode=${mode}`}
                 data-kb-item
                 className="block border-b border-rule/40 py-2 transition-colors hover:bg-ink-raised/60"
               >

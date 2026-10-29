@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
  *
  * The Matchup screen used to live here and its pickers were in the URL
  * (`/hoops?home=DEN&away=OKC&mode=n&neutral=1`), so an old shared link that
- * carries any of those params is sent to /hoops/matchup with them intact
+ * carries any of those params is sent to /hoops/sim/matchup with them intact
  * rather than dropped on today's scores.
  */
 export default function HoopsLandingPage({
@@ -22,7 +22,7 @@ export default function HoopsLandingPage({
     for (const [k, v] of Object.entries(searchParams)) {
       for (const one of Array.isArray(v) ? v : v === undefined ? [] : [v]) params.append(k, one);
     }
-    redirect(`/hoops/matchup?${params.toString()}`);
+    redirect(`/hoops/sim/matchup?${params.toString()}`);
   }
   redirect("/hoops/scores");
 }

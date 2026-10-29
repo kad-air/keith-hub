@@ -9,6 +9,7 @@ const GROUP_ORDER: SectionGroup[] = [
   "Reading",
   "Tracking",
   "Library",
+  "Hoops",
   "Guitar",
   "System",
 ];

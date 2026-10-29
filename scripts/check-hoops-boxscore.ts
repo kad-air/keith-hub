@@ -29,7 +29,7 @@
 //
 //   3. REPRODUCIBILITY, AND THE BATCH-SIZE TRAP. The same run_id must give a
 //      byte-identical sampled game on every call — that is the entire promise
-//      of /hoops/game/[runId]. A fresh nonce must give a different one, or
+//      of /hoops/sim/game/[runId]. A fresh nonce must give a different one, or
 //      "sim another night" would replay the same night forever.
 //
 //      🔴 And the trap this check exists to nail shut: replicate 0 of an
@@ -71,7 +71,7 @@
 //      perturbation reads 0.192 -> 0.585.
 //
 //   7. run_id ROUND-TRIP. Encode → parse → identical coordinates, and every
-//      malformed shape rejected, because /hoops/game/[runId] turns a parse
+//      malformed shape rejected, because /hoops/sim/game/[runId] turns a parse
 //      failure into a 404 and a parse SUCCESS into a simulation.
 //
 // KNOWN UNCOVERED, stated rather than papered over: the imputed-rates path in
@@ -362,7 +362,7 @@ check(
   const second = buildBoxscore(boxInput(m, runId, "sample"));
   check(
     JSON.stringify(first) === JSON.stringify(second),
-    `the same run_id (${runId}) produced two different sampled games — /hoops/game/[runId] ` +
+    `the same run_id (${runId}) produced two different sampled games — /hoops/sim/game/[runId] ` +
       `is not reproducible`,
   );
 
