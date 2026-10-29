@@ -88,7 +88,7 @@ export default function HoopsNav({
         </h1>
         <div className="flex min-w-0 items-baseline gap-3">
           {through && (
-            <p className="truncate font-mono text-[0.6rem] uppercase tracking-kicker text-cream-dimmer max-xs:hidden">
+            <p className="truncate font-mono text-[0.6rem] uppercase tracking-kicker text-cream-dimmer max-sm:hidden">
               games through {fmtDate(through)}
             </p>
           )}
@@ -100,6 +100,13 @@ export default function HoopsNav({
           </Link>
         </div>
       </div>
+      {/* On a phone the area link takes the room beside the title, so the
+          results date gets its own line rather than a clipped one. */}
+      {through && (
+        <p className="mt-0.5 font-mono text-[0.6rem] uppercase tracking-kicker text-cream-dimmer sm:hidden">
+          games through {fmtDate(through)}
+        </p>
+      )}
       {/* 1 … n switch tabs from the keyboard, in this area's order (lib/shortcuts.ts lists them). */}
       <SectionTabKeys hrefs={tabs.map((t) => t.href)} />
       <nav className="mt-3 flex gap-1.5 overflow-x-auto sm:gap-2">

@@ -54,16 +54,18 @@ export default async function HoopsScoresTeamPage({ params }: { params: { tri: s
   const playoffs = teamRecord(raw, tri, now, "postseason", RECENT_N);
   const started = (r: TeamRecord) => r.wins + r.losses + r.held > 0;
   const headline = started(playoffs)
-    ? { label: "Playoffs", rec: playoffs }
+    ? { label: "Playoffs", kind: "postseason" as const, rec: playoffs }
     : started(regular)
-      ? { label: null, rec: regular }
+      ? { label: null, kind: "regular" as const, rec: regular }
       : started(preseason)
-        ? { label: "Preseason", rec: preseason }
+        ? { label: "Preseason", kind: "preseason" as const, rec: preseason }
         : null;
 
   const upcoming = games.filter((g) => g.state === "pre" && !g.postponed).slice(0, NEXT_N);
+  // The record's own season type only, so the list and the record agree (a
+  // preseason result under a regular-season record reads as a mistake).
   const recent = games
-    .filter((g) => g.state !== "pre")
+    .filter((g) => g.state !== "pre" && (!headline || g.seasonKind === headline.kind))
     .slice(-RECENT_N)
     .reverse();
 
