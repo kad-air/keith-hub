@@ -11,7 +11,7 @@ import type { RatingMode } from "./types.ts";
 // ── run_id ───────────────────────────────────────────────────────────────
 //
 // 🔴 The run_id is SELF-DESCRIBING on purpose: `DEN-OKC-hb-3f2a9c1b0d4e5f6a`
-// carries home, away, court and rating mode, so /hoops/game/[runId] can
+// carries home, away, court and rating mode, so /hoops/sim/game/[runId] can
 // reproduce the game from the URL and nothing else. The alternative — a bare
 // random id plus a row in hoops_runs — makes a shared link depend on this
 // device's database, which is exactly the property "reproducible forever" was

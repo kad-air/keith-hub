@@ -32,6 +32,10 @@ npm run check:hoops:movers       # Team-page "what moved" gate: the biggest thre
 npm run check:hoops:scores       # Real scores gate: ESPN scoreboard / box score / standings parsers over recorded
                                  #   responses (hoops-scores-fixture/), quarters and player lines add up to the final,
                                  #   notable-line thresholds, Mountain-time dates, the cache policy (same)
+npm run check:hoops:teams        # Real team/player/schedule gate: roster, schedule, athlete and game-log parsers over
+                                 #   recorded responses (hoops-teams-fixture/), Utah's 1-4 and Jokić's 22.0/10.5 as anchors,
+                                 #   and the spoiler guard on a fake clock (last night's game, record, log line and
+                                 #   injury held until 3 AM) (same)
 npm run check:hoops:projections  # Rest-of-season projection gate: the season_projection contract fixture is accepted,
                                  #   27 damage patterns refused (missing/duplicate team, prob > 1, title > finals, bad
                                  #   date, wrong conference, league sums off…), the table order is by projected wins, a
@@ -41,7 +45,7 @@ npm run check:hoops:partial-schedule  # Partial-schedule gate: a 1,200-game slat
                                  #   the exact-1,230 rule still holds without the token, the real importer stores the
                                  #   status and ignores the fields without the token (same)
 npm run check:tracking-hidden    # Tracking section stays hidden (needs a running server; NOT in prebuild)
-npm run check:hoops:mobile       # Hoops still fits on a phone: seven pages at 375px and 430px in the
+npm run check:hoops:mobile       # Hoops still fits on a phone: every hoops page at 375px and 430px in the
                                  #   installed Chrome (needs a running server; NOT in prebuild)
 npm run check:books:bytes        # Books byte-identity gate: partialMd5 vs offline Python reference, ingest stores untouched bytes (same)
 npm run check:books:opds         # Books OPDS device-contract gate: CrossPoint parser constraints + the To Read shelf, anchored on Stump's device-proven feed (same)
@@ -195,7 +199,7 @@ First-class gesture in `FeedClient.tsx`. An indicator zone above the category na
 Section navigation went through a rewrite: the old `HeaderNav` + `BottomNav` split was replaced by a single pattern that works the same on mobile and desktop.
 
 - **Masthead** (`components/Masthead.tsx`) is the sticky top header: wordmark on the left, centered section switcher button, gear `AppMenu` on the right. The switcher shows the current section's name and opens `Contents`. Masthead also owns the `⌘K` / `Ctrl+K` global binding. It is the ONLY persistent chrome — there is no sub-tab bar below it.
-- **Contents** (`components/Contents.tsx`) is the fullscreen section picker. Sections come from `lib/sections.ts`, grouped into **Reading** (Feed, Saved, Read — each a full section, so the masthead switcher correctly reads "Saved"/"Read" on those routes), **Tracking** (one entry per tracker in `TRACKER_CONFIGS` — **currently renders nothing; the group is hidden**, see "Tracker data"), **Library** (Comics, Hoops). Type to filter; Enter jumps to the first match; Esc closes. Adding a tracker to `TRACKER_CONFIGS` automatically adds it to both the Masthead switcher and Contents — there's no separate nav config to update.
+- **Contents** (`components/Contents.tsx`) is the fullscreen section picker. Sections come from `lib/sections.ts`, grouped into **Reading** (Feed, Saved, Read — each a full section, so the masthead switcher correctly reads "Saved"/"Read" on those routes), **Tracking** (one entry per tracker in `TRACKER_CONFIGS` — **currently renders nothing; the group is hidden**, see "Tracker data"), **Library** (Comics), **Hoops** (Scores, Sim — two sections of their own since 2026-10-29, `g n` and `g i`). Type to filter; Enter jumps to the first match; Esc closes. Adding a tracker to `TRACKER_CONFIGS` automatically adds it to both the Masthead switcher and Contents — there's no separate nav config to update.
 - **Saved / Read reachability**: via Contents (switcher tap or `⌘K`), the `g s` / `g r` keyboard chords, and each page's own `<h1>`. They're archive views — occasional visits don't earn always-visible tabs. The old `SubBar` (Today/Saved/Read row under the masthead) was removed for this reason.
 - The Feed's **category row** (`FeedClient.tsx` controls row) is in-page and scrolls away with the content — deliberately not sticky; category switching happens at the top of a session, not mid-scroll. On mobile it's a single horizontally scrollable line (hidden scrollbar), not a wrapping block.
 
@@ -1119,6 +1123,16 @@ capture element, so a click handler on the `<g>` fires unreliably). `app/books/d
 `app/api/books/discworld/[nodeId]/route.ts` (POST a mark, DELETE to clear).
 
 ### Hoops — the NBA simulation studio
+🔴 **Two areas since 2026-10-29 (owner).** Hoops is its own group in Contents with two sections
+(`lib/sections.ts`): **Scores** (`/hoops/scores`, `g n` — the real NBA off ESPN: scores, standings,
+teams, players) and **Sim** (`/hoops/sim`, `g i` — the hoops-sim studio; lands on Projections).
+Each area has its own tab row in `HoopsNav` (`area="scores" | "sim"`, `SCORES_TABS` / `SIM_TABS`,
+also the `1..n` key order) and the header links across to the other. Every sim route moved under
+`/hoops/sim/…` and standings under `/hoops/scores/standings`; the old paths (`/hoops/matchup`,
+`/hoops/teams`, `/hoops/players`, `/hoops/game`, `/hoops/projections`, `/hoops/standings`, and
+everything below them) redirect in `next.config.mjs`, so old links and bookmarks still land. Older
+paragraphs below still use the pre-split paths; read `/hoops/X` as `/hoops/sim/X`.
+
 An NBA sim & what-if studio as its own section, built to the plan in `HOOPS_PLAN.md` (tracking epic: GitHub #63). **Shipped so far: milestone 1, the read-model spine (#64) — `/hoops/teams` and `/hoops/teams/[tri]`; milestone 2, the RNG parity + engine port (#65, #66) — `lib/hoops/{rng,philox,blake2b,engine}.ts`; the Mac Mini PUSH endpoint (#73, wire contract kad-air/hoops-sim#24) — `POST /api/hoops/import`; milestone 3, the matchup + box score (#67) — `/hoops/matchup` (originally `/hoops`) and `/hoops/game/[runId]`; and the player rankings — `/hoops/players`, which is also what finally carried the bundle's offence/defence value split into the read model.** The engine now runs from a screen. Next up: the studio (#69), with the design spike (#68) ahead of it.
 
 **Zero runtime dependency on the Mac Mini for READS.** Same shape as `/comics`, scaled up: heavy work (fitting a possession model against a 20GB DuckDB over 8TB of parquet) runs offline in `~/Code/hoops-sim`; what ships here is a bundle plus a TypeScript port of the engine. The Mini reaches OUT to push that bundle (below) — the hub never calls back to the Mini.
@@ -1507,6 +1521,39 @@ so the unfolded panel's controls are measured too), a recorded past day, a real 
 standings. `CHROME_PATH=<binary>` points it at a specific Chromium where no Google Chrome is
 installed (a container; it still never downloads one). Baseline before the pass: 508 problems at
 280/320 across the sim pages, zero on the scores pages; after: zero.
+
+#### Real teams, players and schedules (`/hoops/scores/teams`, `/hoops/scores/players`) — 2026-10-29
+
+Same upstream and the same separation as the scores pages (`lib/hoops/scores/`, never the sim
+bundle). `/hoops/scores/teams` lists the 30 clubs (no fetch); `/hoops/scores/teams/[tri]` is one club:
+its record, the next three and last five games, the roster with each player linked, the coach;
+`/hoops/scores/teams/[tri]/schedule` is the whole season by season type and month;
+`/hoops/scores/players/[id]` is a player's bio, per-game averages and game log. Interlinks: a game
+page's team names and a box score's team heading go to the team page, a box score's player names to
+the player page, standings rows to the team page; every schedule row goes to its game page and its
+opponent's team page; a player page links back to their team and each log line to its game. The real
+and sim pages link to each other ("In the sim →", "Roster & schedule →", "Game log →"; sim player
+ids ARE ESPN athlete ids). `teams.ts` (**pure**) parses ESPN's roster, team schedule, athlete and
+game-log endpoints; `getRoster`/`getTeamSchedule`/`getTeamGames`/`getAthlete`/`getGamelog` in
+`data.ts` cache them (30 min; a schedule 30s while a game is live, 2 min with a game today).
+
+🔴 **Spoiler mode carries over** (`guard.ts`, **pure**): a STARTED game on a guarded date (today,
+and last night until 3 AM — `isGuardedDate`) ships veiled (`veilGame`), and under a
+`LiveProvider` the schedule rows pick up the viewer's reveal or sync from this device exactly as
+the scores list's cards do (`TeamGameRow.tsx`). Everything a result could leak through is
+computed from the unguarded games and never read off ESPN's own summaries: the team record,
+home/road, streak and last-five (`teamRecord`, which counts what it `held`), a player's averages
+(`averages` over `guardLog`'s shown lines; a guarded log line ships date and opponent only), and
+the roster's injury notes (`guardRoster` holds any stamped at or after the guarded tip, or
+undated). The parsers deliberately skip `recordSummary`, `standingSummary`, `statsSummary` and the
+game log's `summary`/`totals` — the gate checks it. The server can't see a reveal made on the
+device, so the record, averages and log line keep leaving a revealed game out until 3 AM, and say
+so. **`/hoops/scores/standings` is NOT guarded** (the source's own records, last night included) —
+unchanged from before the split.
+
+**Gate: `npm run check:hoops:teams`** (in `prebuild`, offline) over `hoops-teams-fixture/` (Utah's
+roster and schedule, Jokić's and Walker Kessler's bio and game log, recorded the morning of
+2026-10-29), with the guard read at 11 PM, 2 AM and 7 AM Mountain.
 
 **Notable lines** (`notable.ts`): every threshold lives in `NOTABLE` and the page prints the rules
 from it. Finished games only. Career/season highs are NOT detected — the upstream carries no

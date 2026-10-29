@@ -7,7 +7,7 @@ import type { RawProjectionTeam } from "@/lib/hoops/types";
  * One conference of the rest-of-season projection, in the order
  * lib/hoops/projections.ts decides (projected wins, descending — the gate
  * asserts the same function, so the page and the check cannot disagree).
- * Dense monospace, the /hoops/standings shape, so the two tables read as a
+ * Dense monospace, the /hoops/scores/standings shape, so the two tables read as a
  * pair one tab apart. Below `sm` the three deep-playoff columns fold away:
  * seven columns of short numbers fit a 280px cover screen, ten do not.
  */
@@ -46,7 +46,7 @@ export default function ProjectionTable({
               >
                 <td className="py-1 text-right text-cream-dimmer">{i + 1}</td>
                 <td className="whitespace-nowrap pl-2 text-left">
-                  <Link href={`/hoops/teams/${r.team}`} className="text-cream hover:text-cat-hoops">
+                  <Link href={`/hoops/sim/teams/${r.team}`} className="text-cream hover:text-cat-hoops">
                     {r.team}
                   </Link>
                   <span className="ml-1.5 font-display text-[0.8rem] text-cream-dimmer max-sm:hidden">

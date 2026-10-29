@@ -362,7 +362,7 @@ export function PlayerExplainBlock({
 
       <p className="mt-6 text-xs text-cream-dimmer">
         Compare him on the{" "}
-        <Link href="/hoops/players" className="underline hover:text-cream-dim">
+        <Link href="/hoops/sim/players" className="underline hover:text-cream-dim">
           league ranking
         </Link>
         .

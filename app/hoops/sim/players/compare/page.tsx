@@ -60,7 +60,7 @@ export default function HoopsComparePage({
   }));
 
   // League ranks, computed before anything is picked — the same league ranking
-  // /hoops/players prints, never a re-rank of the two men on screen.
+  // /hoops/sim/players prints, never a re-rank of the two men on screen.
   const ranked = rankPlayers(all, "value", meta.rotationFloorMinutes);
   const of = ranked.filter((r) => r.rank > 0).length;
   const rankOf = (id: number): { rank: number; of: number } => ({
@@ -80,10 +80,10 @@ export default function HoopsComparePage({
 
   return (
     <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6">
-      <HoopsNav active="players" through={through} />
+      <HoopsNav area="sim" active="players" through={through} />
 
       <Link
-        href="/hoops/players"
+        href="/hoops/sim/players"
         className="font-mono text-[0.68rem] uppercase tracking-kicker text-cream-dimmer transition-colors hover:text-cream-dim"
       >
         ← Players

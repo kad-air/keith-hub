@@ -86,7 +86,7 @@ export function getDb(): Database.Database {
       value TEXT NOT NULL
     );
 
-    -- Hoops scores (/hoops/scores, /hoops/standings): parsed responses from
+    -- Hoops scores (/hoops/scores, /hoops/scores/standings): parsed responses from
     -- ESPN's public JSON, keyed "v<N>:<kind>:<arg>". final = 1 means the
     -- payload can never change again (a finished day / game) and is served
     -- forever; otherwise fetched_at (epoch ms) ages it out on a short TTL.
@@ -554,7 +554,7 @@ export function getDb(): Database.Database {
   addHoopsParamsCol("features_json", `features_json TEXT`);
   addHoopsParamsCol("constants_json", `constants_json TEXT`);
 
-  // hoops_players: the offence/defence value split, added for /hoops/players.
+  // hoops_players: the offence/defence value split, added for /hoops/sim/players.
   // The exporter has shipped these two fields all along — the importer used to
   // drop them on the floor — so a pre-existing DB has the table WITHOUT the
   // columns and CREATE TABLE IF NOT EXISTS above will never add them. Same

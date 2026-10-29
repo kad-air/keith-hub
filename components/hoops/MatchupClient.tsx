@@ -25,7 +25,7 @@ interface Props {
   form: Record<string, FormSummary>;
   meta: HoopsMeta;
   /** The lenses THIS bundle can offer — three, or four with nightly. Same
-   *  list /hoops/teams draws, so the two screens never disagree. */
+   *  list /hoops/sim/teams draws, so the two screens never disagree. */
   modes: RatingMode[];
   defaultHome: string;
   defaultAway: string;
@@ -102,7 +102,7 @@ export default function MatchupClient({
     params.set("mode", mode);
     if (neutral) params.set("neutral", "1");
     else params.delete("neutral");
-    router.replace(`/hoops/matchup?${params.toString()}`, { scroll: false });
+    router.replace(`/hoops/sim/matchup?${params.toString()}`, { scroll: false });
     // searchParams deliberately not a dependency: this effect WRITES it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [home, away, mode, neutral, router]);
@@ -278,7 +278,7 @@ export default function MatchupClient({
       </div>
 
       {/* Rating mode is a CHOICE with a caveat, never a hidden default. The
-          list is whatever this bundle can offer, same as /hoops/teams. */}
+          list is whatever this bundle can offer, same as /hoops/sim/teams. */}
       <div className="mt-4 flex gap-2">
         {modes.map((m) => (
           <button
@@ -514,7 +514,7 @@ export default function MatchupClient({
                 run's replicates would produce a game its run_id cannot
                 reproduce (see lib/hoops/boxscore.ts on batch size). */}
             <Link
-              href={`/hoops/game/new?home=${summary.home}&away=${summary.away}&mode=${summary.ratingMode}${summary.neutralSite ? "&neutral=1" : ""}`}
+              href={`/hoops/sim/game/new?home=${summary.home}&away=${summary.away}&mode=${summary.ratingMode}${summary.neutralSite ? "&neutral=1" : ""}`}
               className="mt-6 block border border-cat-hoops/60 px-4 py-3 text-center font-mono text-[0.68rem] uppercase tracking-kicker text-cat-hoops transition-colors hover:bg-cat-hoops/10"
             >
               Sim one specific night →

@@ -48,7 +48,7 @@ export default async function GamePage({
   if (!sb.data) {
     return (
       <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6">
-        <HoopsNav active="scores" />
+        <HoopsNav area="scores" active="scores" />
         <SourceNote fetched={[sourceMeta(sb)]} />
       </article>
     );
@@ -76,7 +76,13 @@ export default async function GamePage({
         </Link>
       </p>
       <h2 className="mb-3 font-display text-lg text-cream">
-        {game.away.name} <span className="text-cream-dimmer">at</span> {game.home.name}
+        <Link href={`/hoops/scores/teams/${game.away.tri.toLowerCase()}`} className="hover:text-cat-hoops">
+          {game.away.name}
+        </Link>{" "}
+        <span className="text-cream-dimmer">at</span>{" "}
+        <Link href={`/hoops/scores/teams/${game.home.tri.toLowerCase()}`} className="hover:text-cat-hoops">
+          {game.home.name}
+        </Link>
       </h2>
       <GameCard game={guarded ? veilGame(game) : game} date={date} protect={guardDay} />
       {tv.length > 0 && (
@@ -112,7 +118,7 @@ export default async function GamePage({
   const watch = game.state === "in" || (game.state === "pre" && !game.postponed) || guarded;
   return (
     <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6">
-      <HoopsNav active="scores" />
+      <HoopsNav area="scores" active="scores" />
       {watch ? (
         <LiveProvider
           dates={[date]}

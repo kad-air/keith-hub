@@ -66,7 +66,7 @@ interface StoredState {
    *  hca_pts/replacement_per36/value_as_of — see the no-op check below. */
   hasScalars: boolean;
   /** false when no player row carries value_off_per36 — i.e. this read model
-   *  was written by the importer as it stood before /hoops/players, which
+   *  was written by the importer as it stood before /hoops/sim/players, which
    *  dropped the split. Same purpose as hasScalars: force one rewrite so an
    *  existing volume backfills instead of serving null forever. */
   hasPlayerSplit: boolean;
@@ -322,7 +322,7 @@ function writeBundle(db: Database.Database, bundle: HoopsBundle, meta: WriteMeta
     // 🔴 The projection lives in playervalue.ts, not inline here, so the build
     // gate can drive the REAL one over the REAL bundle. It is what decides
     // whether the offence/defence value split survives the trip from JSON into
-    // SQLite — and before /hoops/players it silently did not: the exporter had
+    // SQLite — and before /hoops/sim/players it silently did not: the exporter had
     // been shipping value_off_per36/value_def_per36 for months and this loop
     // dropped both on the floor.
     const insPlayer = db.prepare(
@@ -492,7 +492,7 @@ export function importHoopsData(force = false): ImportSummary {
   // has a disk fallback for it — see queries.ts).
   //
   // The same trick, for the same reason, on the offence/defence value split:
-  // a read model written before /hoops/players has the columns (the migration
+  // a read model written before /hoops/sim/players has the columns (the migration
   // in lib/db.ts adds them) but every value is NULL, and an unchanged content
   // hash would otherwise keep it that way forever. Only demanded when THIS
   // bundle actually carries a split, so an older bundle that genuinely has

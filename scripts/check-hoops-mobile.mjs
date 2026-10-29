@@ -142,7 +142,7 @@ const WIDTHS = [
 const PAGES = [
   {
     id: "matchup",
-    path: "/hoops/matchup",
+    path: "/hoops/sim/matchup",
     landmark: "Head to head this season",
     async prepare(page) {
       // The button counts its own games ("Sim 1,000 games"), so match the
@@ -167,21 +167,21 @@ const PAGES = [
   // Team and player names are the landmarks wherever there is one: they are
   // real-NBA facts the page can only show if the bundle actually reached the
   // read model, where a line of copy is something an editing pass can move.
-  { id: "teams", path: "/hoops/teams", landmark: "Denver Nuggets" },
-  { id: "team-DEN", path: "/hoops/teams/DEN", landmark: "Denver Nuggets" },
-  { id: "players", path: "/hoops/players", landmark: "Nikola Jokic" },
-  { id: "player-3112335", path: "/hoops/players/3112335", landmark: "How we got there" },
+  { id: "teams", path: "/hoops/sim/teams", landmark: "Denver Nuggets" },
+  { id: "team-DEN", path: "/hoops/sim/teams/DEN", landmark: "Denver Nuggets" },
+  { id: "players", path: "/hoops/sim/players", landmark: "Nikola Jokic" },
+  { id: "player-3112335", path: "/hoops/sim/players/3112335", landmark: "How we got there" },
   // Jokić vs Wembanyama: one man with a plus-minus history half and one
   // without, the two ledger shapes the comparison has to lay out side by side.
   {
     id: "compare",
-    path: "/hoops/players/compare?a=3112335&b=5104157",
+    path: "/hoops/sim/players/compare?a=3112335&b=5104157",
     landmark: "How each rating was built",
   },
   {
-    // Redirects to /hoops/game/<runId>; playwright follows it.
+    // Redirects to /hoops/sim/game/<runId>; playwright follows it.
     id: "game",
-    path: "/hoops/game/new?home=DEN&away=OKC",
+    path: "/hoops/sim/game/new?home=DEN&away=OKC",
     landmark: "one simulated game",
   },
   // The REAL scores section (lib/hoops/scores/). Today's page is spoiler-
@@ -208,12 +208,18 @@ const PAGES = [
   // The game page's play-by-play tab: a long text column beside a clock, a
   // team and a running score — the row that has to wrap, not clip, at 280.
   { id: "scores-plays", path: "/hoops/scores/2026-10-21/atl-orl/plays", landmark: "1st quarter" },
-  { id: "standings", path: "/hoops/standings", landmark: "Live data from ESPN" },
+  { id: "standings", path: "/hoops/scores/standings", landmark: "Live data from ESPN" },
+  // The real clubs: the list (no fetch), a team (roster table, game rows), its
+  // schedule (every game), and a player (bio, game-log table that scrolls).
+  { id: "scores-teams", path: "/hoops/scores/teams", landmark: "Northwest" },
+  { id: "scores-team-UTA", path: "/hoops/scores/teams/uta", landmark: "Roster" },
+  { id: "scores-schedule-UTA", path: "/hoops/scores/teams/uta/schedule", landmark: "Regular season" },
+  { id: "scores-player-3112335", path: "/hoops/scores/players/3112335", landmark: "Game log" },
   // The nightly rest-of-season projection. "Rest of season" is the page's own
   // heading and renders in BOTH states — with a projection (two ten-column
   // tables that must scroll, not clip, at 280) and without one (the empty
   // state, which is what a dev DB that has never received a push shows).
-  { id: "projections", path: "/hoops/projections", landmark: "Rest of season" },
+  { id: "projections", path: "/hoops/sim/projections", landmark: "Rest of season" },
 ];
 
 // ── login (the check:tracking-hidden pattern) ──────────────────────────────

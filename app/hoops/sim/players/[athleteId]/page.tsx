@@ -25,7 +25,7 @@ export function generateMetadata({ params }: { params: { athleteId: string } }):
 /**
  * One player: his rating, and HOW the model came to it. The ledger and the
  * itemised wage sheet come straight off the bundle's explain block; the
- * league ranks are computed here over the same rows /hoops/players ranks.
+ * league ranks are computed here over the same rows /hoops/sim/players ranks.
  */
 export default function HoopsPlayerPage({ params }: { params: { athleteId: string } }) {
   const id = Number(params.athleteId);
@@ -75,10 +75,10 @@ export default function HoopsPlayerPage({ params }: { params: { athleteId: strin
 
   return (
     <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6">
-      <HoopsNav active="players" through={through} />
+      <HoopsNav area="sim" active="players" through={through} />
 
       <Link
-        href={`/hoops/players?team=${p.tri}`}
+        href={`/hoops/sim/players?team=${p.tri}`}
         className="font-mono text-[0.68rem] uppercase tracking-kicker text-cream-dimmer transition-colors hover:text-cream-dim"
       >
         ← Players
@@ -86,7 +86,7 @@ export default function HoopsPlayerPage({ params }: { params: { athleteId: strin
 
       <header className="mt-3">
         <p className="font-mono text-[0.7rem] uppercase tracking-kicker text-cat-hoops">
-          <Link href={`/hoops/teams/${p.tri}`} className="hover:underline">
+          <Link href={`/hoops/sim/teams/${p.tri}`} className="hover:underline">
             {p.tri} · {teamName(p.tri)}
           </Link>
         </p>
@@ -95,6 +95,12 @@ export default function HoopsPlayerPage({ params }: { params: { athleteId: strin
           {rValue.rank > 0 ? `#${rValue.rank} of ${rValue.of} by value a game` : "unranked"}
           {rOff.rank > 0 && ` · offence #${rOff.rank}`}
           {rDef.rank > 0 && ` · defence #${rDef.rank}`}
+        </p>
+        {/* Sim ids are ESPN athlete ids: the real bio and game log are under Scores. */}
+        <p className="mt-2 font-mono text-[0.62rem] uppercase tracking-kicker">
+          <Link href={`/hoops/scores/players/${id}`} className="text-cat-hoops hover:text-cream">
+            Game log →
+          </Link>
         </p>
         {/* The comparison is a link, so this is only a shortcut into it. */}
         <CompareWithPicker options={compareOptions} self={id} />

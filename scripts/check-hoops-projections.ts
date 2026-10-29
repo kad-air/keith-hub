@@ -7,7 +7,7 @@
 //
 // WHAT THIS PROVES. hoops-sim publishes a nightly projections.json (projected
 // record, 80% win band, playoff / play-in / title odds per team) and
-// /hoops/projections renders it. The ways it can quietly go wrong all render
+// /hoops/sim/projections renders it. The ways it can quietly go wrong all render
 // as a plausible-looking table:
 //
 //   • the validator lets a malformed file through — a percentage where a
@@ -446,7 +446,7 @@ const clone = (): RawProjectionsFile => JSON.parse(JSON.stringify(fixtureRaw));
   check(JSON.stringify(accepted.teams.map((t) => t.team)) === JSON.stringify(fixtureRaw.teams.map((t) => t.team)), "orderForTable mutated its input");
 
   // The page and the table component order through the pure module, never on their own.
-  const page = fs.readFileSync(path.join(ROOT, "app/hoops/projections/page.tsx"), "utf-8");
+  const page = fs.readFileSync(path.join(ROOT, "app/hoops/sim/projections/page.tsx"), "utf-8");
   const table = fs.readFileSync(path.join(ROOT, "components/hoops/ProjectionTable.tsx"), "utf-8");
   check(/conferenceTable\(/.test(table), "ProjectionTable does not order through conferenceTable()");
   check(!/\.sort\(/.test(page) && !/\.sort\(/.test(table), "the page or the table sorts on its own — the order must come from lib/hoops/projections.ts");
@@ -565,11 +565,11 @@ const clone = (): RawProjectionsFile => JSON.parse(JSON.stringify(fixtureRaw));
 // ── 6. the tab, the key, the mobile check ─────────────────────────────────
 {
   const nav = fs.readFileSync(path.join(ROOT, "components/hoops/HoopsNav.tsx"), "utf-8");
-  check(/href: "\/hoops\/projections"/.test(nav), "HoopsNav has no Projections tab");
+  check(/href: "\/hoops\/sim\/projections"/.test(nav), "HoopsNav has no Projections tab");
   const shortcuts = fs.readFileSync(path.join(ROOT, "lib/shortcuts.ts"), "utf-8");
   check(/label: "Projections"/.test(shortcuts), "lib/shortcuts.ts has no number key for Projections");
   const mobile = fs.readFileSync(path.join(ROOT, "scripts/check-hoops-mobile.mjs"), "utf-8");
-  check(/path: "\/hoops\/projections"/.test(mobile), "check:hoops:mobile does not walk /hoops/projections");
+  check(/path: "\/hoops\/sim\/projections"/.test(mobile), "check:hoops:mobile does not walk /hoops/sim/projections");
   notes.push("nav: tab, number key and the phone-fit walk all know the page");
 }
 

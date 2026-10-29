@@ -54,7 +54,7 @@ export const SUPPORTED_PRICING_VERSION = 3;
  *   season_projection   2026-10-28 — the bundle carries `projections.json`,
  *                       a nightly rest-of-season projection (projected
  *                       record, 80% win band, playoff/play-in/title odds per
- *                       team) that /hoops/projections renders. Display only:
+ *                       team) that /hoops/sim/projections renders. Display only:
  *                       nothing is priced off it. The file is REQUIRED when
  *                       the token is declared (FEATURE_FILES) and validated
  *                       by lib/hoops/projections.ts before anything is

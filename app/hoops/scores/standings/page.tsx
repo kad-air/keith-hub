@@ -12,13 +12,17 @@ export const metadata: Metadata = { title: "Hoops · Standings — hub" };
  * Real standings by conference, off the same live upstream as /hoops/scores
  * (not the hoops-sim bundle). Order is the source's playoff seed, which
  * carries the tiebreakers. A rule under 6th and 10th marks the play-in.
+ * Each team links to its page (/hoops/scores/teams/<tri>).
+ *
+ * Not spoiler-guarded: the records are the source's own and include last
+ * night's results. The team pages compute their records from unguarded games.
  */
 export default async function HoopsStandingsPage() {
   const st = await getStandings();
   const cols = ["W", "L", "PCT", "GB", "L10", "STRK"];
   return (
     <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6">
-      <HoopsNav active="standings" />
+      <HoopsNav area="scores" active="standings" />
       {st.data?.season && (
         <p className="mb-4 font-mono text-[0.62rem] uppercase tracking-kicker text-cream-dimmer">
           {st.data.season} · <Link href="/hoops/scores" className="text-cat-hoops hover:text-cream">Scores</Link>
@@ -52,10 +56,12 @@ export default async function HoopsStandingsPage() {
                     >
                       <td className="py-1 text-right text-cream-dimmer">{i + 1}</td>
                       <td className="whitespace-nowrap pl-2 text-left">
-                        <span className="text-cream">{r.tri}</span>
-                        <span className="ml-1.5 font-display text-[0.8rem] text-cream-dimmer max-sm:hidden">
-                          {r.name}
-                        </span>
+                        <Link href={`/hoops/scores/teams/${r.tri.toLowerCase()}`} className="group" data-kb-item>
+                          <span className="text-cream group-hover:text-cat-hoops">{r.tri}</span>
+                          <span className="ml-1.5 font-display text-[0.8rem] text-cream-dimmer max-sm:hidden">
+                            {r.name}
+                          </span>
+                        </Link>
                       </td>
                       <td className="px-1 text-right text-cream">{r.wins}</td>
                       <td className="px-1 text-right text-cream">{r.losses}</td>

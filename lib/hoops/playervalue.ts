@@ -1,6 +1,6 @@
 // Pure player-value helpers — no fs, no SQLite, no server-only imports.
 //
-// Separate from queries.ts for exactly the reason rating.ts is: /hoops/players
+// Separate from queries.ts for exactly the reason rating.ts is: /hoops/sim/players
 // re-sorts and re-filters every rostered player (~530) on a phone, and there is
 // no reason to ask the server for a re-sort of numbers it already sent.
 //
@@ -249,7 +249,7 @@ function sortKey(p: RankedPlayer, sort: PlayerSort): number | null {
  * sort key with dense ranks 1..n, then the unrankable ones (rank 0) by
  * minutes. Nobody is dropped — a player the model cannot price is a fact about
  * the model, and hiding him would make the roster counts stop matching
- * /hoops/teams.
+ * /hoops/sim/teams.
  *
  * `rotationFloorMinutes` is the bundle's own `absorption_rotation_floor_minutes`
  * constant, passed in rather than hardcoded (null = the bundle didn't carry it,

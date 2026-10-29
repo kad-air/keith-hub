@@ -5,7 +5,7 @@ import { useCallback } from "react";
 import { teamName } from "@/lib/hoops/rating";
 
 // The only client code the comparison needs: two <select>s that navigate.
-// Everything else on /hoops/players/compare renders on the server, because
+// Everything else on /hoops/sim/players/compare renders on the server, because
 // the whole answer is a function of the two ids in the URL — which also makes
 // every comparison a link somebody can send.
 
@@ -64,7 +64,7 @@ export default function ComparePickers({
       const params = new URLSearchParams();
       if (na) params.set("a", na);
       if (nb) params.set("b", nb);
-      router.push(`/hoops/players/compare?${params.toString()}`);
+      router.push(`/hoops/sim/players/compare?${params.toString()}`);
     },
     [router, a, b],
   );
@@ -118,7 +118,7 @@ export function CompareWithPicker({
         className={SELECT_CLASS}
         value=""
         onChange={(e) => {
-          if (e.target.value) router.push(`/hoops/players/compare?a=${self}&b=${e.target.value}`);
+          if (e.target.value) router.push(`/hoops/sim/players/compare?a=${self}&b=${e.target.value}`);
         }}
         aria-label="Compare with another player"
       >

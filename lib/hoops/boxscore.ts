@@ -529,7 +529,7 @@ export interface BoxscoreInput {
    * n = 1 and 135-134 at n = 1000. Feeding a sampled box score the matchup
    * screen's 1000-replicate simulation would therefore produce a game that
    * its own run_id can never reproduce, which is the one thing
-   * /hoops/game/[runId] promises.
+   * /hoops/sim/game/[runId] promises.
    */
   simulation?: GameSimResult;
 }

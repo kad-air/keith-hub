@@ -37,7 +37,7 @@ export default function HoopsTeamPage({
   const rows = getTeamRows();
   if (!rows.some((r) => r.tri === tri)) notFound();
 
-  // The same lenses and default as /hoops/teams and /hoops — four cards when
+  // The same lenses and default as /hoops/sim/teams and /hoops — four cards when
   // the bundle carries a nightly read, and the default is the one the sim
   // prices with.
   const modes = availableRatingModes(rows);
@@ -74,10 +74,10 @@ export default function HoopsTeamPage({
 
   return (
     <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6">
-      <HoopsNav active="teams" through={getResultsWindow()?.to ?? null} />
+      <HoopsNav area="sim" active="teams" through={getResultsWindow()?.to ?? null} />
 
       <Link
-        href={`/hoops/teams?mode=${mode}`}
+        href={`/hoops/sim/teams?mode=${mode}`}
         className="font-mono text-[0.68rem] uppercase tracking-kicker text-cream-dimmer transition-colors hover:text-cream-dim"
       >
         ← All teams
@@ -90,6 +90,12 @@ export default function HoopsTeamPage({
           {team.conference} · {team.division} · #{team.rank} by {MODE_COPY[mode].label.toLowerCase()}{" "}
           rating
         </p>
+        {/* The real club (roster, schedule, results) lives under Scores. */}
+        <p className="mt-2 font-mono text-[0.62rem] uppercase tracking-kicker">
+          <Link href={`/hoops/scores/teams/${tri.toLowerCase()}`} className="text-cat-hoops hover:text-cream">
+            Roster &amp; schedule →
+          </Link>
+        </p>
       </header>
 
       {/* Every rating side by side — the mode is a choice, not a default to
@@ -101,7 +107,7 @@ export default function HoopsTeamPage({
           return (
             <Link
               key={m}
-              href={`/hoops/teams/${tri}?mode=${m}`}
+              href={`/hoops/sim/teams/${tri}?mode=${m}`}
               className={`border px-3 py-2 transition-colors ${
                 active
                   ? "border-cat-hoops/70 bg-cat-hoops/10"
@@ -201,13 +207,13 @@ export default function HoopsTeamPage({
 
       <div className="mt-6 grid grid-cols-2 gap-2">
         <Link
-          href={`/hoops/matchup?home=${tri}&mode=${mode}`}
+          href={`/hoops/sim/matchup?home=${tri}&mode=${mode}`}
           className="block border border-cat-hoops/60 px-4 py-3 text-center font-mono text-[0.68rem] uppercase tracking-kicker text-cat-hoops transition-colors hover:bg-cat-hoops/10"
         >
           Sim a game at {tri} →
         </Link>
         <Link
-          href={`/hoops/players?team=${tri}`}
+          href={`/hoops/sim/players?team=${tri}`}
           className="block border border-rule/60 px-4 py-3 text-center font-mono text-[0.68rem] uppercase tracking-kicker text-cream-dim transition-colors hover:border-cat-hoops/40 hover:text-cream"
         >
           {tri} in the league ranking →
@@ -220,7 +226,7 @@ export default function HoopsTeamPage({
         <em>Val/G</em> is that: his rating times the minutes we expect him to get. <em>Rate</em> is
         the same rating stated per 36 minutes on the floor, so a bench man who plays well in short
         bursts reads high there and small on Val/G. Both are the same model that ranks the league on{" "}
-        <Link href="/hoops/players" className="underline hover:text-cream-dim">
+        <Link href="/hoops/sim/players" className="underline hover:text-cream-dim">
           Players
         </Link>
         , as of {meta.valueAsOf.slice(0, 10)} — what we expect of him, not a measurement of this
@@ -247,7 +253,7 @@ export default function HoopsTeamPage({
           <li key={p.athlete_id} className="border-b border-rule/40 py-2">
             <span className="flex items-baseline gap-2">
               <Link
-                href={`/hoops/players/${p.athlete_id}`}
+                href={`/hoops/sim/players/${p.athlete_id}`}
                 className="min-w-0 flex-1 truncate font-display text-cream hover:text-cat-hoops"
               >
                 {p.name}
@@ -382,7 +388,7 @@ function MoverRow({ m, lastNGames }: { m: RawNightlyMover; lastNGames: number })
           <span className="min-w-0 flex-1 font-display text-cream-dimmer">next man up</span>
         ) : (
           <Link
-            href={`/hoops/players/${m.athlete_id}`}
+            href={`/hoops/sim/players/${m.athlete_id}`}
             className="min-w-0 flex-1 truncate font-display text-cream hover:text-cat-hoops"
           >
             {m.name}

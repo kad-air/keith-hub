@@ -24,7 +24,7 @@ export default function HoopsProjectionsPage() {
 
   return (
     <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6">
-      <HoopsNav active="projections" through={through} />
+      <HoopsNav area="sim" active="projections" through={through} />
       <h2 className="mb-1 font-display text-lg text-cream">Rest of season</h2>
 
       {!projection ? (
@@ -36,7 +36,7 @@ export default function HoopsProjectionsPage() {
             The Mac Mini publishes one nightly once hoops-sim declares{" "}
             <span className="text-cream-dim">season_projection</span> on its bundle. Until then the
             real table is on{" "}
-            <Link href="/hoops/standings" className="text-cat-hoops hover:text-cream">
+            <Link href="/hoops/scores/standings" className="text-cat-hoops hover:text-cream">
               Standings
             </Link>
             .
