@@ -18,6 +18,11 @@ import type { Game } from "@/lib/hoops/scores/types";
  * drops the rest at noon (or on the first look back, for a backgrounded PWA)
  * and refreshes the server tree once so last night's notable lines and its
  * live polling go with it.
+ *
+ * Until 3 AM (`protect`) the games arrive veiled from the server and render
+ * under spoiler mode, as they did when they were tonight's. A page left open
+ * across 3 AM refreshes the server tree once, which lifts the veil and brings
+ * last night's notable lines.
  */
 export default function LastNight({
   title,
@@ -25,6 +30,8 @@ export default function LastNight({
   games,
   until,
   pastAtRender,
+  protect = false,
+  guardUntil,
 }: {
   title: string;
   /** Last night's date. */
@@ -34,12 +41,17 @@ export default function LastNight({
   until: number;
   /** The server's clock had passed `until` when it rendered. */
   pastAtRender: boolean;
+  /** Spoiler mode on last night (before 3 AM): `games` come veiled. */
+  protect?: boolean;
+  /** Epoch ms spoiler mode lets go of last night. */
+  guardUntil: number;
 }) {
   const router = useRouter();
   const [past, setPast] = useState(pastAtRender);
   // null until the stored syncs are read (never on the server render).
   const [kept, setKept] = useState<Set<string> | null>(null);
   const pastRef = useRef(pastAtRender);
+  const guardRef = useRef(protect);
 
   useEffect(() => {
     const ids = (games ?? []).map((g) => g.id);
@@ -49,9 +61,14 @@ export default function LastNight({
       setKept(new Set(keepLastNight(ids, loadSpoiler(date), now)));
       setPast(now);
       // Crossed noon on this page: let the server drop the rest too.
-      if (now && !pastRef.current) router.refresh();
+      // Crossed 3 AM under guard: let the server lift the veil.
+      const open = Date.now() >= guardUntil;
+      if ((now && !pastRef.current) || (open && guardRef.current)) router.refresh();
       pastRef.current = now;
-      if (!now && timer === null) timer = setTimeout(check, until - Date.now());
+      if (open) guardRef.current = false;
+      const next = [until, ...(guardRef.current ? [guardUntil] : [])].filter((t) => t > Date.now());
+      if (timer) clearTimeout(timer);
+      timer = next.length ? setTimeout(check, Math.min(...next) - Date.now()) : null;
     };
     const onVis = () => {
       if (document.visibilityState === "visible") check();
@@ -62,11 +79,11 @@ export default function LastNight({
       if (timer) clearTimeout(timer);
       document.removeEventListener("visibilitychange", onVis);
     };
-  }, [games, date, until, router]);
+  }, [games, date, until, guardUntil, router]);
 
-  if (!past) return <GamesSection title={title} date={date} games={games} />;
+  if (!past) return <GamesSection title={title} date={date} games={games} protect={protect} />;
   if (!kept || !games) return null;
   const left = games.filter((g) => kept.has(g.id));
   if (left.length === 0) return null;
-  return <GamesSection title={title} date={date} games={left} />;
+  return <GamesSection title={title} date={date} games={left} protect={protect} />;
 }

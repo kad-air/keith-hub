@@ -19,9 +19,11 @@ import { fileURLToPath } from "url";
 import { FRANCHISES } from "../lib/hoops/nba-franchises.ts";
 import {
   addDays,
+  isGuardedDate,
   isIsoDate,
   lastNightUntil,
   longDate,
+  spoilerUntil,
   tipTime,
   todayIn,
   wallClockAt,
@@ -310,6 +312,30 @@ check(!staleSpoilerKey("hoops-spoiler:2026-10-29", "2026-10-29"), "today's spoil
 check(!staleSpoilerKey("hoops-spoiler:2026-10-28", "2026-10-29"), "yesterday's spoiler key is kept");
 check(staleSpoilerKey("hoops-spoiler:2026-10-27", "2026-10-29"), "the day before yesterday's key is pruned");
 check(!staleSpoilerKey("feed-outbox", "2026-10-29"), "keys outside the spoiler store are left alone");
+// Saving LAST NIGHT's choices (a reveal or sync on a last-night card before
+// 3 AM) must not prune today's.
+check(!staleSpoilerKey("hoops-spoiler:2026-10-29", "2026-10-28"), "saving yesterday keeps today's key");
+check(!staleSpoilerKey("hoops-spoiler:2026-10-27", "2026-10-28"), "…and the day before it");
+check(staleSpoilerKey("hoops-spoiler:2026-10-26", "2026-10-28"), "…but nothing older");
+check(staleSpoilerKey("hoops-spoiler:garbage", "2026-10-29"), "a malformed spoiler key is pruned");
+
+// Spoiler mode outlives midnight: last night stays guarded until 3 AM
+// MOUNTAIN on today's date (09:00Z under MDT, 10:00Z under MST), then the
+// scores just show. Today is always guarded; older days and tomorrow never.
+const threeZ = (d: string) => new Date(spoilerUntil(d)).toISOString();
+check(threeZ("2026-10-29") === "2026-10-29T09:00:00.000Z", `3 AM MDT, got ${threeZ("2026-10-29")}`);
+check(threeZ("2026-12-15") === "2026-12-15T10:00:00.000Z", `3 AM MST, got ${threeZ("2026-12-15")}`);
+// DST ends 2026-11-01 at 2 AM MDT → 1 AM MST: 3 AM that morning is MST.
+check(threeZ("2026-11-01") === "2026-11-01T10:00:00.000Z", `3 AM on the day DST ends, got ${threeZ("2026-11-01")}`);
+const at = (iso: string) => new Date(iso);
+check(isGuardedDate("2026-10-28", at("2026-10-29T06:30:00Z")), "12:30 AM: last night is still guarded");
+check(isGuardedDate("2026-10-28", at("2026-10-29T08:59:59Z")), "2:59 AM: still guarded");
+check(!isGuardedDate("2026-10-28", at("2026-10-29T09:00:00Z")), "3 AM: last night lets go");
+check(!isGuardedDate("2026-10-28", at("2026-10-29T18:00:00Z")), "noon: long since open");
+check(isGuardedDate("2026-10-28", at("2026-10-29T04:00:00Z")), "10 PM the night of: it is today, guarded");
+check(isGuardedDate("2026-10-29", at("2026-10-29T06:30:00Z")), "today is guarded from midnight on");
+check(!isGuardedDate("2026-10-27", at("2026-10-29T06:30:00Z")), "the night before last is never guarded");
+check(!isGuardedDate("2026-10-30", at("2026-10-29T18:00:00Z")), "tomorrow is not guarded");
 
 // ── 7. cache policy ──────────────────────────────────────────────────────
 const today = "2026-10-22";

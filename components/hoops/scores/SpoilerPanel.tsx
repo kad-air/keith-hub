@@ -38,7 +38,7 @@ export default function SpoilerPanel({
   // Digits read as m:ss ("732" → 7:32); the reading shows beside the field.
   const typed = typedClockSeconds(clock);
   const hold = useLongPress(() => {
-    sp.reveal(game.id);
+    sp.reveal(game.id, date);
     onDone();
   });
 
@@ -55,9 +55,9 @@ export default function SpoilerPanel({
     setNote(null);
     setAhead(false);
     try {
-      const r = await sp.resolve(game.id, period, typed);
+      const r = await sp.resolve(game.id, period, typed, date);
       if (r.ok) {
-        sp.syncTo(game.id, r.offsetMs);
+        sp.syncTo(game.id, r.offsetMs, date);
         onDone();
       } else if (r.reason === "ahead") {
         setAhead(true);
@@ -152,7 +152,7 @@ export default function SpoilerPanel({
             type="button"
             className={`${btn} mt-1.5`}
             onClick={() => {
-              sp.reveal(game.id);
+              sp.reveal(game.id, date);
               onDone();
             }}
           >
@@ -167,7 +167,7 @@ export default function SpoilerPanel({
             type="button"
             className={btn}
             onClick={() => {
-              sp.unsync(game.id);
+              sp.unsync(game.id, date);
               onDone();
             }}
           >

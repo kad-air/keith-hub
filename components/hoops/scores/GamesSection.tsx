@@ -7,8 +7,8 @@ import type { Game } from "@/lib/hoops/scores/types";
  * day's "Games". No "use client" on purpose: rendered from ScoresDay it stays
  * a server component, so under `protect` the veil is applied BEFORE the games
  * reach the client (today's scores are in neither the HTML nor the RSC
- * payload until the viewer reveals them). LastNight renders it client side,
- * always unprotected.
+ * payload until the viewer reveals them). LastNight renders it client side;
+ * under guard (before 3 AM) its games arrive already veiled from ScoresDay.
  */
 export default function GamesSection({
   title,
