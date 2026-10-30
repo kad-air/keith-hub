@@ -30,6 +30,7 @@ function getInitialData(): { items: Item[]; counts: CategoryCounts } {
         music: 0,
         film: 0,
         podcasts: 0,
+        newsletters: 0,
         bluesky: 0,
       },
     };

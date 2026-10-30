@@ -115,6 +115,7 @@ export interface CategoryCounts {
   music: number;
   film: number;
   podcasts: number;
+  newsletters: number;
   bluesky: number;
 }
 

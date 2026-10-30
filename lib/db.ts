@@ -803,6 +803,7 @@ const WEIGHTS = {
   film:        6,
   tech_review: 6,
   reading:     3,
+  newsletters: 4,
   bluesky:     1,
 } as const;
 
@@ -816,6 +817,7 @@ export const RANKED_ORDER = `
     WHEN 'film'        THEN ${WEIGHTS.film}.0
     WHEN 'tech_review' THEN ${WEIGHTS.tech_review}.0
     WHEN 'reading'     THEN ${WEIGHTS.reading}.0
+    WHEN 'newsletters' THEN ${WEIGHTS.newsletters}.0
     WHEN 'bluesky'     THEN ${WEIGHTS.bluesky}.0
     ELSE             ${WEIGHTS.reading}.0
   END) / ((julianday('now') - julianday(i.published_at)) * 24.0 + ${C}.0) DESC

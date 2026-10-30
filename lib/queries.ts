@@ -437,6 +437,7 @@ export function getCategoryCounts(
     music: 0,
     film: 0,
     podcasts: 0,
+    newsletters: 0,
     bluesky: 0,
   };
 

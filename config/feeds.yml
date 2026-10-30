@@ -25,6 +25,61 @@ sources:
     category: tech_review
     url: https://www.theverge.com/rss/partner/subscriber-only-reviews/rss.xml
 
+  # --- Newsletters (moved off email; paid posts may arrive as previews) ---
+  - id: evil-speakers
+    name: Evil Speakers
+    type: rss
+    category: newsletters
+    url: https://stevenhyden.substack.com/feed
+
+  - id: gmib
+    name: "Good Morning, It's Basketball"
+    type: rss
+    category: newsletters
+    url: https://www.teamziller.com/rss/
+
+  - id: last-weeks-new-yorker
+    name: "Last Week's New Yorker"
+    type: rss
+    category: newsletters
+    url: https://buttondown.com/lastweeksnewyorker/rss
+
+  - id: good-movie
+    name: Good Movie
+    type: rss
+    category: newsletters
+    url: https://goodmovie.substack.com/feed
+
+  - id: aftermath
+    name: Aftermath
+    type: rss
+    category: newsletters
+    url: https://aftermath.site/feed
+
+  - id: today-in-tabs
+    name: Today in Tabs
+    type: rss
+    category: newsletters
+    url: https://rss.beehiiv.com/feeds/ZRiesnGI0u.xml
+
+  - id: links-i-would-gchat-you
+    name: Links I Would Gchat You
+    type: rss
+    category: newsletters
+    url: https://linksiwouldgchatyou.substack.com/feed
+
+  - id: los-campesinos
+    name: "Letters from Los Campesinos!"
+    type: rss
+    category: newsletters
+    url: https://loscampesinos.substack.com/feed
+
+  - id: today-on-trail
+    name: Today on Trail
+    type: rss
+    category: newsletters
+    url: https://rss.beehiiv.com/feeds/tFydJ0qBKY.xml
+
   # --- Books ---
   - id: nyt-books
     name: NYT Book Review

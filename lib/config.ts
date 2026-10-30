@@ -76,6 +76,7 @@ export const RSS_CATEGORIES = [
   "tech_review",
   "podcasts",
   "reading",
+  "newsletters",
 ] as const;
 
 export const ALL_CATEGORIES = [...RSS_CATEGORIES, "bluesky"] as const;
@@ -100,6 +101,7 @@ export const ALGORITHM_DEFAULTS: ResolvedAlgorithm = {
     film: 4,
     tech_review: 4,
     podcasts: 3,
+    newsletters: 3,
     reading: 2,
     bluesky: 1,
   },
@@ -115,6 +117,7 @@ export const ALGORITHM_DEFAULTS: ResolvedAlgorithm = {
     tech_review: 168,
     podcasts: 168,
     reading: 168,
+    newsletters: 168,
   },
   retentionHours: 168,
 };

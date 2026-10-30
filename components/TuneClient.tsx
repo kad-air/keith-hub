@@ -49,6 +49,7 @@ const ALGO_DEFAULTS: Required<Omit<AlgorithmConfig, "surprise_pool" | "ttl_days"
     film: 4,
     tech_review: 4,
     podcasts: 3,
+    newsletters: 3,
     reading: 2,
     bluesky: 1,
   },
@@ -67,6 +68,7 @@ const PRIORITY_CATEGORIES: Array<{ id: string; label: string }> = [
   { id: "tech_review", label: "Tech reviews" },
   { id: "podcasts", label: "Podcasts" },
   { id: "reading", label: "Reading" },
+  { id: "newsletters", label: "Newsletters" },
   { id: "bluesky", label: "Bluesky" },
 ];
 
@@ -77,6 +79,7 @@ const CAT_DOT: Record<string, string> = {
   tech_review: "bg-cat-tech_review",
   podcasts: "bg-cat-podcasts",
   reading: "bg-cat-reading",
+  newsletters: "bg-cat-newsletters",
   bluesky: "bg-cat-bluesky",
 };
 
