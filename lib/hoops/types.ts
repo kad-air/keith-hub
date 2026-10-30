@@ -142,6 +142,17 @@ export interface RawNightlyRating extends RawTeamRatings {
   n_movers_total?: number | null;
   movers_delta_sum?: number | null;
   movers?: RawNightlyMover[] | null;
+  /**
+   * EARLY SEASON (2026-10-30). Which minutes the nightly read was compared
+   * against: `season_typical` (≥ 10 games played — the man's own season, the
+   * only reading before this) or `last_season` (fewer than 10 — his minutes a
+   * night across LAST season's schedule, any team). Absent on an older bundle
+   * ⇒ `season_typical`.
+   */
+  movers_baseline?: "season_typical" | "last_season" | null;
+  /** `nothing_moved` ⇒ `movers` is an empty list and the card is one line.
+   *  Absent on an older bundle ⇒ `moved`. */
+  movers_state?: "moved" | "nothing_moved" | null;
 }
 
 /**
@@ -176,9 +187,12 @@ export interface RawNightlyMover {
    *              his minutes — and the delta can still be negative if he is a
    *              below-replacement man taking a bigger share.
    * `up`/`down`— around either way, at more or fewer minutes than his average
+   * `same`     — equal minutes (a 0.00 row; the sender does not ship these)
+   * `new`      — no baseline minutes at all: a rookie, or a man who sat out
+   *              last year (only under the `last_season` baseline)
    * `absorbed` — the next-man-up slot, never a person
    */
-  direction: "out" | "back" | "up" | "down" | "absorbed";
+  direction: "out" | "back" | "up" | "down" | "same" | "new" | "absorbed";
 }
 
 export interface RawTeam {
@@ -215,6 +229,9 @@ export interface RawTeamsFile {
    */
   nightly_league_typical_shift?: number | null;
   nightly_movers_note?: string | null;
+  /** How many teams' movers were read against LAST season (fewer than 10
+   *  games played). Absent on an older bundle. */
+  nightly_movers_last_season_teams?: number | null;
   teams: Record<string, RawTeam>;
 }
 
@@ -606,6 +623,12 @@ export interface TeamRow {
   nightly_delta_post_mix?: number | null;
   nightly_n_movers_total?: number | null;
   nightly_movers_delta_sum?: number | null;
+  /** EARLY SEASON (2026-10-30): the baseline and state the sender declared,
+   *  and the team's games played this season. NULL on a row from before
+   *  them reads as season_typical / moved — see lib/hoops/movers.ts. */
+  nightly_movers_baseline?: string | null;
+  nightly_movers_state?: string | null;
+  nightly_games_played?: number | null;
 }
 
 /** A team with one rating mode resolved, plus derived net/rank. */

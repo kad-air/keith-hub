@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Fragment } from "react";
 import { notFound } from "next/navigation";
 import HoopsNav from "@/components/hoops/HoopsNav";
 import {
@@ -15,6 +16,8 @@ import {
   resolveRatingMode,
 } from "@/lib/hoops/queries";
 import type { TeamFormGame, TeamMovers } from "@/lib/hoops/queries";
+import { whatMovedCopy } from "@/lib/hoops/movers";
+import type { Segment } from "@/lib/hoops/movers";
 import { rankPlayers, replacementLevelsOf } from "@/lib/hoops/playervalue";
 import { MODE_COPY, fmtSigned, rankTeams, teamName } from "@/lib/hoops/rating";
 import type { RawNightlyMover } from "@/lib/hoops/types";
@@ -310,17 +313,17 @@ export default function HoopsTeamPage({
 /**
  * WHAT MOVED — the men behind this team's nightly rating.
  *
- * Two readings of the SAME roster through the SAME pricing: every man weighted
- * by the minutes he has actually played over the last ten games, against every
- * man weighted by the minutes he has averaged all season. The gap between them
- * splits one piece per player, and these are the biggest three.
+ * Two readings of the SAME men through the SAME pricing: every man weighted by
+ * the minutes he has actually played lately, against every man weighted by his
+ * BASELINE minutes — his own season once the team has ten games, LAST season's
+ * until then (lib/hoops/movers.ts has the why). The gap between them splits one
+ * piece per player, and these are the biggest three.
  *
- * 🔴 Three numbers that are NOT the same thing, and the copy has to keep them
- * apart: the team's WHOLE gap (`deltaPreMix`, which the full decomposition sums
- * to), the part these three account for (`moversDeltaSum`), and the share that
- * survives the mix with the season-long rating (`deltaPostMix`). The team's
- * Nightly-minus-Results number is a fourth quantity again, and these men do not
- * decompose it, so it is deliberately not quoted here.
+ * 🔴 Every word here comes from `whatMovedCopy`, and this component renders
+ * exactly what it returns: the lead, the rows, the accounting line and the
+ * league drift when they are present, the one plain line when nothing has
+ * moved. No copy and no branch of its own, so the build gate drives the real
+ * sentences.
  */
 function WhatMoved({
   tri,
@@ -333,51 +336,47 @@ function WhatMoved({
   lastNGames: number;
   leagueShift: number | null;
 }) {
-  const gap = movers.deltaPreMix;
-  const worse = gap < 0;
+  const copy = whatMovedCopy(movers, { tri, lastNGames, leagueShift });
   return (
     <section className="mt-6 border-l-2 border-cat-hoops/50 pl-3">
       <h3 className="font-display text-lg text-cream">What moved</h3>
-      <p className="mt-1 text-sm text-cream-dim">
-        Priced off the men who have actually played {tri}&rsquo;s last {lastNGames} games, this team
-        reads{" "}
-        <span className={`font-mono ${worse ? "text-cream-dim" : "text-cream"}`}>
-          {Math.abs(gap).toFixed(1)}
-        </span>{" "}
-        points a game {worse ? "worse" : "better"} than the same roster at its season-typical
-        minutes. {movers.nMoversTotal} men moved it; these are the biggest.
-      </p>
+      {copy.nothing && <p className="mt-1 text-sm text-cream-dim">{copy.nothing}</p>}
+      {copy.lead && <p className="mt-1 text-sm text-cream-dim">{segments(copy.lead)}</p>}
 
-      <ol className="mt-3">
-        {movers.movers.map((m, i) => (
-          <MoverRow key={`${m.athlete_id}-${i}`} m={m} lastNGames={lastNGames} />
-        ))}
-      </ol>
-
-      <p className="mt-3 text-xs text-cream-dimmer">
-        {movers.movers.length === 1 ? "That man accounts" : `Those ${movers.movers.length} account`}{" "}
-        for{" "}
-        <span className="font-mono">{fmtSigned(movers.moversDeltaSum, 1)}</span> of the{" "}
-        <span className="font-mono">{fmtSigned(gap, 1)}</span>. Blending with the season-long
-        results rating keeps{" "}
-        <span className="font-mono">{fmtSigned(movers.deltaPostMix, 1)}</span> of it inside the
-        Nightly number.
-      </p>
-      {leagueShift != null && (
-        <p className="mt-1.5 text-xs text-cream-dimmer">
-          Every team drifts a little: the league as a whole reads{" "}
-          <span className="font-mono">{Math.abs(leagueShift).toFixed(1)}</span> points a game{" "}
-          {leagueShift < 0 ? "lower" : "higher"} off its last {lastNGames} games than off the full
-          season, because injuries and rest pile up. That drift sits under all thirty teams and is
-          charged to nobody here.
-        </p>
+      {copy.rows.length > 0 && (
+        <ol className="mt-3">
+          {copy.rows.map(({ mover, phrase }, i) => (
+            <MoverRow key={`${mover.athlete_id}-${i}`} m={mover} phrase={phrase} />
+          ))}
+        </ol>
       )}
+
+      {copy.accounts && <p className="mt-3 text-xs text-cream-dimmer">{segments(copy.accounts)}</p>}
+      {copy.drift && <p className="mt-1.5 text-xs text-cream-dimmer">{segments(copy.drift)}</p>}
     </section>
   );
 }
 
+/** A segment list as JSX: text as it is, numbers in the mono face. */
+function segments(segs: Segment[]) {
+  return segs.map((s, i) =>
+    typeof s === "string" ? (
+      <Fragment key={i}>{s}</Fragment>
+    ) : (
+      <span
+        key={i}
+        className={`font-mono${
+          s.tone === "dim" ? " text-cream-dim" : s.tone === "bright" ? " text-cream" : ""
+        }`}
+      >
+        {s.mono}
+      </span>
+    ),
+  );
+}
+
 /** One mover: who, what changed about his nights, and what it was worth. */
-function MoverRow({ m, lastNGames }: { m: RawNightlyMover; lastNGames: number }) {
+function MoverRow({ m, phrase }: { m: RawNightlyMover; phrase: string }) {
   // 🔴 athlete_id −1 is the "next man up" slot the minutes of a declared
   // absence were handed to. It is not a person and must never link to one.
   const isSlot = m.athlete_id === -1;
@@ -405,33 +404,10 @@ function MoverRow({ m, lastNGames }: { m: RawNightlyMover; lastNGames: number })
       {/* Wraps rather than truncates: the phrase is the whole point of the row,
           and a clipped one on a phone would say less than nothing. */}
       <span className="mt-0.5 block font-mono text-[0.62rem] leading-relaxed text-cream-dimmer">
-        {moverPhrase(m, lastNGames)}
+        {phrase}
       </span>
     </li>
   );
-}
-
-/** The direction as a sentence a broadcast could say out loud. */
-function moverPhrase(m: RawNightlyMover, lastNGames: number): string {
-  const played =
-    m.games_played_of_last_n === 0 ? "none" : `${m.games_played_of_last_n} of the last ${lastNGames}`;
-  const now = m.minutes_last_n.toFixed(1);
-  const usual = m.minutes_typical.toFixed(1);
-  switch (m.direction) {
-    case "out":
-      // Not "0 minutes lately" — the sentence people say is that he is out.
-      return `out — played ${played === "none" ? `none of the last ${lastNGames}` : played}, after ${usual} min a night on the season`;
-    case "back":
-      // His minutes may be up or down; what is up is his AVAILABILITY, and
-      // those are different sentences.
-      return `back — played ${played}, ${now} min a night against ${usual} on the season`;
-    case "up":
-      return `playing more — ${now} min a night against ${usual} on the season`;
-    case "down":
-      return `playing less — ${now} min a night against ${usual} on the season`;
-    case "absorbed":
-      return `the minutes an absence left behind — ${now} a night against ${usual} on the season`;
-  }
 }
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];

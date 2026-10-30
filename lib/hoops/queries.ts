@@ -16,12 +16,13 @@ import { availableRatingModes as availableModesOf, modeDisagreement, rankTeams }
 import type { ModeDisagreement } from "./rating";
 import { COMPLETE_SCHEDULE } from "./schedule.ts";
 import type { ScheduleStatus } from "./schedule.ts";
+import { moversFromRow } from "./movers.ts";
+import type { MoverRow, TeamMovers } from "./movers.ts";
 import type {
   ExplainModel,
   PlayerRow,
   RankedTeam,
   RatingMode,
-  RawNightlyMover,
   RawParamsFile,
   RawPlayerExplain,
   RawPlayerGameRates,
@@ -97,6 +98,9 @@ export interface NightlyMeta {
    *  the movers precisely so it is charged to nobody's name. Null on a bundle
    *  that predates it. */
   leagueTypicalShift: number | null;
+  /** EARLY SEASON: how many teams' movers were read against LAST season
+   *  (fewer than 10 games played). Null on a bundle that predates it. */
+  lastSeasonTeams: number | null;
 }
 
 export function getNightlyMeta(): NightlyMeta {
@@ -105,7 +109,7 @@ export function getNightlyMeta(): NightlyMeta {
   const row = db
     .prepare(
       `SELECT nightly_as_of, nightly_value_source, nightly_last_n_games, nightly_priced,
-              nightly_league_typical_shift
+              nightly_league_typical_shift, nightly_movers_last_season_teams
        FROM hoops_params WHERE id = 1`,
     )
     .get() as
@@ -115,6 +119,7 @@ export function getNightlyMeta(): NightlyMeta {
         nightly_last_n_games: number | null;
         nightly_priced: number | null;
         nightly_league_typical_shift: number | null;
+        nightly_movers_last_season_teams: number | null;
       }
     | undefined;
   const abstained = (
@@ -135,58 +140,33 @@ export function getNightlyMeta(): NightlyMeta {
     lastNGames: row?.nightly_last_n_games ?? null,
     abstained,
     leagueTypicalShift: row?.nightly_league_typical_shift ?? null,
+    lastSeasonTeams: row?.nightly_movers_last_season_teams ?? null,
   };
 }
 
-/** One team's "what moved": the whole gap between its nightly read and the
- *  same roster priced off its season-typical minutes, and the three men most
- *  responsible for it. */
-export interface TeamMovers {
-  /** The team's WHOLE gap, points a game, before the mix with the season-long
-   *  rating. The FULL decomposition sums to this; the three below do not. */
-  deltaPreMix: number;
-  /** deltaPreMix × (1 − results_w): the share of it inside the nightly number. */
-  deltaPostMix: number;
-  /** How many men moved the team by at least a hundredth of a point a game. */
-  nMoversTotal: number;
-  /** The sum over the SHOWN movers only — so the page can say "these three
-   *  account for X of the Y" without implying the three are the whole story. */
-  moversDeltaSum: number;
-  movers: RawNightlyMover[];
-}
+/** One team's "what moved" — the view lives in lib/hoops/movers.ts (pure, so
+ *  the gate can drive the real parse and the real copy); re-exported here for
+ *  the page. */
+export type { TeamMovers } from "./movers.ts";
 
 /**
  * The movers for one team, or null when this bundle has none for it — an older
  * bundle, or (the case that matters) a team the nightly read abstained on,
  * where nothing was re-priced and so nothing moved. Null, never an empty list:
- * "nobody moved" and "we never looked" are different sentences.
+ * "nobody moved" and "we never looked" are different sentences — and a stored
+ * `nothing_moved` is the first of those, so it renders (as one line).
  */
 export function getTeamMovers(tri: string): TeamMovers | null {
   ensureHoopsImport();
   const row = getDb()
     .prepare(
       `SELECT nightly_movers_json, nightly_delta_pre_mix, nightly_delta_post_mix,
-              nightly_n_movers_total, nightly_movers_delta_sum
+              nightly_n_movers_total, nightly_movers_delta_sum,
+              nightly_movers_baseline, nightly_movers_state, nightly_games_played
        FROM hoops_teams WHERE tri = ?`,
     )
-    .get(tri.toUpperCase()) as
-    | {
-        nightly_movers_json: string | null;
-        nightly_delta_pre_mix: number | null;
-        nightly_delta_post_mix: number | null;
-        nightly_n_movers_total: number | null;
-        nightly_movers_delta_sum: number | null;
-      }
-    | undefined;
-  if (!row?.nightly_movers_json) return null;
-  if (row.nightly_delta_pre_mix == null || row.nightly_delta_post_mix == null) return null;
-  return {
-    deltaPreMix: row.nightly_delta_pre_mix,
-    deltaPostMix: row.nightly_delta_post_mix,
-    nMoversTotal: row.nightly_n_movers_total ?? 0,
-    moversDeltaSum: row.nightly_movers_delta_sum ?? 0,
-    movers: JSON.parse(row.nightly_movers_json) as RawNightlyMover[],
-  };
+    .get(tri.toUpperCase()) as MoverRow | undefined;
+  return moversFromRow(row);
 }
 
 export function getModeDisagreement(): ModeDisagreement {

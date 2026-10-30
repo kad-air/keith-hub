@@ -334,7 +334,9 @@ export function getDb(): Database.Database {
       -- How much the 30-team AVERAGE moved between the nightly reading and the
       -- season-typical one. A league-wide level, published apart from the
       -- per-player spread precisely so it is charged to nobody's name.
-      nightly_league_typical_shift REAL
+      nightly_league_typical_shift REAL,
+      -- EARLY SEASON: how many teams' movers were read against last season.
+      nightly_movers_last_season_teams INTEGER
     );
 
     -- Wide, not long: one row per team with every rating mode as columns, so
@@ -369,7 +371,15 @@ export function getDb(): Database.Database {
       nightly_delta_pre_mix REAL,
       nightly_delta_post_mix REAL,
       nightly_n_movers_total INTEGER,
-      nightly_movers_delta_sum REAL
+      nightly_movers_delta_sum REAL,
+      -- EARLY SEASON (2026-10-30): which minutes the movers were read against
+      -- ('season_typical' | 'last_season'), whether anything moved at all
+      -- ('moved' | 'nothing_moved'), and the team's games played this season.
+      -- NULL on a row from before them reads as season_typical / moved
+      -- (lib/hoops/movers.ts), which is what every such bundle was.
+      nightly_movers_baseline TEXT,
+      nightly_movers_state TEXT,
+      nightly_games_played INTEGER
     );
 
     -- value_off_per36/value_def_per36 are the genuine offence/defence split of
@@ -739,6 +749,33 @@ export function getDb(): Database.Database {
   addSchedCol("schedule_pending_to", `schedule_pending_to TEXT`);
   addSchedCol("schedule_pending_why", `schedule_pending_why TEXT`);
   addSchedCol("schedule_season_start_year", `schedule_season_start_year INTEGER`);
+
+  // EARLY-SEASON MOVERS (2026-10-30): the baseline the sender compared
+  // against, whether anything moved, the team's games played, and the league
+  // count of last-season teams. Additive and nullable like every migration
+  // above. No no-op marker is needed for these: they ride INSIDE
+  // hoops_teams.json, which is in the content hash, so a bundle carrying them
+  // can never match a stored hash from one that did not — and NULL reads as
+  // the only reading an older bundle ever had (season_typical / moved).
+  const hoopsTeamEarlyCols = (
+    dbInstance.prepare(`PRAGMA table_info(hoops_teams)`).all() as Array<{ name: string }>
+  ).map((c) => c.name);
+  for (const col of [
+    "nightly_movers_baseline TEXT",
+    "nightly_movers_state TEXT",
+    "nightly_games_played INTEGER",
+  ]) {
+    const name = col.split(" ")[0];
+    if (!hoopsTeamEarlyCols.includes(name)) {
+      dbInstance.exec(`ALTER TABLE hoops_teams ADD COLUMN ${col}`);
+    }
+  }
+  const hoopsParamsEarlyCols = (
+    dbInstance.prepare(`PRAGMA table_info(hoops_params)`).all() as Array<{ name: string }>
+  ).map((c) => c.name);
+  if (!hoopsParamsEarlyCols.includes("nightly_movers_last_season_teams")) {
+    dbInstance.exec(`ALTER TABLE hoops_params ADD COLUMN nightly_movers_last_season_teams INTEGER`);
+  }
 
   return dbInstance;
 }

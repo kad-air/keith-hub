@@ -22,7 +22,15 @@
 //   • a team the read abstained on gets explained anyway, i.e. the page
 //     accounts for movement in a rating nobody computed,
 //   • the "next man up" absorption slot (athlete_id −1) is rendered as a
-//     person and linked to a player page that cannot exist.
+//     person and linked to a player page that cannot exist,
+//   • EARLY SEASON (2026-10-30): with 4–5 games played the two halves read the
+//     SAME games and every card said "0 men moved it; these are the biggest",
+//     Doncic "playing less — 28.4 min a night against 28.4 on the season". The
+//     sender now names its BASELINE (`season_typical` | `last_season`) and
+//     STATE (`moved` | `nothing_moved`) and two more directions (`new`,
+//     `same`); the card's copy follows them (lib/hoops/movers.ts, pure — the
+//     real sentences are driven here, not a copy of them), and a bundle
+//     WITHOUT the fields must read exactly as it always did.
 //
 // Second source for the headline claims: hoops-sim's own espn_player_box, via
 // the two real-basketball anchors below — Giannis Antetokounmpo played none of
@@ -34,7 +42,14 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
-import type { RawNightlyMover, RawTeamsFile } from "../lib/hoops/types.ts";
+import type { RawNightlyMover, RawNightlyRating, RawTeamsFile } from "../lib/hoops/types.ts";
+import {
+  NOTHING_MOVED_LINE,
+  flat,
+  moversFromRow,
+  whatMovedCopy,
+} from "../lib/hoops/movers.ts";
+import type { MoverRow } from "../lib/hoops/movers.ts";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -51,9 +66,19 @@ const MOVER_TEAM_COLS = [
   "nightly_delta_post_mix",
   "nightly_n_movers_total",
   "nightly_movers_delta_sum",
+  // EARLY SEASON (2026-10-30)
+  "nightly_movers_baseline",
+  "nightly_movers_state",
+  "nightly_games_played",
 ];
-const MOVER_PARAM_COLS = ["nightly_league_typical_shift"];
-const DIRECTIONS = new Set(["out", "back", "up", "down", "absorbed"]);
+const MOVER_PARAM_COLS = ["nightly_league_typical_shift", "nightly_movers_last_season_teams"];
+const DIRECTIONS = new Set(["out", "back", "up", "down", "same", "new", "absorbed"]);
+const BASELINES = new Set(["season_typical", "last_season"]);
+const STATES = new Set(["moved", "nothing_moved"]);
+/** The sender switches baselines at this many games played. */
+const EARLY_SEASON_GAMES = 10;
+/** A mover is shipped only when he moved the team by at least this much. */
+const MIN_SHIPPED_DELTA = 0.01;
 /** hoops-sim's exporthub.NIGHTLY_MOVERS_TOP_N. */
 const TOP_N = 3;
 
@@ -151,8 +176,8 @@ const tris = Object.keys(teamsFile.teams).sort();
       const ok = wantsBlob
         ? /JSON\.stringify\(\s*t\.nightly\.movers\s*\)/.test(arg) && /t\.nightly\?\.movers/.test(arg)
         : new RegExp(
-            c === "nightly_league_typical_shift"
-              ? "bundle\\.teams\\.nightly_league_typical_shift"
+            spec.table === "hoops_params"
+              ? `bundle\\.teams\\.${c}`
               : `t\\.nightly\\?\\.${c.replace(/^nightly_/, "")}`,
           ).test(arg);
       check(
@@ -198,6 +223,9 @@ const tris = Object.keys(teamsFile.teams).sort();
   let withMovers = 0;
   let abstained = 0;
   let absorbedSlots = 0;
+  let earlyDeclared = 0;
+  let lastSeasonTeams = 0;
+  let nothingMoved = 0;
   for (const tri of tris) {
     const n = teamsFile.teams[tri].nightly;
     if (!n) continue;
@@ -217,6 +245,42 @@ const tris = Object.keys(teamsFile.teams).sort();
       continue;
     }
     priced += 1;
+
+    // EARLY SEASON: a sender that declares its baseline and state is held to
+    // them. Baseline `last_season` means fewer than ten games played — the
+    // rule is the sender's, restated here so a bundle that says "last season"
+    // about an 82-game team (or "season typical" about a 4-game one) fails.
+    const declaresEarly = n.movers_baseline != null || n.movers_state != null;
+    if (declaresEarly) {
+      earlyDeclared += 1;
+      check(
+        n.movers_baseline != null && BASELINES.has(n.movers_baseline),
+        `${tri}: movers_baseline "${n.movers_baseline}" is not season_typical | last_season`,
+      );
+      check(
+        n.movers_state != null && STATES.has(n.movers_state),
+        `${tri}: movers_state "${n.movers_state}" is not moved | nothing_moved`,
+      );
+      check(
+        (n.movers_baseline === "last_season") === (n.games_played < EARLY_SEASON_GAMES),
+        `${tri}: baseline "${n.movers_baseline}" with ${n.games_played} games played — the sender ` +
+          `switches to last season under ${EARLY_SEASON_GAMES}`,
+      );
+      if (n.movers_baseline === "last_season") lastSeasonTeams += 1;
+      if (n.movers_state === "nothing_moved") {
+        nothingMoved += 1;
+        check(
+          Array.isArray(n.movers) && n.movers.length === 0,
+          `${tri}: nothing_moved, but ships ${n.movers?.length ?? "no"} movers`,
+        );
+        check(
+          (n.n_movers_total ?? 0) === 0,
+          `${tri}: nothing_moved, but n_movers_total is ${n.n_movers_total}`,
+        );
+        continue;
+      }
+    }
+
     if (n.movers == null) {
       // Every priced team must ship movers, so a silent degrade cannot pass
       // as "nothing moved here".
@@ -289,9 +353,63 @@ const tris = Object.keys(teamsFile.teams).sort();
         m.minutes_last_n >= 0 && m.minutes_typical >= 0,
         `${tri}/${m.name}: negative minutes (${m.minutes_last_n} / ${m.minutes_typical})`,
       );
+      if (declaresEarly) {
+        // The new sender's own rules: no 0.00 row, so `same` never ships;
+        // `new` is a man with no baseline minutes, only against last season;
+        // `out` against last season is a man with none THIS season.
+        check(
+          Math.abs(m.delta_pts) >= MIN_SHIPPED_DELTA - 1e-9,
+          `${tri}/${m.name}: a ${m.delta_pts} row shipped — under ${MIN_SHIPPED_DELTA} is not a mover`,
+        );
+        check(
+          m.direction !== "same",
+          `${tri}/${m.name}: direction "same" shipped — equal minutes are a 0.00 row and never ship`,
+        );
+        if (m.direction === "new") {
+          check(
+            n.movers_baseline === "last_season",
+            `${tri}/${m.name}: "new" under the ${n.movers_baseline} baseline — only last season ` +
+              `can have no minutes for a man`,
+          );
+          check(
+            m.minutes_typical === 0,
+            `${tri}/${m.name}: "new" with ${m.minutes_typical} baseline minutes`,
+          );
+        }
+        if (m.direction === "out" && n.movers_baseline === "last_season") {
+          check(
+            m.minutes_last_n === 0,
+            `${tri}/${m.name}: "out" against last season but ${m.minutes_last_n} min a night this one`,
+          );
+        }
+      }
     }
   }
-  check(withMovers >= 25, `only ${withMovers} teams carry movers — expected nearly all 30`);
+  check(
+    withMovers + nothingMoved >= 25,
+    `only ${withMovers + nothingMoved} teams carry a movers verdict — expected nearly all 30`,
+  );
+  // The league count of last-season teams must agree with the teams themselves.
+  if (teamsFile.nightly_movers_last_season_teams != null) {
+    check(
+      teamsFile.nightly_movers_last_season_teams === lastSeasonTeams,
+      `hoops_teams.json: nightly_movers_last_season_teams says ${teamsFile.nightly_movers_last_season_teams}, ` +
+        `but ${lastSeasonTeams} teams declare the last_season baseline`,
+    );
+  } else {
+    check(
+      earlyDeclared === 0,
+      `hoops_teams.json: ${earlyDeclared} teams declare an early-season baseline but the file ` +
+        `carries no nightly_movers_last_season_teams`,
+    );
+  }
+  notes.push(
+    earlyDeclared === 0
+      ? "bundle: pre-early-season shape (no movers_baseline/movers_state) — the new shape is " +
+          "exercised synthetically in section 4"
+      : `bundle: ${earlyDeclared} teams declare a baseline — ${lastSeasonTeams} against last ` +
+          `season, ${nothingMoved} with nothing moved`,
+  );
   check(
     teamsFile.nightly_league_typical_shift != null,
     "hoops_teams.json: nightly_league_typical_shift missing — the league-wide drift has to be " +
@@ -448,10 +566,278 @@ const tris = Object.keys(teamsFile.teams).sort();
           nightly_delta_post_mix: n?.delta_post_mix ?? null,
           nightly_n_movers_total: n?.n_movers_total ?? null,
           nightly_movers_delta_sum: n?.movers_delta_sum ?? null,
+          nightly_movers_baseline: n?.movers_baseline ?? null,
+          nightly_movers_state: n?.movers_state ?? null,
+          nightly_games_played: n?.games_played ?? null,
         };
         return cols.map((c) => byName[c] ?? null);
       };
       for (const tri of ["MIL", "BOS"]) ins.run(...bindTeam(tri));
+
+      // The SELECT getTeamMovers runs, lifted from queries.ts so the read half
+      // here is the page's read half — and must name every movers column, or
+      // a stored baseline would never reach the card.
+      const q = fs.readFileSync(path.join(ROOT, "lib/hoops/queries.ts"), "utf-8");
+      const selStart = q.indexOf("export function getTeamMovers");
+      const selSrc = q.slice(selStart).match(/`(SELECT[\s\S]*?FROM hoops_teams WHERE tri = \?)`/);
+      check(!!selSrc, "queries.ts: could not find getTeamMovers' SELECT");
+      for (const c of MOVER_TEAM_COLS) {
+        check(
+          !!selSrc && selSrc[1].includes(c),
+          `queries.ts: getTeamMovers does not SELECT ${c} — stored, never read`,
+        );
+      }
+      const selectMovers = db.prepare(selSrc ? selSrc[1] : `SELECT * FROM hoops_teams WHERE tri = ?`);
+
+      // ── EARLY SEASON: the new shape, through the REAL INSERT and the REAL
+      // parse + copy. The committed bundle may or may not carry it (section 2
+      // reports which), so every case is built here from LAL's real row.
+      const lal = teamsFile.teams.LAL;
+      const synth = (tri: string, nightly: Partial<RawNightlyRating> | null): void => {
+        const t = { ...lal, nightly: nightly ? ({ ...lal.nightly!, ...nightly } as RawNightlyRating) : undefined };
+        const n = t.nightly;
+        const byName: Record<string, unknown> = {
+          tri,
+          conference: t.conference,
+          division: t.division,
+          results_off: t.results.off,
+          results_def: t.results.def,
+          roster_off: t.roster.off,
+          roster_def: t.roster.def,
+          blend_off: t.blend.off,
+          blend_def: t.blend.def,
+          nightly_off: n?.off ?? null,
+          nightly_def: n?.def ?? null,
+          nightly_results_w: n?.results_w ?? null,
+          nightly_n_basis_games: n?.n_basis_games ?? null,
+          nightly_abstained: n ? (n.abstained ? 1 : 0) : null,
+          nightly_movers_json: n?.movers ? JSON.stringify(n.movers) : null,
+          nightly_delta_pre_mix: n?.delta_pre_mix ?? null,
+          nightly_delta_post_mix: n?.delta_post_mix ?? null,
+          nightly_n_movers_total: n?.n_movers_total ?? null,
+          nightly_movers_delta_sum: n?.movers_delta_sum ?? null,
+          nightly_movers_baseline: n?.movers_baseline ?? null,
+          nightly_movers_state: n?.movers_state ?? null,
+          nightly_games_played: n?.games_played ?? null,
+        };
+        ins.run(...cols.map((c) => byName[c] ?? null));
+      };
+      const mover = (over: Partial<RawNightlyMover>): RawNightlyMover => ({
+        athlete_id: 3945274,
+        name: "Luka Doncic",
+        games_played_of_last_n: 5,
+        minutes_last_n: 34.2,
+        minutes_typical: 28.4,
+        value_per36: 6.4341,
+        delta_pts: 1.03,
+        direction: "up",
+        ...over,
+      });
+      const EARLY_MOVERS: RawNightlyMover[] = [
+        mover({}),
+        mover({ athlete_id: 5100001, name: "Rookie Row", minutes_last_n: 18.5, minutes_typical: 0, delta_pts: -0.41, direction: "new" }),
+        mover({ athlete_id: 5100002, name: "Not Yet Row", games_played_of_last_n: 0, minutes_last_n: 0, minutes_typical: 31.7, delta_pts: -0.33, direction: "out" }),
+        mover({ athlete_id: 5100003, name: "Back Row", minutes_last_n: 22.0, minutes_typical: 9.8, delta_pts: 0.2, direction: "back" }),
+        mover({ athlete_id: 5100004, name: "Less Row", minutes_last_n: 20.1, minutes_typical: 30.6, delta_pts: -0.18, direction: "down" }),
+        mover({ athlete_id: -1, name: "absorbed", minutes_last_n: 12.0, minutes_typical: 4.0, delta_pts: -0.11, direction: "absorbed" }),
+        mover({ athlete_id: 5100005, name: "Same Row", minutes_last_n: 28.4, minutes_typical: 28.4, delta_pts: 0, direction: "same" }),
+      ];
+      // (a) the committed LAL row with the early fields STRIPPED — an old bundle.
+      const { movers_baseline: _b, movers_state: _s, ...lalOld } = lal.nightly!;
+      void _b;
+      void _s;
+      synth("ZOL", { ...lalOld, movers_baseline: undefined, movers_state: undefined });
+      // (b) early season, moved, against last season, five games in.
+      synth("ZEA", {
+        movers_baseline: "last_season",
+        movers_state: "moved",
+        games_played: 5,
+        n_basis_games: 5,
+        delta_pre_mix: 0.4,
+        delta_post_mix: 0.26,
+        n_movers_total: 6,
+        movers_delta_sum: 0.2,
+        movers: EARLY_MOVERS,
+      });
+      // (c) nothing moved, with the empty list the sender ships…
+      synth("ZEN", {
+        movers_baseline: "last_season",
+        movers_state: "nothing_moved",
+        games_played: 4,
+        delta_pre_mix: 0,
+        delta_post_mix: 0,
+        n_movers_total: 0,
+        movers_delta_sum: 0,
+        movers: [],
+      });
+      // (d) …and with the list left out entirely (and the deltas with it).
+      synth("ZEM", {
+        movers_baseline: "last_season",
+        movers_state: "nothing_moved",
+        games_played: 4,
+        delta_pre_mix: null,
+        delta_post_mix: null,
+        n_movers_total: null,
+        movers_delta_sum: null,
+        movers: null,
+      });
+      // (e) season_typical declared explicitly, a row of equal minutes called "down".
+      synth("ZET", {
+        movers_baseline: "season_typical",
+        movers_state: "moved",
+        games_played: 12,
+        movers: [mover({ minutes_last_n: 28.4, minutes_typical: 28.4, delta_pts: 0.01, direction: "down" })],
+        n_movers_total: 1,
+        movers_delta_sum: 0.01,
+      });
+      // (f) a sender ahead of this receiver: a baseline this code has never heard of.
+      synth("ZEU", { movers_baseline: "ice_age" as never, movers_state: "moved", games_played: 30 });
+
+      const read = (tri: string) => moversFromRow(selectMovers.get(tri) as MoverRow | undefined);
+      const ctx = (tri: string) => ({ tri, lastNGames: 10, leagueShift: -1.34 });
+
+      // (a) OLD BUNDLE: reads season_typical / moved, and says EXACTLY what it
+      // said before the early-season work — this pins "keep today's copy".
+      const old = read("ZOL");
+      check(
+        old?.baseline === "season_typical" && old.state === "moved",
+        `old bundle: a row with no baseline/state reads as ${old?.baseline} / ${old?.state}`,
+      );
+      if (old) {
+        const copy = whatMovedCopy(old, ctx("LAL"));
+        const gap = Math.abs(lal.nightly!.delta_pre_mix!).toFixed(1);
+        check(
+          copy.lead != null &&
+            flat(copy.lead) ===
+              `Priced off the men who have actually played LAL’s last 10 games, this team reads ` +
+                `${gap} points a game ${lal.nightly!.delta_pre_mix! < 0 ? "worse" : "better"} than the ` +
+                `same roster at its season-typical minutes. ${lal.nightly!.n_movers_total} men moved ` +
+                `it; these are the biggest.`,
+          `old bundle: the lead sentence changed — ${copy.lead ? flat(copy.lead) : "null"}`,
+        );
+        check(copy.nothing === null, "old bundle: the nothing-moved line rendered on a team that moved");
+        check(
+          copy.rows.length === lal.nightly!.movers!.length,
+          `old bundle: ${copy.rows.length} rows for ${lal.nightly!.movers!.length} movers`,
+        );
+        const luka = copy.rows.find((r) => r.mover.athlete_id === 3945274);
+        const lm = lal.nightly!.movers!.find((m) => m.athlete_id === 3945274);
+        if (luka && lm && lm.direction === "down") {
+          check(
+            luka.phrase ===
+              `playing less — ${lm.minutes_last_n.toFixed(1)} min a night against ` +
+                `${lm.minutes_typical.toFixed(1)} on the season`,
+            `old bundle: Doncic's phrase changed — "${luka.phrase}"`,
+          );
+        }
+        check(
+          copy.accounts != null &&
+            flat(copy.accounts).startsWith(`Those ${copy.rows.length} account for `) &&
+            flat(copy.accounts).includes(" of it inside the Nightly number."),
+          `old bundle: the accounting line changed — ${copy.accounts ? flat(copy.accounts) : "null"}`,
+        );
+        check(
+          copy.drift != null &&
+            flat(copy.drift) ===
+              "Every team drifts a little: the league as a whole reads 1.3 points a game lower off its " +
+                "last 10 games than off the full season, because injuries and rest pile up. That drift " +
+                "sits under all thirty teams and is charged to nobody here.",
+          `old bundle: the drift line changed — ${copy.drift ? flat(copy.drift) : "null"}`,
+        );
+      }
+
+      // (b) LAST SEASON: the early lead, every direction's line, the drift.
+      const early = read("ZEA");
+      check(
+        early?.baseline === "last_season" && early.state === "moved" && early.gamesPlayed === 5,
+        `last_season: read back as ${JSON.stringify(early)}`,
+      );
+      if (early) {
+        const copy = whatMovedCopy(early, ctx("LAL"));
+        check(
+          copy.lead != null &&
+            flat(copy.lead) ===
+              "Early season: priced off the men who have played LAL’s first 5 games, this team reads " +
+                "0.4 points a game better than the same men at their minutes last season. 6 men moved " +
+                "it; these are the biggest.",
+          `last_season: lead reads "${copy.lead ? flat(copy.lead) : "null"}"`,
+        );
+        const want: Record<string, string> = {
+          up: "playing more — 34.2 min a night against 28.4 last season",
+          new: "new this year — 18.5 min a night",
+          out: "hasn’t played yet — 31.7 min a night last season",
+          back: "back — 22.0 min a night against 9.8 last season",
+          down: "playing less — 20.1 min a night against 30.6 last season",
+          absorbed: "the minutes an absence left behind — 12.0 a night against 4.0 last season",
+          same: "same minutes — 28.4 a night",
+        };
+        for (const row of copy.rows) {
+          check(
+            row.phrase === want[row.mover.direction],
+            `last_season/${row.mover.direction}: "${row.phrase}" (wanted "${want[row.mover.direction]}")`,
+          );
+        }
+        check(copy.rows.length === EARLY_MOVERS.length, `last_season: ${copy.rows.length} rows`);
+        const everything = [copy.lead, copy.accounts, copy.drift]
+          .map((s) => (s ? flat(s) : ""))
+          .concat(copy.rows.map((r) => r.phrase))
+          .join("\n");
+        check(
+          !/season-typical|on the season|full season|last 10 games/.test(everything),
+          `last_season: the card still speaks of the team's own season somewhere:\n${everything}`,
+        );
+        check(
+          copy.drift != null && /lower off this season’s games so far than off last season/.test(flat(copy.drift)),
+          `last_season: the drift line does not say last season — "${copy.drift ? flat(copy.drift) : "null"}"`,
+        );
+      }
+
+      // (c)+(d) NOTHING MOVED: one line, nothing else — whether or not the
+      // sender bothered to ship the empty list.
+      for (const tri of ["ZEN", "ZEM"]) {
+        const v = read(tri);
+        check(
+          v != null && v.state === "nothing_moved" && v.movers.length === 0,
+          `${tri}: nothing_moved read back as ${JSON.stringify(v)} — a null here renders NO card, ` +
+            `which says "we never looked" when the truth is "nothing moved"`,
+        );
+        if (!v) continue;
+        const copy = whatMovedCopy(v, ctx("LAL"));
+        check(copy.nothing === NOTHING_MOVED_LINE, `${tri}: the line is "${copy.nothing}"`);
+        check(
+          copy.lead === null && copy.rows.length === 0 && copy.accounts === null && copy.drift === null,
+          `${tri}: nothing_moved still renders ${JSON.stringify({
+            lead: copy.lead && flat(copy.lead),
+            rows: copy.rows.length,
+            accounts: copy.accounts && flat(copy.accounts),
+            drift: copy.drift && flat(copy.drift),
+          })}`,
+        );
+        check(
+          !/0 men|these are the biggest|account for/.test(copy.nothing ?? ""),
+          `${tri}: the nothing-moved line talks about movers`,
+        );
+      }
+
+      // (e) equal minutes are never "playing less", whatever the direction says.
+      const eq = read("ZET");
+      check(
+        eq != null && whatMovedCopy(eq, ctx("LAL")).rows[0]?.phrase === "same minutes — 28.4 a night",
+        `season_typical: a "down" row at 28.4 vs 28.4 reads "${eq && whatMovedCopy(eq, ctx("LAL")).rows[0]?.phrase}"`,
+      );
+
+      // (f) an unknown baseline falls back to the old reading rather than
+      // refusing the card (a sender ahead of this receiver is not an error).
+      const unknown = read("ZEU");
+      check(
+        unknown?.baseline === "season_typical" && unknown.state === "moved" && unknown.movers.length > 0,
+        `unknown baseline: read back as ${unknown?.baseline} / ${unknown?.state}`,
+      );
+      notes.push(
+        "early season: an old row reads season_typical/moved with today's exact copy; last_season " +
+          "says 'first 5 games' and 'last season' on every line; nothing_moved is one line (list " +
+          "shipped empty or left out); equal minutes never 'playing less'; an unknown baseline falls back",
+      );
 
       // A team with NO movers at all — the abstained shape, which this bundle
       // happens not to contain, driven live rather than merely asserted absent.
@@ -518,8 +904,21 @@ const tris = Object.keys(teamsFile.teams).sort();
     "queries.ts: getTeamMovers is gone — the team page has no read",
   );
   check(
-    /if \(!row\?\.nightly_movers_json\) return null;/.test(q),
-    "queries.ts: getTeamMovers no longer returns null when the blob is absent",
+    /return moversFromRow\(row\);/.test(q),
+    "queries.ts: getTeamMovers no longer goes through moversFromRow — the page and this gate " +
+      "would be reading two different parses",
+  );
+
+  // 🔴 The copy module imports NOTHING but types (the pages.ts lesson: a
+  // runtime import here drags its dependencies into the client bundle and
+  // breaks plain-node execution of this very check).
+  const moversSrc = fs.readFileSync(path.join(ROOT, "lib/hoops/movers.ts"), "utf-8");
+  const runtimeImports = moversSrc
+    .split("\n")
+    .filter((l) => /^import\s/.test(l) && !/^import type\s/.test(l));
+  check(
+    runtimeImports.length === 0,
+    `lib/hoops/movers.ts has a runtime import: ${runtimeImports.join(" | ")}`,
   );
   check(
     /leagueTypicalShift/.test(q) && /nightly_league_typical_shift/.test(q),
@@ -543,7 +942,28 @@ const tris = Object.keys(teamsFile.teams).sort();
     "the team page does not special-case athlete_id −1 — the absorption slot would be rendered as " +
       "a person and linked to a player page that cannot exist",
   );
-  notes.push("read model + page: movers read nulls out cleanly, the −1 slot is never a person");
+  // 🔴 The page renders whatMovedCopy's output and carries no sentence of its
+  // own — otherwise the copy this gate drives is not the copy on screen.
+  check(
+    /whatMovedCopy\(movers, \{ tri, lastNGames, leagueShift \}\)/.test(page),
+    "the team page does not render through whatMovedCopy",
+  );
+  // Comments stripped first: the component's own docblock may describe the copy.
+  const pageCode = page.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  const pageCopy = pageCode.match(/these are the biggest|playing less|season-typical|last season|account for/g);
+  check(
+    pageCopy == null,
+    `the team page carries movers copy of its own (${(pageCopy ?? []).join(", ")}) — every sentence ` +
+      `belongs in lib/hoops/movers.ts, where this gate can read it`,
+  );
+  check(
+    /copy\.nothing &&/.test(page) && /copy\.rows\.length > 0 &&/.test(page),
+    "the team page renders the nothing-moved line or the list unconditionally",
+  );
+  notes.push(
+    "read model + page: movers read nulls out cleanly, the −1 slot is never a person, every " +
+      "sentence comes from lib/hoops/movers.ts",
+  );
 }
 
 // ── report ────────────────────────────────────────────────────────────────

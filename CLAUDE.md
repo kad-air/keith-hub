@@ -1199,6 +1199,62 @@ The nightly rating is one number and one number cannot say why. A team page now 
 
 Gate: `npm run check:hoops:movers` (appended to `prebuild` at the END, after `check:hoops:matchup`). It reads the importer's own `run(...)` argument list and demands the blob's slot binds the serialised block **by position**; round-trips MIL and BOS through the real schema and the real INSERT, plus a team with no read that must come back NULL; and over the committed bundle asserts the sort, the count, both sums, the mix identity, the abstain rule and the −1 rule. Two REAL-basketball anchors from `espn_player_box` (hoops-sim's, not this bundle's movers): Giannis is Milwaukee's biggest mover, `out`, none of the last ten; Tatum is Boston's, `back` — each clear of the runner-up by more than 1.2 a game, and if either leaves the league the failure says the ANCHOR LIST is stale rather than blaming the decomposition. **11/11 falsification probes caught, one only after a REAL HOLE was found and the CHECK repaired**: the marker assertion grepped the whole file for `moversSettled` and stayed green when the term was deleted from the no-op `if` and left declared above it — it now reads the CONDITION.
 
+##### Early season: movers against LAST season (2026-10-30)
+
+Keith's rule: "this should be early movement versus last year until we have the appropriate
+sample size." With 4–5 games played the "last ten" and "season-typical" halves read the SAME
+games, so every card shipped all zeros ("0 men moved it; these are the biggest", Doncic "playing
+less — 28.4 min a night against 28.4 on the season"). hoops-sim (the sender, on a branch) now
+declares per team, inside the nightly block: `movers_baseline` (`season_typical` — ≥ 10 games
+played, the card as it was — or `last_season` — fewer than 10: this season's games against each
+man's minutes a night across LAST season's schedule, any team), `movers_state` (`moved` |
+`nothing_moved`, the latter with an empty `movers` list), two more `direction` values (`new` — no
+baseline minutes, a rookie or a man who sat out; `same` — equal minutes, a 0.00 row the sender
+never ships), no 0.00 rows at all, and a league count `nightly_movers_last_season_teams`.
+
+🔴 **The receiver was never going to REJECT that bundle — it was going to mislabel it.** Measured
+before the change: no zod/enum/CHECK on any of these; the importer stored the movers blob verbatim
+and ignored the new fields; the card then read a 5-game team as "last 10 games … season-typical
+minutes", a `nothing_moved` team as "0 men moved it; these are the biggest … Those 0 account for
++0.0", and a `new`/`same` row with NO phrase at all (the `moverPhrase` switch had no default, so the
+row rendered a name and a number and nothing under them). Three new nullable columns on
+`hoops_teams` (`nightly_movers_baseline`, `nightly_movers_state`, `nightly_games_played`) and one on
+`hoops_params` (`nightly_movers_last_season_teams`), additive migrations, bound by the importer.
+**No no-op marker**, deliberately: the fields ride INSIDE `hoops_teams.json`, which is in the
+content hash, so a bundle carrying them can never match a stored hash from one that did not — and
+NULL reads as the only reading an older bundle ever had (`season_typical` / `moved`).
+
+🔴 **Every sentence of the card lives in `lib/hoops/movers.ts` (pure, imports only types).**
+`moversFromRow` is the one parse (getTeamMovers calls it) and `whatMovedCopy` returns the card as
+data — `nothing` (one plain line, "Nothing has moved this team's number yet.", with every other
+field empty), `lead`, `rows`, `accounts`, `drift` — and the page renders exactly what comes back,
+with no copy or branch of its own (the gate greps the page for any). Under `last_season` the lead
+is "Early season: priced off the men who have played LAL's first 5 games, this team reads X points a
+game better than the same men at their minutes last season.", every row says "last season" ("new
+this year — A min a night", "hasn't played yet — B min a night last season"), and the league-drift
+line says "off this season's games so far than off last season". Under `season_typical` the copy is
+today's exactly, except that equal rounded minutes read "same minutes — A a night", never "playing
+less". A `nothing_moved` row with NO blob still renders the one line (a null there would say "we
+never looked"). An unknown baseline string from a sender ahead of this receiver falls back to the
+old reading rather than dropping the card.
+
+`check:hoops:movers` grew: the two INSERTs' new slots by position (`hoops_params` columns now
+checked as `bundle.teams.<col>` generically), the new-sender rules over the bundle when it declares
+them (baseline ⇔ games played < 10, `nothing_moved` ⇒ empty list and total 0, no row under 0.01,
+`same` never shipped, `new` only against last season with 0 baseline minutes, the league count
+equal to the teams declaring it) with a note saying which shape the committed bundle is, and over
+a throwaway DB through the REAL INSERT, the REAL `getTeamMovers` SELECT (lifted from queries.ts
+and required to name every column) and the real `moversFromRow`/`whatMovedCopy`: an old row
+(LAL stripped of the fields) must produce today's exact lead, Doncic phrase, accounting and drift
+lines; a `last_season` row every direction's exact phrase and no "season-typical"/"on the
+season"/"full season"/"last 10 games" anywhere; `nothing_moved` with and without the blob exactly
+the one line; equal minutes never "playing less"; the unknown baseline falling back; the module
+importing nothing but types. **15/15 falsification probes caught** (nothing_moved rendering the
+card, the early lead/drift keeping the old wording, equal minutes "playing less", the no-blob
+nothing_moved returning null, the default flipped to last_season, `new` phrased as `up`, a runtime
+import, each new slot bound null or swapped, the SELECT dropping a column, the schema dropping one,
+copy inlined in the page, the list rendered unconditionally).
+
 #### The matchup + box score (milestone 3, #67)
 
 `/hoops/matchup` is the sim's front door: home/away pickers, a neutral-court toggle, a ratings-mode row, and one accented **Sim**. `/hoops/game/[runId]` is one sampled game. 🔴 **The section landing is Scores, not the Matchup** (2026-10-23): `/hoops` redirects to `/hoops/scores` (`app/hoops/page.tsx`), the masthead entry in `lib/sections.ts` points there, and the tab row reads Scores, Standings, Projections, Matchup, Teams, Players (`HOOPS_TABS`, which is also the 1..6 key order). An old `/hoops?home=&away=&mode=&neutral=` link still carries its pickers through to `/hoops/matchup`.
