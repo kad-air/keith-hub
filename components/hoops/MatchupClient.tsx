@@ -11,7 +11,13 @@ import {
 } from "@/components/hoops/BoxScoreTable";
 import MarginHistogram from "@/components/hoops/MarginHistogram";
 import type { BoxscoreResult } from "@/lib/hoops/boxscore";
-import type { Meeting, SimSummary } from "@/lib/hoops/matchup";
+import {
+  favouriteView,
+  fmtWinProb,
+  marginLabel,
+  type Meeting,
+  type SimSummary,
+} from "@/lib/hoops/matchup";
 import type { FormSummary, HoopsMeta } from "@/lib/hoops/queries";
 import { MODE_COPY, fmtSigned, rankTeams, teamName, teamNickname } from "@/lib/hoops/rating";
 import { pendingNote } from "@/lib/hoops/schedule";
@@ -202,16 +208,21 @@ export default function MatchupClient({
   useKeyboard({ s: () => void sim(), x: swap, r: surprise });
 
   const summary = result?.summary;
+  // 🔴 Everything the answer section prints reads off THIS, never off the
+  // home-side fields directly: the favourite leads, and every signed margin
+  // is favourite − underdog (see favouriteView in lib/hoops/matchup).
+  const view = summary ? favouriteView(summary) : null;
 
-  // The last meeting's closing line, from tonight's HOME side, for the "our
-  // line vs the market" sentence. A meeting where the other team hosted has
-  // its spread flipped to this side.
+  // The last meeting's closing line, from tonight's FAVOURITE's side, for the
+  // "our line vs the market" sentence — the same side the Line stat is quoted
+  // from, so the two read as one number. A meeting the other team hosted has
+  // its spread flipped.
   const lastLined = [...meetings].reverse().find((m) => m.homeSpread != null);
   // "30 games not scheduled yet (Dec 4 to 8)", or null when the slate is whole.
   const scheduleNote = pendingNote(meta.schedule);
-  const lastLineFromHome =
-    lastLined && lastLined.homeSpread != null
-      ? lastLined.home === home
+  const lastLineFromFav =
+    lastLined && lastLined.homeSpread != null && view
+      ? lastLined.home === view.fav
         ? lastLined.homeSpread
         : -lastLined.homeSpread
       : null;
@@ -368,7 +379,7 @@ export default function MatchupClient({
         </section>
       )}
 
-      {summary && result && (
+      {summary && result && view && (
         <>
           {/* ── The answer ─────────────────────────────────────────── */}
           <section ref={resultRef} className="mt-8 scroll-mt-20 border-t border-rule pt-5">
@@ -377,26 +388,31 @@ export default function MatchupClient({
               {teamName(summary.home)}
             </p>
 
+            {/* 🔴 The FAVOURITE leads — big name, accent percentage — and the
+                underdog sits small and grey on the right, whichever of them is
+                at home. The home team used to be hard-wired into this slot, so
+                a 38% home side got the headline and the accent. On a coin flip
+                (both print the same at one decimal) the home team leads, as
+                before. */}
             <div className="mt-2 flex items-baseline justify-between gap-4">
-              <h2 className="font-display text-3xl text-cream">
-                {summary.home}{" "}
-                <span className="text-cat-hoops">
-                  {(summary.homeWinProb * 100).toFixed(1)}%
-                </span>
+              <h2 className="font-display text-3xl text-cream" data-fav={view.fav}>
+                {view.fav}{" "}
+                <span className="text-cat-hoops">{fmtWinProb(view.favWinProb)}</span>
               </h2>
               <p className="font-mono text-sm text-cream-dim">
-                {summary.away} {((1 - summary.homeWinProb) * 100).toFixed(1)}%
+                {view.dog} {fmtWinProb(view.dogWinProb)}
               </p>
             </div>
 
-            {/* The same number as a length. The labels above carry identity;
-                the tick is the coin-flip line, so lopsidedness reads at a
-                glance. Home is the accented side, matching the histogram. */}
+            {/* The same number as a length: the accent fill is the favourite's
+                share, filling from the left under its name. The tick is the
+                coin-flip line, so lopsidedness reads at a glance. The
+                favourite is the accented side, matching the histogram. */}
             <div className="relative mt-2" aria-hidden>
               <div className="flex h-2 gap-0.5">
                 <div
                   className="bg-cat-hoops/70"
-                  style={{ width: `${(summary.homeWinProb * 100).toFixed(2)}%` }}
+                  style={{ width: `${(view.favWinProb * 100).toFixed(2)}%` }}
                 />
                 <div className="flex-1 bg-cream-dimmer/40" />
               </div>
@@ -404,9 +420,10 @@ export default function MatchupClient({
             </div>
 
             <dl className="mt-4 grid grid-cols-3 gap-2 border-y border-rule/60 py-3">
+              {/* Market convention from the favourite's side: "ORL -4.5". */}
               <Stat
                 label="Line"
-                value={`${summary.home} ${fmtSigned(summary.homeSpread)}`}
+                value={`${view.fav} ${fmtSigned(view.favSpread)}`}
                 sub={`± ${summary.mcStderrMargin.toFixed(2)} MC`}
               />
               <Stat
@@ -414,49 +431,59 @@ export default function MatchupClient({
                 value={summary.meanTotal.toFixed(1)}
                 sub={`${summary.total.p25.toFixed(0)}–${summary.total.p75.toFixed(0)} mid half`}
               />
+              {/* Favourite first, and NAMED: a bare "109–117" under an
+                  ORL-led headline used to be home–away with nothing saying
+                  so. The names ARE the label ("ORL–BKN" over "117–109"): a
+                  sub-line "ORL–BKN · OT 4.0%" wrapped in this third column
+                  at 375px, and the label row is the one line short enough
+                  to hold at every width. */}
               <Stat
-                label="Score"
-                value={`${summary.meanHomeScore.toFixed(0)}–${summary.meanAwayScore.toFixed(0)}`}
+                label={`${view.fav}–${view.dog}`}
+                value={`${view.favScore.toFixed(0)}–${view.dogScore.toFixed(0)}`}
                 sub={`OT ${summary.otPct.toFixed(1)}%`}
               />
             </dl>
 
             <MarginHistogram
-              hist={summary.marginHist}
-              home={summary.home}
-              away={summary.away}
-              meanMargin={summary.meanMargin}
+              hist={view.marginHist}
+              fav={view.fav}
+              dog={view.dog}
+              meanMargin={view.meanMargin}
             />
 
-            {/* The whole reason the histogram is here, said out loud. */}
+            {/* The whole reason the histogram is here, said out loud. Every
+                margin is in words ("ORL by 13", "BKN by 6") rather than a
+                signed number, so nobody has to know which way the sign runs. */}
             <p className="mt-3 border-l-2 border-rule/60 pl-3 text-sm text-cream-dim">
               The answer is a <em>distribution</em>, not a number.{" "}
-              {summary.meanMargin >= 0 ? summary.home : summary.away} by{" "}
-              <span className="font-mono">{Math.abs(summary.meanMargin).toFixed(1)}</span> is the
-              middle of a cloud about{" "}
+              <span className="font-mono">{marginLabel(view.meanMargin, view.fav, view.dog, 1)}</span>{" "}
+              is the middle of a cloud about{" "}
               <span className="font-mono">{(summary.sdMargin * 2).toFixed(0)}</span> points wide —
               half of these games land between{" "}
-              <span className="font-mono">{summary.margin.p25.toFixed(0)}</span> and{" "}
-              <span className="font-mono">{summary.margin.p75.toFixed(0)}</span>, and one in ten
-              finishes outside{" "}
+              <span className="font-mono">{marginLabel(view.margin.p25, view.fav, view.dog)}</span>{" "}
+              and{" "}
+              <span className="font-mono">{marginLabel(view.margin.p75, view.fav, view.dog)}</span>,
+              and one in ten finishes outside{" "}
               <span className="font-mono">
-                {summary.margin.p5.toFixed(0)} … {summary.margin.p95.toFixed(0)}
+                {marginLabel(view.margin.p5, view.fav, view.dog)} …{" "}
+                {marginLabel(view.margin.p95, view.fav, view.dog)}
               </span>
               .
             </p>
 
             {/* The sim's read next to the market's — a curiosity, never an
                 edge (HOOPS_PLAN.md §8). Different night, different roster,
-                and the market misses by less than we do. */}
-            {lastLined && lastLineFromHome != null && (
+                and the market misses by less than we do. Both lines are quoted
+                from the favourite's side, the same as the Line stat above. */}
+            {lastLined && lastLineFromFav != null && (
               <p className="mt-3 border-l-2 border-rule/60 pl-3 text-sm text-cream-dimmer">
                 We make it{" "}
                 <span className="font-mono text-cream-dim">
-                  {summary.home} {fmtSigned(summary.homeSpread)}
+                  {view.fav} {fmtSigned(view.favSpread)}
                 </span>
                 . The market closed{" "}
                 <span className="font-mono text-cream-dim">
-                  {summary.home} {fmtSigned(lastLineFromHome, 1)}
+                  {view.fav} {fmtSigned(lastLineFromFav, 1)}
                 </span>{" "}
                 the last time these two met ({fmtDate(lastLined.date)}
                 {lastLined.home !== summary.home && !lastLined.neutral && `, at ${lastLined.home}`}) —
