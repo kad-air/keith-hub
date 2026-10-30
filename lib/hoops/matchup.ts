@@ -202,6 +202,111 @@ export function summarizeSim(
   };
 }
 
+// ── The favourite's view ─────────────────────────────────────────────────
+//
+// The matchup screen leads with the FAVOURITE, not the home team. Every
+// number the engine produces is from the home side (homeWinProb, a margin of
+// home − away, the home spread), and the first version of the screen rendered
+// those as-is: the home team got the big headline, the accent colour and the
+// right-hand half of the histogram whether it was 62% to win or 38%, so an
+// "Orlando at Brooklyn" read as if the page were pushing the Nets at 38%.
+//
+// `favouriteView` re-expresses the whole summary from the favourite's side,
+// in ONE place, so the headline, the win bar, the line, the histogram, its
+// end labels and its caption cannot disagree about who is favoured or what a
+// sign means:
+//   · the favourite is the team whose UNROUNDED win probability exceeds 0.5;
+//   · when the two probabilities print the same at the displayed precision
+//     (one decimal — 50.0% vs 50.0%) the page falls back to the home team,
+//     exactly as it always did, rather than appear to choose between two
+//     identical numbers; the same when the probability is exactly 0.5;
+//   · every signed margin here is favourite − underdog, so a positive margin
+//     is always the favourite winning. The histogram is mirrored (bins
+//     reversed, the axis negated) when the favourite is the away team, and the
+//     quantiles mirror with it (p25 ↔ −p75, p5 ↔ −p95).
+// The home-side fields on SimSummary are untouched; this is a view.
+
+export interface FavouriteView {
+  /** Tri of the favoured team (the home team on a coin flip). */
+  fav: string;
+  dog: string;
+  favIsHome: boolean;
+  /** True when the favourite could not be told apart at the displayed
+   *  precision and the home team was taken instead. */
+  coinFlip: boolean;
+  favWinProb: number;
+  dogWinProb: number;
+  /** Market convention from the favourite's side — negative when the mean
+   *  margin agrees with the win probability, which it nearly always does. */
+  favSpread: number;
+  /** favourite − underdog. */
+  meanMargin: number;
+  margin: Quantiles;
+  marginHist: Histogram;
+}
+
+/** How win probabilities are printed on the matchup screen; the coin-flip
+ *  rule is defined in terms of this so the two can't drift. */
+export const WIN_PROB_DIGITS = 1;
+
+export function fmtWinProb(p: number): string {
+  return `${(p * 100).toFixed(WIN_PROB_DIGITS)}%`;
+}
+
+/** Mirror a histogram about zero: the same games, counted from the other
+ *  team's side. Reversing the bins and negating the right edge keeps every
+ *  count on the bin that holds the same games. */
+export function mirrorHistogram(h: Histogram): Histogram {
+  const width = h.counts.length * h.binWidth;
+  return { min: -(h.min + width), binWidth: h.binWidth, counts: [...h.counts].reverse() };
+}
+
+export function mirrorQuantiles(q: Quantiles): Quantiles {
+  return { p5: -q.p95, p25: -q.p75, p50: -q.p50, p75: -q.p25, p95: -q.p5 };
+}
+
+export function favouriteView(s: SimSummary): FavouriteView {
+  const pHome = s.homeWinProb;
+  const pAway = 1 - pHome;
+  const coinFlip = fmtWinProb(pHome) === fmtWinProb(pAway);
+  const favIsHome = coinFlip || pHome >= 0.5;
+  if (favIsHome) {
+    return {
+      fav: s.home,
+      dog: s.away,
+      favIsHome: true,
+      coinFlip,
+      favWinProb: pHome,
+      dogWinProb: pAway,
+      favSpread: s.homeSpread,
+      meanMargin: s.meanMargin,
+      margin: s.margin,
+      marginHist: s.marginHist,
+    };
+  }
+  return {
+    fav: s.away,
+    dog: s.home,
+    favIsHome: false,
+    coinFlip: false,
+    favWinProb: pAway,
+    dogWinProb: pHome,
+    favSpread: -s.homeSpread,
+    meanMargin: -s.meanMargin,
+    margin: mirrorQuantiles(s.margin),
+    marginHist: mirrorHistogram(s.marginHist),
+  };
+}
+
+/** A favourite-side margin as words: "ORL by 12" / "BKN by 4" / "level".
+ *  Every signed figure the screen prints goes through this, so a reader never
+ *  has to know which way the sign runs. */
+export function marginLabel(margin: number, fav: string, dog: string, digits = 0): string {
+  const abs = Math.abs(margin).toFixed(digits);
+  if (Number(abs) === 0) return "level";
+  return `${margin > 0 ? fav : dog} by ${abs}`;
+}
+
 // ── Head to head ─────────────────────────────────────────────────────────
 //
 // What the market and the scoreboard said the last time these two met. The
