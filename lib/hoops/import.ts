@@ -231,8 +231,8 @@ function writeBundle(db: Database.Database, bundle: HoopsBundle, meta: WriteMeta
           nightly_as_of, nightly_value_source, nightly_last_n_games, nightly_priced,
           explain_model_json, nightly_league_typical_shift, replacement_tilt_per36,
           schedule_complete, schedule_n_pending, schedule_pending_from, schedule_pending_to,
-          schedule_pending_why, schedule_season_start_year)
-       VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          schedule_pending_why, schedule_season_start_year, nightly_movers_last_season_teams)
+       VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
       bundle.params.parameter_set.param_version,
       meta.paramsBlobText,
@@ -277,6 +277,9 @@ function writeBundle(db: Database.Database, bundle: HoopsBundle, meta: WriteMeta
       schedule.pendingWindow?.to ?? null,
       schedule.pendingWindow?.why ?? null,
       bundle.schedule.season_start_year ?? null,
+      // EARLY-SEASON MOVERS: how many teams were read against last season.
+      // NULL on a bundle that predates it.
+      bundle.teams.nightly_movers_last_season_teams ?? null,
     );
 
     const insTeam = db.prepare(
@@ -285,8 +288,9 @@ function writeBundle(db: Database.Database, bundle: HoopsBundle, meta: WriteMeta
           blend_off, blend_def,
           nightly_off, nightly_def, nightly_results_w, nightly_n_basis_games, nightly_abstained,
           nightly_movers_json, nightly_delta_pre_mix, nightly_delta_post_mix,
-          nightly_n_movers_total, nightly_movers_delta_sum)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          nightly_n_movers_total, nightly_movers_delta_sum,
+          nightly_movers_baseline, nightly_movers_state, nightly_games_played)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     );
     for (const [tri, t] of Object.entries(bundle.teams.teams)) {
       insTeam.run(
@@ -316,6 +320,14 @@ function writeBundle(db: Database.Database, bundle: HoopsBundle, meta: WriteMeta
         t.nightly?.delta_post_mix ?? null,
         t.nightly?.n_movers_total ?? null,
         t.nightly?.movers_delta_sum ?? null,
+        // EARLY SEASON (2026-10-30): the sender's declared baseline and state,
+        // stored as the strings it sent (lib/hoops/movers.ts decides what an
+        // unknown one means), and the team's games played this season — the
+        // "first N games" of the early-season sentence. NULL on an older
+        // bundle, which reads as season_typical / moved.
+        t.nightly?.movers_baseline ?? null,
+        t.nightly?.movers_state ?? null,
+        t.nightly?.games_played ?? null,
       );
     }
 
