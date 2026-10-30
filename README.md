@@ -26,7 +26,7 @@ The home view (**Today**) is everything new from your sources, interleaved so ca
 - **Swipe right** to save for later. **Swipe left** to dismiss without opening. (On desktop, hover for save / dismiss / clear-above buttons.)
 - **Long-press** (or press `c`) to clear the focused card and everything above it — a quick way to bulk-dismiss what you've already scanned.
 - **Pull down** to refresh. Or just wait — the poller pulls new content every ~15 minutes, and the app silently refreshes when you return to it.
-- **Filter by category** with the tabs across the top (All / Reading / Tech / Books / Music / Film / Podcasts / Bluesky).
+- **Filter by category** with the tabs across the top (All / Podcasts / Music / Books / Film / Tech Review / Reading / Newsletters / Bluesky).
 - A **"That's enough for now"** button at the bottom dismisses everything visible in one tap.
 
 Bluesky posts render with full rich content: images, link cards, quoted posts, reply context, repost banners. You can like, repost, and follow directly from the card without leaving the app.

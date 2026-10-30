@@ -23,6 +23,7 @@
     --cat-film: 236 190 104;
     --cat-reading: 216 200 170;
     --cat-tech_review: 232 158 138;
+    --cat-newsletters: 222 150 182;
     --cat-bluesky: 146 188 220;
     --cat-games: 140 200 118;
     --cat-tv: 122 184 224;
@@ -141,6 +142,7 @@
     --cat-film: 184 132 36;
     --cat-reading: 122 110 90;
     --cat-tech_review: 175 90 70;
+    --cat-newsletters: 160 74 112;
     --cat-bluesky: 74 130 170;
     --cat-games: 80 140 60;
     --cat-tv: 60 120 170;
@@ -260,6 +262,7 @@
       --cat-film: 184 132 36;
       --cat-reading: 122 110 90;
       --cat-tech_review: 175 90 70;
+      --cat-newsletters: 160 74 112;
       --cat-bluesky: 74 130 170;
       --cat-games: 80 140 60;
       --cat-tv: 60 120 170;

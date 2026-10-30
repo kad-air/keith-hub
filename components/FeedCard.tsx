@@ -55,6 +55,7 @@ const CATEGORY_LABEL: Record<string, { label: string; klass: string }> = {
   film: { label: "Film", klass: "text-cat-film" },
   tech_review: { label: "Tech Review", klass: "text-cat-tech_review" },
   reading: { label: "Reading", klass: "text-cat-reading" },
+  newsletters: { label: "Newsletter", klass: "text-cat-newsletters" },
   podcasts: { label: "Podcast", klass: "text-cat-podcasts" },
   bluesky: { label: "Bluesky", klass: "text-cat-bluesky" },
 };
