@@ -241,6 +241,10 @@ export interface FavouriteView {
   favSpread: number;
   /** favourite − underdog. */
   meanMargin: number;
+  /** Mean scores, the favourite's first — the Score stat reads these so it
+   *  can never show a bare home–away pair under a favourite-led headline. */
+  favScore: number;
+  dogScore: number;
   margin: Quantiles;
   marginHist: Histogram;
 }
@@ -280,6 +284,8 @@ export function favouriteView(s: SimSummary): FavouriteView {
       dogWinProb: pAway,
       favSpread: s.homeSpread,
       meanMargin: s.meanMargin,
+      favScore: s.meanHomeScore,
+      dogScore: s.meanAwayScore,
       margin: s.margin,
       marginHist: s.marginHist,
     };
@@ -293,6 +299,8 @@ export function favouriteView(s: SimSummary): FavouriteView {
     dogWinProb: pHome,
     favSpread: -s.homeSpread,
     meanMargin: -s.meanMargin,
+    favScore: s.meanAwayScore,
+    dogScore: s.meanHomeScore,
     margin: mirrorQuantiles(s.margin),
     marginHist: mirrorHistogram(s.marginHist),
   };

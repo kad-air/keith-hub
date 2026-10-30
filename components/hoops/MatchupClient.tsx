@@ -431,9 +431,15 @@ export default function MatchupClient({
                 value={summary.meanTotal.toFixed(1)}
                 sub={`${summary.total.p25.toFixed(0)}–${summary.total.p75.toFixed(0)} mid half`}
               />
+              {/* Favourite first, and NAMED: a bare "109–117" under an
+                  ORL-led headline used to be home–away with nothing saying
+                  so. The names ARE the label ("ORL–BKN" over "117–109"): a
+                  sub-line "ORL–BKN · OT 4.0%" wrapped in this third column
+                  at 375px, and the label row is the one line short enough
+                  to hold at every width. */}
               <Stat
-                label="Score"
-                value={`${summary.meanHomeScore.toFixed(0)}–${summary.meanAwayScore.toFixed(0)}`}
+                label={`${view.fav}–${view.dog}`}
+                value={`${view.favScore.toFixed(0)}–${view.dogScore.toFixed(0)}`}
                 sub={`OT ${summary.otPct.toFixed(1)}%`}
               />
             </dl>

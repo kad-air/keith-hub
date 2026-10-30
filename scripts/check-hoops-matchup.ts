@@ -223,6 +223,10 @@ const HIST: Histogram = { min: -6, binWidth: 3, counts: [3, 5, 7, 4, 1] };
   check(near(v.favSpread, -4.5) && near(v.meanMargin, 4.5), "home favourite: spread and margin unchanged");
   check(JSON.stringify(v.marginHist) === JSON.stringify(HIST), "home favourite: histogram unchanged");
   check(v.margin.p25 === -6 && v.margin.p75 === 11, "home favourite: quantiles unchanged");
+  check(
+    near(v.favScore, 112.25) && near(v.dogScore, 107.75),
+    `home favourite: the score must be home first (112.25–107.75), got ${v.favScore}–${v.dogScore}`,
+  );
 }
 // (b) Away favoured — the Orlando-at-Brooklyn case: everything flips.
 {
@@ -231,6 +235,11 @@ const HIST: Histogram = { min: -6, binWidth: 3, counts: [3, 5, 7, 4, 1] };
   check(near(v.favWinProb, 0.619) && near(v.dogWinProb, 0.381), "away favourite: probabilities swapped");
   check(near(v.favSpread, -4.5), `away favourite: the line must read AWY -4.5, got ${v.favSpread}`);
   check(near(v.meanMargin, 4.5), "away favourite: the mean margin is from its side");
+  // synth(…, −4.5): home scores 107.75, away 112.25 — the away favourite leads the score.
+  check(
+    near(v.favScore, 112.25) && near(v.dogScore, 107.75),
+    `away favourite: the score must be away first (112.25–107.75), got ${v.favScore}–${v.dogScore}`,
+  );
   check(
     v.marginHist.min === -9 &&
       v.marginHist.binWidth === 3 &&
@@ -255,6 +264,7 @@ for (const p of [0.5, 0.5004, 0.4996]) {
   const v = favouriteView(synth(p, 0.1, HIST));
   check(v.fav === "HOM" && v.favIsHome && v.coinFlip, `homeWinProb ${p} prints as a coin flip and must lead with the home team`);
   check(fmtWinProb(v.favWinProb) === fmtWinProb(v.dogWinProb), `coin flip at ${p}: both must print the same`);
+  check(near(v.favScore, 110.05) && near(v.dogScore, 109.95), `coin flip at ${p}: the score is home first, like the headline`);
 }
 // …but the moment they print differently the UNROUNDED number decides, even
 // a hair past the line.
@@ -382,6 +392,24 @@ check(marginLabel(-60, "ORL", "BKN") === "BKN by 60" && marginLabel(48, "ORL", "
       `${c.away}@${c.home}: favourite-side quantiles do not match the engine's margins`,
     );
     check(near(v.meanMargin, sign * result.meanMargin, 1e-9), `${c.away}@${c.home}: favourite-side mean margin`);
+    // The Score stat: the favourite's mean score first, each read straight
+    // off the engine's own finals for that side — never off the summary.
+    let sumHome = 0;
+    let sumAway = 0;
+    for (let i = 0; i < n; i++) {
+      sumHome += result.finalHomeScore[i];
+      sumAway += result.finalAwayScore[i];
+    }
+    const favMean = (v.favIsHome ? sumHome : sumAway) / n;
+    const dogMean = (v.favIsHome ? sumAway : sumHome) / n;
+    check(
+      near(v.favScore, favMean, 1e-9) && near(v.dogScore, dogMean, 1e-9),
+      `${c.away}@${c.home}: score must read ${v.fav} ${favMean.toFixed(1)}–${dogMean.toFixed(1)} ${v.dog}, got ${v.favScore.toFixed(1)}–${v.dogScore.toFixed(1)}`,
+    );
+    check(
+      near(v.favScore - v.dogScore, v.meanMargin, 1e-9),
+      `${c.away}@${c.home}: the two mean scores must differ by the favourite-side mean margin`,
+    );
     check(
       (v.meanMargin > 0) === (v.favSpread < 0),
       `${c.away}@${c.home}: a favourite with a positive mean margin must carry a negative line, got ${v.favSpread}`,
