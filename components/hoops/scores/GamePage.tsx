@@ -11,6 +11,7 @@ import { findGame, getBox, getScoreboard, sourceMeta } from "@/lib/hoops/scores/
 import { isGuardedDate, isIsoDate, longDate, todayIn } from "@/lib/hoops/scores/dates";
 import { gameSlug } from "@/lib/hoops/scores/parse";
 import { playsAt, veilGame, wirePlay } from "@/lib/hoops/scores/spoiler";
+import { viewerTz } from "@/lib/hoops/scores/viewerTz";
 
 /**
  * One real game: the card, then a tab row — the box score
@@ -23,7 +24,7 @@ import { playsAt, veilGame, wirePlay } from "@/lib/hoops/scores/spoiler";
  * the viewer's reveal/sync) fills them in: nothing while veiled; the box
  * rebuilt from the plays up to the synced moment and only those plays while
  * synced; the live box and every play once revealed. Last night's game stays
- * guarded the same way until 3 AM Mountain (dates.ts isGuardedDate), so a
+ * guarded the same way until 3 AM (dates.ts isGuardedDate), so a
  * game synced last night is still held to its moment here after midnight.
  * Another day's game, or one not started, renders straight from the server
  * as before.
@@ -40,9 +41,10 @@ export default async function GamePage({
   if (!isIsoDate(date)) notFound();
   const sb = await getScoreboard(date);
   const now = new Date();
-  const today = todayIn(now);
+  const tz = viewerTz();
+  const today = todayIn(now, tz);
   const isToday = date === today;
-  const guardDay = isGuardedDate(date, now);
+  const guardDay = isGuardedDate(date, now, tz);
   const dayHref = isToday ? "/hoops/scores" : `/hoops/scores/${date}`;
 
   if (!sb.data) {

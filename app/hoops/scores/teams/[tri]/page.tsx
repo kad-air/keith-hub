@@ -9,6 +9,7 @@ import TeamRecordLine from "@/components/hoops/scores/TeamRecordLine";
 import { FRANCHISES } from "@/lib/hoops/nba-franchises";
 import { getRoster, getTeamGames, sourceMeta } from "@/lib/hoops/scores/data";
 import { addDays, isGuardedDate, todayIn } from "@/lib/hoops/scores/dates";
+import { viewerTz } from "@/lib/hoops/scores/viewerTz";
 import { guardGames, guardRoster, teamRecord, type TeamRecord } from "@/lib/hoops/scores/guard";
 import { gameDate, teamFromSlug } from "@/lib/hoops/scores/teams";
 import type { Game, GameState } from "@/lib/hoops/scores/types";
@@ -31,7 +32,7 @@ const RECENT_N = 5;
  *
  * 🔴 Spoiler mode, the scores list's own rule (lib/hoops/scores/guard.ts): a
  * game that has started on a guarded date (today, and last night until 3 AM
- * Mountain) ships veiled, and the record, home/road split, streak and
+ * in the viewer's zone) ships veiled, and the record, home/road split, streak and
  * last-five strip are counted WITHOUT it. Under a LiveProvider the rows pick
  * up the viewer's reveal or sync from this device, as the scores list's cards
  * do, and the record adds back every guarded game that tick shows unlocked
@@ -43,16 +44,17 @@ export default async function HoopsScoresTeamPage({ params }: { params: { tri: s
   if (!tri) notFound();
   const slug = tri.toLowerCase();
   const now = new Date();
-  const today = todayIn(now);
+  const tz = viewerTz();
+  const today = todayIn(now, tz);
   const team = FRANCHISES[tri];
 
   const [sched, rosterF] = await Promise.all([getTeamGames(tri, now), getRoster(tri)]);
   const raw = sched.games;
-  const { games, guarded } = guardGames(raw, now);
+  const { games, guarded } = guardGames(raw, now, tz);
 
-  const regular = teamRecord(raw, tri, now, "regular", RECENT_N);
-  const preseason = teamRecord(raw, tri, now, "preseason", RECENT_N);
-  const playoffs = teamRecord(raw, tri, now, "postseason", RECENT_N);
+  const regular = teamRecord(raw, tri, now, "regular", RECENT_N, tz);
+  const preseason = teamRecord(raw, tri, now, "preseason", RECENT_N, tz);
+  const playoffs = teamRecord(raw, tri, now, "postseason", RECENT_N, tz);
   const started = (r: TeamRecord) => r.wins + r.losses + r.held > 0;
   const headline = started(playoffs)
     ? { label: "Playoffs", kind: "postseason" as const, rec: playoffs }
@@ -70,13 +72,13 @@ export default async function HoopsScoresTeamPage({ params }: { params: { tri: s
     .slice(-RECENT_N)
     .reverse();
 
-  const roster = rosterF.data ? guardRoster(rosterF.data, raw, now) : null;
+  const roster = rosterF.data ? guardRoster(rosterF.data, raw, now, tz) : null;
 
   // The rows tick when this page lists a guarded day's game (a viewer's
   // reveal or sync applies) or a game today (a tip turns the row live).
   const shown = [...upcoming, ...recent];
   const days = [today, addDays(today, -1)].filter(
-    (d) => isGuardedDate(d, now) && shown.some((g) => gameDate(g.startUtc) === d),
+    (d) => isGuardedDate(d, now, tz) && shown.some((g) => gameDate(g.startUtc) === d),
   );
   const states: Record<string, GameState> = Object.fromEntries(
     shown.filter((g) => days.includes(gameDate(g.startUtc))).map((g) => [g.id, g.state]),

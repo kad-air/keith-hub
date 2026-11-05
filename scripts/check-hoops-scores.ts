@@ -23,9 +23,12 @@ import {
   isIsoDate,
   lastNightUntil,
   longDate,
+  normalizeTz,
+  SCORES_TZ,
   spoilerUntil,
   tipTime,
   todayIn,
+  tzLabel,
   wallClockAt,
 } from "../lib/hoops/scores/dates.ts";
 import { keepLastNight, staleSpoilerKey } from "../lib/hoops/scores/spoilerStore.ts";
@@ -150,6 +153,9 @@ check(clePhi.state === "pre" && clePhi.away.score === null, "CLE@PHI scheduled, 
 // 23:00Z on Oct 22 is 7pm EDT = 5pm MDT; 01:30Z Oct 23 is 9:30 EDT = 7:30 MDT.
 check(statusLabel(clePhi) === "5:00 PM MT", `CLE@PHI tip, got ${statusLabel(clePhi)}`);
 check(statusLabel(denOkc) === "7:30 PM MT", `DEN@OKC tip, got ${statusLabel(denOkc)}`);
+// A viewer elsewhere reads the tip in their own zone, with its own label.
+check(statusLabel(clePhi, "America/New_York") === "7:00 PM ET", `CLE@PHI in New York, got ${statusLabel(clePhi, "America/New_York")}`);
+check(statusLabel(clePhi, "America/Los_Angeles") === "4:00 PM PT", `CLE@PHI in LA, got ${statusLabel(clePhi, "America/Los_Angeles")}`);
 check(denOkc.tv.national.includes("ESPN"), "DEN@OKC on ESPN");
 check(denOkc.home.record === "1-0" && denOkc.away.record === "0-0", "pre-game records still shown (OKC won its opener)");
 
@@ -336,6 +342,88 @@ check(isGuardedDate("2026-10-28", at("2026-10-29T04:00:00Z")), "10 PM the night 
 check(isGuardedDate("2026-10-29", at("2026-10-29T06:30:00Z")), "today is guarded from midnight on");
 check(!isGuardedDate("2026-10-27", at("2026-10-29T06:30:00Z")), "the night before last is never guarded");
 check(!isGuardedDate("2026-10-30", at("2026-10-29T18:00:00Z")), "tomorrow is not guarded");
+
+// ── 6b. the viewer's time zone (owner, 2026-11-05: "I travel") ──────────
+// Everything above is the FALLBACK (Mountain, before the device has said).
+// A viewer elsewhere gets their own today, tip times and cutoffs — and the
+// spoiler guarantee holds wherever they are.
+check(SCORES_TZ === "America/Denver", "the fallback is still Mountain");
+check(normalizeTz("Europe/London") === "Europe/London" && normalizeTz("America/Argentina/Buenos_Aires") !== null, "a real zone is accepted");
+check(normalizeTz("UTC") === "UTC", "UTC is a zone");
+for (const bad of [null, undefined, "", "Not/AZone", "../../etc", "America/Denver; path=/", "x".repeat(80)]) {
+  check(normalizeTz(bad) === null, `a bad zone falls back: ${JSON.stringify(bad)?.slice(0, 20)}`);
+}
+check(tzLabel("America/Denver", at("2026-10-29T18:00:00Z")) === "MT", `MT label, got ${tzLabel("America/Denver", at("2026-10-29T18:00:00Z"))}`);
+check(tzLabel("America/New_York", at("2026-10-29T18:00:00Z")) === "ET", "ET label");
+check(tzLabel("Europe/London", at("2026-12-15T18:00:00Z")) === "GMT", `London label, got ${tzLabel("Europe/London", at("2026-12-15T18:00:00Z"))}`);
+check(tzLabel("Asia/Tokyo", at("2026-12-15T18:00:00Z")) === "GMT+9", `Tokyo label, got ${tzLabel("Asia/Tokyo", at("2026-12-15T18:00:00Z"))}`);
+// 9pm MDT Oct 22 = 11pm EDT Oct 22 = 4am BST Oct 23.
+check(todayIn(evening, "America/New_York") === "2026-10-22" && todayIn(evening, "Europe/London") === "2026-10-23", "today is the viewer's date");
+check(tipTime("2026-11-03T02:00:00Z", "America/New_York") === "9:00 PM", "a tip in New York");
+check(tipTime("2026-11-03T02:00:00Z", "Europe/London") === "2:00 AM", "a tip in London");
+// For any US zone the cutoffs are just 3 AM and noon where the viewer is.
+const iso = (ms: number) => new Date(ms).toISOString();
+check(iso(spoilerUntil("2026-10-29", "America/New_York")) === "2026-10-29T07:00:00.000Z", "3 AM EDT");
+check(iso(spoilerUntil("2026-10-29", "America/Los_Angeles")) === "2026-10-29T10:00:00.000Z", "3 AM PDT");
+check(iso(spoilerUntil("2026-12-15", "Pacific/Honolulu")) === "2026-12-15T13:00:00.000Z", "3 AM HST");
+check(iso(lastNightUntil("2026-10-29", "America/New_York")) === "2026-10-29T16:00:00.000Z", "noon EDT");
+check(iso(lastNightUntil("2026-10-29", "America/Los_Angeles")) === "2026-10-29T19:00:00.000Z", "noon PDT");
+check(!isGuardedDate("2026-10-28", at("2026-10-29T07:00:00Z"), "America/New_York"), "New York: last night lets go at 3 AM there");
+check(isGuardedDate("2026-10-28", at("2026-10-29T07:00:00Z")), "…while Mountain (1 AM) still holds it");
+// East of the US the slate is played after the viewer's midnight, so the 3 AM
+// cutoff never comes before 3 AM Eastern (07:00Z in October): in London 3 AM
+// there is 11 PM Eastern, games still on.
+check(iso(spoilerUntil("2026-10-29", "Europe/London")) === "2026-10-29T07:00:00.000Z", "London: 3 AM Eastern, not 3 AM London");
+check(iso(spoilerUntil("2026-10-29", "Asia/Tokyo")) === "2026-10-29T07:00:00.000Z", "Tokyo: 3 AM Eastern too");
+check(iso(lastNightUntil("2026-10-29", "Europe/London")) === "2026-10-29T12:00:00.000Z", "London: noon there");
+check(iso(lastNightUntil("2026-10-29", "Asia/Tokyo")) === "2026-10-29T07:00:00.000Z", "Tokyo: last night stays until the slate is done, past noon");
+check(isGuardedDate("2026-10-28", at("2026-10-29T03:30:00Z"), "Europe/London"), "London 3:30 AM (11:30 PM ET): last night still guarded");
+// The leak sweep: wherever the viewer is, a slate's date is guarded the whole
+// time its games can be on (noon ET on its day to 2 AM ET the next), every
+// 15 minutes, across both DST changes and the weeks between.
+const SWEEP_ZONES = [
+  "America/Denver", "America/Phoenix", "America/New_York", "America/Chicago", "America/Los_Angeles",
+  "America/Anchorage", "Pacific/Honolulu", "America/Puerto_Rico", "Europe/London", "Europe/Paris",
+  "Asia/Kolkata", "Asia/Tokyo", "Australia/Sydney", "Pacific/Auckland", "Pacific/Kiritimati", "Pacific/Pago_Pago", "UTC",
+];
+let sweepFails = 0;
+let sweepChecks = 0;
+for (const slate of ["2026-10-31", "2026-11-01", "2026-11-02", "2026-12-25", "2027-03-13", "2027-03-14", "2027-03-15", "2027-06-10"]) {
+  const from = wallClockAt(slate, 12, "America/New_York");
+  const to = wallClockAt(addDays(slate, 1), 2, "America/New_York");
+  for (const tz of SWEEP_ZONES) {
+    for (let t = from; t <= to; t += 15 * 60_000) {
+      sweepChecks++;
+      if (!isGuardedDate(slate, new Date(t), tz)) {
+        if (sweepFails++ < 3) console.error(`  unguarded: ${slate} at ${iso(t)} in ${tz}`);
+      }
+    }
+  }
+}
+check(sweepFails === 0, `a live slate is guarded in every zone (${sweepChecks} instants, ${sweepFails} open)`);
+// …and the guard still lets go: by 10 AM Eastern the next day nobody is held.
+for (const tz of SWEEP_ZONES) {
+  check(!isGuardedDate("2026-10-28", at("2026-10-30T14:00:00Z"), tz), `${tz}: two days on, open`);
+}
+// Every scores page and endpoint that decides "today" or a cutoff reads the
+// viewer's zone (a forgotten one silently falls back to Mountain).
+for (const f of [
+  "components/hoops/scores/ScoresDay.tsx",
+  "components/hoops/scores/GamePage.tsx",
+  "app/hoops/scores/page.tsx",
+  "app/hoops/scores/layout.tsx",
+  "app/hoops/scores/teams/[tri]/page.tsx",
+  "app/hoops/scores/teams/[tri]/schedule/page.tsx",
+  "app/hoops/scores/players/[id]/page.tsx",
+  "app/api/hoops/scores/live/route.ts",
+  "app/api/hoops/scores/players/[id]/log/route.ts",
+]) {
+  check(/viewerTz\(\)/.test(fs.readFileSync(path.join(ROOT, f), "utf8")), `${f} reads the viewer's zone`);
+}
+for (const f of ["GameCard.tsx", "TeamGameRow.tsx", "SourceNote.tsx"]) {
+  const src = fs.readFileSync(path.join(ROOT, "components/hoops/scores", f), "utf8");
+  check(/useViewerTz\(\)/.test(src) && !/America\/Denver/.test(src), `${f} formats in the viewer's zone`);
+}
 
 // ── 7. cache policy ──────────────────────────────────────────────────────
 const today = "2026-10-22";

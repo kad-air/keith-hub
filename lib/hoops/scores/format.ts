@@ -1,6 +1,6 @@
 // Pure display helpers for the scores section (status line, period labels).
 
-import { tipTime } from "./dates.ts";
+import { SCORES_TZ, tipTime, tzLabel } from "./dates.ts";
 import type { Game } from "./types.ts";
 
 /** "1 2 3 4 OT 2OT" — headers for a line score with `n` periods. */
@@ -10,10 +10,14 @@ export function periodLabels(n: number): string[] {
   return out;
 }
 
-/** What the top line of a game says: the tip time (Mountain) before it, the
- *  live clock during, the source's "Final" / "Final/OT" after. */
-export function statusLabel(g: Game): string {
+/** What the top line of a game says: the tip time in the viewer's zone
+ *  before it ("7:30 PM MT", "2:30 AM GMT"), the live clock during, the
+ *  source's "Final" / "Final/OT" after. */
+export function statusLabel(g: Game, tz: string = SCORES_TZ): string {
   if (g.postponed) return g.statusDetail || "Postponed";
-  if (g.state === "pre") return `${tipTime(g.startUtc)} MT`;
+  if (g.state === "pre") {
+    const at = new Date(g.startUtc);
+    return `${tipTime(g.startUtc, tz)} ${tzLabel(tz, Number.isNaN(at.getTime()) ? new Date() : at)}`;
+  }
   return g.statusDetail || (g.state === "post" ? "Final" : "Live");
 }

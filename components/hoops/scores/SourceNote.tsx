@@ -1,6 +1,8 @@
 "use client";
 
 import { useLive } from "./LiveProvider";
+import { useViewerTz } from "./ViewerTz";
+import { tzLabel } from "@/lib/hoops/scores/dates";
 import type { SourceMeta } from "@/lib/hoops/scores/types";
 
 /** Where the numbers came from and how fresh they are — and, when the
@@ -8,6 +10,8 @@ import type { SourceMeta } from "@/lib/hoops/scores/types";
  *  LiveProvider the timestamp follows the live ticks. */
 export function SourceNote({ fetched }: { fetched: SourceMeta[] }) {
   const live = useLive();
+  const tz = useViewerTz();
+  const zone = tzLabel(tz);
   const errors = fetched.filter((f) => f.error);
   const stale = errors.filter((f) => f.stale);
   const times = fetched.map((f) => f.fetchedAt).filter((t): t is number => t != null);
@@ -15,7 +19,7 @@ export function SourceNote({ fetched }: { fetched: SourceMeta[] }) {
   const shown = live.fetchedAt ?? oldest;
   const at = (ms: number) =>
     new Intl.DateTimeFormat("en-US", {
-      timeZone: "America/Denver",
+      timeZone: tz,
       hour: "numeric",
       minute: "2-digit",
       second: "2-digit",
@@ -25,12 +29,12 @@ export function SourceNote({ fetched }: { fetched: SourceMeta[] }) {
       {errors.length > 0 && (
         <p className="mb-4 border border-cat-hoops/50 px-3 py-2 font-mono text-[0.68rem] text-cream-dim">
           {stale.length === errors.length
-            ? `Couldn't reach ESPN (${errors[0].error}). Showing the copy from ${oldest ? at(oldest) : "earlier"} MT.`
+            ? `Couldn't reach ESPN (${errors[0].error}). Showing the copy from ${oldest ? at(oldest) : "earlier"} ${zone}.`
             : `Couldn't reach ESPN (${errors[0].error}) and there's no saved copy yet. Try again in a minute.`}
         </p>
       )}
       <p className="mt-8 font-mono text-[0.58rem] uppercase tracking-kicker text-cream-dimmer">
-        Live data from ESPN · times Mountain
+        Live data from ESPN · times {zone}
         {shown ? ` · updated ${at(shown)}` : ""}
         {live.error ? ` · last tick failed (${live.error})` : ""}
       </p>

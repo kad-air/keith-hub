@@ -8,6 +8,7 @@ import TeamGameRow from "@/components/hoops/scores/TeamGameRow";
 import { FRANCHISES } from "@/lib/hoops/nba-franchises";
 import { getTeamGames, sourceMeta } from "@/lib/hoops/scores/data";
 import { addDays, isGuardedDate, todayIn } from "@/lib/hoops/scores/dates";
+import { viewerTz } from "@/lib/hoops/scores/viewerTz";
 import { guardGames } from "@/lib/hoops/scores/guard";
 import { gameDate, teamFromSlug } from "@/lib/hoops/scores/teams";
 import type { Game, GameState, SeasonKind } from "@/lib/hoops/scores/types";
@@ -41,11 +42,12 @@ export default async function HoopsScoresSchedulePage({ params }: { params: { tr
   const tri = teamFromSlug(params.tri);
   if (!tri) notFound();
   const now = new Date();
-  const today = todayIn(now);
+  const tz = viewerTz();
+  const today = todayIn(now, tz);
   const team = FRANCHISES[tri];
 
   const sched = await getTeamGames(tri, now);
-  const { games, guarded } = guardGames(sched.games, now);
+  const { games, guarded } = guardGames(sched.games, now, tz);
 
   // Season type, then month — newest season type first (the playoffs above
   // the regular season above the preseason), each read oldest game first.
@@ -66,7 +68,7 @@ export default async function HoopsScoresSchedulePage({ params }: { params: { tr
   }).filter((s) => s.months.length > 0);
 
   const days = [today, addDays(today, -1)].filter(
-    (d) => isGuardedDate(d, now) && games.some((g) => gameDate(g.startUtc) === d),
+    (d) => isGuardedDate(d, now, tz) && games.some((g) => gameDate(g.startUtc) === d),
   );
   const states: Record<string, GameState> = Object.fromEntries(
     games.filter((g) => days.includes(gameDate(g.startUtc))).map((g) => [g.id, g.state]),

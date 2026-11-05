@@ -98,7 +98,7 @@ export function useGameView(id: string, guarded: boolean): GameView {
  * once so everything the overlay doesn't carry (winner, records, the notable
  * list) catches up through the slow path.
  *
- * Spoiler mode (`guarded`: today, and last night until 3 AM Mountain —
+ * Spoiler mode (`guarded`: today, and last night until 3 AM, the viewer's —
  * dates.ts isGuardedDate): the viewer's reveals and syncs live in
  * localStorage (spoilerStore.ts), one map per day, and ride every tick as
  * `reveal=` and `sync=`, so the SERVER veils what hasn't been revealed — no
@@ -115,7 +115,7 @@ export default function LiveProvider({
   children,
 }: {
   /** The day(s) whose games this page shows — today's page also lists last
-   *  night's, and a late tip can still be running past midnight Mountain. */
+   *  night's, and a late tip can still be running past the viewer's midnight. */
   dates: string[];
   /** Set on the game page: a single game, plus its box score. */
   gameId?: string | null;
