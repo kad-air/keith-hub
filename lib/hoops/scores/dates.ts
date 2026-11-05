@@ -1,14 +1,50 @@
 // Pure date helpers for the scores section. All calendar maths is STRING
 // maths on YYYY-MM-DD (via Date.UTC, never local time), and the only clock
-// that matters is the reader's: America/Denver. Railway runs UTC, so a 9pm
-// Mountain tip is already "tomorrow" on the server — the same trap
-// lib/books/stats.ts documents for reading streaks.
+// that matters is the reader's: the VIEWER's time zone (owner, 2026-11-05 —
+// "I travel"). The device reports it (components/hoops/scores/ViewerTz.tsx
+// sets the TZ_COOKIE, lib/hoops/scores/viewerTz.ts reads it on the server);
+// until it has, and for anything that isn't a viewer, it is America/Denver.
+// Railway runs UTC, so a 9pm Mountain tip is already "tomorrow" on the
+// server — the same trap lib/books/stats.ts documents for reading streaks.
 //
-// The upstream lists games under their US EASTERN date. For an NBA game that
-// is the same day as Mountain time (tips run ~10am–10:30pm ET), so the date
-// in the URL and ESPN's `dates=` parameter are used interchangeably.
+// The upstream lists games under their US EASTERN date (the slate). For an
+// NBA game that is the same day as Mountain time (tips run ~10am–10:30pm
+// ET), so the date in the URL and ESPN's `dates=` parameter are used
+// interchangeably. "Today" is the viewer's calendar date; a viewer far east
+// of the US (Europe, Asia) watches a slate after their own midnight, so the
+// spoiler cutoffs below never fall before 3 AM Eastern (see spoilerUntil).
 
+/** The fallback zone: the owner's home, used before the device has said. */
 export const SCORES_TZ = "America/Denver";
+
+/** The slate's own zone: ESPN dates games by the US Eastern calendar. */
+export const SLATE_TZ = "America/New_York";
+
+/** The cookie the client writes its IANA zone into (ViewerTz.tsx). */
+export const TZ_COOKIE = "hub-tz";
+
+/** A usable IANA zone name, or null. Anything the runtime can't format in
+ *  (garbage, a stale or unknown zone) is refused, so a bad cookie falls back
+ *  to Mountain instead of throwing a RangeError mid-render. */
+export function normalizeTz(raw: string | null | undefined): string | null {
+  if (!raw || raw.length > 64 || !/^[A-Za-z0-9_+\-]+(\/[A-Za-z0-9_+\-]+)*$/.test(raw)) return null;
+  try {
+    return new Intl.DateTimeFormat("en-US", { timeZone: raw }).resolvedOptions().timeZone;
+  } catch {
+    return null;
+  }
+}
+
+/** The zone's short label at `at`: "MT", "ET", "PT", "HST" where there's a
+ *  short US-style name, else the offset form ("GMT", "GMT+9"). */
+export function tzLabel(tz: string = SCORES_TZ, at: Date = new Date()): string {
+  const name = (style: "shortGeneric" | "short") =>
+    new Intl.DateTimeFormat("en-US", { timeZone: tz, timeZoneName: style })
+      .formatToParts(at)
+      .find((p) => p.type === "timeZoneName")?.value ?? "";
+  const generic = name("shortGeneric");
+  return generic && generic.length <= 4 && !generic.includes(" ") ? generic : name("short");
+}
 
 const ISO = /^(\d{4})-(\d{2})-(\d{2})$/;
 
@@ -21,7 +57,7 @@ export function isIsoDate(s: string): boolean {
   return t.getUTCFullYear() === y && t.getUTCMonth() === mo - 1 && t.getUTCDate() === d;
 }
 
-/** Today's date in Denver, for the instant `now`. */
+/** Today's date in `tz` (Denver by default), for the instant `now`. */
 export function todayIn(now: Date, tz: string = SCORES_TZ): string {
   // en-CA formats as YYYY-MM-DD.
   return new Intl.DateTimeFormat("en-CA", {
@@ -43,7 +79,7 @@ export function espnDate(iso: string): string {
   return iso.replace(/-/g, "");
 }
 
-/** Tip time in Mountain: "7:30 PM". */
+/** Tip time in `tz`: "7:30 PM". */
 export function tipTime(utc: string, tz: string = SCORES_TZ): string {
   const t = new Date(utc);
   if (Number.isNaN(t.getTime())) return "TBD";
@@ -102,23 +138,32 @@ export function wallClockAt(iso: string, hour: number, tz: string = SCORES_TZ): 
   return t;
 }
 
-/** Today's page carries last night's games until noon Mountain, then lets
- *  them go (a game the viewer is still synced to stays — spoilerStore.ts). */
+/** Today's page carries last night's games until noon (the viewer's), then
+ *  lets them go (a game the viewer is still synced to stays —
+ *  spoilerStore.ts). */
 export const LAST_NIGHT_UNTIL_HOUR = 12;
 
-/** The instant `today`'s page stops showing last night's games. */
+/** The instant `today`'s page stops showing last night's games: noon in
+ *  `tz`, but never before last night's spoiler mode ends — in Tokyo last
+ *  night's slate is still being played at noon. */
 export function lastNightUntil(today: string, tz: string = SCORES_TZ): number {
-  return wallClockAt(today, LAST_NIGHT_UNTIL_HOUR, tz);
+  return Math.max(wallClockAt(today, LAST_NIGHT_UNTIL_HOUR, tz), spoilerUntil(today, tz));
 }
 
 /** Spoiler mode outlives its day by a few hours: a game the viewer left
- *  veiled or synced stays that way past midnight, until 3 AM Mountain on the
- *  next day, and then the scores just show (owner, 2026-10-28). */
+ *  veiled or synced stays that way past midnight, until 3 AM on the next
+ *  day, and then the scores just show (owner, 2026-10-28). */
 export const SPOILER_UNTIL_HOUR = 3;
 
-/** The instant `today`'s page stops guarding last night's games. */
+/** The instant `today`'s page stops guarding last night's games: 3 AM in
+ *  `tz`, or 3 AM Eastern if that is later. The floor is what keeps the
+ *  guarantee for a viewer east of the US: the slate is Eastern-dated and its
+ *  last games end around 1:30 AM Eastern, so in London (3 AM there is 10 PM
+ *  Eastern) or Tokyo last night's games are still live at 3 AM local. For
+ *  every US zone the viewer's own 3 AM is the later one, so the rule there
+ *  is just "3 AM where you are" — Mountain is exactly as before. */
 export function spoilerUntil(today: string, tz: string = SCORES_TZ): number {
-  return wallClockAt(today, SPOILER_UNTIL_HOUR, tz);
+  return Math.max(wallClockAt(today, SPOILER_UNTIL_HOUR, tz), wallClockAt(today, SPOILER_UNTIL_HOUR, SLATE_TZ));
 }
 
 /** Whether `date`'s started games are under spoiler mode at `now`: today's

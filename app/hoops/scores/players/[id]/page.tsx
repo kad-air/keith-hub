@@ -7,6 +7,7 @@ import { SourceNote } from "@/components/hoops/scores/SourceNote";
 import { getPlayer } from "@/lib/hoops/queries";
 import { getAthlete, getGamelog, getScoreboard, sourceMeta } from "@/lib/hoops/scores/data";
 import { todayIn } from "@/lib/hoops/scores/dates";
+import { viewerTz } from "@/lib/hoops/scores/viewerTz";
 import { guardLog } from "@/lib/hoops/scores/guard";
 
 export const dynamic = "force-dynamic";
@@ -37,7 +38,7 @@ function inSim(id: string): boolean {
  * when the sim carries them.
  *
  * 🔴 Spoiler mode (lib/hoops/scores/guard.ts): a game-log line from a
- * guarded date (today, and last night until 3 AM Mountain) ships as a bare
+ * guarded date (today, and last night until 3 AM, the viewer's) ships as a bare
  * row — date and opponent, no result, no stats — and the averages are taken
  * over the shown lines only, never off the source's own season summary. The
  * hidden row links to the game page, where the reveal and sync controls are;
@@ -47,7 +48,8 @@ function inSim(id: string): boolean {
 export default async function HoopsScoresPlayerPage({ params }: { params: { id: string } }) {
   if (!ID.test(params.id)) notFound();
   const now = new Date();
-  const today = todayIn(now);
+  const tz = viewerTz();
+  const today = todayIn(now, tz);
   const bioF = await getAthlete(params.id);
   if (!bioF.data && !bioF.error) notFound();
   const bio = bioF.data;
@@ -56,7 +58,7 @@ export default async function HoopsScoresPlayerPage({ params }: { params: { id: 
   const sb = bio?.team ? await getScoreboard(today, now) : null;
   const busyToday = !!sb?.data?.games.some((g) => g.home.tri === bio!.team!.tri || g.away.tri === bio!.team!.tri);
   const logF = await getGamelog(params.id, busyToday);
-  const shown = logF.data ? guardLog(logF.data.games, now) : [];
+  const shown = logF.data ? guardLog(logF.data.games, now, tz) : [];
 
   return (
     <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6">

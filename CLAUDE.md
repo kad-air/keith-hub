@@ -1456,7 +1456,25 @@ live overlay" below); today / tomorrow 60s; further out 15 min; an empty past da
 5 min. 🔴 On an upstream failure the last copy is served with a visible "couldn't reach ESPN,
 showing the copy from …" line — never a blank day that reads as an off night. Pages with a live
 game (or tonight's unfinished slate) tick in place through `LiveProvider` (the old whole-page
-`LiveRefresh` is gone). "Today" is `todayIn()` in America/Denver, never the server's UTC date.
+`LiveRefresh` is gone). "Today" is `todayIn()` in the VIEWER's zone, never the server's UTC date.
+
+**The viewer's time zone (2026-11-05, owner: "I travel").** Game times, "today" vs "last night", the
+noon drop and the 3 AM spoiler cutoff all follow the device's zone, not always Mountain.
+`components/hoops/scores/ViewerTz.tsx` (mounted by `app/hoops/scores/layout.tsx`) compares the
+device's `Intl` zone with the one the server rendered in and, when they differ, writes the `hub-tz`
+cookie and `router.refresh()`es once (also on coming back into view — a PWA left open on a flight);
+`lib/hoops/scores/viewerTz.ts` reads it on the server (pages, the live and game-log endpoints) through
+`normalizeTz`, falling back to **America/Denver** when there's no cookie or it's not a zone the
+runtime knows. Client components format with `useViewerTz()` — the same zone the server used, so no
+hydration mismatch. The status label carries the zone's short name (`7:30 PM MT`, `2:00 AM GMT`,
+`tzLabel`). Dates in URLs stay the ESPN (Eastern) slate date; "today" is the viewer's calendar date.
+🔴 **The spoiler floor**: `spoilerUntil` is 3 AM in the viewer's zone OR 3 AM Eastern, whichever is
+later, and `lastNightUntil` never falls before it — east of the US a slate is played after the
+viewer's midnight (3 AM London is 10–11 PM Eastern), so a plain local 3 AM would open live games. For
+every US zone the viewer's own 3 AM is the later one, and Mountain behaves exactly as before. Gate:
+section 6b of `check:hoops:scores` sweeps 17 zones every 15 minutes across both DST changes and
+asserts a slate is guarded from noon Eastern on its day to 2 AM Eastern the next; dropping the floor
+fails it (London, Puerto Rico).
 
 **The live overlay — the fast path (2026-10-25).** A game in progress ticks IN PLACE every 3s:
 clock, period, both totals and the last play on every card, the box score on the game page every

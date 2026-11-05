@@ -2,7 +2,7 @@
 //
 // The rule is the scores pages' own (dates.ts isGuardedDate): a game that has
 // STARTED and is listed under a guarded date (today, and yesterday until 3 AM
-// Mountain) is hidden unless the viewer revealed or synced it on this device.
+// in the viewer's zone) is hidden unless the viewer revealed or synced it on this device.
 // The server can't read that choice (it lives in localStorage), so it ships
 // every guarded game VEILED — no score, winner, record or quarter, the same
 // `veilGame` the scores list uses — and the page's LiveProvider asks the live
@@ -21,16 +21,17 @@
 // Errs toward showing LESS: a game on a guarded date with no state (a game
 // log line) is treated as started.
 
-import { isGuardedDate } from "./dates.ts";
+import { SCORES_TZ, isGuardedDate } from "./dates.ts";
 import { gameDate, sideOf } from "./teams.ts";
 import { veilGame } from "./spoiler.ts";
 import type { Game, PlayerGameLine, Roster } from "./types.ts";
 
-/** A game the server must not show the result of at `now`. */
-export function isGuardedGame(g: Pick<Game, "startUtc" | "state">, now: Date): boolean {
+/** A game the server must not show the result of at `now`, for a viewer in
+ *  `tz` (lib/hoops/scores/viewerTz.ts). */
+export function isGuardedGame(g: Pick<Game, "startUtc" | "state">, now: Date, tz: string = SCORES_TZ): boolean {
   if (g.state === "pre") return false;
   const d = gameDate(g.startUtc);
-  return d !== "" && isGuardedDate(d, now);
+  return d !== "" && isGuardedDate(d, now, tz);
 }
 
 export interface GuardedGames {
@@ -42,11 +43,11 @@ export interface GuardedGames {
   dates: string[];
 }
 
-export function guardGames(games: Game[], now: Date): GuardedGames {
+export function guardGames(games: Game[], now: Date, tz: string = SCORES_TZ): GuardedGames {
   const guarded = new Set<string>();
   const dates = new Set<string>();
   const out = games.map((g) => {
-    if (!isGuardedGame(g, now)) return g;
+    if (!isGuardedGame(g, now, tz)) return g;
     guarded.add(g.id);
     dates.add(gameDate(g.startUtc));
     return veilGame(g);
@@ -123,6 +124,7 @@ export function teamRecord(
   now: Date,
   kind: Game["seasonKind"] = "regular",
   recentN = 5,
+  tz: string = SCORES_TZ,
 ): TeamRecord & { results: RecordResult[]; heldGames: HeldGame[] } {
   const results: RecordResult[] = [];
   const heldGames: HeldGame[] = [];
@@ -130,7 +132,7 @@ export function teamRecord(
     if (g.seasonKind !== kind) continue;
     const side = sideOf(g, tri);
     if (!side) continue;
-    if (isGuardedGame(g, now)) {
+    if (isGuardedGame(g, now, tz)) {
       heldGames.push({ id: g.id, home: side === "home" });
       continue;
     }
@@ -148,9 +150,9 @@ export type ShownLine =
   | { hidden: false; line: PlayerGameLine }
   | { hidden: true; line: Pick<PlayerGameLine, "gameId" | "startUtc" | "date" | "seasonKind" | "tri" | "home" | "opp"> };
 
-export function guardLog(lines: PlayerGameLine[], now: Date): ShownLine[] {
+export function guardLog(lines: PlayerGameLine[], now: Date, tz: string = SCORES_TZ): ShownLine[] {
   return lines.map((l) =>
-    l.date !== "" && !isGuardedDate(l.date, now)
+    l.date !== "" && !isGuardedDate(l.date, now, tz)
       ? { hidden: false, line: l }
       : {
           hidden: true,
@@ -176,8 +178,9 @@ export function unlockedLines(
   lines: PlayerGameLine[],
   now: Date,
   unlocked: ReadonlySet<string>,
+  tz: string = SCORES_TZ,
 ): PlayerGameLine[] {
-  return guardLog(lines, now)
+  return guardLog(lines, now, tz)
     .filter((s) => s.hidden && unlocked.has(s.line.gameId))
     .map((s) => lines.find((l) => l.gameId === s.line.gameId)!)
     .filter(Boolean);
@@ -233,9 +236,14 @@ export function averages(shown: ShownLine[], kind: PlayerGameLine["seasonKind"] 
 
 /** The roster with any injury stamped at or after the tip of one of the
  *  team's guarded games taken off (and counted). */
-export function guardRoster(roster: Roster, games: Game[], now: Date): { roster: Roster; heldInjuries: number } {
+export function guardRoster(
+  roster: Roster,
+  games: Game[],
+  now: Date,
+  tz: string = SCORES_TZ,
+): { roster: Roster; heldInjuries: number } {
   const tips = games
-    .filter((g) => sideOf(g, roster.tri) && isGuardedGame(g, now))
+    .filter((g) => sideOf(g, roster.tri) && isGuardedGame(g, now, tz))
     .map((g) => Date.parse(g.startUtc))
     .filter(Number.isFinite);
   if (tips.length === 0) return { roster, heldInjuries: 0 };

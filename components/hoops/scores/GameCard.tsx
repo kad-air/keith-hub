@@ -6,12 +6,13 @@ import { gameSlug, tvLabel } from "@/lib/hoops/scores/parse";
 import { periodLabels, statusLabel } from "@/lib/hoops/scores/format";
 import { behindLabel, protectedStatus } from "@/lib/hoops/scores/spoiler";
 import { useLiveGame, useSpoiler } from "./LiveProvider";
+import { useViewerTz } from "./ViewerTz";
 import SpoilerPanel from "./SpoilerPanel";
 import { HoldBar, useLongPress } from "./useLongPress";
 import type { Game, LiveGame, TeamLine } from "@/lib/hoops/scores/types";
 
 /**
- * One game, plaintextsports-dense: a status line (tip time in Mountain, the
+ * One game, plaintextsports-dense: a status line (tip time in the viewer's zone, the
  * live clock, or Final) with the network on the right, then a row per team —
  * tri, record, points by quarter (overtimes appended), total. Away on top,
  * the US convention. The whole card links to the box score.
@@ -113,6 +114,7 @@ export default function GameCard({
 
 /** The ordinary card: status + network, then both rows with quarters. */
 function CardBody({ game, live, kicker }: { game: Game; live: LiveGame | null; kicker?: string }) {
+  const tz = useViewerTz();
   const n = Math.max(game.away.linescore.length, game.home.linescore.length);
   const started = game.state !== "pre" && n > 0;
   const labels = started ? periodLabels(n) : [];
@@ -144,7 +146,7 @@ function CardBody({ game, live, kicker }: { game: Game; live: LiveGame | null; k
       <div className="flex items-baseline justify-between gap-2 font-mono text-[0.62rem] uppercase tracking-kicker">
         <span className={inProgress ? "text-cat-hoops" : "text-cream-dimmer"}>
           {inProgress && <span aria-hidden>● </span>}
-          {statusLabel(game)}
+          {statusLabel(game, tz)}
           {kicker && <span className="text-cream-dimmer"> · {kicker}</span>}
         </span>
         <span className="min-w-0 text-right text-cream-dimmer">{tvLabel(game.tv)}</span>

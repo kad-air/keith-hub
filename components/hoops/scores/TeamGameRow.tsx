@@ -5,12 +5,13 @@ import { tipTime, shortDate } from "@/lib/hoops/scores/dates";
 import { gameSlug, tvLabel } from "@/lib/hoops/scores/parse";
 import { gameDate } from "@/lib/hoops/scores/teams";
 import { useLiveGame, useSpoiler } from "./LiveProvider";
+import { useViewerTz } from "./ViewerTz";
 import type { Game } from "@/lib/hoops/scores/types";
 
 /**
  * One game on a team's schedule, from that team's side: the date, vs / @ the
  * opponent (a link to the opponent's team page), and the result (a link to
- * the game page) — or, before tip, the tip time in Mountain and the network.
+ * the game page) — or, before tip, the tip time (viewer's zone) and the network.
  *
  * 🔴 Spoiler mode: `guarded` games arrive from the server already veiled
  * (lib/hoops/scores/guard.ts). Under a LiveProvider the live tick carries the
@@ -34,6 +35,7 @@ export default function TeamGameRow({
   dateFirst?: boolean;
 }) {
   const live = useLiveGame(initial.id);
+  const tz = useViewerTz();
   const sp = useSpoiler();
   const entry = sp.spoiler[initial.id];
 
@@ -62,7 +64,7 @@ export default function TeamGameRow({
   } else if (game.state === "pre") {
     result = (
       <span className="text-cream-dim">
-        {tipTime(game.startUtc)}
+        {tipTime(game.startUtc, tz)}
         {/* The network gives way first on a folding phone's cover screen. */}
         <span className="text-cream-dimmer max-xs:hidden"> · {tvLabel(game.tv)}</span>
       </span>

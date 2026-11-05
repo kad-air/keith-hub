@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getBox, getGamelog } from "@/lib/hoops/scores/data";
 import { guardLog, unlockedLines } from "@/lib/hoops/scores/guard";
 import { momentAt } from "@/lib/hoops/scores/spoiler";
+import { viewerTz } from "@/lib/hoops/scores/viewerTz";
 
 export const dynamic = "force-dynamic";
 
@@ -28,10 +29,11 @@ export async function GET(request: Request, { params }: { params: { id: string }
     .map(([id, ms]) => [id, Number(ms)] as const);
 
   const now = new Date();
+  const tz = viewerTz();
   const log = await getGamelog(params.id, true);
   if (!log.data) return NextResponse.json({ error: log.error ?? "unavailable" }, { status: 503 });
 
-  const hidden = new Set(guardLog(log.data.games, now).filter((s) => s.hidden).map((s) => s.line.gameId));
+  const hidden = new Set(guardLog(log.data.games, now, tz).filter((s) => s.hidden).map((s) => s.line.gameId));
   const unlocked = new Set(reveal.filter((id) => hidden.has(id)));
   // A synced game counts once the viewer's moment has reached the final.
   await Promise.all(
@@ -45,7 +47,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
       }),
   );
   return NextResponse.json(
-    { lines: unlockedLines(log.data.games, now, unlocked) },
+    { lines: unlockedLines(log.data.games, now, unlocked, tz) },
     { headers: { "cache-control": "no-store" } },
   );
 }
