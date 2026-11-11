@@ -40,6 +40,11 @@ npm run check:hoops:projections  # Rest-of-season projection gate: the season_pr
                                  #   27 damage patterns refused (missing/duplicate team, prob > 1, title > finals, bad
                                  #   date, wrong conference, league sums off…), the table order is by projected wins, a
                                  #   bundle without the token still imports, the importer keeps the latest projection (same)
+npm run check:hoops:projection-history  # The projection's season (`projection_history`): the history file is accepted,
+                                 #   12 damage patterns refused (nights out of order or doubled, one night's own arithmetic
+                                 #   broken, a record that shrinks…), every pushed projection records its night, the history
+                                 #   file REPLACES the season, the chart's maths (calendar x, more wins higher, band = p10..p90)
+                                 #   and the card's above/below words (same)
 npm run check:hoops:partial-schedule  # Partial-schedule gate: a 1,200-game slate that accounts for every missing game
                                  #   (`partial_schedule`) is accepted, 20 damage patterns refused for their named reason,
                                  #   the exact-1,230 rule still holds without the token, the real importer stores the
@@ -1171,6 +1176,7 @@ Three things the site had never had, all gated on `contract.features`, all taugh
 | `nightly_strength` | v2: prefer the last-ten-games team read when pricing a game |
 | `season_projection` | 2026-10-28: the bundle carries `projections.json`, hoops-sim's nightly rest-of-season projection; `/hoops/projections` renders it. Display only — nothing is priced off it. See "The rest-of-season projection" below |
 | `goto_scorer` | v3 (2026-09-06, hoops-sim issue #73): a team built around one big scorer is worth more than its five men summed — add `star_goto_premium × (clamp(leading scorer's share of projected points, star_goto_share_band) − star_goto_league_share)` to a roster's raw strength, the share projected from each man's `pts_per36` over his allocated minutes, summed in ascending order. Net only; the tilt (game totals) never moves. Seven fixture cases (`v3 goto …`), including one that proves the port charges NOTHING when the token is absent. `pts_per36` ships on every player but is not stored in `hoops_players` yet — nothing on the site prices at runtime; the site's team ratings are transported from hoops-sim, which carries the term once its `FEATURES` flips |
+| `projection_history` | 2026-11-11: the bundle carries `projection_history.json`, every night's projection this season (nightly files plus nights the sender rebuilt back to opening night); it REPLACES the stored season and the sim team page charts it. Display only. See "The projection's season" below |
 | `partial_schedule` | 2026-10-28: `hoops_schedule.json` may carry FEWER than 1,230 games if it accounts for every missing one (`n_pending`, `pending_per_team` × 30, `pending_window`) and the arithmetic closes to 82 a team. No new file. Without the token the exact-1,230 rule stands. See "The partial schedule" below |
 
 `SUPPORTED_PRICING_VERSION` is 3 since the go-to round (was 2). Rule 4 is one-directional, so **every bundle hoops-sim sends today still imports and is still priced the v1 way** — which it will be until the flip lands. Two negotiation rules were added, both about a bundle being ACCEPTED and then priced wrongly (the failure nobody sees on screen): `checkFeatureCoherence` refuses `symmetric_off_def` and `split_off_def` together, and `checkFeatureConstants` refuses a DECLARED feature whose constants are absent while never demanding an undeclared one's (`FEATURE_CONSTANTS`) — which is what keeps a v1 bundle importable forever.
@@ -1352,6 +1358,45 @@ token dropped from `SUPPORTED_FEATURES`, file no longer demanded, route storing 
 `checkFeatureFiles`, `describeContract`), `app/api/hoops/import/route.ts` (GET discovery + the
 token-gated validation), `app/hoops/projections/page.tsx`, `components/hoops/ProjectionTable.tsx`,
 `scripts/check-hoops-projections.ts`, `hoops-data/hoops_projections_fixture.json`.
+
+#### The projection's season (`projection_history`, sim team page) — 2026-11-11
+
+Keith's ask: "the sim section needs the projection for each team on the team page. i also want the
+trend of the projection over the course of the season, as they outplay or underplay their ratings
+... backdate it to the start of the season." The hub kept only the latest projection; hoops-sim had
+kept a dated file a night from Oct 27 (none before, Nov 7 lost), so the sender REBUILDS every past
+night with today's model and only what was known that night, and ships the archive.
+
+**Two writers into one table, one rule each** (`hoops_projection_history`, one row a team a night,
+PK season + date + team; `lib/hoops/projectionStore.ts`): every pushed `projections.json` records
+its own `as_of_date` as a `nightly` point (so the line grows by itself with no sender change), and
+a declared `projection_history.json` **replaces the season's rows whole** (`rebuilt` and `nightly`
+nights as the sender chose them), then tonight's projection is recorded on top, inside
+`writeBundle`'s transaction. A push with neither leaves the line alone. Contract: `{
+season_start_year, generated_at, snapshots: [ { as_of_date, source: "nightly"|"rebuilt",
+replicates, method, teams: [30 × the projections.json team object] } ] }`, ascending, one a date.
+
+🔴 **Every night is held to the projections.json rulebook** (`validateProjections`, reused, not
+retyped) **plus the one rule only a series can break: a team's record never shrinks** from one
+night to the next. The route's same-hash no-op gained `historySettled` (meta singleton's
+`generated_at`), the `projectionSettled` pattern. GET discovery reports `stored.projection_history`
+(nights, first, last, file_generated_at).
+
+**The card** (`components/hoops/TeamProjection.tsx`, on `/hoops/sim/teams/[tri]` between the
+rating lenses and What moved): tonight's projected record, 80% range, playoff and title odds, then
+the line — projected wins by night with the 80% band and a dashed line where it started — and one
+sentence from `trendVerdict` ("Playing above what we expected: +4.2 projected wins since opening
+night", ±`VERDICT_WINS` = 2). The SVG is stretched to its box (`preserveAspectRatio="none"`,
+non-scaling strokes); `trendChart` returns every coordinate as a percentage and the labels are
+HTML at those percentages, so text stays phone-sized. One night is not a trend (the card says the
+line starts at two). The caption names the last rebuilt night when there is one.
+
+**Key files:** `lib/hoops/projectionHistory.ts` (**pure** — validator, summary, words, chart
+geometry), `lib/hoops/projectionStore.ts`, `lib/hoops/import.ts`, `app/api/hoops/import/route.ts`,
+`components/hoops/TeamProjection.tsx`, `scripts/check-hoops-projection-history.ts` (falsified
+13/13 at writing: record rule, date order, per-night validator, trend order, history appends,
+nightly not recorded, history not written, y flipped, x by index, verdict sign, token dropped, file
+not demanded, band edges).
 
 #### The partial schedule (`partial_schedule`) — 2026-10-28
 

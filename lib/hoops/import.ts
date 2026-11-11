@@ -35,7 +35,7 @@ import { getDb } from "@/lib/db";
 import { bundleHash, loadBundle, readParamsBlobText } from "./data";
 import { decodeParams } from "./params";
 import { playerRowsFromBundle } from "./playervalue.ts";
-import { writeProjection } from "./projectionStore.ts";
+import { recordProjectionNight, replaceProjectionHistory, writeProjection } from "./projectionStore.ts";
 import { scheduleStatusOf } from "./schedule.ts";
 import type { HoopsBundle } from "./types";
 
@@ -423,8 +423,17 @@ function writeBundle(db: Database.Database, bundle: HoopsBundle, meta: WriteMeta
     // later one that omits it) leaves the last projection standing, dated on
     // the page by its own as_of_date. Already validated by the route
     // (lib/hoops/projections.ts) before it got here.
+    //
+    // THE PROJECTION'S SEASON (projection_history). The sender's archive, when
+    // declared, replaces the season's history first; then tonight's projection
+    // is recorded as tonight's point, so the newest night is always the one
+    // the projections page shows.
+    if (bundle.projectionHistory) {
+      replaceProjectionHistory(db, bundle.projectionHistory, now);
+    }
     if (bundle.projections) {
       writeProjection(db, bundle.projections, now);
+      recordProjectionNight(db, bundle.projections, now);
     }
   });
 

@@ -60,6 +60,16 @@ export const SUPPORTED_PRICING_VERSION = 3;
  *                       by lib/hoops/projections.ts before anything is
  *                       written; without the token the file is ignored and
  *                       the import is exactly what it was before.
+ *   projection_history  2026-11-11 — the bundle carries
+ *                       `projection_history.json`, every night's projection
+ *                       this season (the nightly's own files plus the nights
+ *                       the sender rebuilt back to opening night), which the
+ *                       sim team page charts. Display only. Required when
+ *                       declared, validated night by night with the
+ *                       projections.json rules (lib/hoops/projectionHistory.ts),
+ *                       and REPLACES the season's stored history. Without it,
+ *                       each pushed projections.json still records its own
+ *                       night, so the line grows from the day this ships.
  *   partial_schedule    2026-10-28 — hoops_schedule.json may carry FEWER than
  *                       1,230 games, provided it accounts for every missing
  *                       one (`n_pending`, `pending_per_team` for all 30,
@@ -81,6 +91,7 @@ export const SUPPORTED_FEATURES: ReadonlySet<string> = new Set([
   "goto_scorer",
   "season_projection",
   "partial_schedule",
+  "projection_history",
 ]);
 
 /**
@@ -92,6 +103,7 @@ export const SUPPORTED_FEATURES: ReadonlySet<string> = new Set([
  */
 export const FEATURE_FILES: Readonly<Record<string, readonly string[]>> = {
   season_projection: ["projections.json"],
+  projection_history: ["projection_history.json"],
 };
 
 /**
