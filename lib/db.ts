@@ -491,6 +491,47 @@ export function getDb(): Database.Database {
       finals_pct REAL NOT NULL,
       title_pct REAL NOT NULL
     );
+
+    -- THE PROJECTION'S SEASON (wire token projection_history, file
+    -- projection_history.json; lib/hoops/projectionHistory.ts validates).
+    -- One row a team a night. Every pushed projections.json also lands here
+    -- under its own as_of_date (source 'nightly'); a projection_history.json
+    -- replaces its season's rows whole (the sender's archive, including the
+    -- nights it rebuilt back to opening night). Never truncated with the
+    -- bundle tables, never written by the committed disk seed.
+    CREATE TABLE IF NOT EXISTS hoops_projection_history (
+      season_start_year INTEGER NOT NULL,
+      as_of_date TEXT NOT NULL,
+      tri TEXT NOT NULL,
+      source TEXT NOT NULL,
+      replicates INTEGER NOT NULL,
+      generated_at TEXT NOT NULL,
+      received_at TEXT NOT NULL,
+      conference TEXT NOT NULL,
+      wins INTEGER NOT NULL,
+      losses INTEGER NOT NULL,
+      proj_wins REAL NOT NULL,
+      proj_losses REAL NOT NULL,
+      wins_p10 INTEGER NOT NULL,
+      wins_p90 INTEGER NOT NULL,
+      playoff_pct REAL NOT NULL,
+      playin_pct REAL NOT NULL,
+      top6_pct REAL NOT NULL,
+      conf_finals_pct REAL NOT NULL,
+      finals_pct REAL NOT NULL,
+      title_pct REAL NOT NULL,
+      PRIMARY KEY (season_start_year, as_of_date, tri)
+    );
+
+    -- When the last projection_history.json landed (the route's same-hash
+    -- "settled" marker reads generated_at). Singleton.
+    CREATE TABLE IF NOT EXISTS hoops_projection_history_meta (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      season_start_year INTEGER NOT NULL,
+      generated_at TEXT NOT NULL,
+      received_at TEXT NOT NULL,
+      n_snapshots INTEGER NOT NULL
+    );
   `);
 
   // Additive migrations — CREATE IF NOT EXISTS above never alters existing

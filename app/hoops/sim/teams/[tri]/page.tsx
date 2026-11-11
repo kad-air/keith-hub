@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Fragment } from "react";
 import { notFound } from "next/navigation";
 import HoopsNav from "@/components/hoops/HoopsNav";
+import TeamProjection from "@/components/hoops/TeamProjection";
 import {
   availableRatingModes,
   getHoopsMeta,
@@ -11,6 +12,7 @@ import {
   getRoster,
   getTeamForm,
   getTeamMovers,
+  getTeamProjection,
   getTeamRows,
   isRatingMode,
   resolveRatingMode,
@@ -58,6 +60,9 @@ export default function HoopsTeamPage({
   // nothing to explain and the block simply does not appear.
   const movers = getTeamMovers(tri);
   const nightly = getNightlyMeta();
+  // THE PROJECTION: tonight's rest-of-season numbers for this team and the
+  // line of how they moved this season (components/hoops/TeamProjection.tsx).
+  const projection = getTeamProjection(tri);
 
   // The roster is ordered and priced by the SAME model the league ranking and
   // the player page use — the promoted stack rating (value_pg = rating ×
@@ -144,6 +149,8 @@ export default function HoopsTeamPage({
           one is the correction.
         </p>
       )}
+
+      <TeamProjection tri={tri} current={projection.current} meta={projection.meta} trend={projection.trend} />
 
       {movers && (
         <WhatMoved

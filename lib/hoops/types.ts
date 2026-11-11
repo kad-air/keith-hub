@@ -579,6 +579,36 @@ export interface RawProjectionsFile {
 }
 
 // ---------------------------------------------------------------------------
+// projection_history.json — every night's projection this season
+// (projection_history)
+// ---------------------------------------------------------------------------
+
+/**
+ * Where one night's projection came from. `nightly` is the file the nightly
+ * actually wrote that night; `rebuilt` is the same model re-run later with only
+ * what was known through that date (the backfill to opening night, and any
+ * night the nightly missed).
+ */
+export type ProjectionSource = "nightly" | "rebuilt";
+
+/** One night's projection inside the history file: a projections.json minus
+ *  the two envelope fields the history file carries once for all of them. */
+export interface RawProjectionSnapshot {
+  as_of_date: string;
+  source: ProjectionSource;
+  replicates: number;
+  method: string;
+  teams: RawProjectionTeam[];
+}
+
+export interface RawProjectionHistoryFile {
+  season_start_year: number;
+  generated_at: string;
+  /** Ascending by as_of_date, one per date. */
+  snapshots: RawProjectionSnapshot[];
+}
+
+// ---------------------------------------------------------------------------
 // The bundle
 // ---------------------------------------------------------------------------
 
@@ -592,6 +622,9 @@ export interface HoopsBundle {
   /** Present only on a push that declares `season_projection`; the committed
    *  disk seed never carries one. Already validated by the time it is here. */
   projections?: RawProjectionsFile | null;
+  /** Present only on a push that declares `projection_history`. Already
+   *  validated (lib/hoops/projectionHistory.ts) by the time it is here. */
+  projectionHistory?: RawProjectionHistoryFile | null;
 }
 
 // ---------------------------------------------------------------------------

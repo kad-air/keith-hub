@@ -37,7 +37,8 @@ import { importPushedBundle } from "@/lib/hoops/import";
 import { decodeParams, StaleBlobError } from "@/lib/hoops/params";
 import { BundleRejection, validatePushedBundle } from "@/lib/hoops/bundleValidation";
 import { ProjectionRejection, validateProjections } from "@/lib/hoops/projections";
-import { storedProjectionGeneratedAt } from "@/lib/hoops/projectionStore";
+import { ProjectionHistoryRejection, validateProjectionHistory } from "@/lib/hoops/projectionHistory";
+import { storedProjectionGeneratedAt, storedProjectionHistoryGeneratedAt } from "@/lib/hoops/projectionStore";
 import { getDb } from "@/lib/db";
 import type {
   HoopsBundle,
@@ -117,6 +118,17 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       }
     | undefined;
   const scheduled = (db.prepare(`SELECT COUNT(*) AS n FROM hoops_schedule`).get() as { n: number }).n;
+  // The season's projection history: how many nights are stored and when the
+  // last history file landed, so the sender can see its archive arrived.
+  const history = db
+    .prepare(
+      `SELECT COUNT(DISTINCT as_of_date) AS nights, MIN(as_of_date) AS first, MAX(as_of_date) AS last
+         FROM hoops_projection_history`,
+    )
+    .get() as { nights: number; first: string | null; last: string | null };
+  const historyMeta = db
+    .prepare(`SELECT generated_at FROM hoops_projection_history_meta WHERE id = 1`)
+    .get() as { generated_at: string } | undefined;
   return NextResponse.json({
     ...describeContract(),
     stored: stored
@@ -127,6 +139,12 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
           projection: projection
             ? { as_of_date: projection.as_of_date, generated_at: projection.generated_at }
             : null,
+          projection_history: {
+            nights: history.nights,
+            first: history.first,
+            last: history.last,
+            file_generated_at: historyMeta?.generated_at ?? null,
+          },
           schedule: {
             season_start_year: sched?.schedule_season_start_year ?? null,
             n_games: scheduled,
@@ -252,6 +270,20 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
   }
 
+  // THE PROJECTION'S SEASON. Same gate, same fail-closed rule: declared ->
+  // validated night by night (lib/hoops/projectionHistory.ts) before anything
+  // is written; undeclared -> ignored.
+  if (contract.features.includes("projection_history")) {
+    try {
+      bundle.projectionHistory = validateProjectionHistory(files["projection_history.json"]);
+    } catch (err) {
+      if (err instanceof ProjectionHistoryRejection) {
+        return NextResponse.json({ error: `invalid projection history: ${err.message}` }, { status: 400 });
+      }
+      throw err;
+    }
+  }
+
   // content_hash: the sender's own if it supplied one, else computed here —
   // either way this is the idempotency key rule 6 (unchanged -> no-op) reads.
   const contentHash = contract.contentHash ?? computeContentHash({ constants, files });
@@ -303,6 +335,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // would otherwise publish a fresh projection every night that never lands).
   const projectionSettled =
     !bundle.projections || storedProjectionGeneratedAt(db) === bundle.projections.generated_at;
+  // And the history file, the same way.
+  const historySettled =
+    !bundle.projectionHistory ||
+    storedProjectionHistoryGeneratedAt(db) === bundle.projectionHistory.generated_at;
 
   // And for the schedule status: a row written before the hub stored how
   // whole its schedule was has NULL there, and a same-hash re-POST must fall
@@ -313,7 +349,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     .get() as { schedule_complete: number | null } | undefined;
   const scheduleSettled = storedSchedule?.schedule_complete != null;
 
-  if (existing && existing.content_hash === contentHash && splitSettled && nightlySettled && scheduleSettled && projectionSettled) {
+  if (existing && existing.content_hash === contentHash && splitSettled && nightlySettled && scheduleSettled && historySettled && projectionSettled) {
     return NextResponse.json({
       imported: false,
       reason: "unchanged",
@@ -373,6 +409,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       contractUsedFallback: contract.usedFallback,
       projection: bundle.projections
         ? { as_of_date: bundle.projections.as_of_date, generated_at: bundle.projections.generated_at }
+        : null,
+      projectionHistory: bundle.projectionHistory
+        ? {
+            snapshots: bundle.projectionHistory.snapshots.length,
+            from: bundle.projectionHistory.snapshots[0].as_of_date,
+            to: bundle.projectionHistory.snapshots[bundle.projectionHistory.snapshots.length - 1].as_of_date,
+            generated_at: bundle.projectionHistory.generated_at,
+          }
         : null,
       schedule: {
         n_games: bundle.schedule.games.length,

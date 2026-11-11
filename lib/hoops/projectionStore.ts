@@ -9,7 +9,13 @@
 // of its own for that reason; the gate wraps it in one.
 
 import type Database from "better-sqlite3";
-import type { RawProjectionsFile, RawProjectionTeam } from "./types";
+import type {
+  ProjectionSource,
+  RawProjectionHistoryFile,
+  RawProjectionsFile,
+  RawProjectionTeam,
+} from "./types";
+import type { TrendPoint } from "./projectionHistory.ts";
 
 export interface ProjectionMeta {
   seasonStartYear: number;
@@ -114,4 +120,103 @@ export function storedProjectionGeneratedAt(db: Database.Database): string | nul
     | { generated_at: string }
     | undefined;
   return m?.generated_at ?? null;
+}
+
+// ---------------------------------------------------------------------------
+// The projection's season (hoops_projection_history). Same rule as above:
+// the caller holds the transaction (writeBundle's, in production).
+// ---------------------------------------------------------------------------
+
+const HISTORY_TEAM_COLS = TEAM_COLS.filter((c) => c !== "tri");
+
+function insertSnapshotRows(
+  db: Database.Database,
+  season: number,
+  date: string,
+  source: ProjectionSource,
+  replicates: number,
+  generatedAt: string,
+  receivedAt: string,
+  teams: readonly RawProjectionTeam[],
+): void {
+  const cols = ["season_start_year", "as_of_date", "tri", "source", "replicates", "generated_at", "received_at", ...HISTORY_TEAM_COLS];
+  const ins = db.prepare(
+    `INSERT OR REPLACE INTO hoops_projection_history (${cols.join(", ")})
+     VALUES (${cols.map(() => "?").join(", ")})`,
+  );
+  for (const t of teams) {
+    ins.run(
+      season,
+      date,
+      t.team,
+      source,
+      replicates,
+      generatedAt,
+      receivedAt,
+      ...HISTORY_TEAM_COLS.map((c) => t[c as keyof RawProjectionTeam]),
+    );
+  }
+}
+
+/** Record one pushed projections.json as that night's point (source 'nightly'),
+ *  replacing whatever that night held. */
+export function recordProjectionNight(db: Database.Database, file: RawProjectionsFile, receivedAt: string): void {
+  db.prepare(`DELETE FROM hoops_projection_history WHERE season_start_year = ? AND as_of_date = ?`).run(
+    file.season_start_year,
+    file.as_of_date,
+  );
+  insertSnapshotRows(db, file.season_start_year, file.as_of_date, "nightly", file.replicates, file.generated_at, receivedAt, file.teams);
+}
+
+/** Replace the season's whole history with the sender's archive. */
+export function replaceProjectionHistory(db: Database.Database, file: RawProjectionHistoryFile, receivedAt: string): void {
+  db.prepare(`DELETE FROM hoops_projection_history WHERE season_start_year = ?`).run(file.season_start_year);
+  for (const s of file.snapshots) {
+    insertSnapshotRows(db, file.season_start_year, s.as_of_date, s.source, s.replicates, file.generated_at, receivedAt, s.teams);
+  }
+  db.prepare(
+    `INSERT OR REPLACE INTO hoops_projection_history_meta (id, season_start_year, generated_at, received_at, n_snapshots)
+     VALUES (1, ?, ?, ?, ?)`,
+  ).run(file.season_start_year, file.generated_at, receivedAt, file.snapshots.length);
+}
+
+/** The stored history file's generated_at, for the route's "unchanged" rule. */
+export function storedProjectionHistoryGeneratedAt(db: Database.Database): string | null {
+  const m = db.prepare(`SELECT generated_at FROM hoops_projection_history_meta WHERE id = 1`).get() as
+    | { generated_at: string }
+    | undefined;
+  return m?.generated_at ?? null;
+}
+
+/** One team's nights for a season, oldest first. */
+export function readTeamTrend(db: Database.Database, seasonStartYear: number, tri: string): TrendPoint[] {
+  const rows = db
+    .prepare(
+      `SELECT as_of_date, source, wins, losses, proj_wins, wins_p10, wins_p90, playoff_pct, title_pct
+         FROM hoops_projection_history
+        WHERE season_start_year = ? AND tri = ?
+        ORDER BY as_of_date`,
+    )
+    .all(seasonStartYear, tri) as Array<{
+    as_of_date: string;
+    source: ProjectionSource;
+    wins: number;
+    losses: number;
+    proj_wins: number;
+    wins_p10: number;
+    wins_p90: number;
+    playoff_pct: number;
+    title_pct: number;
+  }>;
+  return rows.map((r) => ({
+    date: r.as_of_date,
+    source: r.source,
+    wins: r.wins,
+    losses: r.losses,
+    projWins: r.proj_wins,
+    p10: r.wins_p10,
+    p90: r.wins_p90,
+    playoffPct: r.playoff_pct,
+    titlePct: r.title_pct,
+  }));
 }

@@ -5,7 +5,8 @@
 
 import { getDb } from "@/lib/db";
 import type { BoxPlayer } from "./boxscore";
-import { readProjection, type Projection } from "./projectionStore.ts";
+import { readProjection, readTeamTrend, type Projection } from "./projectionStore.ts";
+import type { TrendPoint } from "./projectionHistory.ts";
 import { ensureHoopsImport } from "./import";
 import type { ImportSource } from "./import";
 import { meetingsBetween } from "./matchup";
@@ -514,6 +515,33 @@ export function getProjection(): Projection | null {
 }
 
 export type { Projection, ProjectionMeta } from "./projectionStore.ts";
+
+export interface TeamProjection {
+  /** Tonight's projection for this team, or null when none has been received. */
+  current: import("./types").RawProjectionTeam | null;
+  meta: import("./projectionStore.ts").ProjectionMeta | null;
+  /** Every stored night for this team this season, oldest first. */
+  trend: TrendPoint[];
+}
+
+/**
+ * One team's projection and its season so far, for the sim team page. The
+ * season is the stored projection's; with no projection at all, the newest
+ * season the history holds.
+ */
+export function getTeamProjection(tri: string): TeamProjection {
+  ensureHoopsImport();
+  const db = getDb();
+  const projection = readProjection(db);
+  const season =
+    projection?.meta.seasonStartYear ??
+    (db.prepare(`SELECT MAX(season_start_year) AS s FROM hoops_projection_history`).get() as { s: number | null }).s;
+  return {
+    current: projection?.teams.find((t) => t.team === tri) ?? null,
+    meta: projection?.meta ?? null,
+    trend: season == null ? [] : readTeamTrend(db, season, tri),
+  };
+}
 
 export interface HoopsMeta {
   paramVersion: string;
