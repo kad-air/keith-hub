@@ -274,9 +274,11 @@ export function trendChart(points: readonly TrendPoint[], box: ChartBox = CHART_
   const yTicks: TrendChart["yTicks"] = [];
   for (let w = Math.ceil(yMin / step) * step; w <= yMax; w += step) yTicks.push({ y: y(w), label: String(w) });
 
-  // A tick on the 1st of every month inside the span, labelled by month.
-  const xTicks: TrendChart["xTicks"] = [];
-  const [sy, sm] = points[0].date.split("-").map(Number);
+  // The first night, labelled with its date, then a tick on the 1st of every
+  // month inside the span, labelled by month — skipping a 1st so close to the
+  // start that the two labels would collide.
+  const [sy, sm, sd] = points[0].date.split("-").map(Number);
+  const xTicks: TrendChart["xTicks"] = [{ x: x(points[0].date), label: `${MONTHS[sm - 1]} ${sd}` }];
   for (let yy = sy, mm = sm + 1; ; mm++) {
     if (mm > 12) {
       mm = 1;
@@ -284,7 +286,7 @@ export function trendChart(points: readonly TrendPoint[], box: ChartBox = CHART_
     }
     const iso = `${yy}-${String(mm).padStart(2, "0")}-01`;
     if (dayNumber(iso) > d1) break;
-    xTicks.push({ x: x(iso), label: MONTHS[mm - 1] });
+    if (x(iso) - xTicks[0].x >= 12) xTicks.push({ x: x(iso), label: MONTHS[mm - 1] });
   }
 
   return {

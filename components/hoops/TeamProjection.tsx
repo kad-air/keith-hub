@@ -129,7 +129,7 @@ export default function TeamProjection({
                 {chart.xTicks.map((t) => (
                   <span
                     key={`${t.label}-${t.x}`}
-                    className="absolute top-0.5 -translate-x-1/2 font-mono text-[0.58rem] uppercase text-cream-dimmer"
+                    className={`absolute top-0.5 ${t.x === 0 ? "" : "-translate-x-1/2"} font-mono text-[0.58rem] uppercase text-cream-dimmer`}
                     style={{ left: `${t.x}%` }}
                   >
                     {t.label}

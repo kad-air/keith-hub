@@ -284,6 +284,8 @@ const clone = (): RawProjectionHistoryFile => JSON.parse(JSON.stringify(goodRaw)
   check(c.yMin <= 33 && c.yMax >= 58 && c.yMin % 5 === 0 && c.yMax % 5 === 0, `y range ${c.yMin}..${c.yMax} does not hold the band on whole fives`);
   check(c.yTicks.every((t, i, arr) => i === 0 || t.y < arr[i - 1].y), "y ticks are not ascending wins going up");
   check(c.xTicks.some((t) => t.label === "Nov"), "no month tick for Nov 1");
+  check(c.xTicks[0].x === 0 && c.xTicks[0].label === "Oct 21", `the first x label is ${JSON.stringify(c.xTicks[0])}, not the first night`);
+  check(c.xTicks.every((t, i, arr) => i === 0 || t.x - arr[i - 1].x >= 12), "two x labels sit close enough to collide");
   check(c.xTicks.every((t) => t.x >= 0 && t.x <= 100), "a month tick falls off the chart");
   // The band must contain the line, night by night: parse the polygon.
   const coords = (d: string) => [...d.matchAll(/(-?[\d.]+),(-?[\d.]+)/g)].map((m) => [+m[1], +m[2]]);
