@@ -610,3 +610,18 @@
     transform: scale(1.07);
   }
 }
+
+/* Team colours on hoops charts (lib/hoops/teamColors.ts). Each element sets
+   --team to the team's colour, tuned for the dark ink; the light palette
+   darkens it so yellows and silvers still read on paper. */
+.hoops-team {
+  --team-c: var(--team);
+}
+[data-theme="light"] .hoops-team {
+  --team-c: color-mix(in oklab, var(--team) 68%, black);
+}
+@media (prefers-color-scheme: light) {
+  [data-theme="auto"] .hoops-team {
+    --team-c: color-mix(in oklab, var(--team) 68%, black);
+  }
+}

@@ -1,9 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import HoopsNav from "@/components/hoops/HoopsNav";
+import LeagueProjectionTrend from "@/components/hoops/LeagueProjectionTrend";
 import ProjectionTable from "@/components/hoops/ProjectionTable";
+import { FRANCHISES } from "@/lib/hoops/nba-franchises";
+import type { TeamSeries } from "@/lib/hoops/leagueTrend";
 import { fmtAsOf } from "@/lib/hoops/projections";
-import { getProjection, getResultsWindow } from "@/lib/hoops/queries";
+import { getLeagueTrend, getProjection, getResultsWindow } from "@/lib/hoops/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +24,15 @@ export const metadata: Metadata = { title: "Hoops · Projections — hub" };
 export default function HoopsProjectionsPage() {
   const projection = getProjection();
   const through = getResultsWindow()?.to ?? null;
+  const { byTeam } = getLeagueTrend();
+  const series: TeamSeries[] = Object.entries(byTeam)
+    .filter(([tri]) => FRANCHISES[tri])
+    .map(([tri, points]) => ({
+      tri,
+      conference: FRANCHISES[tri].conference,
+      division: FRANCHISES[tri].division,
+      points,
+    }));
 
   return (
     <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6">
@@ -48,6 +60,8 @@ export default function HoopsProjectionsPage() {
             as of {fmtAsOf(projection.meta.asOfDate)} ·{" "}
             {projection.meta.seasonStartYear}–{String(projection.meta.seasonStartYear + 1).slice(2)}
           </p>
+
+          {series.length > 0 && <LeagueProjectionTrend series={series} />}
 
           <div className="grid gap-8">
             <ProjectionTable conference="East" rows={projection.teams} />
