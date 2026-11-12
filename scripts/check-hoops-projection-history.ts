@@ -54,6 +54,18 @@ import {
   validateProjectionHistory,
 } from "../lib/hoops/projectionHistory.ts";
 import type { TrendPoint } from "../lib/hoops/projectionHistory.ts";
+import {
+  fmtMetric,
+  leagueTrendChart,
+  metricDomain,
+  nearestNight,
+  nearestTeam,
+  pointAt,
+  spreadLabels,
+} from "../lib/hoops/leagueTrend.ts";
+import type { TeamSeries } from "../lib/hoops/leagueTrend.ts";
+import { TEAM_CHART_COLORS } from "../lib/hoops/teamColors.ts";
+import { FRANCHISES } from "../lib/hoops/nba-franchises.ts";
 import type {
   HoopsBundle,
   RawProjectionHistoryFile,
@@ -304,6 +316,66 @@ const clone = (): RawProjectionHistoryFile => JSON.parse(JSON.stringify(goodRaw)
   notes.push("chart: calendar-time x, more wins drawn higher, band holds the line, month ticks on the chart");
 }
 
+// ── 4b. the all-teams chart on /hoops/sim/projections ─────────────────────
+// Three teams, one of which (C) misses a night. The chart must put every team
+// on ONE calendar x and ONE y scale (so a line higher up really is more wins),
+// a team that misses a night must not be drawn at that night, the pointer must
+// pick the line it is actually nearest, and the end labels must not stack.
+{
+  const P = (date: string, projWins: number, playoffPct: number, titlePct: number, w = 0, l = 0): TrendPoint => ({
+    date, source: "rebuilt", wins: w, losses: l, projWins, p10: projWins - 8, p90: projWins + 8, playoffPct, titlePct,
+  });
+  const series: TeamSeries[] = [
+    { tri: "AAA", conference: "East", division: "Atlantic", points: [P("2026-10-21", 50, 0.8, 0.12), P("2026-10-30", 56, 0.92, 0.2, 5, 0), P("2026-11-10", 58, 0.95, 0.24, 9, 1)] },
+    { tri: "BBB", conference: "East", division: "Atlantic", points: [P("2026-10-21", 40, 0.45, 0.01), P("2026-10-30", 36, 0.3, 0.004, 1, 4), P("2026-11-10", 31, 0.12, 0, 2, 8)] },
+    { tri: "CCC", conference: "West", division: "Pacific", points: [P("2026-10-21", 44, 0.6, 0.03), P("2026-11-10", 45, 0.62, 0.03, 5, 5)] },
+  ];
+  const c = leagueTrendChart(series, "wins")!;
+  check(c !== null, "the league chart refused three teams");
+  check(c.dates.join() === "2026-10-21,2026-10-30,2026-11-10", `the league chart's nights are ${c.dates.join()}, not the union in order`);
+  check(c.xs[0] === 0 && c.xs[c.xs.length - 1] === 100, "the league chart's x does not run 0..100");
+  const frac = (dayNumber("2026-10-30") - dayNumber("2026-10-21")) / (dayNumber("2026-11-10") - dayNumber("2026-10-21"));
+  check(Math.abs(c.xs[1] - frac * 100) < 0.11, "the league chart's x is not calendar time");
+  const line = (t: string) => c.lines.find((l) => l.tri === t)!;
+  check(line("CCC").pts.length === 2 && line("CCC").pts[1].dateIndex === 2, "a team that missed a night was drawn on it");
+  check(line("AAA").pts[2].y < line("CCC").pts[1].y && line("CCC").pts[1].y < line("BBB").pts[2].y, "more wins are not drawn higher ACROSS teams");
+  check(c.yMin <= 31 && c.yMax >= 58 && c.yMin % 5 === 0 && c.yMax % 5 === 0, `league y range ${c.yMin}..${c.yMax} does not hold every line on whole fives`);
+  const yOf = (w: number) => (1 - (w - c.yMin) / (c.yMax - c.yMin)) * 100;
+  check(Math.abs(line("BBB").pts[1].y - yOf(36)) < 0.11, "a league line is not at its projected wins");
+  check(c.evenY !== null && Math.abs(c.evenY - yOf(41)) < 0.11, "the .500 line is not at 41 wins");
+  check(typeof c.bands.AAA === "string" && c.bands.AAA.endsWith("Z"), "no 80% band for a focused team");
+  // the pointer
+  check(nearestNight(c, 2) === 0 && nearestNight(c, frac * 100 + 3) === 1 && nearestNight(c, 99) === 2, "nearestNight picks the wrong night");
+  check(nearestTeam(c, 2, line("AAA").pts[2].y + 1) === "AAA", "the pointer near AAA's line picked another team");
+  check(nearestTeam(c, 2, line("BBB").pts[2].y - 1) === "BBB", "the pointer near BBB's line picked another team");
+  check(nearestTeam(c, 1, line("CCC").pts[0].y) === "CCC", "a team that missed a night can't be picked on it (should read its last night)");
+  check(pointAt(line("CCC"), 1)?.dateIndex === 0, "pointAt does not fall back to the last earlier night");
+  check(nearestTeam(c, 2, 0, new Set(["BBB"])) === "BBB", "nearestTeam ignores its candidate set");
+  // odds: a fraction drawn as a percentage, playoffs pinned to 0..100, title to a round ceiling
+  const po = leagueTrendChart(series, "playoffs")!;
+  check(po.yMin === 0 && po.yMax === 100, `playoff odds drawn on ${po.yMin}..${po.yMax}, not 0..100`);
+  check(Math.abs(po.lines[0].pts[0].value - 80) < 1e-9, "playoff odds are not read as a percentage of the fraction");
+  check(po.evenY === null, "the .500 line shows on odds");
+  const ti = metricDomain(series, "title");
+  check(ti.min === 0 && ti.max >= 25 && ti.max <= 30, `title odds drawn on ${ti.min}..${ti.max}, not 0 to a round ceiling over 24%`);
+  check(fmtMetric(0.3, "title") === "<1%" && fmtMetric(0, "title") === "0%" && fmtMetric(47.25, "wins") === "47.3", "the readout's number formats are off");
+  check(leagueTrendChart([series[0]].map((s) => ({ ...s, points: s.points.slice(0, 1) })), "wins") === null, "one night drew a league chart");
+  // labels never stack, never leave the chart
+  const sp = spreadLabels([{ tri: "X", y: 50 }, { tri: "Y", y: 51 }, { tri: "Z", y: 99 }, { tri: "W", y: 98.5 }]);
+  const ys = sp.map((s) => s.y).sort((a, b) => a - b);
+  check(ys.every((y, i) => i === 0 || y - ys[i - 1] >= 6.9) && ys[ys.length - 1] <= 100.01 && ys[0] >= 0, `end labels collide or leave the chart: ${ys.join()}`);
+  // every franchise has its own colour
+  const tris = Object.keys(FRANCHISES);
+  check(tris.length === 30 && tris.every((t) => /^#[0-9a-f]{6}$/.test(TEAM_CHART_COLORS[t] ?? "")), "a franchise has no chart colour");
+  for (const conf of ["East", "West"]) {
+    for (const div of new Set(tris.filter((t) => FRANCHISES[t].conference === conf).map((t) => FRANCHISES[t].division))) {
+      const cols = tris.filter((t) => FRANCHISES[t].division === div).map((t) => TEAM_CHART_COLORS[t]);
+      check(new Set(cols).size === cols.length, `two ${div} teams share a chart colour`);
+    }
+  }
+  notes.push("league chart: one calendar x and one y for every team, missed nights not drawn, the pointer picks the nearest line, labels spread");
+}
+
 // ── 5. the store and the REAL importer ────────────────────────────────────
 {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "hoops-projection-history-check-"));
@@ -313,7 +385,7 @@ const clone = (): RawProjectionHistoryFile => JSON.parse(JSON.stringify(goodRaw)
     process.chdir(tmp);
     const { getDb } = await import(path.join(ROOT, "lib/db.ts"));
     db = getDb() as import("better-sqlite3").Database;
-    const { readTeamTrend, storedProjectionHistoryGeneratedAt } = await import(path.join(ROOT, "lib/hoops/projectionStore.ts"));
+    const { readLeagueTrend, readTeamTrend, storedProjectionHistoryGeneratedAt } = await import(path.join(ROOT, "lib/hoops/projectionStore.ts"));
     const { importPushedBundle } = await import(path.join(ROOT, "lib/hoops/import.ts"));
 
     for (const t of ["hoops_projection_history", "hoops_projection_history_meta"]) {
@@ -364,6 +436,9 @@ const clone = (): RawProjectionHistoryFile => JSON.parse(JSON.stringify(goodRaw)
     check(t2[0].source === "rebuilt", "the history file did not replace the nightly night it covers");
     check(t2[2].projWins === hist.snapshots[2].teams.find((x) => x.team === A)!.proj_wins, "a stored night lost its projected wins");
     check(storedProjectionHistoryGeneratedAt(db) === hist.generated_at, "the history meta did not record generated_at");
+    const league = readLeagueTrend(db, base.season_start_year) as Record<string, TrendPoint[]>;
+    check(Object.keys(league).length === 30, `readLeagueTrend returned ${Object.keys(league).length} teams, not 30`);
+    check(JSON.stringify(league[A]) === JSON.stringify(t2), "readLeagueTrend disagrees with readTeamTrend for one team");
 
     // (c) a later push without either keeps the line
     importPushedBundle(bundle, meta("sha256:c"));
@@ -401,6 +476,10 @@ const clone = (): RawProjectionHistoryFile => JSON.parse(JSON.stringify(goodRaw)
   check(/<TeamProjection\b/.test(page) && /getTeamProjection\(/.test(page), "the sim team page does not render the Projection card");
   const card = fs.readFileSync(path.join(ROOT, "components/hoops/TeamProjection.tsx"), "utf-8");
   check(/trendChart\(/.test(card) && /trendVerdict\(/.test(card), "the card does not draw from the pure module");
+  const projPage = fs.readFileSync(path.join(ROOT, "app/hoops/sim/projections/page.tsx"), "utf-8");
+  check(/<LeagueProjectionTrend\b/.test(projPage) && /getLeagueTrend\(/.test(projPage), "the projections page does not render the all-teams trend");
+  const league = fs.readFileSync(path.join(ROOT, "components/hoops/LeagueProjectionTrend.tsx"), "utf-8");
+  check(/leagueTrendChart\(/.test(league) && /nearestTeam\(/.test(league), "the all-teams chart does not draw from the pure module");
   const mobile = fs.readFileSync(path.join(ROOT, "scripts/check-hoops-mobile.mjs"), "utf-8");
   check(/path: "\/hoops\/sim\/teams\/DEN"/.test(mobile), "check:hoops:mobile no longer walks a sim team page");
   notes.push("wiring: route validates and settles it; the team page renders the card; the phone walk covers the page");

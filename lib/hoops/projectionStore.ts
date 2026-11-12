@@ -220,3 +220,42 @@ export function readTeamTrend(db: Database.Database, seasonStartYear: number, tr
     titlePct: r.title_pct,
   }));
 }
+
+/** Every team's nights for a season, oldest first per team, keyed by tri —
+ *  the all-teams trend on /hoops/sim/projections. One query, not thirty. */
+export function readLeagueTrend(db: Database.Database, seasonStartYear: number): Record<string, TrendPoint[]> {
+  const rows = db
+    .prepare(
+      `SELECT tri, as_of_date, source, wins, losses, proj_wins, wins_p10, wins_p90, playoff_pct, title_pct
+         FROM hoops_projection_history
+        WHERE season_start_year = ?
+        ORDER BY tri, as_of_date`,
+    )
+    .all(seasonStartYear) as Array<{
+    tri: string;
+    as_of_date: string;
+    source: ProjectionSource;
+    wins: number;
+    losses: number;
+    proj_wins: number;
+    wins_p10: number;
+    wins_p90: number;
+    playoff_pct: number;
+    title_pct: number;
+  }>;
+  const out: Record<string, TrendPoint[]> = {};
+  for (const r of rows) {
+    (out[r.tri] ??= []).push({
+      date: r.as_of_date,
+      source: r.source,
+      wins: r.wins,
+      losses: r.losses,
+      projWins: r.proj_wins,
+      p10: r.wins_p10,
+      p90: r.wins_p90,
+      playoffPct: r.playoff_pct,
+      titlePct: r.title_pct,
+    });
+  }
+  return out;
+}

@@ -5,7 +5,7 @@
 
 import { getDb } from "@/lib/db";
 import type { BoxPlayer } from "./boxscore";
-import { readProjection, readTeamTrend, type Projection } from "./projectionStore.ts";
+import { readLeagueTrend, readProjection, readTeamTrend, type Projection } from "./projectionStore.ts";
 import type { TrendPoint } from "./projectionHistory.ts";
 import { ensureHoopsImport } from "./import";
 import type { ImportSource } from "./import";
@@ -541,6 +541,20 @@ export function getTeamProjection(tri: string): TeamProjection {
     meta: projection?.meta ?? null,
     trend: season == null ? [] : readTeamTrend(db, season, tri),
   };
+}
+
+/**
+ * Every team's projection, night by night, for the all-teams trend on
+ * /hoops/sim/projections: the stored projection's season (or, with none, the
+ * newest season the history holds), keyed by tri. Empty when nothing is stored.
+ */
+export function getLeagueTrend(): { seasonStartYear: number | null; byTeam: Record<string, TrendPoint[]> } {
+  ensureHoopsImport();
+  const db = getDb();
+  const season =
+    readProjection(db)?.meta.seasonStartYear ??
+    (db.prepare(`SELECT MAX(season_start_year) AS s FROM hoops_projection_history`).get() as { s: number | null }).s;
+  return { seasonStartYear: season, byTeam: season == null ? {} : readLeagueTrend(db, season) };
 }
 
 export interface HoopsMeta {

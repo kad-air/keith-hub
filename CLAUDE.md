@@ -44,7 +44,9 @@ npm run check:hoops:projection-history  # The projection's season (`projection_h
                                  #   12 damage patterns refused (nights out of order or doubled, one night's own arithmetic
                                  #   broken, a record that shrinks…), every pushed projection records its night, the history
                                  #   file REPLACES the season, the chart's maths (calendar x, more wins higher, band = p10..p90)
-                                 #   and the card's above/below words (same)
+                                 #   and the card's above/below words, and the all-teams chart on /hoops/sim/projections
+                                 #   (one x and y for every team, missed nights not drawn, the pointer picks the nearest
+                                 #   line, end labels don't stack, a colour per franchise unique in its division) (same)
 npm run check:hoops:partial-schedule  # Partial-schedule gate: a 1,200-game slate that accounts for every missing game
                                  #   (`partial_schedule`) is accepted, 20 damage patterns refused for their named reason,
                                  #   the exact-1,230 rule still holds without the token, the real importer stores the
@@ -1391,12 +1393,26 @@ non-scaling strokes); `trendChart` returns every coordinate as a percentage and 
 HTML at those percentages, so text stays phone-sized. One night is not a trend (the card says the
 line starts at two). The caption names the last rebuilt night when there is one.
 
+**The league chart** (`components/hoops/LeagueProjectionTrend.tsx`, client, on
+`/hoops/sim/projections` above the tables; added 2026-11-12): one line per team from the same table
+(`readLeagueTrend`, one query). League / East / West narrows and rescales it; Wins / Playoffs / Title
+switches the measure (odds drawn 0..100, title to a round ceiling over the best team). Drag or hover
+scrubs night by night — the line nearest the pointer lights up and a tooltip reads out the focused
+teams; a tap on the chart or a key chip pins a team (a division name pins all five), and everything
+unpinned fades. One focused team on Wins also gets its 80% band; a dashed line marks 41 wins. Scope,
+measure and pins live in localStorage (`hoops:sim:projection-trend:v1`), convenience only. Geometry
+and the pointer maths are `lib/hoops/leagueTrend.ts` (**pure**, gated); team colours are
+`lib/hoops/teamColors.ts`, tuned for the dark ink and darkened for light themes by the
+`.hoops-team` rule in `app/globals.css`. The late-October step in every line (each team's third
+game) is real model behaviour and stays visible; the caption names it.
+
 **Key files:** `lib/hoops/projectionHistory.ts` (**pure** — validator, summary, words, chart
 geometry), `lib/hoops/projectionStore.ts`, `lib/hoops/import.ts`, `app/api/hoops/import/route.ts`,
 `components/hoops/TeamProjection.tsx`, `scripts/check-hoops-projection-history.ts` (falsified
 13/13 at writing: record rule, date order, per-night validator, trend order, history appends,
 nightly not recorded, history not written, y flipped, x by index, verdict sign, token dropped, file
-not demanded, band edges).
+not demanded, band edges). The league chart's checks were falsified 5/5 on 2026-11-12 (y flipped,
+nearest line inverted, labels not spread, odds read as fractions, nights indexed per team).
 
 #### The partial schedule (`partial_schedule`) — 2026-10-28
 
