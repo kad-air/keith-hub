@@ -10,6 +10,7 @@ import type { HealthSeverity } from "@/lib/books/health";
 import { needsReplacementFile } from "@/lib/books/healthRemedy";
 import type { PhraseSearchResult, PositionCandidate } from "@/lib/books/xpointer";
 import { finishLabel } from "@/lib/books/stats";
+import BookAsk from "@/components/BookAsk";
 
 const finishDate = (days: number) => finishLabel(days, Date.now());
 
@@ -328,6 +329,8 @@ export default function BookDetailClient({ book, sync, history, health }: Props)
           </p>
         )}
       </section>
+
+      {sync && <BookAsk bookId={book.id} />}
 
       <section className="mt-4 border border-rule/60 bg-ink-raised/40 px-4 py-3 text-sm">
         <h2 className="font-mono text-[0.7rem] uppercase tracking-kicker text-cream-dimmer">
