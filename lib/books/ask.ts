@@ -1,4 +1,5 @@
 import type { ParsedBook } from "./pageText.ts";
+import { PAGE_WORDS } from "./pages.ts";
 
 // "Ask about the book I'm reading": what the model is allowed to see.
 //
@@ -21,7 +22,7 @@ import type { ParsedBook } from "./pageText.ts";
 // knows of the rest of THIS book, which is an instruction and not a guarantee
 // — the UI says so.
 //
-// Pure: imports types only.
+// Pure: imports types and the page convention (pages.ts, itself import-free).
 
 /** Words per cached chunk. Chunk boundaries depend only on the book, never on the position. */
 export const CHUNK_WORDS = 20_000;
@@ -73,6 +74,20 @@ export function readSoFar(book: ParsedBook, cutoff: number): ReadSoFar {
   }
   flush();
   return { chunks, words: end, totalWords: total };
+}
+
+/**
+ * The line shown between two questions when the reader has moved: "You read 12
+ * more pages". `before` is the words read at the previous question (null for
+ * the first one, which says where the conversation starts). Null when the
+ * position moved by less than half a page — nothing worth a line.
+ */
+export function progressNote(before: number | null, words: number): string | null {
+  if (before == null) return `Starting around page ${Math.floor(Math.max(0, words) / PAGE_WORDS) + 1}`;
+  const pages = Math.round(Math.abs(words - before) / PAGE_WORDS);
+  if (pages < 1) return null;
+  const n = `${pages.toLocaleString("en-US")} ${pages === 1 ? "page" : "pages"}`;
+  return words > before ? `You read ${pages.toLocaleString("en-US")} more ${pages === 1 ? "page" : "pages"}` : `You went back ${n}`;
 }
 
 export const MAX_QUESTION_CHARS = 4_000;

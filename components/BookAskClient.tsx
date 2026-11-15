@@ -3,6 +3,7 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { AskTurn } from "@/lib/books/askStore";
+import { progressNote } from "@/lib/books/ask";
 
 // The conversation about one book. The thread is kept on the server
 // (lib/books/askStore.ts) and the server sends the model only the text before
@@ -63,6 +64,21 @@ function Answer({ text }: { text: string }) {
   );
 }
 
+const QUESTION = "ml-8 border-l-2 border-accent/60 pl-3 font-display text-[1.05rem] leading-snug text-cream";
+
+/** The line above a question: where the conversation starts, or the reading done since the last one. */
+function Progress({ before, words, at }: { before: number | null; words: number | null; at: number }) {
+  const note = words == null ? null : progressNote(before, words);
+  if (!note) return null;
+  return (
+    <li className="flex items-center gap-3 font-mono text-[0.6rem] uppercase tracking-kicker text-cream-dimmer">
+      <span className="h-px flex-1 bg-rule/60" />
+      {note} · {new Date(at).toLocaleDateString([], { month: "short", day: "numeric" })}
+      <span className="h-px flex-1 bg-rule/60" />
+    </li>
+  );
+}
+
 const pct = (p: number) => `${(p * 100).toFixed(1)}%`;
 
 export default function BookAskClient({
@@ -79,7 +95,7 @@ export default function BookAskClient({
   const [turns, setTurns] = useState(initialTurns);
   const [status, setStatus] = useState<Status | null>(null);
   // The question being answered right now and what has streamed in so far.
-  const [live, setLive] = useState<{ question: string; answer: string } | null>(null);
+  const [live, setLive] = useState<{ question: string; answer: string; words: number | null; at: number } | null>(null);
   const [question, setQuestion] = useState("");
   const [error, setError] = useState<string | null>(null);
   const liveRef = useRef(false);
@@ -126,7 +142,7 @@ export default function BookAskClient({
     const q = question.trim();
     if (!q || liveRef.current) return;
     liveRef.current = true;
-    setLive({ question: q, answer: "" });
+    setLive({ question: q, answer: "", words: status?.words ?? null, at: Date.now() });
     setQuestion("");
     setError(null);
 
@@ -160,7 +176,10 @@ export default function BookAskClient({
           if (event.t === "text") {
             answer += event.v;
             const shown = answer;
-            setLive({ question: q, answer: shown });
+            setLive((l) => (l ? { ...l, answer: shown } : l));
+          } else if (event.t === "meta") {
+            const words = event.words as number;
+            setLive((l) => (l ? { ...l, words } : l));
           } else if (event.t === "error") {
             failed = event.v;
           }
@@ -229,35 +248,24 @@ export default function BookAskClient({
         )}
 
         <ol className="mt-6 space-y-6">
-          {turns.map((t, i) => {
-            const moved = t.role === "user" && (i === 0 || Math.abs(turns[i - 1].percentage - t.percentage) >= 0.0005);
-            return (
-              <Fragment key={t.id}>
-                {moved && (
-                  <li className="flex items-center gap-3 font-mono text-[0.6rem] uppercase tracking-kicker text-cream-dimmer">
-                    <span className="h-px flex-1 bg-rule/60" />
-                    {new Date(t.createdAt * 1000).toLocaleDateString([], { month: "short", day: "numeric" })} · at{" "}
-                    {pct(t.percentage)}
-                    <span className="h-px flex-1 bg-rule/60" />
-                  </li>
-                )}
-                {t.role === "user" ? (
-                  <li className="ml-8 border-l-2 border-accent/60 pl-3 font-display text-[1.05rem] leading-snug text-cream">
-                    {t.content}
-                  </li>
-                ) : (
-                  <li className="text-[0.95rem] leading-relaxed text-cream-dim">
-                    <Answer text={t.content} />
-                  </li>
-                )}
-              </Fragment>
-            );
-          })}
+          {turns.map((t, i) => (
+            <Fragment key={t.id}>
+              {t.role === "user" && (
+                <Progress before={i === 0 ? null : turns[i - 1].words} words={t.words} at={t.createdAt * 1000} />
+              )}
+              {t.role === "user" ? (
+                <li className={QUESTION}>{t.content}</li>
+              ) : (
+                <li className="text-[0.95rem] leading-relaxed text-cream-dim">
+                  <Answer text={t.content} />
+                </li>
+              )}
+            </Fragment>
+          ))}
           {live && (
             <>
-              <li className="ml-8 border-l-2 border-accent/60 pl-3 font-display text-[1.05rem] leading-snug text-cream">
-                {live.question}
-              </li>
+              <Progress before={turns.length > 0 ? turns[turns.length - 1].words : null} words={live.words} at={live.at} />
+              <li className={QUESTION}>{live.question}</li>
               <li className="text-[0.95rem] leading-relaxed text-cream-dim">
                 {live.answer ? <Answer text={live.answer} /> : <span className="text-cream-dimmer">Reading…</span>}
               </li>

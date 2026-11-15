@@ -152,7 +152,7 @@ export async function POST(
   const earlier = listTurns(params.id).slice(-MAX_TURNS_SENT);
   while (earlier.length > 0 && earlier[0].role !== "user") earlier.shift();
   while (earlier.length > 0 && earlier[earlier.length - 1].role !== "assistant") earlier.pop();
-  const questionId = beginQuestion(params.id, question, ready.percentage);
+  const questionId = beginQuestion(params.id, question, ready.words);
   if (questionId == null) {
     return NextResponse.json({ error: "The last question is still being answered." }, { status: 409 });
   }
@@ -196,7 +196,7 @@ export async function POST(
         dropQuestion(params.id, questionId);
         send({ t: "error", v: "The model declined to answer this one." });
       } else {
-        completeAnswer(params.id, questionId, answer, ready.percentage);
+        completeAnswer(params.id, questionId, answer, ready.words);
         if (message.stop_reason === "max_tokens") send({ t: "error", v: "The answer was cut off at the length limit." });
         else send({ t: "done" });
       }

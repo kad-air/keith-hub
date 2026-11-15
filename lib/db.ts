@@ -207,14 +207,15 @@ export function getDb(): Database.Database {
     -- "Ask about what you've read": the conversation about one book, kept so
     -- it can be picked up again on any device. One thread per book, keyed by
     -- the book's id (not its bytes), so it survives a file edit and leaves
-    -- with the book. percentage is the synced position the turn was asked at:
-    -- an older answer was given with less of the book in view.
+    -- with the book. words is how many words of the book had been read (and
+    -- were sent) when the turn was asked: an older answer was given with less
+    -- of the book in view, and the page shows the reading done between turns.
     CREATE TABLE IF NOT EXISTS book_ask_turns (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       book_id TEXT NOT NULL REFERENCES books(id) ON DELETE CASCADE,
       role TEXT NOT NULL,
       content TEXT NOT NULL,
-      percentage REAL NOT NULL,
+      words INTEGER NOT NULL,
       created_at INTEGER NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_book_ask_turns_book ON book_ask_turns(book_id, id);

@@ -40,7 +40,8 @@ const fixture = (name: string) => fs.readFileSync(path.resolve(repoRoot, "books-
 const source = (rel: string) => fs.readFileSync(path.resolve(repoRoot, rel), "utf8");
 
 const { parseBook, resolvePosition } = await import("../lib/books/pageText.ts");
-const { readSoFar, CHUNK_WORDS } = await import("../lib/books/ask.ts");
+const { readSoFar, progressNote, CHUNK_WORDS } = await import("../lib/books/ask.ts");
+const { PAGE_WORDS } = await import("../lib/books/pages.ts");
 
 let failures = 0;
 function assert(cond: boolean, label: string): void {
@@ -200,7 +201,7 @@ console.log("\nthe route:");
   assert(/listProgress\(\)\.find\(\(p\) => p\.document === book\.partialMd5\)/.test(route), "the position is the latest sync for this file");
   assert(/if \(!sync\)[\s\S]{0,200}status: 409/.test(route), "no synced position → refused, never the whole book");
   assert(/if \(!process\.env\.ANTHROPIC_API_KEY\)[\s\S]{0,200}status: 503/.test(route), "no API key → refused with a reason");
-  assert(!/^import (?!type )/m.test(mod), "ask.ts imports nothing but types");
+  assert(!/^import (?!type |\{ PAGE_WORDS \} from "\.\/pages\.ts")/m.test(mod), "ask.ts imports nothing but types and the page convention");
   assert(/have not read anything after it/.test(mod) && /do not draw on what you know of how it continues/.test(mod) && /outside this book is welcome/.test(mod),
     "the instructions keep the rest of the book out and the outside world in");
 
@@ -231,30 +232,40 @@ console.log("\nthe saved conversation:");
   const t0 = 1_800_000_000;
   const shape = () => listTurns(book.id).map((t) => t.role[0]).join("");
 
-  const q1 = beginQuestion(book.id, "Who is late?", 0.1, t0)!;
+  const q1 = beginQuestion(book.id, "Who is late?", 1000, t0)!;
   assert(q1 != null && shape() === "u" && isPending(listTurns(book.id), t0 + 5), "a question is saved as soon as it is asked, and is pending");
-  assert(beginQuestion(book.id, "And another?", 0.1, t0 + 10) === null && shape() === "u", "🔴 no second question while the first is being answered");
-  completeAnswer(book.id, q1, "The White Rabbit.", 0.1, t0 + 20);
+  assert(beginQuestion(book.id, "And another?", 1000, t0 + 10) === null && shape() === "u", "🔴 no second question while the first is being answered");
+  completeAnswer(book.id, q1, "The White Rabbit.", 1000, t0 + 20);
   assert(shape() === "ua" && !isPending(listTurns(book.id), t0 + 21), "its answer lands after it");
 
-  const q2 = beginQuestion(book.id, "Fails", 0.2, t0 + 30)!;
+  const q2 = beginQuestion(book.id, "Fails", 2000, t0 + 30)!;
   dropQuestion(book.id, q2);
   assert(shape() === "ua", "a question that got no answer is removed");
-  completeAnswer(book.id, q2, "late answer", 0.2, t0 + 40);
+  completeAnswer(book.id, q2, "late answer", 2000, t0 + 40);
   assert(shape() === "ua", "an answer to a question that is gone is not saved");
 
-  beginQuestion(book.id, "Lost in a restart", 0.2, t0 + 50);
-  const q4 = beginQuestion(book.id, "Asked later", 0.3, t0 + 50 + PENDING_SECONDS)!;
+  beginQuestion(book.id, "Lost in a restart", 2000, t0 + 50);
+  const q4 = beginQuestion(book.id, "Asked later", 3000, t0 + 50 + PENDING_SECONDS)!;
   assert(q4 != null && shape() === "uau" && listTurns(book.id)[2].content === "Asked later", "🔴 a question whose answer was lost is dropped, not left to block the thread");
-  completeAnswer(book.id, q4, "Answer", 0.3, t0 + 60 + PENDING_SECONDS);
+  completeAnswer(book.id, q4, "Answer", 3000, t0 + 60 + PENDING_SECONDS);
   const turns = listTurns(book.id);
   assert(
-    shape() === "uaua" && turns[0].percentage === 0.1 && turns[3].percentage === 0.3 && turns[0].createdAt === t0,
-    "the thread alternates and each turn keeps the position it was asked at",
+    shape() === "uaua" && turns[0].words === 1000 && turns[3].words === 3000 && turns[0].createdAt === t0,
+    "the thread alternates and each turn keeps how far the reader was",
+  );
+  const P = PAGE_WORDS;
+  assert(
+    progressNote(null, P * 41 + 10) === "Starting around page 42" &&
+      progressNote(1000, 1000 + P * 12) === "You read 12 more pages" &&
+      progressNote(1000, 1000 + P) === "You read 1 more page" &&
+      progressNote(P * 9, P * 4) === "You went back 5 pages" &&
+      progressNote(1000, 1000) === null &&
+      progressNote(1000, 1000 + Math.floor(P / 2) - 1) === null,
+    "🔴 between questions: pages read since the last one, in the hub's own page size; under half a page says nothing",
   );
 
-  const oq = beginQuestion(other.id, "Other book", 0.5, t0)!;
-  completeAnswer(other.id, oq, "Other answer", 0.5, t0 + 1);
+  const oq = beginQuestion(other.id, "Other book", 5000, t0)!;
+  completeAnswer(other.id, oq, "Other answer", 5000, t0 + 1);
   assert(listTurns(book.id).length === 4 && listTurns(other.id).length === 2, "one thread per book");
   dropQuestion(other.id, q1);
   assert(listTurns(book.id).length === 4, "one book's route cannot remove another's turn");

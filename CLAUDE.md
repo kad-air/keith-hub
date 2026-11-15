@@ -493,8 +493,10 @@ from the book page as "Current page" once a position exists.
 Claude from the part already read: a chat page of its own, one click in from the book page ("Ask",
 shown once the book has a synced position). 🔴 **The conversation is kept** — one thread per book in
 `book_ask_turns` (`lib/books/askStore.ts`; FK to `books` with `ON DELETE CASCADE`, keyed by book id
-so it survives a file edit), the same on every device, with a divider wherever the position it was
-asked at changes. "Clear" (confirmed) is the only thing that removes it.
+so it survives a file edit), the same on every device. Each turn stores `words` (how much of the book
+had been read when it was asked), and the page puts a line between questions wherever that moved:
+"You read 12 more pages" (`progressNote` in `ask.ts`, at `PAGE_WORDS` a page like the stats; under
+half a page says nothing; going backwards reads "You went back N pages"). "Clear" (confirmed) is the only thing that removes it.
 - 🔴 **The model is sent the book's text before the synced position and nothing at or after it.**
   `lib/books/ask.ts` (**pure**, imports only types) owns the cut: `readSoFar(book, cutoff)` returns
   every word with a global index below `cutoff`, where `cutoff` is the word `resolvePosition` gives

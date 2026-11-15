@@ -12,8 +12,8 @@ export type AskTurn = {
   id: number;
   role: "user" | "assistant";
   content: string;
-  /** The synced position (0..1) the turn was asked at. */
-  percentage: number;
+  /** Words of the book read (and sent to the model) when the turn was asked. */
+  words: number;
   /** Unix seconds. */
   createdAt: number;
 };
@@ -26,7 +26,7 @@ const now = () => Math.floor(Date.now() / 1000);
 export function listTurns(bookId: string): AskTurn[] {
   return getDb()
     .prepare(
-      `SELECT id, role, content, percentage, created_at AS createdAt
+      `SELECT id, role, content, words, created_at AS createdAt
          FROM book_ask_turns WHERE book_id = ? ORDER BY id`,
     )
     .all(bookId) as AskTurn[];
@@ -37,7 +37,7 @@ export function listTurns(bookId: string): AskTurn[] {
  * still being answered. An unanswered question older than PENDING_SECONDS is
  * one whose answer was lost (a restart mid-answer); it is dropped first.
  */
-export function beginQuestion(bookId: string, question: string, percentage: number, at = now()): number | null {
+export function beginQuestion(bookId: string, question: string, words: number, at = now()): number | null {
   const db = getDb();
   return db.transaction(() => {
     const last = db
@@ -48,20 +48,20 @@ export function beginQuestion(bookId: string, question: string, percentage: numb
       db.prepare(`DELETE FROM book_ask_turns WHERE id = ?`).run(last.id);
     }
     const r = db
-      .prepare(`INSERT INTO book_ask_turns (book_id, role, content, percentage, created_at) VALUES (?, 'user', ?, ?, ?)`)
-      .run(bookId, question, percentage, at);
+      .prepare(`INSERT INTO book_ask_turns (book_id, role, content, words, created_at) VALUES (?, 'user', ?, ?, ?)`)
+      .run(bookId, question, words, at);
     return Number(r.lastInsertRowid);
   })();
 }
 
 /** Store the answer to a question. A no-op if the question is gone (the thread was cleared meanwhile). */
-export function completeAnswer(bookId: string, questionId: number, answer: string, percentage: number, at = now()): void {
+export function completeAnswer(bookId: string, questionId: number, answer: string, words: number, at = now()): void {
   const db = getDb();
   db.transaction(() => {
     const q = db.prepare(`SELECT 1 FROM book_ask_turns WHERE id = ? AND book_id = ? AND role = 'user'`).get(questionId, bookId);
     if (!q) return;
-    db.prepare(`INSERT INTO book_ask_turns (book_id, role, content, percentage, created_at) VALUES (?, 'assistant', ?, ?, ?)`)
-      .run(bookId, answer, percentage, at);
+    db.prepare(`INSERT INTO book_ask_turns (book_id, role, content, words, created_at) VALUES (?, 'assistant', ?, ?, ?)`)
+      .run(bookId, answer, words, at);
   })();
 }
 
