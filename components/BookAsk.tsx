@@ -120,9 +120,10 @@ export default function BookAsk({ bookId }: { bookId: string }) {
       <p className="mt-2 text-[0.8rem] leading-relaxed text-cream-dim">
         Claude is given the book up to your synced position (the first{" "}
         {info.words.toLocaleString()} of {info.totalWords.toLocaleString()} words,{" "}
-        {(info.percentage * 100).toFixed(1)}%) and nothing after it. It is also told not to use
-        anything it already knows about the book. For a well-known book that part is an
-        instruction, not a guarantee.
+        {(info.percentage * 100).toFixed(1)}%) and nothing after it. It can use what it knows
+        about the wider world, such as allusions, history and jargon, and is told not to use what
+        it knows of the rest of this book. For a well-known book that last part is an instruction,
+        not a guarantee.
       </p>
 
       {!info.configured ? (

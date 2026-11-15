@@ -197,7 +197,8 @@ console.log("\nthe route:");
   assert(/if \(!sync\)[\s\S]{0,200}status: 409/.test(route), "no synced position → refused, never the whole book");
   assert(/if \(!process\.env\.ANTHROPIC_API_KEY\)[\s\S]{0,200}status: 503/.test(route), "no API key → refused with a reason");
   assert(!/^import (?!type )/m.test(mod), "ask.ts imports nothing but types");
-  assert(/have not read anything after it/.test(mod) && /do not draw on what you know/.test(mod), "the instructions state the rule");
+  assert(/have not read anything after it/.test(mod) && /do not draw on what you know of how it continues/.test(mod) && /outside this book is welcome/.test(mod),
+    "the instructions keep the rest of the book out and the outside world in");
 
   assert(Array.isArray(parseHistory(undefined)) && parseHistory([{ role: "user", content: "q" }, { role: "assistant", content: "a" }])!.length === 2, "history: a well-formed conversation passes");
   assert(

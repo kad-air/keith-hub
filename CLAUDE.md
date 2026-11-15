@@ -499,8 +499,10 @@ synced position; the conversation lives in the browser's memory and is gone on r
   the word the position names is withheld, so a reader partway down a page is "behind" by up to
   that page. No synced position → 409, never the whole book.
 - 🔴 **What it cannot do: remove what the model already knows about a well-known book.** The system
-  prompt (`ASK_INSTRUCTIONS`) tells it to answer from the supplied text only and to give no hints;
-  that is an instruction, not a guarantee, and the section says so on screen. The title and author
+  prompt (`ASK_INSTRUCTIONS`) separates two kinds of knowledge: everything about the world OUTSIDE
+  the book is welcome (allusions, quotations, history, jargon — the owner reads le Carré and asked
+  for exactly this), and what happens in THIS book past the position is off limits, hints included.
+  The second half is an instruction, not a guarantee, and the section says so on screen. The title and author
   are not sent separately (the book's own front matter is in the text, including its contents page).
 - Route: `GET /api/books/[id]/ask` (is it available, how many words would be sent) and `POST`
   `{question, history?}` → an NDJSON stream (`meta`, `text`…, `done` | `error`). Cookie-gated.
