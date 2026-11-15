@@ -520,10 +520,21 @@ half a page says nothing; going backwards reads "You went back N pages"). "Clear
   tied to the request's signal, because a phone put away mid-answer kills the request. The
   question is stored when asked and the answer when done; a refusal or an error removes the
   question, so the thread always alternates. A second question is refused (409) while one is
-  pending; a question whose answer was lost to a restart stops counting after `PENDING_SECONDS`
-  and is dropped by the next one. The page re-reads the thread on coming back into view and polls
+  pending. 🔴 A question orphaned by a restart or a deploy mid-answer is removed on the next read
+  (`liveTurns` in the route: an unanswered question this process is not answering, per its
+  in-memory `inFlight` set) — left to `PENDING_SECONDS` it showed "Reading" and refused new
+  questions for five minutes with nothing running. The page re-reads the thread on coming back into view and polls
   while a question is pending, so an answer finished in the background (or asked from another
   device) appears on its own.
+- **The page** (`components/BookAskClient.tsx`). 🔴 The question box is `sticky bottom-0` at the
+  foot of a screen-tall flex column, NOT `position: fixed`: on iOS a fixed bar was left stranded
+  mid-screen, over the text, after the keyboard went away (owner's screenshot, 2026-11-15). The
+  newest question is scrolled to the top of the screen on arriving and when one is asked, and at no
+  other time: not while the answer streams and not when it finishes (it is being read); a spacer under the
+  thread gives the last question room to get there. Answers render the Markdown the model actually
+  writes — paragraphs, `-` and `1.` lists with hanging indents, headings (`#` or a line that is only
+  `**bold**`) as mono kickers, `>` quotes — through `answerBlocks`; a raw hyphen list was the other
+  half of that screenshot. The prompt also asks for plain paragraphs over headings and lists.
 - **Caching.** The text goes in `system` as chunks of `CHUNK_WORDS` (20,000) whose boundaries depend
   on the book alone, with cache breakpoints on the last full chunk and on the tail: follow-up
   questions read the whole book from cache, and after a day's reading every full chunk still hits.

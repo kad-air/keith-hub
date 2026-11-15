@@ -33,6 +33,23 @@ const MAX_TURNS_SENT = 60;
 // ANTHROPIC_API_KEY unset = refused with a reason (fail closed, like the other
 // Books credentials). Cookie-gated with the rest of /api/books.
 
+// Questions this process is answering right now. A question in the database
+// with no answer that is NOT in here was orphaned by a restart or a deploy
+// mid-answer; left alone it would show "Reading" and refuse new questions for
+// PENDING_SECONDS with nothing actually running.
+const inFlight = new Set<number>();
+
+/** The thread, with a question orphaned by a restart removed. */
+function liveTurns(bookId: string) {
+  const turns = listTurns(bookId);
+  const last = turns[turns.length - 1];
+  if (last && last.role === "user" && !inFlight.has(last.id)) {
+    dropQuestion(bookId, last.id);
+    turns.pop();
+  }
+  return turns;
+}
+
 type Ready = {
   chunks: string[];
   words: number;
@@ -75,7 +92,7 @@ export async function GET(
   { params }: { params: { id: string } },
 ): Promise<NextResponse> {
   if (!getBook(params.id)) return NextResponse.json({ error: "not found" }, { status: 404 });
-  const turns = listTurns(params.id);
+  const turns = liveTurns(params.id);
   const ready = prepare(params.id);
   return NextResponse.json(
     {
@@ -149,13 +166,15 @@ export async function POST(
 
   // The conversation so far, oldest first. Only complete question/answer
   // pairs are stored, so this always alternates and starts with a question.
-  const earlier = listTurns(params.id).slice(-MAX_TURNS_SENT);
+  const earlier = liveTurns(params.id).slice(-MAX_TURNS_SENT);
   while (earlier.length > 0 && earlier[0].role !== "user") earlier.shift();
   while (earlier.length > 0 && earlier[earlier.length - 1].role !== "assistant") earlier.pop();
   const questionId = beginQuestion(params.id, question, ready.words);
   if (questionId == null) {
     return NextResponse.json({ error: "The last question is still being answered." }, { status: 409 });
   }
+
+  inFlight.add(questionId);
 
   const client = new Anthropic();
   const encoder = new TextEncoder();
@@ -205,6 +224,7 @@ export async function POST(
       dropQuestion(params.id, questionId);
       send({ t: "error", v: describe(err) });
     } finally {
+      inFlight.delete(questionId);
       try {
         out?.close();
       } catch {
