@@ -524,6 +524,15 @@ half a page says nothing; going backwards reads "You went back N pages"). "Clear
   and is dropped by the next one. The page re-reads the thread on coming back into view and polls
   while a question is pending, so an answer finished in the background (or asked from another
   device) appears on its own.
+- **The page** (`components/BookAskClient.tsx`). 🔴 The question box is `sticky bottom-0` at the
+  foot of a screen-tall flex column, NOT `position: fixed`: on iOS a fixed bar was left stranded
+  mid-screen, over the text, after the keyboard went away (owner's screenshot, 2026-11-15). The
+  newest question is scrolled to the top of the screen on arriving and when one is asked, and the
+  page never follows the answer as it streams (it is read from its first line); a spacer under the
+  thread gives the last question room to get there. Answers render the Markdown the model actually
+  writes — paragraphs, `-` and `1.` lists with hanging indents, headings (`#` or a line that is only
+  `**bold**`) as mono kickers, `>` quotes — through `answerBlocks`; a raw hyphen list was the other
+  half of that screenshot. The prompt also asks for plain paragraphs over headings and lists.
 - **Caching.** The text goes in `system` as chunks of `CHUNK_WORDS` (20,000) whose boundaries depend
   on the book alone, with cache breakpoints on the last full chunk and on the tail: follow-up
   questions read the whole book from cache, and after a day's reading every full chunk still hits.
