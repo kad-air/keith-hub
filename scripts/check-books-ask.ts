@@ -206,7 +206,7 @@ console.log("\nthe route:");
     "the instructions keep the rest of the book out and the outside world in");
 
   assert(
-    /listTurns\(params\.id\)/.test(route) && !/body\?\.history|body\.history/.test(route),
+    /liveTurns\(params\.id\)/.test(route) && /listTurns\(bookId\)/.test(route) && !/body\?\.history|body\.history/.test(route),
     "the conversation so far comes from the database, never from the request",
   );
   assert(!/request\.signal/.test(route), "🔴 the answer is not tied to the browser staying connected");

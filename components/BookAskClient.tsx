@@ -222,16 +222,20 @@ export default function BookAskClient({
     return () => clearInterval(timer);
   }, [waiting, refresh]);
 
-  // Bring the newest question to the top of the screen: on arriving, and when
-  // one is asked. Never follow the answer as it streams — it is being read from
-  // its first line, and a page that moves under the reader is worse than a tap.
-  const lastQuestionId = [...turns].reverse().find((t) => t.role === "user")?.id ?? null;
-  const anchorKey = live ? "live" : lastQuestionId;
+  // Bring the newest question to the top of the screen at exactly two moments:
+  // on arriving, and when one is asked. Never while an answer streams and never
+  // when it finishes — it is being read, and a page that moves under the reader
+  // (or snaps back to the question as the answer completes) reads as stuck.
+  const toLastQuestion = useCallback(() => {
+    listRef.current?.querySelector<HTMLElement>("[data-last-question]")?.scrollIntoView({ block: "start" });
+  }, []);
   useEffect(() => {
-    if (anchorKey == null) return;
-    const el = listRef.current?.querySelector<HTMLElement>("[data-last-question]");
-    el?.scrollIntoView({ block: "start" });
-  }, [anchorKey]);
+    toLastQuestion();
+  }, [toLastQuestion]);
+  const asking = live?.at ?? null;
+  useEffect(() => {
+    if (asking != null) toLastQuestion();
+  }, [asking, toLastQuestion]);
 
   // The box grows with what is typed, up to a few lines.
   useEffect(() => {
