@@ -75,29 +75,7 @@ export function readSoFar(book: ParsedBook, cutoff: number): ReadSoFar {
   return { chunks, words: end, totalWords: total };
 }
 
-export type AskTurn = { role: "user" | "assistant"; content: string };
-
 export const MAX_QUESTION_CHARS = 4_000;
-export const MAX_HISTORY_TURNS = 40;
-
-/**
- * The earlier turns of the conversation as the browser sent them back.
- * Null when the shape is wrong — never repaired.
- */
-export function parseHistory(raw: unknown): AskTurn[] | null {
-  if (raw == null) return [];
-  if (!Array.isArray(raw) || raw.length > MAX_HISTORY_TURNS) return null;
-  const turns: AskTurn[] = [];
-  for (const t of raw) {
-    if (!t || typeof t !== "object") return null;
-    const { role, content } = t as { role?: unknown; content?: unknown };
-    if (role !== "user" && role !== "assistant") return null;
-    if (typeof content !== "string" || !content.trim() || content.length > 100_000) return null;
-    turns.push({ role, content });
-  }
-  if (turns.length > 0 && turns[0].role !== "user") return null;
-  return turns;
-}
 
 export const ASK_INSTRUCTIONS = `You are helping someone who is partway through reading a book. The text that follows is the part they have read so far: it runs from the beginning of the book to their current position and stops there, usually mid-chapter. They have not read anything after it.
 

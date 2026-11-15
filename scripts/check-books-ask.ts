@@ -22,6 +22,10 @@
 //     leaves every full chunk byte-identical (the prompt cache depends on it).
 //  4. THE ROUTE takes its text from readSoFar and nowhere else, cut at the
 //     resolved position, and refuses without a key or a synced position.
+//  5. THE SAVED CONVERSATION, in a throwaway database: it always alternates
+//     question/answer, a question that got no answer is removed, a second
+//     question can't start while one is being answered, a question whose
+//     answer was lost is dropped after a while, and it leaves with its book.
 //
 // What this cannot see: what the model already knows about a famous book. The
 // cut controls the request, not the training data; the prompt asks, the UI
@@ -36,7 +40,7 @@ const fixture = (name: string) => fs.readFileSync(path.resolve(repoRoot, "books-
 const source = (rel: string) => fs.readFileSync(path.resolve(repoRoot, rel), "utf8");
 
 const { parseBook, resolvePosition } = await import("../lib/books/pageText.ts");
-const { readSoFar, parseHistory, CHUNK_WORDS, MAX_HISTORY_TURNS } = await import("../lib/books/ask.ts");
+const { readSoFar, CHUNK_WORDS } = await import("../lib/books/ask.ts");
 
 let failures = 0;
 function assert(cond: boolean, label: string): void {
@@ -200,15 +204,63 @@ console.log("\nthe route:");
   assert(/have not read anything after it/.test(mod) && /do not draw on what you know of how it continues/.test(mod) && /outside this book is welcome/.test(mod),
     "the instructions keep the rest of the book out and the outside world in");
 
-  assert(Array.isArray(parseHistory(undefined)) && parseHistory([{ role: "user", content: "q" }, { role: "assistant", content: "a" }])!.length === 2, "history: a well-formed conversation passes");
   assert(
-    parseHistory([{ role: "system", content: "x" }]) === null &&
-      parseHistory([{ role: "assistant", content: "a" }]) === null &&
-      parseHistory([{ role: "user", content: "" }]) === null &&
-      parseHistory("x") === null &&
-      parseHistory(Array.from({ length: MAX_HISTORY_TURNS + 1 }, () => ({ role: "user", content: "q" }))) === null,
-    "history: other roles, an assistant-first turn, empty text and oversize are refused",
+    /listTurns\(params\.id\)/.test(route) && !/body\?\.history|body\.history/.test(route),
+    "the conversation so far comes from the database, never from the request",
   );
+  assert(!/request\.signal/.test(route), "🔴 the answer is not tied to the browser staying connected");
+  assert(
+    /completeAnswer\(params\.id, questionId, answer/.test(route) && (route.match(/dropQuestion\(params\.id, questionId\)/g) ?? []).length >= 2,
+    "an answer is saved; a refusal or an error removes its question",
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 5. The saved conversation
+// ---------------------------------------------------------------------------
+console.log("\nthe saved conversation:");
+{
+  const os = await import("node:os");
+  process.chdir(fs.mkdtempSync(path.join(os.tmpdir(), "ask-check-")));
+  const { ingestBook, deleteBook } = await import("../lib/books/store.ts");
+  const { listTurns, beginQuestion, completeAnswer, dropQuestion, clearTurns, isPending, PENDING_SECONDS } = await import(
+    "../lib/books/askStore.ts"
+  );
+  const { book } = ingestBook(fixture("sheafs-alice.epub"), "alice.epub");
+  const other = ingestBook(fixture("fixture.epub"), "fixture.epub").book;
+  const t0 = 1_800_000_000;
+  const shape = () => listTurns(book.id).map((t) => t.role[0]).join("");
+
+  const q1 = beginQuestion(book.id, "Who is late?", 0.1, t0)!;
+  assert(q1 != null && shape() === "u" && isPending(listTurns(book.id), t0 + 5), "a question is saved as soon as it is asked, and is pending");
+  assert(beginQuestion(book.id, "And another?", 0.1, t0 + 10) === null && shape() === "u", "🔴 no second question while the first is being answered");
+  completeAnswer(book.id, q1, "The White Rabbit.", 0.1, t0 + 20);
+  assert(shape() === "ua" && !isPending(listTurns(book.id), t0 + 21), "its answer lands after it");
+
+  const q2 = beginQuestion(book.id, "Fails", 0.2, t0 + 30)!;
+  dropQuestion(book.id, q2);
+  assert(shape() === "ua", "a question that got no answer is removed");
+  completeAnswer(book.id, q2, "late answer", 0.2, t0 + 40);
+  assert(shape() === "ua", "an answer to a question that is gone is not saved");
+
+  beginQuestion(book.id, "Lost in a restart", 0.2, t0 + 50);
+  const q4 = beginQuestion(book.id, "Asked later", 0.3, t0 + 50 + PENDING_SECONDS)!;
+  assert(q4 != null && shape() === "uau" && listTurns(book.id)[2].content === "Asked later", "🔴 a question whose answer was lost is dropped, not left to block the thread");
+  completeAnswer(book.id, q4, "Answer", 0.3, t0 + 60 + PENDING_SECONDS);
+  const turns = listTurns(book.id);
+  assert(
+    shape() === "uaua" && turns[0].percentage === 0.1 && turns[3].percentage === 0.3 && turns[0].createdAt === t0,
+    "the thread alternates and each turn keeps the position it was asked at",
+  );
+
+  const oq = beginQuestion(other.id, "Other book", 0.5, t0)!;
+  completeAnswer(other.id, oq, "Other answer", 0.5, t0 + 1);
+  assert(listTurns(book.id).length === 4 && listTurns(other.id).length === 2, "one thread per book");
+  dropQuestion(other.id, q1);
+  assert(listTurns(book.id).length === 4, "one book's route cannot remove another's turn");
+  assert(clearTurns(other.id) === 2 && listTurns(other.id).length === 0 && listTurns(book.id).length === 4, "clearing clears that book only");
+  deleteBook(book.id);
+  assert(listTurns(book.id).length === 0, "the conversation leaves with its book");
 }
 
 if (failures > 0) {

@@ -4,21 +4,31 @@ import Anthropic from "@anthropic-ai/sdk";
 import { getBook, bookFilePath } from "@/lib/books/store";
 import { listProgress } from "@/lib/books/kosync";
 import { parseBookCached, resolvePosition } from "@/lib/books/pageText";
-import { ASK_INSTRUCTIONS, MAX_QUESTION_CHARS, parseHistory, readSoFar } from "@/lib/books/ask";
+import { ASK_INSTRUCTIONS, MAX_QUESTION_CHARS, readSoFar } from "@/lib/books/ask";
+import { beginQuestion, clearTurns, completeAnswer, dropQuestion, isPending, listTurns } from "@/lib/books/askStore";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 const MODEL = "claude-opus-5-5";
+/** Earlier turns sent along with a new question. The page shows them all. */
+const MAX_TURNS_SENT = 60;
 
 // Ask a question about a book in progress. The model is sent the book's text
 // up to the latest synced position and nothing after it — see lib/books/ask.ts,
 // which owns the cut (🔴 the text reaches the request ONLY through readSoFar;
 // check:books:ask pins that this file never touches the parsed book's blocks).
 //
-// GET  → whether asking is possible right now, and how much would be sent.
-// POST → { question, history? } → NDJSON stream: {t:"meta"}, {t:"text",v}…,
-//        then {t:"done"} or {t:"error",v}.
+// GET    → the saved conversation, whether asking is possible right now, and
+//          how much of the book would be sent.
+// POST   → { question } → NDJSON stream: {t:"meta"}, {t:"text",v}…, then
+//          {t:"done"} or {t:"error",v}. The conversation so far comes from the
+//          database (lib/books/askStore.ts), never from the request.
+// DELETE → clear the conversation.
+//
+// 🔴 The answer is finished and saved even if the browser goes away: a phone
+// put in a pocket mid-answer kills the request, and the answer should be
+// there on return. So the model call is NOT tied to the request's signal.
 //
 // ANTHROPIC_API_KEY unset = refused with a reason (fail closed, like the other
 // Books credentials). Cookie-gated with the rest of /api/books.
@@ -64,18 +74,33 @@ export async function GET(
   _request: NextRequest,
   { params }: { params: { id: string } },
 ): Promise<NextResponse> {
+  if (!getBook(params.id)) return NextResponse.json({ error: "not found" }, { status: 404 });
+  const turns = listTurns(params.id);
   const ready = prepare(params.id);
-  if ("error" in ready) return NextResponse.json({ error: ready.error }, { status: ready.status });
   return NextResponse.json(
     {
+      turns,
+      pending: isPending(turns),
       configured: Boolean(process.env.ANTHROPIC_API_KEY),
-      words: ready.words,
-      totalWords: ready.totalWords,
-      percentage: ready.percentage,
-      precision: ready.precision,
+      ...("error" in ready
+        ? { unavailable: ready.error }
+        : {
+            words: ready.words,
+            totalWords: ready.totalWords,
+            percentage: ready.percentage,
+            precision: ready.precision,
+          }),
     },
     { headers: { "Cache-Control": "no-store" } },
   );
+}
+
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: { id: string } },
+): Promise<NextResponse> {
+  if (!getBook(params.id)) return NextResponse.json({ error: "not found" }, { status: 404 });
+  return NextResponse.json({ cleared: clearTurns(params.id) });
 }
 
 function describe(err: unknown): string {
@@ -98,9 +123,6 @@ export async function POST(
   if (question.length > MAX_QUESTION_CHARS) {
     return NextResponse.json({ error: "that question is too long" }, { status: 400 });
   }
-  const history = parseHistory(body?.history);
-  if (!history) return NextResponse.json({ error: "malformed conversation history" }, { status: 400 });
-
   if (!process.env.ANTHROPIC_API_KEY) {
     return NextResponse.json(
       { error: "ANTHROPIC_API_KEY is not set on the server, so questions are switched off." },
@@ -125,61 +147,79 @@ export async function POST(
   });
   system.push({ type: "text", text: "(Their reading stops here. Nothing after this point has been read.)" });
 
+  // The conversation so far, oldest first. Only complete question/answer
+  // pairs are stored, so this always alternates and starts with a question.
+  const earlier = listTurns(params.id).slice(-MAX_TURNS_SENT);
+  while (earlier.length > 0 && earlier[0].role !== "user") earlier.shift();
+  while (earlier.length > 0 && earlier[earlier.length - 1].role !== "assistant") earlier.pop();
+  const questionId = beginQuestion(params.id, question, ready.percentage);
+  if (questionId == null) {
+    return NextResponse.json({ error: "The last question is still being answered." }, { status: 409 });
+  }
+
   const client = new Anthropic();
   const encoder = new TextEncoder();
+  // The browser's end of the stream. Null once it has gone; the work carries on.
+  let out: ReadableStreamDefaultController<Uint8Array> | null = null;
+  const send = (event: Record<string, unknown>) => {
+    try {
+      out?.enqueue(encoder.encode(JSON.stringify(event) + "\n"));
+    } catch {
+      out = null;
+    }
+  };
+
+  const work = async () => {
+    send({ t: "meta", words: ready.words, totalWords: ready.totalWords, percentage: ready.percentage });
+    try {
+      const run = client.beta.messages.stream({
+        model: MODEL,
+        max_tokens: 16000,
+        output_config: { effort: "medium" },
+        // If the model declines on a safety classifier (a violent novel can
+        // trip one), the API re-runs the request on a fallback model.
+        betas: ["server-side-fallback-2026-07-01"],
+        fallbacks: "default",
+        system,
+        messages: [
+          ...earlier.map((t) => ({ role: t.role, content: t.content })),
+          { role: "user" as const, content: question },
+        ],
+      });
+      let answer = "";
+      run.on("text", (delta) => {
+        answer += delta;
+        send({ t: "text", v: delta });
+      });
+      const message = await run.finalMessage();
+      if (message.stop_reason === "refusal" || !answer.trim()) {
+        dropQuestion(params.id, questionId);
+        send({ t: "error", v: "The model declined to answer this one." });
+      } else {
+        completeAnswer(params.id, questionId, answer, ready.percentage);
+        if (message.stop_reason === "max_tokens") send({ t: "error", v: "The answer was cut off at the length limit." });
+        else send({ t: "done" });
+      }
+    } catch (err) {
+      console.error("[api/books ask] Error:", err);
+      dropQuestion(params.id, questionId);
+      send({ t: "error", v: describe(err) });
+    } finally {
+      try {
+        out?.close();
+      } catch {
+        // already closed by a disconnect
+      }
+    }
+  };
 
   const stream = new ReadableStream<Uint8Array>({
-    async start(controller) {
-      const send = (event: Record<string, unknown>) =>
-        controller.enqueue(encoder.encode(JSON.stringify(event) + "\n"));
-      send({ t: "meta", words: ready.words, totalWords: ready.totalWords, percentage: ready.percentage });
-      try {
-        const run = client.beta.messages.stream(
-          {
-            model: MODEL,
-            max_tokens: 16000,
-            output_config: { effort: "medium" },
-            // If the model declines on a safety classifier (a violent novel can
-            // trip one), the API re-runs the request on a fallback model.
-            betas: ["server-side-fallback-2026-07-01"],
-            fallbacks: "default",
-            system,
-            messages: [...history, { role: "user", content: question }],
-          },
-          { signal: request.signal },
-        );
-        run.on("text", (delta) => send({ t: "text", v: delta }));
-        const message = await run.finalMessage();
-        if (message.stop_reason === "refusal") {
-          send({ t: "error", v: "The model declined to answer this one." });
-        } else if (message.stop_reason === "max_tokens") {
-          send({ t: "error", v: "The answer was cut off at the length limit." });
-        } else {
-          send({
-            t: "done",
-            cached: message.usage.cache_read_input_tokens ?? 0,
-            input:
-              message.usage.input_tokens +
-              (message.usage.cache_read_input_tokens ?? 0) +
-              (message.usage.cache_creation_input_tokens ?? 0),
-          });
-        }
-      } catch (err) {
-        if (!request.signal.aborted) {
-          console.error("[api/books ask] Error:", err);
-          try {
-            send({ t: "error", v: describe(err) });
-          } catch {
-            // the client is gone
-          }
-        }
-      } finally {
-        try {
-          controller.close();
-        } catch {
-          // already closed by a disconnect
-        }
-      }
+    start(controller) {
+      out = controller;
+      void work();
+    },
+    cancel() {
+      out = null;
     },
   });
 
