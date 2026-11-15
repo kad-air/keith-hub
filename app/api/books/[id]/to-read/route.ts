@@ -10,8 +10,9 @@ export const dynamic = "force-dynamic";
 // it asserts an edit is cosmetic. To Read is reader state, not metadata about
 // the book, and keeping the two apart keeps that gate's subject unchanged.
 //
-// Cookie-gated like the rest of /api/books (the manage surface); the DEVICE
-// only ever reads the resulting shelf, through the key-in-URL OPDS route.
+// Cookie-gated like the rest of /api/books (the manage surface), or the Books
+// app token (lib/books/appToken.ts). The X3 only ever reads the resulting
+// shelf, through the key-in-URL OPDS route.
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } },

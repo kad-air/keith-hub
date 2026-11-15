@@ -71,6 +71,12 @@ npm run check:books:drm          # Books DRM gate: an ADEPT epub is decrypted-or
 npm run check:books:acsm         # Books ACSM gate: the ADEPT canonicalisation + signature match an independent Python implementation byte-for-byte (same)
 npm run check:books:health       # Books file-health gate: clean epub → zero findings, each damage pattern → exactly its finding,
                                  #   the language check anchored on 11 real Gutenberg books, health caching never touches the file (same)
+npm run check:books:app-token    # Books app token gate: the REAL middleware with no token set refuses every bearer (and FEED_PASSWORD /
+                                 #   BOOKS_API_KEY never stand in), a wrong token is 401, the right one opens /api/books/* and nothing
+                                 #   else (other /api routes 401, pages → /login, encoded traversal refused), the cookie path unchanged;
+                                 #   the app's endpoints through the real handlers (by-md5 found by the Python reference key, an
+                                 #   edited file's OLD key still resolves, stats === the page's), every contract field + type, the ask
+                                 #   NDJSON stream against a fake Anthropic on localhost, and docs/books-app-api.md vs the routes (same)
 npm run check:books:discworld    # Discworld map gate: the closed canon + publication order, the library match anchored on the real epubs' OPF, manual-mark precedence, map geometry (same)
 npm run check:feed               # Feed gate: a dismissed Verge review stays dismissed when the reviews feed picks it up later
                                  #   (state moves to the winning copy; matched by post id, not URL), retention never resurrects
@@ -404,7 +410,7 @@ CrossPoint by the Stump deployment — e-readers store one URL and cannot comple
 fail-open). kosync user auth on top: `x-auth-user` + `x-auth-key` headers where the key is
 **md5(password) computed client-side** — the wire value is fixed by the KOReader protocol and must
 never be "hardened"; only the at-rest storage is (sha256 of the wire key, `kosync_users.key_hash`).
-**Rotating the sync password:** `GET/POST /api/books/kosync-password` (cookie-gated like every
+**Rotating the sync password:** `GET/POST /api/books/kosync-password` (cookie- or app-token-gated like every
 other `/api/books` route; GET names the account, POST `{password}` rotates it via
 `setPassword`). The hub renders the username nowhere else; the devices are the only other place
 the username and password live, so after a POST every reader needs its stored password
@@ -918,6 +924,52 @@ the new label), `migrate-stump-progress.mjs` (one-time; carries `koreader_progre
 Readium `end_locator`, never rolls back a newer device position, ends by asserting every migrated
 hash resolves to a catalog book). Relative `.ts` imports in `lib/books/` follow the hoops
 convention so plain node runs the check scripts against the real modules.
+
+#### Books app API (`BOOKS_APP_TOKEN`) — the hub's book features for a native app
+
+A private build of Sheafs (the iOS reader) uses the hub's book features (finding the hub's book
+for the file it has open, To Read, metadata edits, the ask thread, reading stats) without the hub
+password. **The contract the app is built against is `docs/books-app-api.md`**: every endpoint,
+request and response field, NDJSON event and error status. Change it in the same commit as any
+route it lists.
+- **Auth:** `Authorization: Bearer <BOOKS_APP_TOKEN>` on `/api/books/*`, checked in `middleware.ts`
+  right after the cookie check by `appTokenAllows` (`lib/books/appToken.ts`). A right token is let
+  through **exactly as the cookie is**, so no route behind it knows or cares which it got.
+  🔴 That means the token reaches the WHOLE `/api/books` surface, including `DELETE`, upload,
+  replace-file and `kosync-password`, not just the endpoints the contract lists.
+- 🔴 **Four rules, each pinned against the real middleware:** a dedicated var (never `FEED_PASSWORD`,
+  never `BOOKS_API_KEY`, and neither stands in when it's unset); **fail CLOSED** (unset or blank =
+  every bearer refused; the `HOOPS_IMPORT_TOKEN` convention, opposite to `FEED_PASSWORD`'s, which
+  still waves everything through in local dev before the token is consulted); **scoped** to
+  `/api/books` and `/api/books/…` (look-alike prefixes like `/api/bookshelf` are out, and so is
+  any path with an encoded dot, slash or backslash, since none is needed and the router may decode
+  one differently from how the scope check reads it); **the cookie path is unchanged** (a valid cookie wins whatever the
+  header says).
+- 🔴 **It is checked IN the middleware, not by exempting `/api/books` from the matcher** the way
+  `api/hoops/import` / `opds` / `kosync` are: an exemption would make every `/api/books` route
+  responsible for its own auth, and none of them has any.
+- 🔴 **Edge runtime:** `appToken.ts` imports nothing. Node's `crypto.timingSafeEqual` isn't
+  available in middleware, so `tokensEqual` hashes both sides with Web Crypto (fixed 32 bytes,
+  which also hides the length) and XOR-accumulates with no early exit.
+- **New endpoints:** `GET /api/books/by-md5/{partialMd5}` looks a book up by its kosync key
+  **through `resolveDocument`**, so a device's copy from before a file edit still finds the book
+  (`matchedAlias: true`). It returns `{ book, matchedAlias, aliases, sync, history }`, built the
+  way `/books/[id]` builds its page (latest sync from `listProgress`, `getBookHistory`). File
+  health is left out on purpose: its first read unzips the book, and it is a diagnostic.
+  `GET /api/books/stats` returns `{ stats: getReadingStats(), pageWords, timeZone }`. 🔴 It makes
+  the page's own call and must never compute a number itself, so the app and `/books/stats` can't
+  disagree.
+- **The gate: `npm run check:books:app-token`** (in `prebuild`). It drives the real `middleware()`
+  with `NextRequest`s and the real route handlers in a throwaway DB. That needs
+  `scripts/lib/ts-resolve-hooks.mjs`'s `next/*` mapping: Next 14 has no `exports` map, so ESM
+  can't resolve a bare `next/server`. External anchors: the lookup uses the OFFLINE Python partial
+  MD5 from `expected.json` and must find the title, author and series in that file's OPF, and the
+  stats pages are checked against the Python word count. The ask stream runs against a fake
+  Anthropic SSE server on `127.0.0.1` (via `ANTHROPIC_BASE_URL`). Falsification-tested 10/10 at
+  writing: scope dropped, fail-open when unset, a prefix compare, a `FEED_PASSWORD` fallback, the
+  encoded-path guard dropped, `api/books` exempted in the matcher, the middleware check removed,
+  by-md5 without alias resolution, stats computed at another instant, the ask `done` event renamed.
+  It cannot measure timing; constant time is by construction.
 
 #### Reading statistics (`/books/stats`)
 
@@ -2114,7 +2166,7 @@ The **Charts** section (`/charts`) is a personal library of guitar chord charts 
 ### Auth
 `middleware.ts` also carries one non-auth rule, first in the handler: the hidden Tracking section's 404 (see "Tracker data").
 
-Password-protected via Next.js middleware (`middleware.ts`). A `hub-auth` httpOnly cookie gates all routes except `/login`, `/api/auth/*`, static assets, the manifest, the service worker, and `offline.html` (the SW precaches the offline fallback at install time — gating it would cache the login redirect as the fallback). The cookie value is **not** the password itself — `lib/auth.ts` derives a stable HMAC-SHA256 token from `FEED_PASSWORD` (via Web Crypto so it works in both Edge middleware and Node API routes) and compares tokens, so the plaintext password never leaves env. If `FEED_PASSWORD` is unset the middleware waves everything through (local dev). API routes that fail auth return 401; everything else 302-redirects to `/login`. Log out via the gear menu.
+Password-protected via Next.js middleware (`middleware.ts`). A `hub-auth` httpOnly cookie gates all routes except `/login`, `/api/auth/*`, static assets, the manifest, the service worker, and `offline.html` (the SW precaches the offline fallback at install time — gating it would cache the login redirect as the fallback). The cookie value is **not** the password itself — `lib/auth.ts` derives a stable HMAC-SHA256 token from `FEED_PASSWORD` (via Web Crypto so it works in both Edge middleware and Node API routes) and compares tokens, so the plaintext password never leaves env. The one other credential the middleware accepts is the **Books app token**: `Authorization: Bearer <BOOKS_APP_TOKEN>`, on `/api/books/*` only, checked after the cookie (see "Books app API"). If `FEED_PASSWORD` is unset the middleware waves everything through (local dev). API routes that fail auth return 401; everything else 302-redirects to `/login`. Log out via the gear menu.
 
 The login/logout `POST` handlers (`app/api/auth/{login,logout}/route.ts`) must return **303** redirects, not the default 307. iOS Safari preserves the POST method on 307 and tries to POST to `/`, which fails with "Safari can't open the page because the address is invalid" until manual refresh. Redirects also go through `publicUrl()` in `lib/auth.ts` so Railway's forwarded `host`/`proto` headers win over the localhost `request.url` on the internal network.
 
@@ -2130,6 +2182,10 @@ The login/logout `POST` handlers (`app/api/auth/{login,logout}/route.ts`) must r
 - `BOOKS_API_KEY` — device credential for `/opds/{key}/…` and `/kosync/{key}/…` (Books section).
   Generate with `openssl rand -hex 32`. **Unset = both endpoint families refuse every request**
   (fail CLOSED, same convention as `HOOPS_IMPORT_TOKEN`, opposite of `FEED_PASSWORD`).
+- `BOOKS_APP_TOKEN` — bearer token for the Books app API (a private Sheafs build;
+  `docs/books-app-api.md`). Opens `/api/books/*` as if logged in and nothing else. Generate with
+  `openssl rand -hex 32`. **Unset = every bearer request is refused** (fail CLOSED, like
+  `HOOPS_IMPORT_TOKEN`); the cookie is unaffected either way.
 - `ANTHROPIC_API_KEY` — Anthropic API key for "Ask about what you've read" on a book's page (see
   the Books section). **Unset = questions are refused with a reason**; nothing else is affected.
 - `ADOBE_ADEPT_KEY` — Adobe account RSA private key (PKCS#8 DER, base64) used to strip ADEPT DRM

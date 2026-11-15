@@ -28,6 +28,11 @@ function firstExisting(base) {
 
 registerHooks({
   resolve(specifier, context, nextResolve) {
+    if (/^next\/[a-z-]+$/.test(specifier)) {
+      // Next 14 ships no "exports" map, so ESM can't resolve `next/server`
+      // without its extension. The app imports it bare; point it at the file.
+      return nextResolve(`${specifier}.js`, context);
+    }
     if (specifier.startsWith("@/")) {
       const hit = firstExisting(path.join(repoRoot, specifier.slice(2)));
       if (hit) return { url: pathToFileURL(hit).href, shortCircuit: true };
