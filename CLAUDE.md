@@ -64,6 +64,9 @@ npm run check:books:edit         # Books file-edit gate: an OPF/cover edit chang
 npm run check:books:stats        # Books reading-stats gate: word count vs. Python, real DST calendar, sync survives a stats failure (same)
 npm run check:books:pagetext     # Books current-page gate: Sheafs' own paragraph reference + device pointers land on their paragraph,
                                  #   text() offsets name their word, unresolvable pointers fall back to the percentage, paging shows every word once (same)
+npm run check:books:ask          # Books ask gate: the model is sent the text before the synced position and not one word at or past it
+                                 #   (every cutoff of a built book, real device pointers), chunk boundaries don't move with the position,
+                                 #   the route has no other path to the text and refuses without a key or a synced position (same)
 npm run check:books:drm          # Books DRM gate: an ADEPT epub is decrypted-or-refused (never the 34-page ghost); a clean epub passes through byte-identical (same)
 npm run check:books:acsm         # Books ACSM gate: the ADEPT canonicalisation + signature match an independent Python implementation byte-for-byte (same)
 npm run check:books:health       # Books file-health gate: clean epub → zero findings, each damage pattern → exactly its finding,
@@ -485,6 +488,54 @@ from the book page as "Current page" once a position exists.
   `expected.json` must open on their paragraph; offsets/inline/split-container/fallback cases on a
   built epub; paging forward shows every word once in order. Falsification-tested: all-sibling
   indexing, ignoring the offset, 0-based DocFragment all fail it.
+
+**Ask about what you've read (`/books/[id]/ask`).** Questions about a book in progress, answered by
+Claude from the part already read: a chat page of its own, one click in from the book page ("Ask",
+shown once the book has a synced position). 🔴 **The conversation is kept** — one thread per book in
+`book_ask_turns` (`lib/books/askStore.ts`; FK to `books` with `ON DELETE CASCADE`, keyed by book id
+so it survives a file edit), the same on every device. Each turn stores `words` (how much of the book
+had been read when it was asked), and the page puts a line between questions wherever that moved:
+"You read 12 more pages" (`progressNote` in `ask.ts`, at `PAGE_WORDS` a page like the stats; under
+half a page says nothing; going backwards reads "You went back N pages"). "Clear" (confirmed) is the only thing that removes it.
+- 🔴 **The model is sent the book's text before the synced position and nothing at or after it.**
+  `lib/books/ask.ts` (**pure**, imports only types) owns the cut: `readSoFar(book, cutoff)` returns
+  every word with a global index below `cutoff`, where `cutoff` is the word `resolvePosition` gives
+  for the latest sync (the same resolution the current-page view uses). The cut errs toward less:
+  the word the position names is withheld, so a reader partway down a page is "behind" by up to
+  that page. No synced position → 409, never the whole book.
+- 🔴 **What it cannot do: remove what the model already knows about a well-known book.** The system
+  prompt (`ASK_INSTRUCTIONS`) separates two kinds of knowledge: everything about the world OUTSIDE
+  the book is welcome (allusions, quotations, history, jargon — the owner reads le Carré and asked
+  for exactly this), and what happens in THIS book past the position is off limits, hints included.
+  The second half is an instruction, not a guarantee, and the section says so on screen. The title and author
+  are not sent separately (the book's own front matter is in the text, including its contents page).
+- Route: `GET /api/books/[id]/ask` (the thread, whether asking is available, how many words would
+  be sent), `POST {question}` → an NDJSON stream (`meta`, `text`…, `done` | `error`), `DELETE`
+  (clear). Cookie-gated. The earlier turns come from the database, never from the request.
+  `ANTHROPIC_API_KEY` unset → 503 with a reason (fail closed). Model `claude-opus-5-5` at effort
+  `medium`, streamed through `@anthropic-ai/sdk`, with `fallbacks: "default"` (beta
+  `server-side-fallback-2026-07-01`) so a safety-classifier decline on a violent novel is re-run on
+  a fallback model instead of stopping.
+- 🔴 **The answer is finished and saved even if the browser goes away** — the model call is not
+  tied to the request's signal, because a phone put away mid-answer kills the request. The
+  question is stored when asked and the answer when done; a refusal or an error removes the
+  question, so the thread always alternates. A second question is refused (409) while one is
+  pending; a question whose answer was lost to a restart stops counting after `PENDING_SECONDS`
+  and is dropped by the next one. The page re-reads the thread on coming back into view and polls
+  while a question is pending, so an answer finished in the background (or asked from another
+  device) appears on its own.
+- **Caching.** The text goes in `system` as chunks of `CHUNK_WORDS` (20,000) whose boundaries depend
+  on the book alone, with cache breakpoints on the last full chunk and on the tail: follow-up
+  questions read the whole book from cache, and after a day's reading every full chunk still hits.
+  Cost, roughly: the first question on a 200k-word book near its end is about a dollar of input;
+  follow-ups within five minutes are a few cents.
+- **The gate: `npm run check:books:ask`** (in `prebuild`): the expected text is rebuilt from the
+  parsed blocks and every cutoff of a built all-distinct-words book must match exactly; sampled
+  cutoffs on `sheafs-alice.epub` and the 180k-word fixture; 40 real Sheafs pointers resolved and
+  cut; chunk stability; static pins on the route (text only through `readSoFar`, cut at
+  `position.word`, the two refusals, history from the database, no `request.signal`); and the
+  saved conversation in a throwaway database through the real store. Falsified at writing: one word past the cutoff, finishing the
+  paragraph, and a chunk boundary that follows the position each fail it.
 
 **CrossPoint parser constraints** (each a silent failure; asserted by `check:books:opds`, whose
 assertions are ported from `~/Stump/healthcheck.sh` and anchored on a committed snapshot of
@@ -2068,6 +2119,8 @@ The login/logout `POST` handlers (`app/api/auth/{login,logout}/route.ts`) must r
 - `BOOKS_API_KEY` — device credential for `/opds/{key}/…` and `/kosync/{key}/…` (Books section).
   Generate with `openssl rand -hex 32`. **Unset = both endpoint families refuse every request**
   (fail CLOSED, same convention as `HOOPS_IMPORT_TOKEN`, opposite of `FEED_PASSWORD`).
+- `ANTHROPIC_API_KEY` — Anthropic API key for "Ask about what you've read" on a book's page (see
+  the Books section). **Unset = questions are refused with a reason**; nothing else is affected.
 - `ADOBE_ADEPT_KEY` — Adobe account RSA private key (PKCS#8 DER, base64) used to strip ADEPT DRM
   from an uploaded epub (see the Books "DRM" section). **Unset = DRM'ed uploads are refused with a
   reason, never ingested broken** (fail CLOSED); a DRM-free library needs nothing here. Optional

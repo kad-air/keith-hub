@@ -265,6 +265,14 @@ export default function BookDetailClient({ book, sync, history, health }: Props)
                     Current page
                   </Link>
                 )}
+                {sync && (
+                  <Link
+                    href={`/books/${book.id}/ask`}
+                    className="border border-accent/60 px-3 py-1 font-mono text-[0.7rem] uppercase tracking-kicker text-accent hover:bg-accent/10"
+                  >
+                    Ask
+                  </Link>
+                )}
                 <a
                   href={`/api/books/${book.id}/file`}
                   className="border border-accent/60 px-3 py-1 font-mono text-[0.7rem] uppercase tracking-kicker text-accent hover:bg-accent/10"
