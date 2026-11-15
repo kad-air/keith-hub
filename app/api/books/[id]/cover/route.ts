@@ -5,8 +5,8 @@ import { coverMime } from "@/lib/books/opds";
 
 export const dynamic = "force-dynamic";
 
-// Cover bytes for the /books UI (cookie-gated via middleware). Devices use
-// the /opds key-in-URL cover route instead.
+// Cover bytes for the /books UI and the Books app (cookie or app token, via
+// middleware). E-readers use the /opds key-in-URL cover route instead.
 export async function GET(
   _request: NextRequest,
   { params }: { params: { id: string } },

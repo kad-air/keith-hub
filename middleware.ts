@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { AUTH_COOKIE, deriveAuthToken, publicUrl } from "@/lib/auth";
 import { TRACKERS_ENABLED } from "@/lib/tracker-config";
+import { appTokenAllows } from "@/lib/books/appToken";
 
 // The Craft-backed Tracking section is hidden (Stow replaced it) — see
 // lib/tracker-config.ts for the one flag that governs it. Refusing here rather
@@ -58,6 +59,16 @@ export async function middleware(request: NextRequest) {
   const cookie = request.cookies.get(AUTH_COOKIE);
   const expected = await deriveAuthToken(password);
   if (cookie?.value === expected) {
+    return NextResponse.next();
+  }
+
+  // The Books app token (BOOKS_APP_TOKEN — lib/books/appToken.ts): a native
+  // client sends `Authorization: Bearer <token>` instead of the cookie and is
+  // let through exactly as the cookie would be, on /api/books/* ONLY. It comes
+  // after the cookie check, so the cookie path is unchanged; and it lives here
+  // rather than as a matcher exemption, so a wrong or missing token still gets
+  // this file's 401. Fails CLOSED when the token is unset.
+  if (await appTokenAllows(request.nextUrl.pathname, request.headers.get("authorization"))) {
     return NextResponse.next();
   }
 

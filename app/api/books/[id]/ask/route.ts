@@ -31,7 +31,8 @@ const MAX_TURNS_SENT = 60;
 // there on return. So the model call is NOT tied to the request's signal.
 //
 // ANTHROPIC_API_KEY unset = refused with a reason (fail closed, like the other
-// Books credentials). Cookie-gated with the rest of /api/books.
+// Books credentials). Cookie-gated with the rest of /api/books, or the Books
+// app token.
 
 // Questions this process is answering right now. A question in the database
 // with no answer that is NOT in here was orphaned by a restart or a deploy
