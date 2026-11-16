@@ -31,7 +31,12 @@
 //     with the promised types.
 //  4. ASK OVER THE WIRE: the POST's NDJSON stream against a fake Anthropic
 //     server on localhost — meta, text…, done; an API error is an `error`
-//     event and the question is not kept.
+//     event and the question is not kept. The app's `until` (the end of the
+//     page on screen) is the cut when sent, on POST and GET, with or without a
+//     synced position: the fake model is sent the page the reader is on (the
+//     synced start of it alone would leave it out), through Sheafs' own text
+//     of its last paragraph and not a word of the next; a malformed `until`
+//     is a 400, never quietly the synced cut.
 //  5. STATIC: appToken.ts is edge-safe (imports nothing), reads only
 //     BOOKS_APP_TOKEN, the middleware checks it AFTER the cookie, /api/books
 //     is not exempted from the matcher, the stats route makes the page's
@@ -509,11 +514,15 @@ const NEW = replaced.book.partialMd5;
 console.log("\n4. ask over the wire (a fake Anthropic on localhost):");
 {
   const ANSWER = ["The White ", "Rabbit, who ", "is late."];
+  /** The book's text as the fake model last received it (the system blocks between the instructions and the stop line). */
+  let modelSaw = "";
   const server = http.createServer((rq, rs) => {
     let raw = "";
     rq.on("data", (c) => (raw += c));
     rq.on("end", () => {
       const sent = JSON.parse(raw || "{}");
+      const system: Array<{ text: string }> = Array.isArray(sent.system) ? sent.system : [];
+      modelSaw = system.slice(1, -1).map((b) => b.text).join("");
       const question = sent.messages?.[sent.messages.length - 1]?.content ?? "";
       if (String(question).includes("FAIL")) {
         rs.writeHead(400, { "content-type": "application/json" });
@@ -557,21 +566,86 @@ console.log("\n4. ask over the wire (a fake Anthropic on localhost):");
   assert((await askPost({ question: "  " })).status === 400 && (await askPost({ question: "x".repeat(4001) })).status === 400, "an empty or over-4,000-character question → 400");
   assert((await askRoute.GET(req("/api/books/nope/ask"), { params: { id: "nope" } })).status === 404, "ask on an unknown id → 404");
 
+  // The page Keith was on: Sheafs Hub syncs its START (paragraph 38 of
+  // chapter 3) and sends its END as `until`. This page ends the chapter
+  // (paragraph 47 is its last), so the end is the next chapter's start, the
+  // form the app sends there. Paragraph texts are Sheafs' own, from the
+  // reference its converter is tested against.
+  const { parseBook } = await import("../lib/books/pageText.ts");
+  const parsedAlice = parseBook(fixture("sheafs-alice.epub"))!;
+  const aliceRef = JSON.parse(source("books-fixture/sheafs-alice-reference.json"));
+  const ch3 = aliceRef.documents.find((d: { spineIndex: number }) => d.spineIndex === 4);
+  const sheafsText = (p: string) => ch3.samples.find((x: { path: string }) => x.path === p).text as string;
+  const hubBlock = (p: string) => parsedAlice.blocks.find((b) => b.doc === 4 && "/" + b.path === p && b.base === 0)!;
+  const squash = (t: string) => t.replace(/\s+/g, "");
+  const PAGE_START = "/body/DocFragment[5]/body/div[1]/p[38]/text().0";
+  const UNTIL = { pointer: "/body/DocFragment[6]/body", percentage: 0.21 };
+  const untilQuery = `?until=${encodeURIComponent(UNTIL.pointer)}&percentage=${UNTIL.percentage}`;
+  const pageEnd = hubBlock("/body/div[1]/p[47]").wordStart + hubBlock("/body/div[1]/p[47]").words.length;
+  const nextPage = parsedAlice.blocks.find((b) => b.wordStart === pageEnd && b.words.length > 0)!;
+  assert(
+    pageEnd === parsedAlice.docWords[4][1] && nextPage.doc === 5 && hubBlock("/body/div[1]/p[47]").text === sheafsText("/body/div[1]/p[47]"),
+    "(the page: paragraph 47 ends it and chapter 3, chapter 4 starts the next, and the hub's text of 47 is Sheafs')",
+  );
+  const askGetUntil = async (q: string) => askRoute.GET(req(`/api/books/${alice.id}/ask${q}`), p);
+  const gu = await (await askGetUntil(untilQuery)).json();
+  assert(
+    gu.words === pageEnd && gu.cut === "until" && gu.precision === "paragraph" && gu.percentage === UNTIL.percentage && !("unavailable" in gu),
+    `🔴 GET ask ?until= with no synced position: words up to the end of the page (${gu.words} = ${pageEnd}), cut "until"`,
+  );
+  const mid = `/body/DocFragment[5]/body/div[1]/p[46]/text().0`;
+  const gm = await (await askGetUntil(`?until=${encodeURIComponent(mid)}&percentage=0.2`)).json();
+  assert(gm.words === hubBlock("/body/div[1]/p[46]").wordStart && gm.precision === "word", "GET ask ?until= mid-chapter: up to the paragraph the next page starts on");
+  const badUntils: Array<[string, unknown]> = [
+    ["a string", "/body/DocFragment[5]/body/div[1]/p[48]/text().0"],
+    ["no pointer", { percentage: 0.2 }],
+    ["an empty pointer", { pointer: "  ", percentage: 0.2 }],
+    ["an over-long pointer", { pointer: "/body/DocFragment[5]/body/" + "div[1]/".repeat(200), percentage: 0.2 }],
+    ["not a pointer", { pointer: "chapter 3, page 2", percentage: 0.2 }],
+    ["no percentage", { pointer: UNTIL.pointer }],
+    ["a percentage over 1", { pointer: UNTIL.pointer, percentage: 1.5 }],
+    ["a negative percentage", { pointer: UNTIL.pointer, percentage: -0.1 }],
+    ["a percentage as a string", { pointer: UNTIL.pointer, percentage: "0.2" }],
+  ];
+  const refused: string[] = [];
+  for (const [what, until] of badUntils) {
+    const r = await askPost({ question: "Who is late?", until });
+    // Text first: an until let through would answer with an NDJSON stream, not one JSON body.
+    const raw = await r.text();
+    let error: unknown = null;
+    try {
+      error = JSON.parse(raw).error;
+    } catch {
+      // not a JSON error body
+    }
+    if (r.status !== 400 || typeof error !== "string" || !error.includes("until")) refused.push(`${what} (${r.status})`);
+  }
+  assert(refused.length === 0, `🔴 POST ask with a malformed until → 400 naming it, ${badUntils.length} ways (${refused.length ? "let through: " + refused.join(", ") : "all refused"})`);
+  const badGets = [
+    `?until=${encodeURIComponent("not a pointer")}&percentage=0.2`,
+    `?until=${encodeURIComponent(UNTIL.pointer)}`,
+    `?until=${encodeURIComponent(UNTIL.pointer)}&percentage=2`,
+    `?until=${encodeURIComponent(UNTIL.pointer)}&percentage=abc`,
+  ];
+  const getStatuses = await Promise.all(badGets.map(async (q) => (await askGetUntil(q)).status));
+  assert(getStatuses.every((st) => st === 400), `GET ask with a malformed until → 400 (${getStatuses.join(", ")})`);
+  assert((await askGet()).turns.length === 0, "…and none of them started a question");
+
   putProgress("reader", { document: alice.partialMd5, progress: "not-a-pointer", percentage: 0.5, device: "Sheafs", device_id: "dev-1" });
   const g1 = await askGet();
   assert(
-    g1.configured === true && g1.pending === false && g1.words > 0 && g1.totalWords > g1.words && g1.percentage === 0.5 && g1.precision === "percentage",
-    "GET ask once synced: words < totalWords, percentage, precision (an unreadable pointer falls back to the percentage)",
+    g1.configured === true && g1.pending === false && g1.words > 0 && g1.totalWords > g1.words && g1.percentage === 0.5 && g1.precision === "percentage" && g1.cut === "synced",
+    "GET ask once synced: words < totalWords, percentage, precision (an unreadable pointer falls back to the percentage), cut \"synced\"",
   );
-  contract(g1, { ...(ASK_GET as object), words: "number", totalWords: "number", percentage: "number", precision: "string" }, "GET ask has every contract field (ready form)");
+  contract(g1, { ...(ASK_GET as object), words: "number", totalWords: "number", percentage: "number", precision: "string", cut: "string" }, "GET ask has every contract field (ready form)");
 
   const r = await askPost({ question: "Who is late?" });
   const events = await ndjson(r);
   const texts = events.filter((e) => e.t === "text");
   assert(r.status === 200 && (r.headers.get("content-type") ?? "").startsWith("application/x-ndjson"), "POST ask → 200 application/x-ndjson");
   assert(
-    j(events[0]) === j({ t: "meta", words: g1.words, totalWords: g1.totalWords, percentage: 0.5 }),
-    '🔴 the first event is {"t":"meta","words","totalWords","percentage"}',
+    j(events[0]) === j({ t: "meta", words: g1.words, totalWords: g1.totalWords, percentage: 0.5, cut: "synced" }),
+    '🔴 the first event is {"t":"meta","words","totalWords","percentage","cut"}; no until → the synced cut',
   );
   assert(
     texts.length === ANSWER.length && texts.every((e) => typeof e.v === "string") && texts.map((e) => e.v).join("") === ANSWER.join(""),
@@ -593,8 +667,31 @@ console.log("\n4. ask over the wire (a fake Anthropic on localhost):");
   );
   assert((await askGet()).turns.length === 2, "and the failed question is not kept");
 
+  // Keith's report: the synced start of the page alone leaves the page out.
+  putProgress("reader", { document: alice.partialMd5, progress: PAGE_START, percentage: 0.2, device: "Sheafs", device_id: "dev-1" });
+  const gs = await askGet();
+  assert(gs.cut === "synced" && gs.words === hubBlock("/body/div[1]/p[38]").wordStart, "(synced at the start of the page: the page itself is not in the synced cut)");
+  const gu2 = await (await askGetUntil(untilQuery)).json();
+  assert(gu2.words === pageEnd && gu2.cut === "until", "🔴 GET ask ?until= with a synced position: the app's cutoff wins");
+  const ru = await askPost({ question: "What does this mean?", until: UNTIL });
+  const ue = await ndjson(ru);
+  assert(
+    ru.status === 200 && j(ue[0]) === j({ t: "meta", words: pageEnd, totalWords: g1.totalWords, percentage: UNTIL.percentage, cut: "until" }) && j(ue[ue.length - 1]) === j({ t: "done" }),
+    `🔴 POST ask with until: meta says ${pageEnd} words, cut "until", and it answers`,
+  );
+  const saw = squash(modelSaw);
+  assert(
+    saw.includes(squash(sheafsText("/body/div[1]/p[38]"))) && saw.endsWith(squash(sheafsText("/body/div[1]/p[47]"))),
+    "🔴 the model is sent the page on screen: its first paragraph (past the synced start) through its last, in Sheafs' text",
+  );
+  // (Not the heading: "CHAPTER IV" is on the contents page at the front.)
+  const nextProse = parsedAlice.blocks.find((b) => b.doc === 5 && !b.heading && b.words.length > 10)!;
+  assert(saw.length > 1000 && !saw.includes(squash(nextProse.text.slice(0, 50))), "🔴 …and not a word of the next page (chapter 4's first paragraph)");
+  const gt = await askGet();
+  assert(gt.turns.length === 4 && gt.turns[2].words === pageEnd && gt.turns[3].words === pageEnd, "the turn stores the words it was answered from (the until cut)");
+
   const del = await askRoute.DELETE(req(`/api/books/${alice.id}/ask`, { method: "DELETE" }), p);
-  assert(j(await del.json()) === j({ cleared: 2 }) && (await askGet()).turns.length === 0, "DELETE ask → { cleared: 2 }, the thread is empty");
+  assert(j(await del.json()) === j({ cleared: 4 }) && (await askGet()).turns.length === 0, "DELETE ask → { cleared: 4 }, the thread is empty");
   server.close();
   setEnv({ ANTHROPIC_API_KEY: undefined, ANTHROPIC_BASE_URL: undefined });
 }

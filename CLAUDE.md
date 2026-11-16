@@ -64,9 +64,10 @@ npm run check:books:edit         # Books file-edit gate: an OPF/cover edit chang
 npm run check:books:stats        # Books reading-stats gate: word count vs. Python, real DST calendar, sync survives a stats failure (same)
 npm run check:books:pagetext     # Books current-page gate: Sheafs' own paragraph reference + device pointers land on their paragraph,
                                  #   text() offsets name their word, unresolvable pointers fall back to the percentage, paging shows every word once (same)
-npm run check:books:ask          # Books ask gate: the model is sent the text before the synced position and not one word at or past it
-                                 #   (every cutoff of a built book, real device pointers), chunk boundaries don't move with the position,
-                                 #   the route has no other path to the text and refuses without a key or a synced position (same)
+npm run check:books:ask          # Books ask gate: the model is sent the text before the position and not one word at or past it
+                                 #   (every cutoff of a built book, real device pointers; the app's `until` = end of the page on screen,
+                                 #   at every word and against Sheafs' own paragraph text), chunk boundaries don't move with the position,
+                                 #   the route has no other path to the text and refuses without a key or any position (same)
 npm run check:books:drm          # Books DRM gate: an ADEPT epub is decrypted-or-refused (never the 34-page ghost); a clean epub passes through byte-identical (same)
 npm run check:books:acsm         # Books ACSM gate: the ADEPT canonicalisation + signature match an independent Python implementation byte-for-byte (same)
 npm run check:books:health       # Books file-health gate: clean epub → zero findings, each damage pattern → exactly its finding,
@@ -503,12 +504,21 @@ so it survives a file edit), the same on every device. Each turn stores `words` 
 had been read when it was asked), and the page puts a line between questions wherever that moved:
 "You read 12 more pages" (`progressNote` in `ask.ts`, at `PAGE_WORDS` a page like the stats; under
 half a page says nothing; going backwards reads "You went back N pages"). "Clear" (confirmed) is the only thing that removes it.
-- 🔴 **The model is sent the book's text before the synced position and nothing at or after it.**
+- 🔴 **The model is sent the book's text before the position and nothing at or after it.**
   `lib/books/ask.ts` (**pure**, imports only types) owns the cut: `readSoFar(book, cutoff)` returns
-  every word with a global index below `cutoff`, where `cutoff` is the word `resolvePosition` gives
-  for the latest sync (the same resolution the current-page view uses). The cut errs toward less:
-  the word the position names is withheld, so a reader partway down a page is "behind" by up to
-  that page. No synced position → 409, never the whole book.
+  every word with a global index below `cutoff`. The cut errs toward less: the word the position
+  names is withheld. Two positions, two resolvers in `pageText.ts`, one shared body (`locate`):
+  - **The app's `until`** (Sheafs Hub, `POST {question, until: {pointer, percentage}}`, or GET
+    `?until=&percentage=`): the END of the page on screen, i.e. its first unread character, resolved
+    by **`resolveEnd`**, which is `resolvePosition` except that past the last word means
+    `totalWords` (the whole book), not the last word. 🔴 Added 2026-11-15 because the synced
+    position is the START of the page: Keith selected "desultory" on page 233 and the answer quoted
+    chapter 6, since the page holding the word was never sent. A malformed `until` is a 400 (never
+    quietly the synced cut); with `until` no synced row is needed. `cut: "until" | "synced"` in GET
+    and the `meta` event says which was used (absent from an older hub).
+  - **The latest sync** (the web page, older apps): `resolvePosition` (the same resolution the
+    current-page view uses), so a reader partway down a page is "behind" by up to that page. No
+    `until` and no synced position → 409, never the whole book.
 - 🔴 **What it cannot do: remove what the model already knows about a well-known book.** The system
   prompt (`ASK_INSTRUCTIONS`) separates two kinds of knowledge: everything about the world OUTSIDE
   the book is welcome (allusions, quotations, history, jargon — the owner reads le Carré and asked
@@ -516,8 +526,9 @@ half a page says nothing; going backwards reads "You went back N pages"). "Clear
   The second half is an instruction, not a guarantee, and the section says so on screen. The title and author
   are not sent separately (the book's own front matter is in the text, including its contents page).
 - Route: `GET /api/books/[id]/ask` (the thread, whether asking is available, how many words would
-  be sent), `POST {question}` → an NDJSON stream (`meta`, `text`…, `done` | `error`), `DELETE`
-  (clear). Cookie-gated. The earlier turns come from the database, never from the request.
+  be sent; `?until=&percentage=` for the app's cutoff), `POST {question, until?}` → an NDJSON stream
+  (`meta`, `text`…, `done` | `error`), `DELETE` (clear). Each POST logs `[api/books ask] book …: cut
+  until at <pointer> … → words/total, precision`. Cookie-gated. The earlier turns come from the database, never from the request.
   `ANTHROPIC_API_KEY` unset → 503 with a reason (fail closed). Model `claude-opus-5-5` at effort
   `medium`, streamed through `@anthropic-ai/sdk`, with `fallbacks: "default"` (beta
   `server-side-fallback-2026-07-01`) so a safety-classifier decline on a violent novel is re-run on
@@ -549,10 +560,19 @@ half a page says nothing; going backwards reads "You went back N pages"). "Clear
 - **The gate: `npm run check:books:ask`** (in `prebuild`): the expected text is rebuilt from the
   parsed blocks and every cutoff of a built all-distinct-words book must match exactly; sampled
   cutoffs on `sheafs-alice.epub` and the 180k-word fixture; 40 real Sheafs pointers resolved and
-  cut; chunk stability; static pins on the route (text only through `readSoFar`, cut at
-  `position.word`, the two refusals, history from the database, no `request.signal`); and the
-  saved conversation in a throwaway database through the real store. Falsified at writing: one word past the cutoff, finishing the
-  paragraph, and a chunk boundary that follows the position each fail it.
+  cut; **`until`**: an end pointer at the start and the end of every word of the built book, the
+  end of a chapter and of the book (last word included), and a page ending before every word of
+  Sheafs' 40 reference paragraphs at Sheafs' own offsets (2,327 places: 0 past Sheafs' page; exact
+  where the two texts agree, ~80 a word short where Sheafs collapses the `&nbsp;` this parser keeps
+  after a `<br>`); chunk stability; static pins on the route (text only through `readSoFar`, cut at
+  `position.word`, `until` → `resolveEnd` else sync → `resolvePosition`, a malformed `until` 400 on
+  both methods, the two refusals, history from the database, no `request.signal`); and the saved
+  conversation in a throwaway database through the real store. `check:books:app-token` drives the
+  `until` over the wire (the fake model must receive the page past the synced start, through
+  Sheafs' text of its last paragraph, and no word of the next chapter; 9 malformed shapes → 400).
+  Falsified at writing: one word past the cutoff, finishing the paragraph, and a chunk boundary
+  that follows the position each fail it; for `until` (2026-11-15): the route ignoring it, `resolveEnd`
+  as `resolvePosition`, `resolveEnd` one word late, and no validation each fail it.
 
 **CrossPoint parser constraints** (each a silent failure; asserted by `check:books:opds`, whose
 assertions are ported from `~/Stump/healthcheck.sh` and anchored on a committed snapshot of

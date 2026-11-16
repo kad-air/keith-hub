@@ -315,11 +315,37 @@ export function resolvePosition(
   pointer: string | null,
   percentage: number | null,
 ): { word: number; precision: Precision } {
-  const last = Math.max(0, book.totalWords - 1);
+  return locate(book, pointer, percentage, false);
+}
+
+/**
+ * Where a pointer to the END of what has been read cuts the book: the first
+ * word NOT read. Sheafs' Ask sends the end of the page on screen, i.e. the
+ * first character after it, so this is resolvePosition's word (the word the
+ * pointer names is the first one withheld) with one difference: a pointer
+ * past the book's last word means all of it (`totalWords`), not its last
+ * word, and so does a percentage of 1.
+ */
+export function resolveEnd(
+  book: ParsedBook,
+  pointer: string,
+  percentage: number,
+): { word: number; precision: Precision } {
+  return locate(book, pointer, percentage, true);
+}
+
+/** resolvePosition / resolveEnd. `asEnd`: the result may be `totalWords`, one past the last word. */
+function locate(
+  book: ParsedBook,
+  pointer: string | null,
+  percentage: number | null,
+  asEnd: boolean,
+): { word: number; precision: Precision } {
+  const last = asEnd ? book.totalWords : Math.max(0, book.totalWords - 1);
   const byPercent = (lo = 0, hi = book.totalWords): number => {
     const p = Math.min(1, Math.max(0, percentage ?? 0));
     const w = Math.floor(p * book.totalWords);
-    return Math.min(Math.max(w, lo), Math.max(lo, hi - 1), last);
+    return Math.min(Math.max(w, lo), asEnd ? hi : Math.max(lo, hi - 1), last);
   };
 
   const parsed = pointer ? parsePointer(pointer) : null;
@@ -365,6 +391,7 @@ export function resolvePosition(
     }
     char = 0; // past this block's end: the next block's first word
   }
+  // Past the last word of the book: its last word, or for an end, all of it.
   return { word: last, precision: parsed.offset != null ? "word" : "paragraph" };
 }
 
