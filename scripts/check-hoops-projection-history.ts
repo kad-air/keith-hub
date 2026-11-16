@@ -62,9 +62,10 @@ import {
   nearestTeam,
   pointAt,
   spreadLabels,
+  focusDomain,
 } from "../lib/hoops/leagueTrend.ts";
 import type { TeamSeries } from "../lib/hoops/leagueTrend.ts";
-import { TEAM_CHART_COLORS } from "../lib/hoops/teamColors.ts";
+import { MIN_APART, PINNED_PALETTE, TEAM_CHART_COLORS, colorDistance, distinctColors } from "../lib/hoops/teamColors.ts";
 import { FRANCHISES } from "../lib/hoops/nba-franchises.ts";
 import type {
   HoopsBundle,
@@ -373,7 +374,36 @@ const clone = (): RawProjectionHistoryFile => JSON.parse(JSON.stringify(goodRaw)
       check(new Set(cols).size === cols.length, `two ${div} teams share a chart colour`);
     }
   }
+  // zoomed to pinned teams: y fits the pinned lines (padded, round ticks), the
+  // others may run off the plot and can't be picked there, nothing pinned = full view
+  const zc = leagueTrendChart(series, "wins", { zoomTo: ["AAA"] })!;
+  const aaa = series[0].points;
+  const lo = Math.min(...aaa.map((p) => p.p10));
+  const hi = Math.max(...aaa.map((p) => p.p90));
+  check(zc.zoomed && zc.yMin <= lo && zc.yMax >= hi, `one pinned team's range ${zc.yMin}..${zc.yMax} doesn't hold its line and its 80% band`);
+  const z2 = leagueTrendChart(series, "wins", { zoomTo: ["AAA", "CCC"] })!;
+  check(z2.yMin <= 44 && z2.yMin > 31 && z2.yMax >= 58, `two pinned teams drawn on ${z2.yMin}..${z2.yMax}`);
+  check(z2.yTicks.length >= 3 && z2.yTicks.length <= 7 && z2.yTicks.every((t) => t.y >= -0.01 && t.y <= 100.01), "zoomed y ticks are too few, too many or off the plot");
+  const zb = z2.lines.find((l) => l.tri === "BBB")!;
+  check(zb.pts[2].y > 100 && nearestTeam(z2, 2, 99) !== "BBB", "a line below the zoomed plot can still be picked");
+  check(!leagueTrendChart(series, "wins", { zoomTo: [] })!.zoomed && leagueTrendChart(series, "wins", { zoomTo: [] })!.yMin === c.yMin, "nothing pinned did not keep the full view");
+  const zt = focusDomain(series, ["BBB"], "title")!;
+  check(zt.min === 0 && zt.max <= 10, `a long-shot's title odds zoomed to ${zt.min}..${zt.max}`);
+  check(leagueTrendChart(series, "wins", { zoomTo: ["AAA", "BBB"] })!.yMin < 31 && z2.yMax - z2.yMin < c.yMax - c.yMin, "pinning closer teams did not tighten the range");
+  // labels stay as close to their own line ends as crowding allows: a lone label
+  // sits on its line; a crowded group is centred on its lines, not pushed off down
+  const near = spreadLabels([{ tri: "A", y: 20 }, { tri: "B", y: 40 }, { tri: "C", y: 41 }, { tri: "D", y: 42 }], 5);
+  const at = (t: string) => near.find((s) => s.tri === t)!.y;
+  check(at("A") === 20 && Math.abs((at("B") + at("C") + at("D")) / 3 - 41) < 0.11 && at("C") - at("B") >= 4.9 && at("D") - at("C") >= 4.9, `end labels drift from their lines: ${JSON.stringify(near)}`);
+  // pinned colours stay apart: the screenshot's seven (LAL/DEN gold, OKC/DET blue)
+  const seven = distinctColors(["SAS", "BOS", "LAL", "OKC", "NYK", "DEN", "DET"]);
+  const cs = Object.values(seven);
+  check(cs.every((a, i) => cs.every((b, j) => i === j || colorDistance(a, b) >= MIN_APART)), `two pinned lines share a hue: ${JSON.stringify(seven)}`);
+  check(seven.SAS === TEAM_CHART_COLORS.SAS && seven.BOS === TEAM_CHART_COLORS.BOS && seven.LAL === TEAM_CHART_COLORS.LAL, "a pinned team lost its own colour with no clash");
+  check(PINNED_PALETTE.every((a, i) => PINNED_PALETTE.every((b, j) => i === j || colorDistance(a, b) >= MIN_APART)), "the pinned palette has two colours too close");
+  check(distinctColors(["LAL", "DEN"]).DEN !== TEAM_CHART_COLORS.DEN && distinctColors(["DEN", "LAL"]).DEN === TEAM_CHART_COLORS.DEN, "the first-pinned team doesn't keep its colour");
   notes.push("league chart: one calendar x and one y for every team, missed nights not drawn, the pointer picks the nearest line, labels spread");
+  notes.push("pinned view: y fits the pinned lines, off-plot lines can't be picked, labels stay by their lines, pinned colours stay apart");
 }
 
 // ── 5. the store and the REAL importer ────────────────────────────────────

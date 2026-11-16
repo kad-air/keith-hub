@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
 import { FRANCHISES } from "@/lib/hoops/nba-franchises";
 import { fmtAsOf } from "@/lib/hoops/projections";
@@ -17,7 +17,7 @@ import {
   spreadLabels,
 } from "@/lib/hoops/leagueTrend";
 import type { TeamSeries, TrendMetric, TrendScope } from "@/lib/hoops/leagueTrend";
-import { teamChartColor } from "@/lib/hoops/teamColors";
+import { distinctColors, teamChartColor } from "@/lib/hoops/teamColors";
 
 /**
  * Every team's projection, night by night, on one chart — the league view of
@@ -27,7 +27,11 @@ import { teamChartColor } from "@/lib/hoops/teamColors";
  *   • drag (or hover) across the chart to scrub night by night; the line
  *     nearest the pointer lights up and the tooltip reads it out,
  *   • tap the chart, or a team in the key, to pin it (pin several to compare);
- *     everything not pinned fades back,
+ *     everything not pinned fades back, the y axis closes in on the pinned
+ *     lines (animated), and pinned lines get colours that stay apart even
+ *     where two teams' own colours are alike,
+ *   • hovering (or dragging over) one of several pinned lines brings it
+ *     forward and dims the other pinned ones,
  *   • East / West narrows the chart and rescales it to that conference,
  *   • Wins / Playoffs / Title switches what the lines measure.
  * A single focused team on Wins also gets its 80% band. Choices are remembered
@@ -38,6 +42,10 @@ import { teamChartColor } from "@/lib/hoops/teamColors";
  */
 
 const STORE_KEY = "hoops:sim:projection-trend:v1";
+/** Room each end label needs, in pixels: the 0.6rem label plus a little air. */
+const LABEL_PX = 13;
+const ZOOM_MS = 320;
+const ZOOM_EASE = "cubic-bezier(0.2, 0.7, 0.2, 1)";
 const DIVISIONS: Record<"East" | "West", string[]> = {
   East: ["Atlantic", "Central", "Southeast"],
   West: ["Northwest", "Pacific", "Southwest"],
@@ -54,6 +62,16 @@ export default function LeagueProjectionTrend({ series }: { series: TeamSeries[]
   const [metric, setMetric] = useState<TrendMetric>("wins");
   const [pinned, setPinned] = useState<string[]>([]);
   const [hover, setHover] = useState<string | null>(null);
+  // Whether `hover` is under a live pointer (a mouse over the plot or a key
+  // chip, a finger while it's down) rather than left over from a tap.
+  const [hoverLive, setHoverLive] = useState(false);
+  const [plotH, setPlotH] = useState(256);
+  const [zooming, setZooming] = useState(false);
+  const zoomRef = useRef<SVGGElement>(null);
+  const lastDomain = useRef<{ min: number; max: number; metric: TrendMetric } | null>(null);
+  const renderedDomain = useRef<{ min: number; max: number; metric: TrendMetric } | null>(null);
+  const glideUntil = useRef(0);
+  const clipId = `trend-clip-${useId().replace(/:/g, "")}`;
   const [cursor, setCursor] = useState<number | null>(null);
   const [loaded, setLoaded] = useState(false);
   const plotRef = useRef<HTMLDivElement>(null);
@@ -89,9 +107,70 @@ export default function LeagueProjectionTrend({ series }: { series: TeamSeries[]
 
   const visible = useMemo(() => series.filter((s) => inScope(s, scope)), [series, scope]);
   const visibleSet = useMemo(() => new Set(visible.map((s) => s.tri)), [visible]);
-  const chart = useMemo(() => leagueTrendChart(visible, metric), [visible, metric]);
+  const pinnedInView = useMemo(() => pinned.filter((t) => visibleSet.has(t)), [pinned, visibleSet]);
+  // Pinned teams in view: the y axis fits them. Nothing pinned: the full view.
+  const chart = useMemo(
+    () => leagueTrendChart(visible, metric, { zoomTo: pinnedInView }),
+    [visible, metric, pinnedInView],
+  );
 
-  const pinnedInView = pinned.filter((t) => visibleSet.has(t));
+  // The plot's height in pixels, so end labels are spaced by what they need.
+  useEffect(() => {
+    const el = plotRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(([e]) => {
+      if (e.contentRect.height > 0) setPlotH(e.contentRect.height);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [chart != null]);
+
+  // The HTML on the chart (dots, end labels, axis numbers) glides to its new
+  // place on the render where the range changes, in step with the lines. This
+  // has to be known on that very render — a transition added a render later
+  // would come after the jump — so it's read from a ref here, not from state.
+  let gliding = false;
+  if (chart) {
+    const rd = renderedDomain.current;
+    if (rd && rd.metric === metric && (rd.min !== chart.yMin || rd.max !== chart.yMax) && !reducedMotion()) {
+      glideUntil.current = Date.now() + ZOOM_MS;
+    }
+    renderedDomain.current = { min: chart.yMin, max: chart.yMax, metric };
+    gliding = zooming || Date.now() < glideUntil.current;
+  }
+
+  // Zoom animation (FLIP): the lines are drawn on the new y range at once; the
+  // group holding them starts transformed back to where the old range had
+  // them and eases to rest. Only across the same metric — a switch to another
+  // measure is different numbers, not a zoom.
+  const yMin = chart?.yMin;
+  const yMax = chart?.yMax;
+  useLayoutEffect(() => {
+    if (yMin == null || yMax == null) return;
+    const prev = lastDomain.current;
+    lastDomain.current = { min: yMin, max: yMax, metric };
+    const g = zoomRef.current;
+    if (!prev || !g || prev.metric !== metric || (prev.min === yMin && prev.max === yMax)) return;
+    if (reducedMotion()) return;
+    // y on the old range of a point drawn at y on the new one: y' = a·y + b.
+    const a = (yMax - yMin) / (prev.max - prev.min);
+    const b = (100 * (prev.max - yMax)) / (prev.max - prev.min);
+    g.style.transition = "none";
+    g.style.transform = `translate(0px, ${b}px) scale(1, ${a})`;
+    g.getBoundingClientRect();
+    const raf = requestAnimationFrame(() => {
+      g.style.transition = `transform ${ZOOM_MS}ms ${ZOOM_EASE}`;
+      g.style.transform = "";
+    });
+    setZooming(true);
+    const t = window.setTimeout(() => setZooming(false), ZOOM_MS + 40);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.clearTimeout(t);
+      g.style.transition = "";
+      g.style.transform = "";
+    };
+  }, [yMin, yMax, metric]);
   const focus = useMemo(() => {
     const f = new Set(pinnedInView);
     if (hover && visibleSet.has(hover)) f.add(hover);
@@ -131,6 +210,7 @@ export default function LeagueProjectionTrend({ series }: { series: TeamSeries[]
     if (!hit) return;
     setCursor(hit.night);
     setHover(hit.tri);
+    setHoverLive(true);
   };
   const onDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     press.current = { x: e.clientX, y: e.clientY, moved: false, touch: e.pointerType !== "mouse" };
@@ -138,10 +218,12 @@ export default function LeagueProjectionTrend({ series }: { series: TeamSeries[]
     if (!hit) return;
     setCursor(hit.night);
     setHover(hit.tri);
+    setHoverLive(true);
   };
   const onUp = (e: ReactPointerEvent<HTMLDivElement>) => {
     const p = press.current;
     press.current = null;
+    if (p?.touch) setHoverLive(false);
     if (!p || p.moved) return; // a scrub, not a tap: leave the readout up
     const hit = locate(e);
     if (hit?.tri) togglePin(hit.tri);
@@ -150,10 +232,12 @@ export default function LeagueProjectionTrend({ series }: { series: TeamSeries[]
     if (e.pointerType === "mouse") {
       setCursor(null);
       setHover(null);
+      setHoverLive(false);
     }
   };
   const onCancel = () => {
     press.current = null;
+    setHoverLive(false);
   };
 
   if (!chart) {
@@ -171,15 +255,33 @@ export default function LeagueProjectionTrend({ series }: { series: TeamSeries[]
     return l ? l.pts[l.pts.length - 1] : null;
   };
   const anyFocus = focus.size > 0;
-  // Faded lines first, focused on top (SVG paints in order).
-  const order = [...chart.lines].sort((a, b) => Number(focus.has(a.tri)) - Number(focus.has(b.tri)));
+  // Colours for the focused lines that stay apart (pin order, so a team keeps
+  // its colour as more are pinned); every other line keeps its team colour.
+  const lineColors = distinctColors(
+    hover && !pinnedInView.includes(hover) && visibleSet.has(hover) ? [...pinnedInView, hover] : pinnedInView,
+  );
+  const colorOf = (tri: string) => lineColors[tri] ?? teamChartColor(tri);
+  // One of several pinned lines under a live pointer comes forward; the other
+  // pinned lines dim (but stay readable).
+  const emph = hoverLive && hover && pinnedInView.length > 1 && pinnedInView.includes(hover) ? hover : null;
+  const dimmed = (tri: string) => emph != null && tri !== emph;
+  const glide: CSSProperties = gliding ? { transition: `top ${ZOOM_MS}ms ${ZOOM_EASE}` } : {};
+  // Faded lines first, focused on top, the emphasised one topmost (SVG paints in order).
+  const rank = (tri: string) => (tri === emph ? 2 : focus.has(tri) ? 1 : 0);
+  const order = [...chart.lines].sort((a, b) => rank(a.tri) - rank(b.tri));
   const bandTri = metric === "wins" && focus.size === 1 ? [...focus][0] : null;
 
-  const labels = spreadLabels(
+  // End labels sit at their own line's end, spread only as far as they must
+  // be to not overlap; a short leader joins each to its line when it moved.
+  const ends = new Map(
     [...focus].flatMap((tri) => {
       const p = latestOf(tri);
-      return p ? [{ tri, y: p.y }] : [];
+      return p ? [[tri, p.y] as const] : [];
     }),
+  );
+  const labels = spreadLabels(
+    [...ends].map(([tri, y]) => ({ tri, y })),
+    (LABEL_PX / Math.max(80, plotH)) * 100,
   );
 
   // The tooltip: the night under the cursor, read out for the focused teams
@@ -237,7 +339,7 @@ export default function LeagueProjectionTrend({ series }: { series: TeamSeries[]
             <span
               key={t.label}
               className="absolute right-0 -translate-y-1/2 font-mono text-[0.58rem] tabular-nums text-cream-dimmer"
-              style={{ top: `${t.y}%` }}
+              style={{ top: `${t.y}%`, ...glide }}
             >
               {t.label}
             </span>
@@ -261,6 +363,13 @@ export default function LeagueProjectionTrend({ series }: { series: TeamSeries[]
               className="pointer-events-none absolute inset-0 h-full w-full overflow-visible"
               aria-hidden
             >
+              <defs>
+                <clipPath id={clipId}>
+                  <rect x="0" y="0" width="100" height="100" />
+                </clipPath>
+              </defs>
+              <g clipPath={`url(#${clipId})`}>
+              <g ref={zoomRef} style={{ transformOrigin: "0 0" }}>
               {chart.yTicks.map((t) => (
                 <line
                   key={t.label}
@@ -289,18 +398,7 @@ export default function LeagueProjectionTrend({ series }: { series: TeamSeries[]
                 <path
                   d={chart.bands[bandTri]}
                   className="hoops-team"
-                  style={{ "--team": teamChartColor(bandTri), fill: "var(--team-c)", fillOpacity: 0.14 } as CSSProperties}
-                />
-              )}
-              {cursorX != null && (
-                <line
-                  x1={cursorX}
-                  x2={cursorX}
-                  y1="0"
-                  y2="100"
-                  className="stroke-cream-dim/60"
-                  strokeWidth="1"
-                  vectorEffect="non-scaling-stroke"
+                  style={{ "--team": colorOf(bandTri), fill: "var(--team-c)", fillOpacity: 0.14 } as CSSProperties}
                 />
               )}
               {order.map((l) => {
@@ -313,18 +411,31 @@ export default function LeagueProjectionTrend({ series }: { series: TeamSeries[]
                     className="hoops-team transition-[stroke-opacity] duration-150"
                     style={
                       {
-                        "--team": teamChartColor(l.tri),
+                        "--team": colorOf(l.tri),
                         stroke: "var(--team-c)",
-                        strokeOpacity: anyFocus ? (on ? 1 : 0.13) : 0.75,
+                        strokeOpacity: anyFocus ? (on ? (dimmed(l.tri) ? 0.35 : 1) : 0.13) : 0.75,
                       } as CSSProperties
                     }
-                    strokeWidth={on ? 2.5 : 1.4}
+                    strokeWidth={l.tri === emph ? 3.25 : on ? 2.5 : 1.4}
                     strokeLinejoin="round"
                     strokeLinecap="round"
                     vectorEffect="non-scaling-stroke"
                   />
                 );
               })}
+              </g>
+              </g>
+              {cursorX != null && (
+                <line
+                  x1={cursorX}
+                  x2={cursorX}
+                  y1="0"
+                  y2="100"
+                  className="stroke-cream-dim/60"
+                  strokeWidth="1"
+                  vectorEffect="non-scaling-stroke"
+                />
+              )}
             </svg>
 
             {/* the focused teams' dots: tonight, or the night under the cursor */}
@@ -335,18 +446,66 @@ export default function LeagueProjectionTrend({ series }: { series: TeamSeries[]
               return (
                 <span
                   key={tri}
-                  className="hoops-team pointer-events-none absolute h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-ink"
-                  style={{ "--team": teamChartColor(tri), background: "var(--team-c)", left: `${p.x}%`, top: `${p.y}%` } as CSSProperties}
+                  className="hoops-team pointer-events-none absolute h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-ink transition-opacity duration-150"
+                  style={
+                    {
+                      "--team": colorOf(tri),
+                      background: "var(--team-c)",
+                      left: `${p.x}%`,
+                      top: `${p.y}%`,
+                      opacity: dimmed(tri) ? 0.4 : 1,
+                      ...glide,
+                    } as CSSProperties
+                  }
                 />
               );
             })}
 
-            {/* end labels for the focused teams, in the right gutter */}
+            {/* end labels for the focused teams, in the right gutter, each
+                joined to its own line's end by a short leader */}
+            {labels.length > 0 && (
+              <svg
+                viewBox="0 0 10 100"
+                preserveAspectRatio="none"
+                className="pointer-events-none absolute left-full top-0 h-full w-2.5 overflow-visible"
+                aria-hidden
+              >
+                {labels.map((lb) => {
+                  const y0 = ends.get(lb.tri) ?? lb.y;
+                  return (
+                    <path
+                      key={lb.tri}
+                      d={`M0,${y0} C5,${y0} 5,${lb.y} 10,${lb.y}`}
+                      fill="none"
+                      className="hoops-team"
+                      style={
+                        {
+                          "--team": colorOf(lb.tri),
+                          stroke: "var(--team-c)",
+                          strokeOpacity: dimmed(lb.tri) ? 0.3 : 0.7,
+                          ...(gliding ? { transition: `d ${ZOOM_MS}ms ${ZOOM_EASE}` } : {}),
+                        } as CSSProperties
+                      }
+                      strokeWidth="1"
+                      vectorEffect="non-scaling-stroke"
+                    />
+                  );
+                })}
+              </svg>
+            )}
             {labels.map((lb) => (
               <span
                 key={lb.tri}
-                className="hoops-team pointer-events-none absolute left-full ml-1.5 -translate-y-1/2 font-mono text-[0.6rem] font-semibold"
-                style={{ "--team": teamChartColor(lb.tri), color: "var(--team-c)", top: `${lb.y}%` } as CSSProperties}
+                className="hoops-team pointer-events-none absolute left-full ml-3 -translate-y-1/2 font-mono text-[0.6rem] font-semibold leading-none transition-opacity duration-150"
+                style={
+                  {
+                    "--team": colorOf(lb.tri),
+                    color: "var(--team-c)",
+                    top: `${lb.y}%`,
+                    opacity: dimmed(lb.tri) ? 0.45 : 1,
+                    ...glide,
+                  } as CSSProperties
+                }
               >
                 {lb.tri}
               </span>
@@ -355,7 +514,7 @@ export default function LeagueProjectionTrend({ series }: { series: TeamSeries[]
             {chart.evenY != null && !anyFocus && (
               <span
                 className="pointer-events-none absolute left-full ml-1.5 -translate-y-1/2 font-mono text-[0.55rem] text-cream-dimmer"
-                style={{ top: `${chart.evenY}%` }}
+                style={{ top: `${chart.evenY}%`, ...glide }}
               >
                 .500
               </span>
@@ -376,7 +535,7 @@ export default function LeagueProjectionTrend({ series }: { series: TeamSeries[]
                   <p key={r.tri} className="flex items-baseline gap-1.5 font-mono text-[0.68rem] tabular-nums">
                     <span
                       className="hoops-team inline-block h-2 w-2 shrink-0 rounded-full"
-                      style={{ "--team": teamChartColor(r.tri), background: "var(--team-c)" } as CSSProperties}
+                      style={{ "--team": colorOf(r.tri), background: "var(--team-c)" } as CSSProperties}
                     />
                     <span className={r.tri === hover ? "text-cream" : "text-cream-dim"}>{r.tri}</span>
                     <span className="ml-auto text-cream">{fmtMetric(r.value, metric)}</span>
@@ -408,7 +567,7 @@ export default function LeagueProjectionTrend({ series }: { series: TeamSeries[]
           </div>
         </div>
         {/* room for the end labels */}
-        <div className="w-8 shrink-0" aria-hidden />
+        <div className="w-10 shrink-0" aria-hidden />
       </div>
 
       <div className="mt-1 flex items-center justify-between gap-3">
@@ -423,6 +582,7 @@ export default function LeagueProjectionTrend({ series }: { series: TeamSeries[]
             onClick={() => {
               setPinned([]);
               setHover(null);
+              setHoverLive(false);
               setCursor(null);
             }}
             className="shrink-0 border border-rule/60 px-2 py-1 font-mono text-[0.6rem] uppercase tracking-kicker text-cream-dim hover:border-cat-hoops/40 hover:text-cream"
@@ -468,8 +628,14 @@ export default function LeagueProjectionTrend({ series }: { series: TeamSeries[]
                           key={t.tri}
                           type="button"
                           onClick={() => togglePin(t.tri)}
-                          onMouseEnter={() => setHover(t.tri)}
-                          onMouseLeave={() => setHover((h) => (h === t.tri ? null : h))}
+                          onMouseEnter={() => {
+                            setHover(t.tri);
+                            setHoverLive(true);
+                          }}
+                          onMouseLeave={() => {
+                            setHover((h) => (h === t.tri ? null : h));
+                            setHoverLive(false);
+                          }}
                           aria-pressed={on}
                           title={FRANCHISES[t.tri]?.name ?? t.tri}
                           className={`hoops-team flex items-center gap-1 border px-1.5 py-1 font-mono text-[0.64rem] tabular-nums transition-colors ${
@@ -477,7 +643,7 @@ export default function LeagueProjectionTrend({ series }: { series: TeamSeries[]
                           }`}
                           style={
                             {
-                              "--team": teamChartColor(t.tri),
+                              "--team": on ? colorOf(t.tri) : teamChartColor(t.tri),
                               ...(on ? { borderColor: "var(--team-c)" } : {}),
                             } as CSSProperties
                           }
@@ -508,6 +674,10 @@ export default function LeagueProjectionTrend({ series }: { series: TeamSeries[]
       </p>
     </section>
   );
+}
+
+function reducedMotion(): boolean {
+  return typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
 }
 
 function Segmented({
