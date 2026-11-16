@@ -66,6 +66,9 @@ export interface LeagueTrendChart {
   xTicks: Array<{ x: number; label: string }>;
   /** y of 41 wins (an .500 season), or null when not on the wins metric or out of range. */
   evenY: number | null;
+  /** True when the y range was fitted to a few teams (`zoomTo`) rather than the
+   *  whole scope; lines of other teams may then run off the plot. */
+  zoomed: boolean;
 }
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -88,18 +91,67 @@ export function metricDomain(series: readonly TeamSeries[], m: TrendMetric): { m
   return { min: 0, max: ceil };
 }
 
+/** A round tick step that gives about five ticks over `range`. */
+export function niceStep(range: number): number {
+  const steps = [1, 2, 5, 10, 20, 25, 50];
+  return steps.find((st) => range / st <= 6) ?? 50;
+}
+
+/**
+ * The y range fitted to a handful of teams — the pinned ones — across every
+ * night they have, padded a little and rounded out to the tick step so the
+ * axis reads in round numbers. With exactly one team on wins, its 80% band is
+ * held too (it's drawn then, and shouldn't be cut off). A very tight set is
+ * opened to a minimum span so two flat lines don't fill the plot edge to edge.
+ * Wins stay within 0..82 and odds within 0..100. Null when none of `tris` has
+ * a point.
+ */
+export function focusDomain(
+  series: readonly TeamSeries[],
+  tris: readonly string[],
+  m: TrendMetric,
+): { min: number; max: number; step: number } | null {
+  const want = new Set(tris);
+  const picked = series.filter((s) => want.has(s.tri) && s.points.length > 0);
+  if (picked.length === 0) return null;
+  const vals = picked.flatMap((s) => s.points.map((p) => metricValue(p, m)));
+  if (m === "wins" && picked.length === 1) for (const p of picked[0].points) vals.push(p.p10, p.p90);
+  let lo = Math.min(...vals);
+  let hi = Math.max(...vals);
+  const minSpan = 4;
+  if (hi - lo < minSpan) {
+    const mid = (lo + hi) / 2;
+    lo = mid - minSpan / 2;
+    hi = mid + minSpan / 2;
+  }
+  const pad = Math.max(0.5, (hi - lo) * 0.08);
+  lo -= pad;
+  hi += pad;
+  const ceilV = m === "wins" ? 82 : 100;
+  const step = niceStep(hi - lo);
+  const min = Math.max(0, Math.floor(lo / step) * step);
+  const max = Math.min(ceilV, Math.ceil(hi / step) * step);
+  return { min, max, step };
+}
+
 /**
  * Lay out every series in `series` (already filtered to the scope in view).
  * x is calendar time across the union of nights, y is the metric, higher is
  * more. Series with no points are dropped; a series with one point draws a dot.
  */
-export function leagueTrendChart(series: readonly TeamSeries[], m: TrendMetric): LeagueTrendChart | null {
+export function leagueTrendChart(
+  series: readonly TeamSeries[],
+  m: TrendMetric,
+  opts: { zoomTo?: readonly string[] } = {},
+): LeagueTrendChart | null {
   const dateSet = new Set<string>();
   for (const s of series) for (const p of s.points) dateSet.add(p.date);
   const dates = [...dateSet].sort();
   if (dates.length < 2) return null;
 
-  const { min: yMin, max: yMax } = metricDomain(series, m);
+  // Pinned teams in view: fit y to them. Otherwise the whole scope's range.
+  const fit = opts.zoomTo && opts.zoomTo.length > 0 ? focusDomain(series, opts.zoomTo, m) : null;
+  const { min: yMin, max: yMax } = fit ?? metricDomain(series, m);
   const d0 = dayNumber(dates[0]);
   const d1 = dayNumber(dates[dates.length - 1]);
   const span = Math.max(1, d1 - d0);
@@ -126,7 +178,7 @@ export function leagueTrendChart(series: readonly TeamSeries[], m: TrendMetric):
   }
 
   const range = yMax - yMin;
-  const step = m === "wins" ? (range > 30 ? 10 : 5) : range > 50 ? 25 : range > 20 ? 10 : 5;
+  const step = fit ? fit.step : m === "wins" ? (range > 30 ? 10 : 5) : range > 50 ? 25 : range > 20 ? 10 : 5;
   const yTicks: LeagueTrendChart["yTicks"] = [];
   for (let v = Math.ceil(yMin / step) * step; v <= yMax + 1e-9; v += step) {
     yTicks.push({ y: yOf(v), label: m === "wins" ? String(v) : `${v}%` });
@@ -147,7 +199,7 @@ export function leagueTrendChart(series: readonly TeamSeries[], m: TrendMetric):
   }
 
   const evenY = m === "wins" && yMin < 41 && yMax > 41 ? yOf(41) : null;
-  return { dates, xs, lines, bands, yMin, yMax, yTicks, xTicks, evenY };
+  return { dates, xs, lines, bands, yMin, yMax, yTicks, xTicks, evenY, zoomed: fit != null };
 }
 
 /** The night nearest a horizontal position (percent across the plot). */
@@ -161,7 +213,9 @@ export function nearestNight(chart: Pick<LeagueTrendChart, "xs">, xPct: number):
 
 /** The team whose line passes closest to (night, yPct), among `candidates`
  *  (every team in view when empty). A team with no point that night is
- *  measured at its nearest earlier night, so a missed night doesn't hide it. */
+ *  measured at its nearest earlier night, so a missed night doesn't hide it.
+ *  A line that is off the plot at that night (the chart is zoomed to pinned
+ *  teams) can't be picked: the reader can't see it. */
 export function nearestTeam(
   chart: Pick<LeagueTrendChart, "lines">,
   dateIndex: number,
@@ -173,7 +227,7 @@ export function nearestTeam(
   for (const l of chart.lines) {
     if (candidates && candidates.size > 0 && !candidates.has(l.tri)) continue;
     const p = pointAt(l, dateIndex);
-    if (!p) continue;
+    if (!p || p.y < -2 || p.y > 102) continue;
     const d = Math.abs(p.y - yPct);
     if (d < bestD) {
       bestD = d;
@@ -194,24 +248,47 @@ export function pointAt<P extends { dateIndex: number }>(line: { pts: P[] }, dat
 }
 
 /**
- * Vertical positions for the end-of-line labels of the focused teams, pushed
- * apart so no two sit closer than `gap` percent, kept inside 0..100. Input
- * order doesn't matter; output keeps each tri with its label y.
+ * Vertical positions for the end-of-line labels of the focused teams: each as
+ * close to its own line's end as it can be while no two sit closer than `gap`
+ * percent, all inside 0..100. Labels that would collide are grouped and the
+ * group is centred on its lines' ends (not pushed down from the top one), so
+ * no label drifts further from its line than the crowding forces. Input order
+ * doesn't matter; output keeps each tri with its label y.
  */
 export function spreadLabels(
   items: ReadonlyArray<{ tri: string; y: number }>,
   gap = 7,
 ): Array<{ tri: string; y: number }> {
-  const sorted = [...items].sort((a, b) => a.y - b.y).map((i) => ({ ...i }));
-  for (let i = 1; i < sorted.length; i++) {
-    if (sorted[i].y - sorted[i - 1].y < gap) sorted[i].y = sorted[i - 1].y + gap;
-  }
-  const overflow = sorted.length ? sorted[sorted.length - 1].y - 100 : 0;
-  if (overflow > 0) {
-    for (const s of sorted) s.y -= overflow;
-    for (let i = sorted.length - 2; i >= 0; i--) {
-      if (sorted[i + 1].y - sorted[i].y < gap) sorted[i].y = sorted[i + 1].y - gap;
+  const sorted = [...items].sort((a, b) => a.y - b.y || a.tri.localeCompare(b.tri));
+  if (sorted.length === 0) return [];
+  const g = Math.min(gap, sorted.length > 1 ? 100 / (sorted.length - 1) : gap);
+  // Clusters of consecutive labels; each sits at `top`, spaced by g.
+  type Cluster = { from: number; n: number; sum: number; top: number };
+  const place = (c: Cluster) => {
+    const span = (c.n - 1) * g;
+    const top = c.sum / c.n - span / 2;
+    c.top = Math.min(100 - span, Math.max(0, top));
+  };
+  const clusters: Cluster[] = [];
+  sorted.forEach((it, i) => {
+    const c: Cluster = { from: i, n: 1, sum: it.y, top: 0 };
+    place(c);
+    clusters.push(c);
+    // Merge back while the new cluster overlaps the one above it.
+    while (clusters.length > 1) {
+      const b = clusters[clusters.length - 1];
+      const a = clusters[clusters.length - 2];
+      if (a.top + (a.n - 1) * g + g - 1e-9 <= b.top) break;
+      a.n += b.n;
+      a.sum += b.sum;
+      place(a);
+      clusters.pop();
     }
+  });
+  const out: Array<{ tri: string; y: number }> = [];
+  for (const c of clusters) {
+    const top = r1(c.top);
+    for (let k = 0; k < c.n; k++) out.push({ tri: sorted[c.from + k].tri, y: r1(top + k * g) });
   }
-  return sorted.map((s) => ({ tri: s.tri, y: r1(s.y) }));
+  return out;
 }
