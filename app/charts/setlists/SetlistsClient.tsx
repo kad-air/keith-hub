@@ -90,7 +90,7 @@ export default function SetlistsClient({ initialSetlists, readOnly }: Props) {
   return (
     <>
       <SectionTabKeys hrefs={["/charts", "/charts/setlists"]} />
-    <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6">
+    <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6 lg:max-w-[960px]">
       <header className="mb-6 flex items-end justify-between gap-3">
         <div>
           <Link

@@ -899,7 +899,7 @@ export default function FeedClient({
       {/* ── Category nav ── */}
       {/* Refresh has no button: pull-to-refresh on touch, `r` on desktop,
           and the PWA-resume auto-refresh cover it. Feedback rides the toast. */}
-      <nav className="mb-5 flex items-baseline gap-5 overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <nav className="mb-5 flex items-baseline gap-5 overflow-x-auto px-4 [scrollbar-width:none] lg:flex-wrap lg:gap-y-2 lg:overflow-visible [&::-webkit-scrollbar]:hidden">
         {CATEGORIES.map((cat) => {
           const isActive = activeCategory === cat.id;
           const count = counts[cat.id];

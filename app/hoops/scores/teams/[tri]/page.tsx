@@ -143,7 +143,7 @@ export default async function HoopsScoresTeamPage({ params }: { params: { tri: s
   );
 
   return (
-    <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6">
+    <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6 lg:max-w-[1180px] 2xl:max-w-[1400px]">
       <HoopsNav area="scores" active="teams" />
       <p className="mb-3 font-mono text-[0.62rem] uppercase tracking-kicker text-cream-dimmer">
         <Link href="/hoops/scores/teams" className="text-cat-hoops hover:text-cream">
@@ -152,6 +152,10 @@ export default async function HoopsScoresTeamPage({ params }: { params: { tri: s
       </p>
 
 
+      {/* Desktop (xl+): the season and its games on the left, the roster on
+          the right. One column below xl. */}
+      <div className="xl:grid xl:grid-cols-2 xl:gap-x-12">
+      <div className="min-w-0">
       {days.length ? (
         <LiveProvider dates={days} states={states} guarded={days}>
           {body}
@@ -159,8 +163,9 @@ export default async function HoopsScoresTeamPage({ params }: { params: { tri: s
       ) : (
         body
       )}
+      </div>
 
-      <section className="mt-8">
+      <section className="mt-8 min-w-0 xl:mt-0">
         <h3 className="mb-1 font-mono text-[0.68rem] uppercase tracking-kicker text-cat-hoops">Roster</h3>
         {!roster ? (
           <p className="font-display text-sm text-cream-dim">Roster unavailable right now.</p>
@@ -219,6 +224,7 @@ export default async function HoopsScoresTeamPage({ params }: { params: { tri: s
           </>
         )}
       </section>
+      </div>
 
       <SourceNote fetched={[...sched.fetched, rosterF].map(sourceMeta)} />
     </article>

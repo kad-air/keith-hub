@@ -53,7 +53,7 @@ export default function BooksStatsClient({ stats }: { stats: ReadingStats }) {
   if (!stats.hasHistory) return <EmptyState />;
 
   return (
-    <article className="mx-auto max-w-[900px] px-4 pb-24 pt-6 sm:px-6">
+    <article className="mx-auto max-w-[900px] px-4 pb-24 pt-6 sm:px-6 lg:max-w-[1080px]">
       <header className="mb-8">
         <div className="flex items-baseline justify-between gap-3">
           <div>

@@ -55,7 +55,7 @@ export default function HoopsMatchupPage({
   const defaultAway = rawAway === defaultHome ? (ranked[2]?.tri ?? "BOS") : rawAway;
 
   return (
-    <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6">
+    <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6 lg:max-w-[960px]">
       <HoopsNav area="sim" active="matchup" through={getResultsWindow()?.to ?? null} />
       <Suspense>
         <MatchupClient

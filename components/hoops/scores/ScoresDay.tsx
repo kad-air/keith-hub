@@ -103,7 +103,7 @@ export default async function ScoresDay({ date }: { date: string }) {
   );
 
   return (
-    <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6">
+    <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6 lg:max-w-[1180px] 2xl:max-w-[1400px]">
       <HoopsNav area="scores" active="scores" />
       <ScoresDayNav
         date={date}

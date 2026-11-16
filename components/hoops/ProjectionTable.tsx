@@ -23,7 +23,7 @@ export default function ProjectionTable({
     <section>
       <h3 className="mb-2 font-mono text-[0.68rem] uppercase tracking-kicker text-cat-hoops">{conference}</h3>
       <div className="overflow-x-auto">
-        <table className="w-full font-mono text-[0.74rem] tabular-nums">
+        <table className="w-full font-mono text-[0.74rem] tabular-nums 2xl:whitespace-nowrap">
           <thead>
             <tr className="border-b border-rule/60 text-[0.58rem] uppercase tracking-kicker text-cream-dimmer">
               <th className="w-6 pb-1 text-right font-normal">#</th>

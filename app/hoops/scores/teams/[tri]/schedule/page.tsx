@@ -99,7 +99,7 @@ export default async function HoopsScoresSchedulePage({ params }: { params: { tr
   );
 
   return (
-    <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6">
+    <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6 lg:max-w-[960px]">
       <HoopsNav area="scores" active="teams" />
       <p className="mb-3 font-mono text-[0.62rem] uppercase tracking-kicker text-cream-dimmer">
         <Link href={`/hoops/scores/teams/${tri.toLowerCase()}`} className="text-cat-hoops hover:text-cream">

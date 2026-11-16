@@ -5,6 +5,7 @@ import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 import OfflineWarm from "@/components/OfflineWarm";
 import ThemeProvider from "@/components/ThemeProvider";
 import Masthead from "@/components/Masthead";
+import SideNav from "@/components/SideNav";
 
 const displayFont = Newsreader({
   subsets: ["latin"],
@@ -104,8 +105,14 @@ export default function RootLayout({
       </head>
       <body className="font-display text-cream bg-ink min-h-screen">
         <ThemeProvider>
-          <Masthead />
-          <main className="relative z-10">{children}</main>
+          {/* Desktop (lg+) gets a fixed section rail on the left; everything
+              else shifts right by its width. Below lg nothing changes. See
+              components/SideNav.tsx before touching either width. */}
+          <SideNav />
+          <div className="hub-shell">
+            <Masthead />
+            <main className="relative z-10">{children}</main>
+          </div>
           <ServiceWorkerRegister />
           <OfflineWarm />
         </ThemeProvider>

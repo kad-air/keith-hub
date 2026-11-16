@@ -79,7 +79,7 @@ export default function HoopsComparePage({
   const same = aId != null && aId === bId;
 
   return (
-    <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6">
+    <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6 lg:max-w-[960px]">
       <HoopsNav area="sim" active="players" through={through} />
 
       <Link

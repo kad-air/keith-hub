@@ -35,7 +35,7 @@ export default function HoopsProjectionsPage() {
     }));
 
   return (
-    <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6">
+    <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6 lg:max-w-[1180px] 2xl:max-w-[1400px]">
       <HoopsNav area="sim" active="projections" through={through} />
       <h2 className="mb-1 font-display text-lg text-cream">Rest of season</h2>
 
@@ -63,12 +63,13 @@ export default function HoopsProjectionsPage() {
 
           {series.length > 0 && <LeagueProjectionTrend series={series} />}
 
-          <div className="grid gap-8">
+          {/* Wide desktop (2xl+): the two conferences side by side. */}
+          <div className="grid gap-8 2xl:grid-cols-2 2xl:gap-10">
             <ProjectionTable conference="East" rows={projection.teams} />
             <ProjectionTable conference="West" rows={projection.teams} />
           </div>
 
-          <div className="mt-5 grid gap-2 font-mono text-[0.6rem] leading-relaxed text-cream-dimmer">
+          <div className="mt-5 grid max-w-[100ch] gap-2 font-mono text-[0.6rem] leading-relaxed text-cream-dimmer">
             <p>
               <span className="text-cream-dim">What this is.</span> Simulated{" "}
               {projection.meta.replicates.toLocaleString("en-US")} times from the standings after the games

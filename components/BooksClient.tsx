@@ -247,7 +247,7 @@ export default function BooksClient({
   return (
     <>
       <SectionTabKeys hrefs={["/books", "/books/stats", "/books/discworld"]} />
-    <article className="mx-auto max-w-[900px] px-4 pb-24 pt-6 sm:px-6">
+    <article className="mx-auto max-w-[900px] px-4 pb-24 pt-6 sm:px-6 lg:max-w-[1180px] 2xl:max-w-[1400px]">
       <header className="mb-6">
         <p className="font-mono text-[0.7rem] uppercase tracking-kicker text-cream-dimmer">
           Section
@@ -393,7 +393,7 @@ export default function BooksClient({
                   first folder on the X3
                 </p>
               </div>
-              <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
+              <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">
                 {toReadItems.map((item) => (
                   <BookCard
                     key={item.book.id}
@@ -411,7 +411,7 @@ export default function BooksClient({
               <h2 className="mb-3 border-b border-rule/40 pb-1 font-display text-lg text-cream">
                 {author}
               </h2>
-              <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
+              <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">
                 {authorItems.map((item) => (
                   <BookCard
                     key={item.book.id}

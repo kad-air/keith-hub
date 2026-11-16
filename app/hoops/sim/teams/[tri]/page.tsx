@@ -81,7 +81,7 @@ export default function HoopsTeamPage({
   const hasReplacementScale = levels != null;
 
   return (
-    <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6">
+    <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6 lg:max-w-[1180px] 2xl:max-w-[1400px]">
       <HoopsNav area="sim" active="teams" through={getResultsWindow()?.to ?? null} />
 
       <Link
@@ -106,6 +106,10 @@ export default function HoopsTeamPage({
         </p>
       </header>
 
+      {/* Desktop (xl+): the rating, projection and what moved on the left;
+          recent games and the roster on the right. One column below xl. */}
+      <div className="xl:grid xl:grid-cols-2 xl:gap-x-12">
+      <div className="min-w-0">
       {/* Every rating side by side — the mode is a choice, not a default to
           be hidden. */}
       <div className={`mt-5 grid gap-2 ${modes.length === 4 ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-3"}`}>
@@ -161,6 +165,8 @@ export default function HoopsTeamPage({
         />
       )}
 
+      </div>
+      <div className="min-w-0 xl:[&>*:first-child]:mt-5">
       {/* ── Recent games ── the results window, previously imported and never
           rendered anywhere. Form, finals, and the closing market line each
           game actually closed at. */}
@@ -313,6 +319,8 @@ export default function HoopsTeamPage({
         has to give out, because not everybody is available every night. The simulator shares out
         the real 240 when it plays the game.
       </p>
+      </div>
+      </div>
     </article>
   );
 }

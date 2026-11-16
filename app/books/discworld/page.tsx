@@ -11,7 +11,7 @@ export default function DiscworldPage() {
   const progress = getDiscworldProgress();
 
   return (
-    <article className="mx-auto max-w-[1100px] px-4 pb-24 pt-6 sm:px-6">
+    <article className="mx-auto max-w-[1100px] px-4 pb-24 pt-6 sm:px-6 2xl:max-w-[1400px]">
       <header className="mb-5">
         <p className="font-mono text-[0.7rem] uppercase tracking-kicker text-cream-dimmer">
           Books · Reading order

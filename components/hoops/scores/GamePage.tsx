@@ -49,7 +49,7 @@ export default async function GamePage({
 
   if (!sb.data) {
     return (
-      <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6">
+      <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6 lg:max-w-[960px]">
         <HoopsNav area="scores" active="scores" />
         <SourceNote fetched={[sourceMeta(sb)]} />
       </article>
@@ -119,7 +119,7 @@ export default async function GamePage({
   // viewer's choice, and a synced view keeps following after the final.
   const watch = game.state === "in" || (game.state === "pre" && !game.postponed) || guarded;
   return (
-    <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6">
+    <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6 lg:max-w-[960px]">
       <HoopsNav area="scores" active="scores" />
       {watch ? (
         <LiveProvider

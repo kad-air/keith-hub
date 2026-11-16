@@ -16,7 +16,7 @@ const CONFERENCES = ["East", "West"] as const;
  */
 export default function HoopsScoresTeamsPage() {
   return (
-    <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6">
+    <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6 lg:max-w-[960px]">
       <HoopsNav area="scores" active="teams" />
       <div className="grid gap-8 sm:grid-cols-2">
         {CONFERENCES.map((conf) => {

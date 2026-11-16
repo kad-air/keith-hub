@@ -211,7 +211,7 @@ export default function CurrentPageClient({
         )}
       </article>
 
-      <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-rule/60 bg-ink/95 backdrop-blur">
+      <nav className="fixed inset-x-0 bottom-0 z-20 border-t lg:left-52 border-rule/60 bg-ink/95 backdrop-blur">
         <div className="mx-auto flex max-w-[44rem] items-center gap-2 px-4 py-3 font-mono text-[0.75rem] uppercase tracking-kicker">
           <button
             onClick={() => go(w?.prevFrom ?? null)}

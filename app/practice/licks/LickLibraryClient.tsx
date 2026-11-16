@@ -57,7 +57,7 @@ export function LickLibraryClient({
   }, [licks, filter, difficulty, activeTag, learned]);
 
   return (
-    <article className="mx-auto max-w-[900px] px-4 pb-24 pt-6 sm:px-6">
+    <article className="mx-auto max-w-[900px] px-4 pb-24 pt-6 sm:px-6 lg:max-w-[1180px] 2xl:max-w-[1400px]">
       <header className="mb-6">
         <p className="font-mono text-[0.7rem] uppercase tracking-kicker text-cat-practice">
           Practice · Licks
@@ -173,7 +173,7 @@ export function LickLibraryClient({
           No licks match those filters.
         </p>
       ) : (
-        <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {visible.map((l) => {
             const isLearned = learned.has(l.id);
             return (

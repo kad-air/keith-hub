@@ -62,9 +62,10 @@ export default function Masthead() {
   return (
     <>
       <header className="sticky top-0 z-40 border-b border-rule/60 bg-ink/95 pt-[env(safe-area-inset-top)] backdrop-blur-xl">
-        <div className="mx-auto grid min-h-14 max-w-[1100px] grid-cols-[1fr_auto_1fr] items-baseline gap-3 px-[max(1rem,env(safe-area-inset-left))] py-2.5 sm:grid-cols-[1fr_auto_1fr] sm:gap-6 sm:px-[max(1.5rem,env(safe-area-inset-left))] sm:py-3.5">
-          {/* Wordmark */}
-          <Link href="/" className="group inline-flex items-baseline justify-self-start">
+        <div className="mx-auto grid min-h-14 max-w-[1100px] grid-cols-[1fr_auto_1fr] lg:max-w-[1180px] 2xl:max-w-[1400px] items-baseline gap-3 px-[max(1rem,env(safe-area-inset-left))] py-2.5 sm:grid-cols-[1fr_auto_1fr] sm:gap-6 sm:px-[max(1.5rem,env(safe-area-inset-left))] sm:py-3.5">
+          {/* Wordmark — on desktop the SideNav carries it (hidden via
+              .hub-masthead-mark in globals.css while the rail is present) */}
+          <Link href="/" className="hub-masthead-mark group inline-flex items-baseline justify-self-start">
             <span className="font-display text-[1.4rem] font-medium italic leading-none tracking-tight text-cream transition-colors group-hover:text-accent">
               hub
             </span>
