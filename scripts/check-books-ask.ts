@@ -18,11 +18,18 @@
 //  2. FROM A SYNCED POINTER. A device pointer resolved by the real
 //     resolvePosition, then cut: the paragraph it names and everything after
 //     it are absent; the paragraph before it is present.
-//  3. CHUNKS. Boundaries depend on the book alone, so an advancing position
+//  3. TO THE END OF THE PAGE. Sheafs Hub sends `until`, the first character
+//     after the page on screen, resolved by resolveEnd: every word before it
+//     is in, the word it names and everything after are out, for a pointer at
+//     every word of a built book; a pointer at the end of a paragraph of the
+//     real book (Sheafs' own reference text) sends that paragraph and stops;
+//     the end of the book sends all of it, last word included.
+//  4. CHUNKS. Boundaries depend on the book alone, so an advancing position
 //     leaves every full chunk byte-identical (the prompt cache depends on it).
-//  4. THE ROUTE takes its text from readSoFar and nowhere else, cut at the
-//     resolved position, and refuses without a key or a synced position.
-//  5. THE SAVED CONVERSATION, in a throwaway database: it always alternates
+//  5. THE ROUTE takes its text from readSoFar and nowhere else, cut at the
+//     resolved position (the app's `until`, else the latest sync), refuses a
+//     malformed `until`, and refuses without a key or any position.
+//  6. THE SAVED CONVERSATION, in a throwaway database: it always alternates
 //     question/answer, a question that got no answer is removed, a second
 //     question can't start while one is being answered, a question whose
 //     answer was lost is dropped after a while, and it leaves with its book.
@@ -39,7 +46,7 @@ const repoRoot = path.dirname(new URL(import.meta.url).pathname) + "/..";
 const fixture = (name: string) => fs.readFileSync(path.resolve(repoRoot, "books-fixture", name));
 const source = (rel: string) => fs.readFileSync(path.resolve(repoRoot, rel), "utf8");
 
-const { parseBook, resolvePosition } = await import("../lib/books/pageText.ts");
+const { parseBook, resolvePosition, resolveEnd } = await import("../lib/books/pageText.ts");
 const { readSoFar, progressNote, CHUNK_WORDS } = await import("../lib/books/ask.ts");
 const { PAGE_WORDS } = await import("../lib/books/pages.ts");
 
@@ -166,7 +173,118 @@ console.log("\nfrom a device pointer:");
 }
 
 // ---------------------------------------------------------------------------
-// 3. Chunks
+// 3. To the end of the page (the app's `until`)
+// ---------------------------------------------------------------------------
+console.log("\nto the end of the page (until):");
+{
+  let n = 0;
+  const w = (count: number) => Array.from({ length: count }, () => `u${n++}`).join(" ");
+  const built = parseBook(
+    buildEpub([
+      `<h1>${w(3)}</h1><p>${w(40)}</p><div>${w(5)}<p>${w(12)} <em>${w(3)}</em> ${w(4)}</p>${w(6)}</div>`,
+      `<h2>${w(2)}</h2><p>${w(30)}<br/>${w(10)}</p><ul><li>${w(4)}</li><li>${w(4)}</li></ul>`,
+      `<p>${w(25)}</p><p>THE-BUTLER-DID-IT ${w(8)}</p>`,
+    ]),
+  )!;
+  const words = allWords(built);
+  const ptr = (doc: number, path: string, offset: number) => `/body/DocFragment[${doc + 1}]/${path}/text().${offset}`;
+  const pct = (word: number) => word / built.totalWords;
+  // Sheafs' limit is the first character of the next page, so a pointer at
+  // the START of word k must keep k out; one at the END of word k (a page that
+  // ends at the space after it) must let k in and keep k+1 out. The last
+  // piece of each element can also be named by its end.
+  let startWrong = 0;
+  let endWrong = 0;
+  let pointers = 0;
+  for (let i = 0; i < built.blocks.length; i++) {
+    const b = built.blocks[i];
+    for (let k = 0; k < b.words.length; k++) {
+      const g = b.wordStart + k;
+      const atStart = resolveEnd(built, ptr(b.doc, b.path, b.base + b.words[k][0]), pct(g));
+      if (atStart.word !== g || atStart.precision !== "word" || !cutIsExact(built, words, atStart.word)) startWrong++;
+      const laterPiece = built.blocks.some((o, j) => j > i && o.doc === b.doc && o.path === b.path);
+      if (k < b.words.length - 1 || !laterPiece) {
+        const atEnd = resolveEnd(built, ptr(b.doc, b.path, b.base + b.words[k][1]), pct(g + 1));
+        if (atEnd.word !== g + 1 || !cutIsExact(built, words, atEnd.word)) endWrong++;
+        pointers++;
+      }
+      pointers++;
+    }
+  }
+  assert(pointers > 2 * words.length - 10, `${pointers} end-of-page pointers over ${words.length} distinct words`);
+  assert(startWrong === 0, `🔴 a pointer at the start of a word keeps that word and everything after it out (${startWrong} wrong)`);
+  assert(endWrong === 0, `🔴 a pointer at the end of a word sends it and nothing after it, across paragraphs and chapters (${endWrong} wrong)`);
+
+  const butler = words.indexOf("THE-BUTLER-DID-IT");
+  const bb = built.blocks.find((b) => b.wordStart === butler)!;
+  const before = readSoFar(built, resolveEnd(built, ptr(bb.doc, bb.path, 0), pct(butler)).word).chunks.join(" ");
+  const through = readSoFar(built, resolveEnd(built, ptr(bb.doc, bb.path, "THE-BUTLER-DID-IT".length), pct(butler + 1)).word).chunks.join(" ");
+  assert(!before.includes("BUTLER") && through.includes("THE-BUTLER-DID-IT") && !through.includes(words[butler + 1]),
+    "🔴 the next page's first word is withheld; the page's last word is sent and the one after it is not");
+
+  const lastBlock = built.blocks[built.blocks.length - 1];
+  const bookEnd = resolveEnd(built, ptr(lastBlock.doc, lastBlock.path, lastBlock.text.length), 1);
+  assert(bookEnd.word === built.totalWords && cutIsExact(built, words, bookEnd.word) && readSoFar(built, bookEnd.word).chunks.join(" ").endsWith(words[words.length - 1]),
+    "🔴 the end of the book sends all of it, the last word included");
+  assert(resolveEnd(built, "/body/DocFragment[3]/body/p[9]", 1).word === built.totalWords, "…and so does a percentage of 1 for an element it can't find");
+  assert(resolvePosition(built, ptr(lastBlock.doc, lastBlock.path, lastBlock.text.length), 1).word === built.totalWords - 1,
+    "resolvePosition (the current-page view, the synced cut) still stops at the last word");
+  const ch2 = built.docWords[1][0];
+  assert(
+    resolveEnd(built, "/body/DocFragment[2]/body", pct(ch2)).word === ch2 && resolveEnd(built, "/body/DocFragment[2]", pct(ch2)).word === ch2,
+    "the start of the next chapter (its <body>) sends the whole of this one and none of that one",
+  );
+  const lastOf1 = built.blocks.filter((b) => b.doc === 0).pop()!;
+  assert(resolveEnd(built, ptr(0, lastOf1.path, lastOf1.base + lastOf1.text.length), pct(ch2)).word === ch2,
+    "the end of a chapter's last paragraph is the next chapter's first word");
+  const [lo, hi] = built.docWords[1];
+  const lost = resolveEnd(built, "/body/DocFragment[2]/body/section[7]/text().3", 0.99);
+  assert(lost.precision === "percentage" && lost.word >= lo && lost.word <= hi,
+    "an element it can't find falls back to the percentage, held inside that chapter");
+}
+{
+  // The real book against Sheafs' own text for its paragraphs (its converter,
+  // not this parser): a page ending before each of Sheafs' words, at Sheafs'
+  // own offset, sends exactly the words before it, and one ending at the end
+  // of the paragraph sends all of it and nothing of the next. Where the two
+  // texts differ (Sheafs collapses the non-breaking spaces this parser keeps
+  // after a <br>), the offsets drift and the cut may fall SHORT by a word —
+  // never past what Sheafs shows.
+  const book = parseBook(fixture("sheafs-alice.epub"))!;
+  const ref = JSON.parse(fixture("sheafs-alice-reference.json").toString("utf8"));
+  const squash = (s: string) => s.replace(/\s+/g, "");
+  let paragraphs = 0;
+  let pages = 0;
+  let leaked = 0;
+  let wrong = 0;
+  let short = 0;
+  for (const doc of ref.documents) {
+    for (const sample of doc.samples) {
+      if (!sample.text) continue;
+      const at = book.blocks.findIndex((b) => b.doc === doc.spineIndex && "/" + b.path === sample.path && b.base === 0 && b.words.length > 0);
+      if (at < 0 || squash(book.blocks[at].text) !== squash(sample.text)) continue;
+      const b = book.blocks[at];
+      const same = b.text === sample.text;
+      const theirs = [...(sample.text as string).matchAll(/\S+/g)].map((m) => m.index!);
+      const ends = [...theirs, (sample.text as string).length];
+      ends.forEach((offset, k) => {
+        const r = resolveEnd(book, `/body/DocFragment[${doc.spineIndex + 1}]${sample.path}/text().${offset}`, 0.5);
+        const inPara = r.word - b.wordStart;
+        if (inPara > k || readSoFar(book, r.word).words !== r.word) leaked++;
+        else if (inPara < k) (same ? wrong++ : short++);
+        pages++;
+      });
+      paragraphs++;
+    }
+  }
+  assert(paragraphs >= 30 && pages > 1000, `sheafs-alice.epub: a page ending at each of ${pages} places in ${paragraphs} of Sheafs' paragraphs`);
+  assert(leaked === 0, `🔴 none sends a word past where Sheafs' page ends (${leaked} did)`);
+  assert(wrong === 0, `🔴 where Sheafs' text and the hub's agree, each sends exactly the words before it (${wrong} short)`);
+  console.log(`    (${short} fell a word short where the texts differ: the cut errs toward less)`);
+}
+
+// ---------------------------------------------------------------------------
+// 4. Chunks
 // ---------------------------------------------------------------------------
 console.log("\nchunks:");
 {
@@ -187,7 +305,7 @@ console.log("\nchunks:");
 }
 
 // ---------------------------------------------------------------------------
-// 4. The route and the module
+// 5. The route and the module
 // ---------------------------------------------------------------------------
 console.log("\nthe route:");
 {
@@ -198,8 +316,16 @@ console.log("\nthe route:");
     !/\.blocks\b|pageWindow|countEpubWords|findPhrase|readFileSync\([^)]*\)\.toString/.test(route),
     "🔴 the route has no other way to the book's text",
   );
-  assert(/listProgress\(\)\.find\(\(p\) => p\.document === book\.partialMd5\)/.test(route), "the position is the latest sync for this file");
-  assert(/if \(!sync\)[\s\S]{0,200}status: 409/.test(route), "no synced position → refused, never the whole book");
+  assert(/listProgress\(\)\.find\(\(p\) => p\.document === book\.partialMd5\)/.test(route), "without the app's cutoff, the position is the latest sync for this file");
+  assert(
+    /until\s*\?\s*resolveEnd\(parsed, until\.pointer, until\.percentage\)\s*:\s*resolvePosition\(parsed, sync!\.progress, sync!\.percentage\)/.test(route),
+    "🔴 the app's `until` is resolved as an END (resolveEnd), the synced position as a start",
+  );
+  assert(
+    (route.match(/const until = (readUntil\(body\?\.until\)|untilFromQuery\(request\));\s*if \(until && "error" in until\) return NextResponse\.json\(\{ error: until\.error \}, \{ status: 400 \}\)/g) ?? []).length === 2,
+    "a malformed `until` is refused (400) on POST and GET, never ignored",
+  );
+  assert(/if \(!until && !sync\)[\s\S]{0,200}status: 409/.test(route), "no cutoff and no synced position → refused, never the whole book");
   assert(/if \(!process\.env\.ANTHROPIC_API_KEY\)[\s\S]{0,200}status: 503/.test(route), "no API key → refused with a reason");
   assert(!/^import (?!type |\{ PAGE_WORDS \} from "\.\/pages\.ts")/m.test(mod), "ask.ts imports nothing but types and the page convention");
   assert(/have not read anything after it/.test(mod) && /do not draw on what you know of how it continues/.test(mod) && /outside this book is welcome/.test(mod),
@@ -217,7 +343,7 @@ console.log("\nthe route:");
 }
 
 // ---------------------------------------------------------------------------
-// 5. The saved conversation
+// 6. The saved conversation
 // ---------------------------------------------------------------------------
 console.log("\nthe saved conversation:");
 {

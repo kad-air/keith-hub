@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { getBook, bookFilePath } from "@/lib/books/store";
 import { listProgress } from "@/lib/books/kosync";
-import { parseBookCached, resolvePosition } from "@/lib/books/pageText";
+import { parseBookCached, parsePointer, resolveEnd, resolvePosition, type Precision } from "@/lib/books/pageText";
 import { ASK_INSTRUCTIONS, MAX_QUESTION_CHARS, readSoFar } from "@/lib/books/ask";
 import { beginQuestion, clearTurns, completeAnswer, dropQuestion, isPending, listTurns } from "@/lib/books/askStore";
 
@@ -15,15 +15,22 @@ const MODEL = "claude-opus-5-5";
 const MAX_TURNS_SENT = 60;
 
 // Ask a question about a book in progress. The model is sent the book's text
-// up to the latest synced position and nothing after it — see lib/books/ask.ts,
+// up to the reader's position and nothing after it — see lib/books/ask.ts,
 // which owns the cut (🔴 the text reaches the request ONLY through readSoFar;
 // check:books:ask pins that this file never touches the parsed book's blocks).
 //
+// The position is the app's `until` when it sends one: the END of the page on
+// screen (Sheafs Hub), resolved by resolveEnd, so the page being read and a
+// passage picked on it are in. Otherwise (the web page, older apps) it is the
+// latest synced position, the START of the page the device was on.
+//
 // GET    → the saved conversation, whether asking is possible right now, and
-//          how much of the book would be sent.
-// POST   → { question } → NDJSON stream: {t:"meta"}, {t:"text",v}…, then
-//          {t:"done"} or {t:"error",v}. The conversation so far comes from the
-//          database (lib/books/askStore.ts), never from the request.
+//          how much of the book would be sent (?until=<pointer>&percentage=<0..1>
+//          to ask that of the app's cutoff).
+// POST   → { question, until?: { pointer, percentage } } → NDJSON stream:
+//          {t:"meta"}, {t:"text",v}…, then {t:"done"} or {t:"error",v}. The
+//          conversation so far comes from the database (lib/books/askStore.ts),
+//          never from the request.
 // DELETE → clear the conversation.
 //
 // 🔴 The answer is finished and saved even if the browser goes away: a phone
@@ -56,16 +63,44 @@ type Ready = {
   words: number;
   totalWords: number;
   percentage: number;
-  precision: string;
+  precision: Precision;
+  /** Where the cut came from: the app's `until`, or the latest synced position. */
+  cut: "until" | "synced";
 };
 
-function prepare(id: string): { error: string; status: number } | Ready {
+/** Longest `until.pointer` accepted. Sheafs' pointers are well under 200 characters. */
+const MAX_POINTER_CHARS = 1_000;
+
+type Until = { pointer: string; percentage: number };
+
+/**
+ * The app's cutoff, checked: a CREngine pointer to the END of what the reader
+ * can see (the first character after the page on screen) and that place as a
+ * fraction of the book. Null when there is none (the synced position is the
+ * cut); an error for the 400 when it is there but malformed — never ignored,
+ * so a broken app can't quietly fall back to a different cut.
+ */
+function readUntil(raw: unknown): Until | null | { error: string } {
+  if (raw === undefined || raw === null) return null;
+  if (typeof raw !== "object") return { error: "until must be { pointer, percentage }" };
+  const { pointer, percentage } = raw as Record<string, unknown>;
+  if (typeof pointer !== "string" || !pointer.trim()) return { error: "until.pointer must be a non-empty string" };
+  if (pointer.length > MAX_POINTER_CHARS) return { error: `until.pointer is over ${MAX_POINTER_CHARS} characters` };
+  if (!parsePointer(pointer)) return { error: "until.pointer isn't a /body/DocFragment[N]/… pointer" };
+  if (typeof percentage !== "number" || !Number.isFinite(percentage) || percentage < 0 || percentage > 1) {
+    return { error: "until.percentage must be a number from 0 to 1" };
+  }
+  return { pointer: pointer.trim(), percentage };
+}
+
+function prepare(id: string, until: Until | null): { error: string; status: number } | Ready {
   const book = getBook(id);
   if (!book) return { error: "not found", status: 404 };
 
   // Newest first: the first row for this file is the latest position from any device.
-  const sync = listProgress().find((p) => p.document === book.partialMd5) ?? null;
-  if (!sync) {
+  // Not needed when the app says where to cut.
+  const sync = until ? null : (listProgress().find((p) => p.document === book.partialMd5) ?? null);
+  if (!until && !sync) {
     return {
       error: "No synced position for this book yet. Sync it from a device first, so there is a place to stop reading at.",
       status: 409,
@@ -80,21 +115,39 @@ function prepare(id: string): { error: string; status: number } | Ready {
   }
   if (!parsed) return { error: "could not read this epub's text", status: 422 };
 
-  const position = resolvePosition(parsed, sync.progress, sync.percentage);
+  const position = until
+    ? resolveEnd(parsed, until.pointer, until.percentage)
+    : resolvePosition(parsed, sync!.progress, sync!.percentage);
   const sofar = readSoFar(parsed, position.word);
   if (sofar.words === 0) {
-    return { error: "The synced position is the very start of the book, so there is nothing read yet to ask about.", status: 409 };
+    return { error: "The position is the very start of the book, so there is nothing read yet to ask about.", status: 409 };
   }
-  return { ...sofar, percentage: sync.percentage, precision: position.precision };
+  return {
+    ...sofar,
+    percentage: until ? until.percentage : sync!.percentage,
+    precision: position.precision,
+    cut: until ? "until" : "synced",
+  };
+}
+
+/** `?until=<pointer>&percentage=<0..1>` on GET, read the same way as POST's body. */
+function untilFromQuery(request: NextRequest): Until | null | { error: string } {
+  const q = request.nextUrl.searchParams;
+  const pointer = q.get("until");
+  if (pointer === null) return null;
+  const raw = q.get("percentage");
+  return readUntil({ pointer, percentage: raw === null || raw.trim() === "" ? undefined : Number(raw) });
 }
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: { id: string } },
 ): Promise<NextResponse> {
   if (!getBook(params.id)) return NextResponse.json({ error: "not found" }, { status: 404 });
+  const until = untilFromQuery(request);
+  if (until && "error" in until) return NextResponse.json({ error: until.error }, { status: 400 });
   const turns = liveTurns(params.id);
-  const ready = prepare(params.id);
+  const ready = prepare(params.id, until);
   return NextResponse.json(
     {
       turns,
@@ -107,6 +160,7 @@ export async function GET(
             totalWords: ready.totalWords,
             percentage: ready.percentage,
             precision: ready.precision,
+            cut: ready.cut,
           }),
     },
     { headers: { "Cache-Control": "no-store" } },
@@ -141,6 +195,8 @@ export async function POST(
   if (question.length > MAX_QUESTION_CHARS) {
     return NextResponse.json({ error: "that question is too long" }, { status: 400 });
   }
+  const until = readUntil(body?.until);
+  if (until && "error" in until) return NextResponse.json({ error: until.error }, { status: 400 });
   if (!process.env.ANTHROPIC_API_KEY) {
     return NextResponse.json(
       { error: "ANTHROPIC_API_KEY is not set on the server, so questions are switched off." },
@@ -148,8 +204,13 @@ export async function POST(
     );
   }
 
-  const ready = prepare(params.id);
+  const ready = prepare(params.id, until);
   if ("error" in ready) return NextResponse.json({ error: ready.error }, { status: ready.status });
+  console.log(
+    `[api/books ask] book ${params.id}: cut ${ready.cut}` +
+      (until ? ` at ${until.pointer} (${until.percentage})` : "") +
+      ` → ${ready.words}/${ready.totalWords} words, ${ready.precision}`,
+  );
 
   // Instructions, then the text read so far. Chunk boundaries never move with
   // the position, so the breakpoint on the last FULL chunk still hits after a
@@ -190,7 +251,7 @@ export async function POST(
   };
 
   const work = async () => {
-    send({ t: "meta", words: ready.words, totalWords: ready.totalWords, percentage: ready.percentage });
+    send({ t: "meta", words: ready.words, totalWords: ready.totalWords, percentage: ready.percentage, cut: ready.cut });
     try {
       const run = client.beta.messages.stream({
         model: MODEL,

@@ -282,10 +282,36 @@ has no cover (`book.coverName` is `null`) or doesn't exist.
 The route ignores the query string. Append `?v=<first 12 hex chars of book.sha256>` to bust a cached
 cover after a file replacement; the OPDS feed does the same.
 
+### Where Ask cuts the book: `until`
+
+The model is sent the book from the start up to a position, and nothing at or after it. That
+position is the app's **`until`** when it sends one, otherwise the latest synced position:
+
+```jsonc
+"until": {
+  "pointer": "string",     // a CREngine pointer to the END of what the reader can see: the first
+                           // character after the page (or spread) on screen, /body/DocFragment[N]/…
+  "percentage": "number"   // that place as a fraction of the book, 0..1 (used when the pointer's
+                           // element can't be found)
+}
+```
+
+The word the pointer names is the first one **not** sent; everything before it is. The start of a
+chapter (`/body/DocFragment[N]/body`) sends all of the chapter before it. A pointer past the book's
+last word (or a percentage of 1 for an element that can't be found) sends the whole book. A synced
+position, by contrast, is where the page STARTS, so without `until` the page on screen is left out.
+
+`until` is optional (the web page and older apps don't send it). When present it must be valid, or
+the request is refused `400 { "error" }` naming it: `pointer` a non-empty string of at most 1,000
+characters that parses as a pointer, `percentage` a number from 0 to 1. A malformed `until` is never
+quietly replaced by the synced position. A hub from before `until` ignores it and cuts at the synced
+position; `cut` (below) is missing in its answers.
+
 ### `GET /api/books/{id}/ask`
 
 The book's saved conversation (one thread per book, shared by every device), and whether a
-question can be asked right now.
+question can be asked right now. `?until=<pointer>&percentage=<0..1>` (URL-encoded) asks how much
+the app's cutoff would send; the same rules as POST's `until`, `400` when malformed.
 
 Response `200`. It always has:
 
@@ -300,20 +326,22 @@ Response `200`. It always has:
 plus **one** of:
 
 ```jsonc
-{ "unavailable": "string" }    // why a question can't be asked: no synced position yet, the
-                               // position is at the very start, or the file can't be read
+{ "unavailable": "string" }    // why a question can't be asked: no synced position yet (and no
+                               // until), the position is at the very start, or the file can't be read
 ```
 
 ```jsonc
 {
   "words": "number",           // words of the book that would be sent (everything before the position)
   "totalWords": "number",
-  "percentage": "number",      // the synced position, 0..1
-  "precision": "\"word\" | \"paragraph\" | \"percentage\" | \"none\"" // how exactly the position resolved
+  "percentage": "number",      // the position cut at (until's, else the synced one), 0..1
+  "precision": "\"word\" | \"paragraph\" | \"percentage\" | \"none\"", // how exactly the position resolved
+  "cut": "\"until\" | \"synced\""  // which position: the app's until, or the latest sync
 }
 ```
 
-`configured: false` means `POST` will answer `503`. Errors: `404 { "error": "not found" }`.
+`configured: false` means `POST` will answer `503`. Errors: `404 { "error": "not found" }`,
+`400 { "error" }` for a malformed `until`.
 
 While `pending` is true, poll this endpoint every few seconds. An answer is finished and saved on the
 server even if the app disconnects mid-answer, so it shows up here on its own. A question that has
@@ -321,19 +349,22 @@ been pending for 5 minutes stops counting as pending.
 
 ### `POST /api/books/{id}/ask`
 
-Ask a question. The model is sent the book's text up to the latest synced position and nothing after
-it, plus the saved conversation. The earlier turns come from the server, never from the request.
+Ask a question. The model is sent the book's text up to `until` (else the latest synced position)
+and nothing after it, plus the saved conversation. The earlier turns come from the server, never
+from the request.
 
-Request: `{ "question": string }` (trimmed; 1 to 4,000 characters).
+Request: `{ "question": string, "until"?: { "pointer": string, "percentage": number } }` (the
+question trimmed, 1 to 4,000 characters; `until` as above). The turn stores the words it was
+answered from (`AskTurn.words`), so with `until` that is the end of the page on screen.
 
 Refusals before anything starts are ordinary JSON errors, checked in this order:
 
 | status | when |
 | --- | --- |
-| `400` | `question` missing, empty, or over 4,000 characters |
+| `400` | `question` missing, empty, or over 4,000 characters; or `until` malformed |
 | `503` | the server has no `ANTHROPIC_API_KEY` |
 | `404` | no such book |
-| `409` | no synced position yet, or the position is at the very start of the book |
+| `409` | no `until` and no synced position yet, or the position is at the very start of the book |
 | `500` / `422` | the stored file can't be read / its text can't be parsed |
 | `409` | an earlier question on this book is still being answered |
 
@@ -341,7 +372,7 @@ Otherwise the response is `200`, `Content-Type: application/x-ndjson; charset=ut
 per line, each ending `\n`, streamed as they happen:
 
 ```jsonc
-{"t":"meta","words":number,"totalWords":number,"percentage":number} // always first
+{"t":"meta","words":number,"totalWords":number,"percentage":number,"cut":"until"|"synced"} // always first
 {"t":"text","v":"string"}   // zero or more; concatenate the v's to get the answer (Markdown)
 {"t":"done"}                // last line on success
 {"t":"error","v":"string"}  // last line on failure, instead of "done"; v is a readable reason
