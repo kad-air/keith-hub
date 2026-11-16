@@ -217,7 +217,7 @@ export function TodayClient({
         <p className="text-sm leading-relaxed text-cream-dim">{day.why}</p>
       </section>
 
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-rule/60 bg-ink/90 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur-md sm:px-6">
+      <div className="fixed inset-x-0 bottom-0 z-30 lg:left-52 border-t border-rule/60 bg-ink/90 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur-md sm:px-6">
         <div className="mx-auto max-w-[720px]">
           <button
             type="button"

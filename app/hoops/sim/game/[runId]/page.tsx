@@ -75,7 +75,7 @@ export default function HoopsGamePage({
     (coords.neutralSite ? "&neutral=1" : "");
 
   return (
-    <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6">
+    <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6 lg:max-w-[960px] 2xl:max-w-[1400px]">
       <HoopsNav area="sim" active="matchup" through={getResultsWindow()?.to ?? null} />
 
       <div className="flex items-baseline justify-between gap-3">
@@ -131,8 +131,11 @@ export default function HoopsGamePage({
         </p>
       </header>
 
-      <TeamBoxTable box={box.away} mode="sample" poss={box.possAway} />
-      <TeamBoxTable box={box.home} mode="sample" poss={box.possHome} />
+      {/* Wide desktop (2xl+): the two box scores side by side. */}
+      <div className="2xl:grid 2xl:grid-cols-2 2xl:gap-x-10">
+        <TeamBoxTable box={box.away} mode="sample" poss={box.possAway} />
+        <TeamBoxTable box={box.home} mode="sample" poss={box.possHome} />
+      </div>
 
       <VarianceNote />
       <BoxScoreCaveats />

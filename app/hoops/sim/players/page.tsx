@@ -28,7 +28,7 @@ export default function HoopsPlayersPage({
   const initialTeam = wanted && tris.includes(wanted) ? wanted : null;
 
   return (
-    <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6">
+    <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6 lg:max-w-[960px]">
       <HoopsNav area="sim" active="players" through={getResultsWindow()?.to ?? null} />
       <Suspense>
         <PlayersClient

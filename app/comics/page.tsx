@@ -11,7 +11,7 @@ export default function ComicsIndexPage() {
   const readIds = getReadComicIds();
 
   return (
-    <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6">
+    <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6 lg:max-w-[960px]">
       <header className="mb-6">
         <p className="font-mono text-[0.7rem] uppercase tracking-kicker text-cream-dimmer">
           Section
@@ -22,7 +22,7 @@ export default function ComicsIndexPage() {
         </p>
       </header>
 
-      <ul className="space-y-3">
+      <ul className="space-y-3 lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0">
         {STORYLINES.map((s) => {
           const total = s.issues.length;
           const read = s.issues.filter((i) => readIds.has(i.id)).length;
@@ -31,7 +31,7 @@ export default function ComicsIndexPage() {
               <Link
                 href={`/comics/${s.slug}`}
                 data-kb-item
-                className="block border border-rule/60 bg-ink-raised/40 px-4 py-3 transition-colors hover:border-accent/60 hover:bg-ink-raised/70"
+                className="block h-full border border-rule/60 bg-ink-raised/40 px-4 py-3 transition-colors hover:border-accent/60 hover:bg-ink-raised/70"
               >
                 <div className="flex items-baseline justify-between gap-3">
                   <h2 className="font-display text-lg text-cream">{s.title}</h2>

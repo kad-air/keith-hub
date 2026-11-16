@@ -399,7 +399,7 @@ export default function TuneClient() {
 
   if (!data) {
     return (
-      <div className="mx-auto max-w-[720px] px-2 pb-32 pt-6">
+      <div className="mx-auto max-w-[720px] px-2 pb-32 pt-6 lg:max-w-[960px]">
         <div className="px-6 py-24 text-center font-mono text-[0.72rem] uppercase tracking-kicker text-cream-dim">
           Loading…
         </div>
@@ -415,7 +415,7 @@ export default function TuneClient() {
   }
 
   return (
-    <div className="mx-auto max-w-[720px] px-2 pb-32 pt-6">
+    <div className="mx-auto max-w-[720px] px-2 pb-32 pt-6 lg:max-w-[960px]">
       <div className="mb-5 flex items-baseline justify-between px-6">
         <h1 className="font-display text-[1.6rem] font-medium italic text-cream opsz-display">
           Tune
@@ -918,7 +918,7 @@ export default function TuneClient() {
 
       {/* Status pill */}
       {status && (
-        <div className="pointer-events-none fixed inset-x-0 bottom-6 z-50 flex justify-center px-6">
+        <div className="pointer-events-none fixed inset-x-0 bottom-6 z-50 flex lg:left-52 justify-center px-6">
           <div className="rounded-sm border border-rule-strong bg-ink-raised px-4 py-2 font-mono text-[0.7rem] uppercase tracking-kicker text-cream shadow-2xl shadow-black/40">
             {status}
           </div>

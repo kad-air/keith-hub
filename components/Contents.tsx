@@ -3,16 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { SECTIONS, type Section, type SectionGroup } from "@/lib/sections";
-
-const GROUP_ORDER: SectionGroup[] = [
-  "Reading",
-  "Tracking",
-  "Library",
-  "Hoops",
-  "Guitar",
-  "System",
-];
+import { GROUP_ORDER, SECTIONS, type Section } from "@/lib/sections";
 
 const SHORTCUT_HINTS = [
   ["g ·", "Jump to a section"],

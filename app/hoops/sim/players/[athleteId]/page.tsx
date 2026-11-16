@@ -74,7 +74,7 @@ export default function HoopsPlayerPage({ params }: { params: { athleteId: strin
   const through = getResultsWindow()?.to ?? null;
 
   return (
-    <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6">
+    <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6 lg:max-w-[960px]">
       <HoopsNav area="sim" active="players" through={through} />
 
       <Link

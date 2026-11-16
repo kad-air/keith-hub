@@ -41,7 +41,7 @@ export default function GamesSection({
       ) : list.length === 0 ? (
         <p className="font-display text-sm text-cream-dim">No NBA games.</p>
       ) : (
-        <div className="grid gap-2 sm:grid-cols-2">
+        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
           {list.map((g) => (
             <GameCard
               key={g.id}

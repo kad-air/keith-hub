@@ -625,3 +625,15 @@
     --team-c: color-mix(in oklab, var(--team) 68%, black);
   }
 }
+
+/* Desktop shell — the fixed section rail (components/SideNav.tsx) is 13rem
+   wide from lg (1024px) up. Pad the masthead + page by the same amount, but
+   only while the rail is actually on the page (it is absent on /login). */
+@media (min-width: 1024px) {
+  body:has(#hub-sidenav) .hub-shell {
+    padding-left: 13rem;
+  }
+  body:has(#hub-sidenav) .hub-masthead-mark {
+    visibility: hidden;
+  }
+}

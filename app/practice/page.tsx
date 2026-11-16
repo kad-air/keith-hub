@@ -65,7 +65,7 @@ export default function PracticeLandingPage() {
   const learnedLicks = getLearnedLickIds();
 
   return (
-    <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6">
+    <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6 lg:max-w-[960px]">
       <SectionTabKeys hrefs={TILES.map((t) => t.href)} />
       <header className="mb-8">
         <p className="font-mono text-[0.7rem] uppercase tracking-kicker text-cat-practice">

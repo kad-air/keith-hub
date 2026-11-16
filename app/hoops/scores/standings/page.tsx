@@ -21,7 +21,7 @@ export default async function HoopsStandingsPage() {
   const st = await getStandings();
   const cols = ["W", "L", "PCT", "GB", "L10", "STRK"];
   return (
-    <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6">
+    <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6 lg:max-w-[1180px] 2xl:max-w-[1400px]">
       <HoopsNav area="scores" active="standings" />
       {st.data?.season && (
         <p className="mb-4 font-mono text-[0.62rem] uppercase tracking-kicker text-cream-dimmer">
@@ -31,12 +31,13 @@ export default async function HoopsStandingsPage() {
       {!st.data ? (
         <p className="font-display text-sm text-cream-dim">Standings unavailable right now.</p>
       ) : (
-        <div className="grid gap-8">
+        // Desktop (lg+): the two conferences side by side.
+        <div className="grid gap-8 lg:grid-cols-2 lg:gap-10">
           {st.data.conferences.map((c) => (
             <section key={c.name}>
               <h3 className="mb-2 font-mono text-[0.68rem] uppercase tracking-kicker text-cat-hoops">{c.name}</h3>
               <div className="overflow-x-auto">
-              <table className="w-full font-mono text-[0.74rem] tabular-nums">
+              <table className="w-full font-mono text-[0.74rem] tabular-nums lg:whitespace-nowrap">
                 <thead>
                   <tr className="border-b border-rule/60 text-[0.58rem] uppercase tracking-kicker text-cream-dimmer">
                     <th className="w-6 pb-1 text-right font-normal">#</th>

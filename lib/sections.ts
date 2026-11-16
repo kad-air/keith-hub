@@ -2,6 +2,16 @@ import { TRACKER_CONFIGS, TRACKERS_ENABLED } from "@/lib/tracker-config";
 
 export type SectionGroup = "Reading" | "Tracking" | "Library" | "Hoops" | "Guitar" | "System";
 
+/** The order groups appear in, in both Contents and the desktop SideNav. */
+export const GROUP_ORDER: SectionGroup[] = [
+  "Reading",
+  "Tracking",
+  "Library",
+  "Hoops",
+  "Guitar",
+  "System",
+];
+
 export type Section = {
   key: string;
   num: string;

@@ -1147,7 +1147,7 @@ export default function ChartViewerClient({
         // z-10) under the sticky masthead (z-40), so a fixed pill inside the
         // page sat BEHIND the masthead and the countdown ran invisibly.
         <div
-          className="pointer-events-none fixed inset-x-0 z-50 flex justify-center px-4"
+          className="pointer-events-none fixed inset-x-0 z-50 flex lg:left-52 justify-center px-4"
           style={{ top: "calc(env(safe-area-inset-top) + 0.75rem)" }}
         >
           <button
@@ -1164,7 +1164,7 @@ export default function ChartViewerClient({
       {!form && (
       <div
         ref={controlsRef}
-        className="fixed inset-x-0 bottom-0 z-30 border-t border-rule/60 bg-ink/95 backdrop-blur"
+        className="fixed inset-x-0 bottom-0 z-30 border-t lg:left-52 border-rule/60 bg-ink/95 backdrop-blur"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
         <div

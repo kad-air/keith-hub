@@ -68,7 +68,7 @@ export function CagedClient() {
   const chord = chordName(key, quality);
 
   return (
-    <article className="mx-auto max-w-[900px] px-4 pb-24 pt-6 sm:px-6">
+    <article className="mx-auto max-w-[900px] px-4 pb-24 pt-6 sm:px-6 lg:max-w-[1180px]">
       <header className="mb-6">
         <p className="font-mono text-[0.7rem] uppercase tracking-kicker text-cat-practice">
           Practice · CAGED

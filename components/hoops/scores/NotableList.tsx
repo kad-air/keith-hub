@@ -19,7 +19,7 @@ export default function NotableList({
       {lines.length === 0 ? (
         <p className="mt-2 font-display text-sm text-cream-dim">Nothing over the bar.</p>
       ) : (
-        <ol className="mt-2">
+        <ol className="mt-2 lg:grid lg:grid-cols-2 lg:gap-x-8">
           {lines.map((n) => {
             const p = n.line;
             return (

@@ -187,7 +187,7 @@ export default function BookDetailClient({ book, sync, history, health }: Props)
     "w-full border border-rule/60 bg-ink px-2 py-1.5 text-sm text-cream focus:border-accent/60 focus:outline-none";
 
   return (
-    <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6">
+    <article className="mx-auto max-w-[720px] px-4 pb-24 pt-6 sm:px-6 lg:max-w-[960px]">
       <p className="mb-4 font-mono text-[0.7rem] uppercase tracking-kicker">
         <Link href="/books" className="text-cream-dimmer hover:text-accent">
           ← Books
@@ -195,7 +195,7 @@ export default function BookDetailClient({ book, sync, history, health }: Props)
       </p>
 
       <div className="flex gap-6">
-        <div className="w-32 shrink-0 sm:w-40">
+        <div className="w-32 shrink-0 sm:w-40 lg:w-52">
           <div className="aspect-[2/3] overflow-hidden border border-rule/60 bg-ink-raised">
             {book.coverName ? (
               // eslint-disable-next-line @next/next/no-img-element

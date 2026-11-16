@@ -334,7 +334,7 @@ export default function LeagueProjectionTrend({ series }: { series: TeamSeries[]
 
       {/* chart */}
       <div className="flex gap-1.5" role="img" aria-label={`${metricLong} by night, ${scope === "all" ? "every team" : `the ${scope}`}`}>
-        <div className="relative h-64 w-7 shrink-0 sm:h-80">
+        <div className="relative h-64 w-7 shrink-0 sm:h-80 lg:h-[26rem]">
           {chart.yTicks.map((t) => (
             <span
               key={t.label}
@@ -349,7 +349,7 @@ export default function LeagueProjectionTrend({ series }: { series: TeamSeries[]
         <div className="min-w-0 flex-1">
           <div
             ref={plotRef}
-            className="relative h-64 cursor-crosshair select-none border-b border-l border-rule/60 sm:h-80"
+            className="relative h-64 cursor-crosshair select-none border-b border-l border-rule/60 sm:h-80 lg:h-[26rem]"
             style={{ touchAction: "pan-y" }}
             onPointerDown={onDown}
             onPointerMove={onMove}
@@ -662,7 +662,7 @@ export default function LeagueProjectionTrend({ series }: { series: TeamSeries[]
         ))}
       </div>
 
-      <p className="mt-3 text-xs text-cream-dimmer">
+      <p className="mt-3 max-w-[80ch] text-xs text-cream-dimmer">
         {metricLong} after each night&rsquo;s games, one line per team
         {metric === "wins" ? "; the dashed line is a .500 season (41 wins)" : ""}. The step each line takes in late
         October lands on that team&rsquo;s third game, when the model first lets this season&rsquo;s results count. Each
