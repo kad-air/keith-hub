@@ -79,6 +79,10 @@ npm run check:books:app-token    # Books app token gate: the REAL middleware wit
                                  #   edited file's OLD key still resolves, stats === the page's), every contract field + type, the ask
                                  #   NDJSON stream against a fake Anthropic on localhost, and docs/books-app-api.md vs the routes (same)
 npm run check:books:discworld    # Discworld map gate: the closed canon + publication order, the library match anchored on the real epubs' OPF, manual-mark precedence, map geometry (same)
+npm run check:christmas          # Christmas list gate: the REAL middleware (no cookie → passcode form / 401, the
+                                 #   passcode cookie opens /christmas + /api/christmas/* and nothing else, fails closed),
+                                 #   the store's seed + validation in a throwaway DB, the helper reply parser (only the
+                                 #   six ops survive), the rate limiter (same)
 npm run check:feed               # Feed gate: a dismissed Verge review stays dismissed when the reviews feed picks it up later
                                  #   (state moves to the winning copy; matched by post id, not URL), retention never resurrects
                                  #   what a deep feed still carries (tombstones), never-seen items survive retention, dead ids
@@ -2147,6 +2151,47 @@ iOS standalone PWAs have a long-standing quirk: `window.open(url, "_blank")` ope
 - `components/ServiceWorkerRegister.tsx` registers the SW on the client.
 - `skipWaiting: true` and `clientsClaim: true` mean a fresh build replaces the previous SW on next launch — but iOS PWAs may need a force-quit (not just close) to actually pick up the new bundle.
 
+### Christmas — the shared gift list (`/christmas`)
+
+Ported (2026-11-19) from a Claude artifact (`christmas-list.html`) so Kim can use it from her phone
+with no Claude account. Layout, copy and behaviour follow the original; it keeps its OWN look
+(Bricolage Grotesque + Inter via `next/font` in `app/christmas/layout.tsx`, the green/berry/gold
+tokens in `app/christmas/christmas.css`, everything scoped under `.xmas` so nothing leaks into the
+hub). Theme follows the hub's `data-theme` switch.
+
+- 🔴 **Its own passcode, separate from the hub password** (`lib/christmas/auth.ts`, checked in
+  `middleware.ts` BEFORE the `FEED_PASSWORD` bypass). `CHRISTMAS_PASSCODE` → `xmas-auth` cookie
+  (HMAC of the passcode, ~400 days); the passcode cookie opens `/christmas` and `/api/christmas/*`
+  ONLY. The hub cookie opens it too. **Fails CLOSED**: unset passcode = no passcode cookie is valid,
+  and an unset `FEED_PASSWORD` does NOT open this page (it holds the kids' names and an endpoint
+  that spends the API key). `/christmas/login` + `POST /api/christmas/auth` (303, attempts
+  rate-limited per address) are the only public paths. A passcode-only visitor gets the page without
+  the masthead and rail (`GuestChrome`, rendered when the hub cookie is absent; needs the
+  `hub-masthead` class on the Masthead header).
+- **Storage**: `xmas_people` + `xmas_gifts`; total budget, revision counter and the one-time seed
+  flag in `kv` (`christmas_total`, `christmas_rev`, `christmas_seeded`). `lib/christmas/store.ts`
+  validates every write (status one of five, money finite cents, ids `ID_RE`, strings capped) and
+  bumps the rev in the same transaction. The seed runs once ever, keyed on the flag — an emptied list
+  is never re-filled.
+- **API** keeps the artifact's doc names: `GET /api/christmas[?since=rev]` (`{unchanged:true}` when
+  nothing moved), `PUT|PATCH|DELETE /api/christmas/gifts/[id]` and `/people/[id]`, `PUT|DELETE
+  /api/christmas/config`. PUT is create-or-replace (also how Undo restores). Ids are made by the
+  client so a write shows before the server answers.
+- **Live updates** (`components/christmas/ChristmasClient.tsx`): poll every 3 s while visible.
+  Writes apply locally first, queue one at a time per document, and a poll that started before or
+  during a write is discarded; once writes settle the page re-reads the full list. 🔴 `Field` keeps a
+  local draft while focused, so an incoming edit never replaces what someone is typing.
+- **The helper** (`POST /api/christmas/helper`) replaces the artifact's `sample.json`: RULES (in
+  `lib/christmas/shared.ts`, the original's text) as the system prompt, the list JSON **read from the
+  database on the server** (never from the request), the last 10 turns and the request go to
+  `claude-opus-5-5` (effort medium, server-side refusal fallback); the reply's `{reply, ops}` is parsed
+  (`parseHelperReply`) and ops not among the six are dropped. 🔴 **The route never writes.** The page
+  validates each op (`cleanGift`) and applies it through the same routes a hand edit uses, then
+  offers Undo for the batch — the original's `applyOps`/`runUndo`, unchanged in substance. JSON is
+  asked for in the prompt rather than via structured outputs, as the original did. Limits: 6/min and
+  40/hour per device, a durable `CHRISTMAS_HELPER_DAILY_CAP` (default 150) per UTC day in `kv`,
+  request text ≤1000 chars. No `ANTHROPIC_API_KEY` → `sampling_disabled` and the chat hides its box.
+
 ### Charts (the chord-chart library + setlists)
 The **Charts** section (`/charts`) is a personal library of guitar chord charts plus named **setlists** built from that library. It's the one section explicitly built to work offline — the use case is playing a gig with no signal.
 
@@ -2209,8 +2254,12 @@ The login/logout `POST` handlers (`app/api/auth/{login,logout}/route.ts`) must r
   `docs/books-app-api.md`). Opens `/api/books/*` as if logged in and nothing else. Generate with
   `openssl rand -hex 32`. **Unset = every bearer request is refused** (fail CLOSED, like
   `HOOPS_IMPORT_TOKEN`); the cookie is unaffected either way.
+- `CHRISTMAS_PASSCODE` — shared passcode for the Christmas list (`/christmas`); opens that page and
+  `/api/christmas/*` only. **Unset = only a hub login opens it** (fail CLOSED). Changing it signs
+  every device out. `CHRISTMAS_HELPER_DAILY_CAP` (optional, default 150) caps helper calls per day.
 - `ANTHROPIC_API_KEY` — Anthropic API key for "Ask about what you've read" on a book's page (see
-  the Books section). **Unset = questions are refused with a reason**; nothing else is affected.
+  the Books section), and for the Christmas list helper. **Unset = both are refused with a reason**;
+  nothing else is affected.
 - `ADOBE_ADEPT_KEY` — Adobe account RSA private key (PKCS#8 DER, base64) used to strip ADEPT DRM
   from an uploaded epub (see the Books "DRM" section). **Unset = DRM'ed uploads are refused with a
   reason, never ingested broken** (fail CLOSED); a DRM-free library needs nothing here. Optional

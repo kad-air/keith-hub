@@ -1,6 +1,6 @@
 import { TRACKER_CONFIGS, TRACKERS_ENABLED } from "@/lib/tracker-config";
 
-export type SectionGroup = "Reading" | "Tracking" | "Library" | "Hoops" | "Guitar" | "System";
+export type SectionGroup = "Reading" | "Tracking" | "Library" | "Hoops" | "Guitar" | "Home" | "System";
 
 /** The order groups appear in, in both Contents and the desktop SideNav. */
 export const GROUP_ORDER: SectionGroup[] = [
@@ -9,6 +9,7 @@ export const GROUP_ORDER: SectionGroup[] = [
   "Library",
   "Hoops",
   "Guitar",
+  "Home",
   "System",
 ];
 
@@ -161,6 +162,21 @@ const CHARTS_SECTION: Section = {
   match: (p) => p.startsWith("/charts"),
 };
 
+// The shared Christmas gift list (lib/christmas/). The one section someone
+// without the hub password can open: it has its own passcode (CHRISTMAS_PASSCODE,
+// checked in middleware.ts), and a passcode-only visitor sees it without the
+// masthead or rail (components/christmas/GuestChrome.tsx).
+const CHRISTMAS_SECTION: Section = {
+  key: "christmas",
+  num: "",
+  name: "Christmas",
+  href: "/christmas",
+  group: "Home",
+  desc: "Shared gift list · budgets · helper",
+  hotkey: "x",
+  match: (p) => p === "/christmas" || p.startsWith("/christmas/"),
+};
+
 export const SECTIONS: Section[] = (() => {
   // Empty while the Tracking section is hidden, which drops the group from the
   // Masthead switcher and Contents (Contents filters out empty groups) and
@@ -192,6 +208,7 @@ export const SECTIONS: Section[] = (() => {
     HOOPS_SIM_SECTION,
     PRACTICE_SECTION,
     CHARTS_SECTION,
+    CHRISTMAS_SECTION,
     TUNE_SECTION,
   ];
   return all.map((s, i) => ({ ...s, num: String(i + 1).padStart(2, "0") }));
