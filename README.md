@@ -61,6 +61,15 @@ see `BOOKS_PLAN.md` for the design and the invariants.
 
 The **Library** section indexes Marvel Unlimited reading orders (Hickman-era X-Men and Avengers/Secret Wars) as checklists. Tap an issue and the OS hands off to the Marvel Unlimited iOS app at the right page. Read state syncs back so you can see your progress per storyline.
 
+### Christmas
+
+A shared gift list and budget for the two of us (`/christmas`): a section per person with
+their budget, spent and left, gifts edited in place, and a helper you can ask in plain
+English ("add a $40 Lego set for Hudson", "who's over budget?") that makes the changes itself
+and lets you undo them. It has its own family passcode, so it can be shared without the hub password;
+whoever has only the passcode sees just this page. Edits from one phone show up on the
+other within a few seconds.
+
 ### Release alerts — off with the trackers
 
 Release-date pushes existed only for the tracker collections, so the gear menu's toggle is hidden while Tracking is. It returns with the same flag.

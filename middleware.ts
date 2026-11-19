@@ -3,6 +3,12 @@ import type { NextRequest } from "next/server";
 import { AUTH_COOKIE, deriveAuthToken, publicUrl } from "@/lib/auth";
 import { TRACKERS_ENABLED } from "@/lib/tracker-config";
 import { appTokenAllows } from "@/lib/books/appToken";
+import {
+  XMAS_COOKIE,
+  christmasCookieValid,
+  isChristmasPath,
+  isChristmasPublicPath,
+} from "@/lib/christmas/auth";
 
 // The Craft-backed Tracking section is hidden (Stow replaced it) — see
 // lib/tracker-config.ts for the one flag that governs it. Refusing here rather
@@ -48,6 +54,31 @@ export async function middleware(request: NextRequest) {
     // {status: 404})` does NOT work — the status of a rewrite comes from the
     // rewritten route, so it renders the not-found body under a 200 (measured).
     return NextResponse.rewrite(new URL("/section-not-found", request.url));
+  }
+
+  // The shared Christmas list (lib/christmas/auth.ts) has its own passcode, so
+  // Kim can use it without the hub password. Decided entirely here, before the
+  // FEED_PASSWORD bypass below: 🔴 this gate does NOT open when FEED_PASSWORD
+  // is unset — the page holds the kids' names and an endpoint that spends the
+  // API key. Either credential opens it: the passcode cookie, or the hub's
+  // own cookie (so the owner never needs both).
+  const { pathname } = request.nextUrl;
+  if (
+    pathname === "/christmas" || pathname.startsWith("/christmas/") ||
+    pathname === "/api/christmas" || pathname.startsWith("/api/christmas/")
+  ) {
+    if (isChristmasPublicPath(pathname)) return NextResponse.next();
+    if (isChristmasPath(pathname)) {
+      if (await christmasCookieValid(request.cookies.get(XMAS_COOKIE)?.value)) return NextResponse.next();
+      const hubPassword = process.env.FEED_PASSWORD;
+      if (hubPassword && request.cookies.get(AUTH_COOKIE)?.value === (await deriveAuthToken(hubPassword))) {
+        return NextResponse.next();
+      }
+    }
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json({ error: { code: "session_expired" } }, { status: 401 });
+    }
+    return NextResponse.redirect(publicUrl("/christmas/login", request));
   }
 
   const password = process.env.FEED_PASSWORD;

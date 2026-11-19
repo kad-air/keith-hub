@@ -143,6 +143,15 @@ export const SECTION_SHORTCUTS: Record<string, ShortcutGroup[]> = {
       ],
     },
   ],
+  christmas: [
+    {
+      section: "Christmas",
+      rows: [
+        { keys: ["1"], label: "List" },
+        { keys: ["2"], label: "Helper" },
+      ],
+    },
+  ],
   practice: [
     {
       section: "Practice",

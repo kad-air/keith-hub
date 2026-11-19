@@ -134,6 +134,50 @@ export function getDb(): Database.Database {
       updated_at TEXT NOT NULL
     );
 
+    -- The shared Christmas gift list (/christmas — lib/christmas/store.ts).
+    -- Ported from a Claude artifact whose db held collections people + gifts
+    -- and a config/main doc; the total budget, the change counter (rev) and
+    -- the first-run seed flag live in kv as christmas_total / christmas_rev /
+    -- christmas_seeded. Ids are made by the client (gift: a UUID, person: a
+    -- slug of the name) so a write can show before the server answers.
+    CREATE TABLE IF NOT EXISTS xmas_people (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      role TEXT NOT NULL DEFAULT '',
+      budget REAL,
+      sort_order REAL NOT NULL DEFAULT 0
+    );
+    CREATE TABLE IF NOT EXISTS xmas_gifts (
+      id TEXT PRIMARY KEY,
+      recipient TEXT NOT NULL DEFAULT '',
+      group_name TEXT NOT NULL DEFAULT '',
+      idea TEXT NOT NULL DEFAULT '',
+      from_name TEXT NOT NULL DEFAULT '',
+      est REAL,
+      actual REAL,
+      status TEXT NOT NULL DEFAULT 'Idea',
+      notes TEXT NOT NULL DEFAULT '',
+      created_at INTEGER NOT NULL
+    );
+
+    -- The Christmas list helper's conversation (/christmas/helper): ONE thread,
+    -- shared by everyone with the list, like book_ask_turns is one per book.
+    -- An assistant turn carries what it changed (changes_json, the lines the
+    -- page lists) and how to put it back (undo_json, applied by
+    -- POST /api/christmas/helper/undo; undone_at once it has been).
+    CREATE TABLE IF NOT EXISTS xmas_helper_turns (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
+      -- Who asked (questions only): 'Keith' (signed in to the hub) or 'Kim'
+      -- (in by the family passcode) — lib/christmas/identity.ts.
+      author TEXT,
+      content TEXT NOT NULL,
+      changes_json TEXT,
+      undo_json TEXT,
+      undone_at INTEGER,
+      created_at INTEGER NOT NULL
+    );
+
     -- Setlist: uploaded guitar chord charts displayed as clean mono text with
     -- a configurable-speed autoscroll viewer. content is the raw chart text,
     -- preserved verbatim (chord-over-lyric alignment matters). sort_order is
