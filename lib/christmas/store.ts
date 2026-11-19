@@ -99,12 +99,21 @@ export function ensureSeeded() {
  */
 function ensureCorePeople() {
   const db = getDb();
-  const have = new Set((db.prepare("SELECT id FROM xmas_people").all() as { id: string }[]).map((r) => r.id));
+  const rows = db.prepare("SELECT id, name FROM xmas_people").all() as { id: string; name: string }[];
+  const have = new Set(rows.map((r) => r.id));
   const missing = CORE_PEOPLE.map((p, i) => ({ ...p, order: i + 1 })).filter((p) => !have.has(p.id));
   if (!missing.length) return;
   writeTx(() => {
     const ins = db.prepare("INSERT OR IGNORE INTO xmas_people (id, name, role, budget, sort_order) VALUES (?, ?, ?, 370, ?)");
-    for (const p of missing) ins.run(p.id, p.name, p.role, p.order);
+    const rekey = db.prepare("UPDATE xmas_people SET id = ? WHERE id = ?");
+    for (const p of missing) {
+      // Someone re-added by hand under another id (e.g. "kim-2") is the same
+      // person: give that row the core id, keeping its budget and role, rather
+      // than adding a second Kim.
+      const twin = rows.find((r) => key(r.name) === key(p.name));
+      if (twin) rekey.run(p.id, twin.id);
+      else ins.run(p.id, p.name, p.role, p.order);
+    }
   });
 }
 

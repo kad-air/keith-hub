@@ -2180,7 +2180,10 @@ the hub's red accent (all three theme blocks in `app/globals.css`), a little CSS
   they can't be removed or renamed (`store.ts` refuses; the page offers no remove button), and one
   missing from an older volume is put back on the next read. Gifts for **Family** are shared by the
   six: each core member's spent / estimate / left includes an equal sixth of every Family gift (the
-  section says so on screen). Family is never a budget line (the store refuses the name). Anyone
+  section says so on screen). Family is never a budget line (the store refuses the name); a "Family" line typed in before the
+  split is kept in the database but left out (`budgetPeople`), so its budget isn't counted on top of
+  the six. A core member re-added by hand under another id is re-keyed to the core id, never
+  doubled. Anyone
   added by hand sits after Family and is outside the split. Page order: the six, Family, everyone
   else.
 - **API**: `GET /api/christmas[?since=rev]` (`{unchanged:true}` when nothing moved), `PUT|PATCH|DELETE

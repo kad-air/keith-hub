@@ -12,6 +12,7 @@ import {
 import {
   BOUGHT,
   CORE_PEOPLE,
+  budgetPeople,
   FAMILY,
   STATUSES,
   familySplit,
@@ -267,7 +268,7 @@ export default function ChristmasClient({ initial }: { initial: ListState }) {
 
   /* ---------- derived ---------- */
   function model() {
-    const people = D.current.people.slice().sort((a, b) => (a.order || 0) - (b.order || 0));
+    const people = budgetPeople(D.current.people).sort((a, b) => (a.order || 0) - (b.order || 0));
     const gifts = D.current.gifts.slice().sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
     // The six first, then the Family gifts they share, then everyone added by
     // hand, then any recipient that only has gifts.

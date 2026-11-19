@@ -55,7 +55,7 @@ export function cleanMoney(v: unknown): number | null {
 
 /** The list as the helper sees it, sent with every question. */
 export function stateForHelper(s: Pick<ListState, "totalBudget" | "people" | "gifts">): string {
-  const people = s.people.slice().sort((a, b) => (a.order || 0) - (b.order || 0));
+  const people = budgetPeople(s.people).sort((a, b) => (a.order || 0) - (b.order || 0));
   const gifts = s.gifts.slice().sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
   const totals = personTotals(people, gifts);
   const fam = familySplit(gifts);
@@ -118,6 +118,14 @@ export const isCore = (id: string) => CORE_IDS.has(id);
 /** Gifts for "Family" are for all six of us, so their cost is split six ways. */
 export const FAMILY = "Family";
 export const isFamily = (name: unknown) => key(name) === key(FAMILY);
+
+/**
+ * The people who have budget lines. A "Family" budget line can't be made any
+ * more, but one typed in before the split existed may still be in the
+ * database: it is kept there untouched and simply left out, so its budget
+ * isn't counted twice on top of the six who now carry Family's cost.
+ */
+export const budgetPeople = (people: Person[]) => people.filter((p) => !isFamily(p.name));
 
 export type Totals = {
   /** The person's own gifts. */

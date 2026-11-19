@@ -118,6 +118,11 @@ getDb().prepare("DELETE FROM xmas_people WHERE id = 'lydia'").run();
 const restored = store.getListState().people;
 assert(restored.some((p) => p.id === "lydia" && p.budget === 370), "a missing core member is put back");
 assert(restored.find((p) => p.id === "kim")?.budget === 400, "…without touching the others");
+// A core member re-added by hand under another id is the same person: the row
+// takes the core id and keeps its budget, rather than a second Scarlett appearing.
+getDb().prepare("UPDATE xmas_people SET id = 'scarlett-2', budget = 123 WHERE id = 'scarlett'").run();
+const rekeyed = store.getListState().people.filter((p) => p.name === "Scarlett");
+assert(rekeyed.length === 1 && rekeyed[0].id === "scarlett" && rekeyed[0].budget === 123, "a re-added core member is re-keyed, not doubled");
 for (const g of s0.gifts) store.deleteGift(g.id);
 const s1 = store.getListState();
 assert(s1.gifts.length === 0, "emptied gifts stay empty (never re-seeded)");
@@ -156,6 +161,12 @@ assert(tot.get("hudson")!.spent === 145 && tot.get("hudson")!.left === 225, "a c
 assert(tot.get("keith")!.spent === 105 && tot.get("keith")!.ownSpent === 0, "…even with no gifts of their own");
 assert(Math.abs(tot.get("kim")!.est - 980 / 6) < 1e-9, "estimates split the same way");
 assert(tot.get("grandma")!.spent === 25 && tot.get("grandma")!.familySpent === 0, "someone added by hand is outside the split");
+// A "Family" budget line typed in before the split stays in the database but
+// is left out of the people, so its budget isn't counted on top of the six.
+const { budgetPeople, stateForHelper } = await import("../lib/christmas/shared.ts");
+const withStray = [...people, P("family", "Family", 250)];
+assert(budgetPeople(withStray).length === people.length, "a stray Family budget line is left out of the people");
+assert(!JSON.parse(stateForHelper({ totalBudget: 1, people: withStray, gifts })).people.some((p: { name: string }) => p.name === "Family"), "…and out of what the helper sees");
 const shares = CORE_PEOPLE.reduce((s, c) => s + tot.get(c.id)!.familySpent, 0);
 assert(Math.abs(shares - fam.spent) < 1e-9, "the six shares add back up to the Family total");
 
