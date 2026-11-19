@@ -138,6 +138,49 @@ Storylines whose data is incomplete (missing applinks or drns rows) are
 skipped with a warning so a partial regeneration during a long scrape
 doesn't ship broken data.
 
+### Step 6 — New Marvel Comics app ids (marvelIssueId → appIssueId)
+
+Marvel Unlimited was replaced in November 2026 by the Marvel Comics app
+(built with WEBTOON, `marvelcomicsapp.com`). Its issues have their own
+numeric ids (`https://www.marvelcomicsapp.com/issues/{appIssueId}`) that
+can't be derived from the old ones. The site has a lookup keyed on the
+**marvel.com issue page id** (our `marvelIssueId`):
+
+```
+GET https://www.marvelcomicsapp.com/api/v1/mu/issues/{marvelIssueId}
+→ {"success":true,"data":{"issueId":30604}}      (404 ISS_0001 if unknown)
+```
+
+and a web route, `/mu/issues/{marvelIssueId}`, that redirects to the new
+issue page. Never key it on `digitalBookId`: those numbers fall in the
+same range and silently return a different comic.
+
+The API wants the site's `D-Comics-*` headers and the anonymous
+`d-comics-device-id` cookie the site's JS sets on page load, so a plain
+curl gets a 400. What worked (Nov 19, 2026, all 392 issues, ~1 req/s) was
+loading a marvelcomicsapp.com page in a headless browser and calling
+`fetch()` from inside it. No sign-in is needed.
+
+Results live in `scripts/marvel-comics-app-ids.json` (`{marvelIssueId:
+appIssueId}`), which `generate-comics-data.mjs` joins in. Issues missing
+from it get `appIssueId: null`, are listed when the script runs, and fall
+back to the old Marvel Unlimited links.
+
+**Links.** `www.marvelcomicsapp.com`'s apple-app-site-association has no
+`applinks`, so `/issues/*` opens a web page on iOS (and inside the PWA),
+not the app. The app's universal links live on the AppsFlyer OneLink host
+`goto.marvelcomicsapp.com` (`/w9za/*`). `ComicsClient` builds the same
+OneLink the site's own "open in app" button builds:
+
+```
+https://goto.marvelcomicsapp.com/w9za?pid=MCWeb&c=WtA_IssueHome&af_channel=MoWeb
+  &af_dp=marvelcomicsapp://issueHome?issueId={id}&deep_link_value=…&issueId={id}
+  &af_force_deeplink=true&af_ss_ui=true
+```
+
+(`marvelcomicsapp://viewer?issueId={id}` would open the reader directly
+instead of the issue page.)
+
 ## Why three IDs per issue
 
 | Field             | URL pattern                                     | Opens                              |
@@ -145,11 +188,12 @@ doesn't ship broken data.
 | `digitalBookId`   | `read.marvel.com/#/book/{id}`                   | The reader (web; universal link in Safari only — fails from PWA) |
 | `marvelIssueId`   | `marvel.com/comics/issue/{id}/{slug}`           | The landing page (kept as fallback) |
 | `slug`            | (joins the two)                                 | Used in landing-page URL only      |
-| `drn` + `sourceId`| `marvel.smart.link/fiir7ec77?type=issue&drn={drn}&sourceId={sourceId}` | Marvel Unlimited app on iOS, even from inside the PWA |
+| `drn` + `sourceId`| `marvel.smart.link/fiir7ec77?type=issue&drn={drn}&sourceId={sourceId}` | Marvel Unlimited app on iOS, even from inside the PWA (Marvel Unlimited is retired) |
+| `appIssueId`      | `goto.marvelcomicsapp.com/w9za?…issueId={id}` (OneLink) | The Marvel Comics app's issue page |
 
 The catalog stores all of them so we can change which URL the UI links to
-without re-running the scrape. Currently the UI links to the smart.link
-URL (PWA-friendly).
+without re-running the scrape. Currently the UI links to the Marvel Comics
+app OneLink, falling back to smart.link, then read.marvel.com.
 
 ## Re-running the pipeline
 
@@ -168,6 +212,8 @@ python3 fetch_applinks.py <slug>                # ~5s/issue, resumable
 python3 fetch_drns.py <slug>                    # ~1s/issue, resumable
 
 # In this repo:
+# For new issues, add their Marvel Comics app ids (Step 6) to
+# scripts/marvel-comics-app-ids.json, then in this repo:
 node scripts/generate-comics-data.mjs           # rewrites lib/comics-data.ts
 ```
 

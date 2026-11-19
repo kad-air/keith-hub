@@ -9,11 +9,30 @@ interface Props {
   initialReadIds: string[];
 }
 
-// marvel.smart.link is Marvel's Branch deep-link host. It hands off to
-// Marvel Unlimited even from inside the PWA's in-app browser, where
-// read.marvel.com universal links silently fail. See
-// scripts/comics-data-pipeline.md for how drn/sourceId are sourced.
+// The new Marvel Comics app (replaced Marvel Unlimited, Nov 2026). Its web
+// issue pages (www.marvelcomicsapp.com/issues/{id}) are not universal links
+// on iOS, so from the PWA they'd open a web page, not the app. Instead we
+// build the same AppsFlyer OneLink the site's own "open in app" button
+// builds, which deep-links to the issue's page in the app and falls back to
+// the web otherwise. See scripts/comics-data-pipeline.md, Step 6.
+function marvelComicsAppUrl(appIssueId: number): string {
+  const deepLink = `marvelcomicsapp://issueHome?issueId=${appIssueId}`;
+  const url = new URL("https://goto.marvelcomicsapp.com/w9za");
+  url.searchParams.set("pid", "MCWeb");
+  url.searchParams.set("c", "WtA_IssueHome");
+  url.searchParams.set("af_channel", "MoWeb");
+  url.searchParams.set("af_dp", deepLink);
+  url.searchParams.set("deep_link_value", deepLink);
+  url.searchParams.set("issueId", String(appIssueId));
+  url.searchParams.set("af_force_deeplink", "true");
+  url.searchParams.set("af_ss_ui", "true");
+  return url.toString();
+}
+
+// Older fallbacks, kept for any issue that has no new-app id yet.
+// marvel.smart.link is Marvel's Branch deep-link host for Marvel Unlimited.
 function readerUrl(issue: ComicIssue): string {
+  if (issue.appIssueId !== null) return marvelComicsAppUrl(issue.appIssueId);
   if (issue.drn && issue.sourceId) {
     return `https://marvel.smart.link/fiir7ec77?type=issue&drn=${issue.drn}&sourceId=${issue.sourceId}`;
   }
@@ -52,8 +71,8 @@ export default function ComicsClient({ storyline, initialReadIds }: Props) {
     (id: string) => {
       // Auto-mark read on tap. Fire-and-forget; UI updates optimistically.
       // Anchor's default navigation is allowed to proceed (no preventDefault)
-      // so iOS sees a real top-level click and can hand off to Marvel
-      // Unlimited via universal links.
+      // so iOS sees a real top-level click and can hand off to the Marvel
+      // Comics app.
       if (!readIds.has(id)) void setRead(id, true);
     },
     [readIds, setRead],
