@@ -39,7 +39,18 @@ export function entryTitle(e) {
 // (github.com/DieselTech/CBL-ReadingLists):
 //   <Book Series="Hawkeye" Number="5" Volume="2012" Year="2012">
 // Volume is the series' start year; Year is the issue's cover year.
+// Some library files escape twice ("Hickman &amp;amp; Weaver"), so decode
+// until nothing changes.
 function xmlUnescape(s) {
+  for (let i = 0; i < 3; i++) {
+    const next = xmlUnescapeOnce(s);
+    if (next === s) break;
+    s = next;
+  }
+  return s;
+}
+
+function xmlUnescapeOnce(s) {
   return s
     .replace(/&quot;/g, '"')
     .replace(/&apos;/g, "'")
@@ -145,18 +156,25 @@ async function seriesIssues(api, cache, seriesId) {
 
 // Several app issues can carry the same name, year and number: a reprint or
 // facsimile series reuses the original's title ("X-Men (1963) #1" exists as
-// the 1963 book and as 2019–2023 reprints). The issue whose publication year
-// is nearest the entry's cover year (or series year) wins, but only when it's
-// clearly nearer than the rest; otherwise it's a tie for a person to settle.
+// the 1963 book and as 2019–2023 reprints).
+//  • With a cover year (fan CBL lists have one), the issue published nearest
+//    it wins, if it's within two years and clearly nearer than the rest.
+//  • Without one (a hand-written list), the earliest printing wins if every
+//    other match came out at least five years later: those are reprints.
+// Anything closer is a real tie (Weirdworld (2015) is two series, both 2015)
+// and is left for a person to settle.
 function pickByDate(matches, entry) {
   const unique = [...new Map(matches.map((m) => [m.issueId, m])).values()];
   if (unique.length <= 1) return unique;
-  const target = entry.coverYear ?? entry.year;
-  if (!target) return unique;
-  const scored = unique
-    .map((m) => ({ m, d: Math.abs((yearOf(m.publicationDate) ?? 9999) - target) }))
-    .sort((a, b) => a.d - b.d);
-  if (scored[0].d <= 1 && scored[1].d >= scored[0].d + 3) return [scored[0].m];
+  const dated = unique.map((m) => ({ m, y: yearOf(m.publicationDate) }));
+  if (dated.some((x) => x.y === null)) return unique;
+  if (entry.coverYear) {
+    const scored = dated.map((x) => ({ m: x.m, d: Math.abs(x.y - entry.coverYear) })).sort((a, b) => a.d - b.d);
+    if (scored[0].d <= 2 && scored[1].d >= scored[0].d + 3) return [scored[0].m];
+    return unique;
+  }
+  dated.sort((a, b) => a.y - b.y);
+  if (dated[1].y - dated[0].y >= 5) return [dated[0].m];
   return unique;
 }
 
@@ -169,35 +187,66 @@ function candidate(m, how) {
   };
 }
 
+// The app's search misses some exact names ("Infinity: The Hunt" only turns
+// up for "The Hunt"; "Hank Johnson, Agent of Hydra" only for "Hank Johnson").
+// These are the shorter queries to try then; results must still match the
+// full name exactly.
+function shorterQueries(name) {
+  const out = [];
+  const colon = name.lastIndexOf(":");
+  if (colon > 0 && name.slice(colon + 1).trim()) out.push(name.slice(colon + 1).trim());
+  const comma = name.indexOf(",");
+  if (comma > 0) out.push(name.slice(0, comma).trim());
+  return out.filter((x) => normName(x) && normName(x) !== normName(name));
+}
+
+async function exactSeries(api, cache, name) {
+  const exact = (rows) => rows.filter((s) => normName(s.title) === normName(name));
+  let found = exact(await searchSeries(api, cache, name));
+  for (const alt of shorterQueries(name)) {
+    if (found.length) break;
+    found = exact(await searchSeries(api, cache, alt));
+  }
+  return found;
+}
+
+// An alias value is the app's name, optionally with the app's start year when
+// it differs ("S.H.I.E.L.D. (2011)" for issues a fan list files under 2018).
+function aliasTarget(value, year) {
+  const m = /^(.*?)\s*\((\d{4})\)\s*$/.exec(value);
+  return m ? { name: m[1], year: Number(m[2]) } : { name: value, year };
+}
+
 /**
  * Resolve one entry. Returns
  *   { appIssueId, appTitle, how }                       on exactly one match
  *   { appIssueId: null, reason, candidates: [...] }     otherwise
  * `aliases` maps a fan-list series ("Uncanny X-Men (1963)", or a bare name
- * for every year) to the app's name for it ("X-Men"); see
+ * for every year of it) to the app's name for it ("X-Men", or
+ * "S.H.I.E.L.D. (2011)" when the app's start year differs too); see
  * comics/series-aliases.json.
  */
 export async function resolveEntry(entry, { api, cache = makeCache(), aliases = {} }) {
   const number = normNumber(entry.number);
-  const names = [entry.series];
+  const names = [{ name: entry.series, year: entry.year }];
   // Keys are "Name (Year)", or a bare "Name" for every year of it.
   const aliasKey = Object.keys(aliases).find((k) => {
     const m = /^(.*?)\s*\((\d{4})\)\s*$/.exec(k);
     if (m) return normName(m[1]) === normName(entry.series) && Number(m[2]) === entry.year;
     return normName(k) === normName(entry.series);
   });
-  if (aliasKey) names.unshift(aliases[aliasKey]);
+  if (aliasKey) names.unshift(aliasTarget(aliases[aliasKey], entry.year));
 
   // 1. Issue search on the full title, e.g. "Hawkeye (2012) #5". One request,
   //    and right for most issues. Accept only an exact name + number (+ year).
-  for (const name of names) {
-    const query = entry.year ? `${name} (${entry.year}) #${number}` : `${name} #${number}`;
+  for (const { name, year } of names) {
+    const query = year ? `${name} (${year}) #${number}` : `${name} #${number}`;
     const data = await api(`/api/v1/explore/search/issues?query=${q(query)}&offset=0&limit=${PAGE}`);
     const hits = (data?.issues ?? []).filter((i) => {
       if (normNumber(i.issueNumber) !== number) return false;
       const sName = i.series?.title ?? String(i.title).replace(/\s*\(\d{4}\)\s*$/, "");
       if (normName(sName) !== normName(name)) return false;
-      if (entry.year && i.series?.startYear && i.series.startYear !== entry.year) return false;
+      if (year && i.series?.startYear && i.series.startYear !== year) return false;
       return true;
     });
     const picked = pickByDate(hits, entry);
@@ -212,11 +261,11 @@ export async function resolveEntry(entry, { api, cache = makeCache(), aliases = 
   //    candidate series is checked, because the app splits some series in two.
   const matches = [];
   const near = [];
-  for (const name of names) {
-    const series = (await searchSeries(api, cache, name)).filter((s) => normName(s.title) === normName(name));
+  for (const { name, year } of names) {
+    const series = await exactSeries(api, cache, name);
     const start = (s) => s.publicationPeriod?.startYear ?? s.startYear ?? null;
-    let pool = entry.year ? series.filter((s) => start(s) === entry.year) : series;
-    if (entry.year && pool.length === 0) pool = series.filter((s) => start(s) && Math.abs(start(s) - entry.year) <= 1);
+    let pool = year ? series.filter((s) => start(s) === year) : series;
+    if (year && pool.length === 0) pool = series.filter((s) => start(s) && Math.abs(start(s) - year) <= 1);
     for (const s of pool) {
       const issues = await seriesIssues(api, cache, s.seriesId);
       const hit = issues.filter((i) => normNumber(i.issueNumber) === number);

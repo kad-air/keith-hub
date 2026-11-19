@@ -1,6 +1,9 @@
 {
-  "_comment": "Fan-list series → the Marvel Comics app's name for it, for series the app renamed. Key it with the series' start year, \"Name (Year)\", because names get reused (the app's \"X-Men (2013)\" is a different book from Uncanny X-Men (2013)). comics-import tries the app's name first, then the list's. Add a line when the importer can't find a series you know the app has.",
+  "_comment": "Fan-list series → the Marvel Comics app's name for it, for series the app renamed. Key it with the series' start year, \"Name (Year)\", because names get reused (the app's \"X-Men (2013)\" is a different book from Uncanny X-Men (2013)). Give the value a year too, \"Name (Year)\", when the app files the series under another start year. comics-import tries the app's name first, then the list's. Add a line when the importer can't find a series you know the app has.",
   "Uncanny X-Men (1963)": "X-Men",
   "Ultimate Comics Thor (2010)": "Ultimate Thor",
-  "Marvel Super Heroes Secret Wars (1984)": "Secret Wars"
+  "Marvel Super Heroes Secret Wars (1984)": "Secret Wars",
+  "AVX: VS (2012)": "Avengers Vs. X-Men: Versus (2011)",
+  "Infinity: Against the Tide (2013)": "Infinity: Against The Tide Infinite Comic",
+  "S.H.I.E.L.D. by Hickman & Weaver (2018)": "S.H.I.E.L.D. (2011)"
 }

@@ -108,8 +108,15 @@ try {
 }
 
 // COMICS_RECORD=<file> saves every API answer this run got, keyed by path —
-// how scripts/comics-fixture/ was made for check:comics.
+// how scripts/comics-fixture/ was made for check:comics. Only the fields the
+// matcher reads are kept (whole answers carry art, badges and filters).
 const recorded = process.env.COMICS_RECORD ? {} : null;
+const KEEP = new Set(["issues", "series", "issueId", "issueNumber", "title", "seriesId", "startYear", "publicationDate", "publicationPeriod", "totalCount", "hasNext"]);
+function trim(v) {
+  if (Array.isArray(v)) return v.map(trim);
+  if (!v || typeof v !== "object") return v;
+  return Object.fromEntries(Object.entries(v).filter(([k]) => KEEP.has(k)).map(([k, x]) => [k, trim(x)]));
+}
 let lastCall = 0;
 let page;
 async function openSite() {
@@ -151,7 +158,7 @@ async function api(p) {
       }
     }, p);
     if (r.json?.success) {
-      if (recorded) recorded[p] = r.json.data;
+      if (recorded) recorded[p] = trim(r.json.data);
       return r.json.data;
     }
     const code = r.json?.error?.code ?? r.error ?? `HTTP ${r.status}`;

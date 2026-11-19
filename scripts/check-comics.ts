@@ -23,9 +23,7 @@ import Database from "better-sqlite3";
 import { STORYLINES } from "../lib/comics-data.ts";
 import { LEGACY_COMIC_IDS } from "../lib/comics-legacy-ids.ts";
 import { rekeyLegacyComicState } from "../lib/comics-rekey.ts";
-// @ts-expect-error plain ESM, no types
 import { buildStorylines, comicId } from "./generate-comics-data.mjs";
-// @ts-expect-error plain ESM, no types
 import { parseCbl, parseTitles, resolveEntry, makeCache, normName, normNumber } from "./lib/comics-match.mjs";
 
 let failures = 0;
@@ -140,11 +138,13 @@ console.log("4. matcher");
 <Book Series="X of Swords: Creation" Number="1" Volume="2020" Year="2020"><Database Name="cv" Series="130569" Issue="803652" /></Book>
 <Book Series="Marauders" Number="13" Volume="2019" Year="2020" />
 <Book Series="Hawkeye &amp; Mockingbird" Number="003" Volume="2010" Year="2010"></Book>
+<Book Series="S.H.I.E.L.D. by Hickman &amp;amp; Weaver" Number="1" Volume="2018" Year="2018"/>
 </Books></ReadingList>`);
-  assert(cbl.name === "[Marvel] Test & Friends" && cbl.entries.length === 3, "a CBL file parses (name, three books, self-closing and empty forms)");
+  assert(cbl.name === "[Marvel] Test & Friends" && cbl.entries.length === 4, "a CBL file parses (name, four books, self-closing and empty forms)");
   assert(cbl.entries[0].series === "X of Swords: Creation" && cbl.entries[0].year === 2020 && cbl.entries[0].number === "1" && cbl.entries[0].comicVineId === 803652, "…with series, start year, number and the Comic Vine id");
   assert(cbl.entries[1].year === 2019 && cbl.entries[1].coverYear === 2020, "…Volume is the series year, Year the cover year");
   assert(cbl.entries[2].series === "Hawkeye & Mockingbird" && cbl.entries[2].number === "3", "…entities are decoded, leading zeros dropped");
+  assert(cbl.entries[3].series === "S.H.I.E.L.D. by Hickman & Weaver", "…even when the file escaped them twice");
 
   const titles = parseTitles(`# my list
 - [ ] Hawkeye (2012) #5
