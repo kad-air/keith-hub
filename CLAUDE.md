@@ -2183,7 +2183,8 @@ the hub's red accent (all three theme blocks in `app/globals.css`), a little CSS
 - **The helper** (`lib/christmas/helper.ts`, `app/api/christmas/helper/route.ts`,
   `components/christmas/HelperClient.tsx`) — the books "Ask" chat adapted: ONE shared thread
   (`xmas_helper_turns`, `helperStore.ts`), NDJSON streaming, finished and saved even if the browser
-  goes away, orphaned questions dropped. Claude (`claude-opus-5-5`, effort medium, server-side refusal
+  goes away, orphaned questions dropped. The page re-reads the thread every 3 s while on screen, so
+  the other person's questions, answers and undos appear on their own (new turns never move the page). Claude (`claude-opus-5-5`, effort medium, server-side refusal
   fallback, top-level `cache_control`) runs in the SDK's **tool runner** with six `strict` tools —
   `add_gift`, `update_gift`, `delete_gift`, `set_budget`, `remove_person`, `set_total_budget` — which
   are the whole of what it can change. 🔴 Each tool writes through the same validating store as a
