@@ -1,0 +1,180 @@
+{
+  "slug": "fraction-hawkeye",
+  "title": "Matt Fraction's Hawkeye",
+  "description": "The full 2012–2015 David Aja / Matt Fraction run, plus the Annual, in publication order. Opens with Fraction's 2008 Kate Bishop one-shot as a prelude.",
+  "source": {
+    "kind": "legacy",
+    "name": "Built from Marvel Unlimited data before it closed; ids moved to the Marvel Comics app in Nov 2026",
+    "url": null
+  },
+  "issues": [
+    {
+      "title": "Young Avengers Presents (2008) #6",
+      "series": "Young Avengers Presents",
+      "year": 2008,
+      "number": "6",
+      "appIssueId": 21930
+    },
+    {
+      "title": "Hawkeye (2012) #1",
+      "series": "Hawkeye",
+      "year": 2012,
+      "number": "1",
+      "appIssueId": 16543
+    },
+    {
+      "title": "Hawkeye (2012) #2",
+      "series": "Hawkeye",
+      "year": 2012,
+      "number": "2",
+      "appIssueId": 16546
+    },
+    {
+      "title": "Hawkeye (2012) #3",
+      "series": "Hawkeye",
+      "year": 2012,
+      "number": "3",
+      "appIssueId": 16549
+    },
+    {
+      "title": "Hawkeye (2012) #4",
+      "series": "Hawkeye",
+      "year": 2012,
+      "number": "4",
+      "appIssueId": 16552
+    },
+    {
+      "title": "Hawkeye (2012) #5",
+      "series": "Hawkeye",
+      "year": 2012,
+      "number": "5",
+      "appIssueId": 16550
+    },
+    {
+      "title": "Hawkeye (2012) #6",
+      "series": "Hawkeye",
+      "year": 2012,
+      "number": "6",
+      "appIssueId": 16555
+    },
+    {
+      "title": "Hawkeye (2012) #7",
+      "series": "Hawkeye",
+      "year": 2012,
+      "number": "7",
+      "appIssueId": 16560
+    },
+    {
+      "title": "Hawkeye (2012) #8",
+      "series": "Hawkeye",
+      "year": 2012,
+      "number": "8",
+      "appIssueId": 16556
+    },
+    {
+      "title": "Hawkeye (2012) #9",
+      "series": "Hawkeye",
+      "year": 2012,
+      "number": "9",
+      "appIssueId": 16559
+    },
+    {
+      "title": "Hawkeye (2012) #10",
+      "series": "Hawkeye",
+      "year": 2012,
+      "number": "10",
+      "appIssueId": 16562
+    },
+    {
+      "title": "Hawkeye (2012) #11",
+      "series": "Hawkeye",
+      "year": 2012,
+      "number": "11",
+      "appIssueId": 16564
+    },
+    {
+      "title": "Hawkeye (2012) #12",
+      "series": "Hawkeye",
+      "year": 2012,
+      "number": "12",
+      "appIssueId": 16566
+    },
+    {
+      "title": "Hawkeye Annual (2013) #1",
+      "series": "Hawkeye Annual",
+      "year": 2013,
+      "number": "1",
+      "appIssueId": 36540
+    },
+    {
+      "title": "Hawkeye (2012) #13",
+      "series": "Hawkeye",
+      "year": 2012,
+      "number": "13",
+      "appIssueId": 16569
+    },
+    {
+      "title": "Hawkeye (2012) #14",
+      "series": "Hawkeye",
+      "year": 2012,
+      "number": "14",
+      "appIssueId": 16570
+    },
+    {
+      "title": "Hawkeye (2012) #15",
+      "series": "Hawkeye",
+      "year": 2012,
+      "number": "15",
+      "appIssueId": 16573
+    },
+    {
+      "title": "Hawkeye (2012) #16",
+      "series": "Hawkeye",
+      "year": 2012,
+      "number": "16",
+      "appIssueId": 16576
+    },
+    {
+      "title": "Hawkeye (2012) #17",
+      "series": "Hawkeye",
+      "year": 2012,
+      "number": "17",
+      "appIssueId": 16574
+    },
+    {
+      "title": "Hawkeye (2012) #18",
+      "series": "Hawkeye",
+      "year": 2012,
+      "number": "18",
+      "appIssueId": 16578
+    },
+    {
+      "title": "Hawkeye (2012) #19",
+      "series": "Hawkeye",
+      "year": 2012,
+      "number": "19",
+      "appIssueId": 16579
+    },
+    {
+      "title": "Hawkeye (2012) #20",
+      "series": "Hawkeye",
+      "year": 2012,
+      "number": "20",
+      "appIssueId": 16581
+    },
+    {
+      "title": "Hawkeye (2012) #21",
+      "series": "Hawkeye",
+      "year": 2012,
+      "number": "21",
+      "appIssueId": 16582
+    },
+    {
+      "title": "Hawkeye (2012) #22",
+      "series": "Hawkeye",
+      "year": 2012,
+      "number": "22",
+      "appIssueId": 16587
+    }
+  ]
+}

@@ -1,5 +1,6 @@
 import type Database from "better-sqlite3";
 import { getDb } from "./db";
+import { rekeyLegacyComicState } from "./comics-rekey";
 import {
   getAlgorithm,
   RSS_CATEGORIES,
@@ -467,22 +468,37 @@ export function getCategoryCounts(
 // Backed by the comic_state table. Catalog itself lives in
 // lib/comics-data.ts (static); the DB only stores read state.
 // Marking unread = deleting the row (read_at is NOT NULL).
+//
+// Every comics read goes through comicsDb(), which moves any marks still on
+// the old Marvel Unlimited ids to the new "mca-" keys the first time it runs
+// (lib/comics-rekey.ts). It lives here, not in getDb(), because the books and
+// hoops checks load lib/db.ts directly without the comics modules.
+let comicsRekeyed = false;
+function comicsDb() {
+  const db = getDb();
+  if (!comicsRekeyed) {
+    const moved = rekeyLegacyComicState(db);
+    if (moved) console.log(`[comics] moved ${moved} read mark(s) to Marvel Comics app ids`);
+    comicsRekeyed = true;
+  }
+  return db;
+}
 
 export function getReadComicIds(): Set<string> {
-  const db = getDb();
+  const db = comicsDb();
   const rows = db.prepare(`SELECT issue_id FROM comic_state`).all() as { issue_id: string }[];
   return new Set(rows.map((r) => r.issue_id));
 }
 
 export function getComicReadState(): { id: string; read_at: string }[] {
-  const db = getDb();
+  const db = comicsDb();
   return db
     .prepare(`SELECT issue_id AS id, read_at FROM comic_state ORDER BY read_at`)
     .all() as { id: string; read_at: string }[];
 }
 
 export function markComicRead(issueId: string): void {
-  const db = getDb();
+  const db = comicsDb();
   db.prepare(`
     INSERT INTO comic_state (issue_id, read_at)
     VALUES (?, ?)
@@ -491,6 +507,6 @@ export function markComicRead(issueId: string): void {
 }
 
 export function markComicUnread(issueId: string): void {
-  const db = getDb();
+  const db = comicsDb();
   db.prepare(`DELETE FROM comic_state WHERE issue_id = ?`).run(issueId);
 }

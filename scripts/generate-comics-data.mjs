@@ -1,91 +1,84 @@
 #!/usr/bin/env node
-// Convert ~/Code/mu-reading-lists/storylines.json + each storyline's
-// {lookup,applinks,drns}.json subdir into lib/comics-data.ts.
-// Re-run by hand if any source list changes.
+// comics/storylines.json + comics/<slug>.json → lib/comics-data.ts.
+// scripts/comics-import.mjs runs this for you; run it by hand after editing a
+// storyline file (a hand fix, a reorder, a new description):
+//   node scripts/generate-comics-data.mjs
+//
+// A storyline with any issue still unmatched ("appIssueId": null without
+// "skip": true) is left out, with a warning, so a half-fixed import never
+// reaches the hub. Everything else in the file is checked on the way through.
 import fs from "node:fs";
 import path from "node:path";
-import os from "node:os";
+import { fileURLToPath } from "node:url";
 
-const SRC = path.join(os.homedir(), "Code", "mu-reading-lists");
-const storylines = JSON.parse(
-  fs.readFileSync(path.join(SRC, "storylines.json"), "utf8"),
-);
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const COMICS = path.join(ROOT, "comics");
 
-// marvelIssueId -> issue id in the new Marvel Comics app (marvelcomicsapp.com).
-// Lives in this repo; see scripts/comics-data-pipeline.md, Step 6.
-const APP_IDS = JSON.parse(
-  fs.readFileSync(
-    path.join(path.dirname(new URL(import.meta.url).pathname), "marvel-comics-app-ids.json"),
-    "utf8",
-  ),
-);
-const missingAppIds = [];
+// The hub's id for an issue. Prefixed so it can never collide with the old
+// Marvel Unlimited ids still in the database before lib/comics-rekey.ts runs.
+export const comicId = (appIssueId) => `mca-${appIssueId}`;
 
-function readJsonOrEmpty(p) {
-  if (!fs.existsSync(p)) return null;
-  return JSON.parse(fs.readFileSync(p, "utf8"));
+export function buildStorylines(dir = COMICS) {
+  const order = JSON.parse(fs.readFileSync(path.join(dir, "storylines.json"), "utf8"));
+  const built = [];
+  const warnings = [];
+  const seenSlugs = new Set();
+  for (const slug of order) {
+    if (seenSlugs.has(slug)) throw new Error(`comics/storylines.json lists ${slug} twice`);
+    seenSlugs.add(slug);
+    const file = path.join(dir, `${slug}.json`);
+    if (!fs.existsSync(file)) throw new Error(`comics/storylines.json lists ${slug}, but comics/${slug}.json doesn't exist`);
+    const s = JSON.parse(fs.readFileSync(file, "utf8"));
+    if (s.slug !== slug) throw new Error(`comics/${slug}.json has slug "${s.slug}"`);
+    if (!s.title || !Array.isArray(s.issues)) throw new Error(`comics/${slug}.json needs a title and an issues list`);
+
+    const unmatched = s.issues.filter((i) => !i.skip && !Number.isInteger(i.appIssueId));
+    if (unmatched.length) {
+      warnings.push(`left out ${slug}: ${unmatched.length} issue(s) still need an appIssueId or "skip": true (e.g. ${unmatched[0].title})`);
+      continue;
+    }
+    const seen = new Set();
+    const issues = [];
+    for (const i of s.issues) {
+      if (i.skip) continue;
+      if (!i.title) throw new Error(`comics/${slug}.json: an issue (${i.appIssueId}) has no title`);
+      if (seen.has(i.appIssueId)) {
+        warnings.push(`${slug}: ${i.title} (${i.appIssueId}) is listed twice; kept the first`);
+        continue;
+      }
+      seen.add(i.appIssueId);
+      issues.push({ id: comicId(i.appIssueId), title: i.title, appIssueId: i.appIssueId });
+    }
+    built.push({
+      slug,
+      title: s.title,
+      ...(s.description ? { description: s.description } : {}),
+      ...(s.source?.name ? { source: { name: s.source.name, url: s.source.url ?? null } } : {}),
+      issues,
+    });
+  }
+  return { built, warnings };
 }
 
-function loadStoryline(meta) {
-  const dir = path.join(SRC, meta.slug);
-  const lookup = readJsonOrEmpty(path.join(dir, "lookup.json"));
-  const applinks = readJsonOrEmpty(path.join(dir, "applinks.json")) ?? {};
-  const drns = readJsonOrEmpty(path.join(dir, "drns.json")) ?? {};
-  if (!lookup) {
-    console.warn(`  skipping ${meta.slug}: no lookup.json yet`);
-    return null;
-  }
-  const wantSlugs = lookup.filter((r) => r.id && r.slug).map((r) => r.slug);
-  const haveSlugs = wantSlugs.filter((s) => applinks[s]).length;
-  if (haveSlugs < wantSlugs.length) {
-    console.warn(
-      `  skipping ${meta.slug}: applinks incomplete (${haveSlugs}/${wantSlugs.length})`,
-    );
-    return null;
-  }
-  const issues = lookup
-    .map((row) => {
-      const digital = row.slug ? applinks[row.slug] : null;
-      if (!digital || !row.id || !row.slug) return null;
-      const drn = drns[digital] ?? null;
-      const appIssueId = APP_IDS[row.id] ?? null;
-      if (appIssueId === null) missingAppIds.push(`${meta.slug}: ${row.title} (${row.id})`);
-      return {
-        id: digital,
-        title: row.title,
-        digitalBookId: digital,
-        marvelIssueId: row.id,
-        slug: row.slug,
-        drn: drn?.drn ?? null,
-        sourceId: drn?.sourceId ?? null,
-        appIssueId,
-      };
-    })
-    .filter(Boolean);
-  return { ...meta, issues };
-}
-
-const built = storylines.map(loadStoryline).filter(Boolean);
-
-const out = `// AUTO-GENERATED by scripts/generate-comics-data.mjs.
-// Source: ~/Code/mu-reading-lists/storylines.json + per-storyline subdirs.
-// Re-run the script if any underlying reading order changes.
+export function generate() {
+  const { built, warnings } = buildStorylines();
+  const out = `// AUTO-GENERATED by scripts/generate-comics-data.mjs from comics/*.json.
+// Edit those files (or run scripts/comics-import.mjs), then re-run the script.
 
 export interface ComicIssue {
+  /** "mca-<appIssueId>": the read-mark key (comic_state.issue_id). */
   id: string;
   title: string;
-  digitalBookId: string;
-  marvelIssueId: string;
-  slug: string;
-  drn: string | null;
-  sourceId: string | null;
-  appIssueId: number | null;
+  /** The issue's id in the Marvel Comics app (www.marvelcomicsapp.com/issues/<id>). */
+  appIssueId: number;
 }
 
 export interface Storyline {
   slug: string;
   title: string;
   description?: string;
+  /** Where the reading order came from. */
+  source?: { name: string; url: string | null };
   issues: ComicIssue[];
 }
 
@@ -95,18 +88,12 @@ export function getStoryline(slug: string): Storyline | undefined {
   return STORYLINES.find((s) => s.slug === slug);
 }
 `;
-
-const dest = path.join(process.cwd(), "lib", "comics-data.ts");
-fs.writeFileSync(dest, out);
-const total = built.reduce((n, s) => n + s.issues.length, 0);
-console.log(
-  `Wrote ${dest} (${built.length} storylines, ${total} issues total)`,
-);
-for (const s of built) console.log(`  ${s.slug}: ${s.issues.length} issues`);
-if (missingAppIds.length) {
-  console.warn(
-    `\n${missingAppIds.length} issue(s) have no Marvel Comics app id yet (they fall back to the old Marvel links).` +
-      ` Look them up and add them to scripts/marvel-comics-app-ids.json:`,
-  );
-  for (const m of missingAppIds) console.warn(`  ${m}`);
+  const dest = path.join(ROOT, "lib", "comics-data.ts");
+  fs.writeFileSync(dest, out);
+  const total = built.reduce((n, s) => n + s.issues.length, 0);
+  console.log(`Wrote lib/comics-data.ts (${built.length} storylines, ${total} issues)`);
+  for (const s of built) console.log(`  ${s.slug}: ${s.issues.length} issues`);
+  for (const w of warnings) console.warn(`  ⚠ ${w}`);
 }
+
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) generate();

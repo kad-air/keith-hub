@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import type { ComicIssue, Storyline } from "@/lib/comics-data";
+import type { Storyline } from "@/lib/comics-data";
 import { useKeyboard } from "@/lib/useKeyboard";
 
 interface Props {
@@ -14,7 +14,7 @@ interface Props {
 // on iOS, so from the PWA they'd open a web page, not the app. Instead we
 // build the same AppsFlyer OneLink the site's own "open in app" button
 // builds, which deep-links to the issue's page in the app and falls back to
-// the web otherwise. See scripts/comics-data-pipeline.md, Step 6.
+// the web otherwise. See scripts/comics-data-pipeline.md.
 function marvelComicsAppUrl(appIssueId: number): string {
   const deepLink = `marvelcomicsapp://issueHome?issueId=${appIssueId}`;
   const url = new URL("https://goto.marvelcomicsapp.com/w9za");
@@ -27,16 +27,6 @@ function marvelComicsAppUrl(appIssueId: number): string {
   url.searchParams.set("af_force_deeplink", "true");
   url.searchParams.set("af_ss_ui", "true");
   return url.toString();
-}
-
-// Older fallbacks, kept for any issue that has no new-app id yet.
-// marvel.smart.link is Marvel's Branch deep-link host for Marvel Unlimited.
-function readerUrl(issue: ComicIssue): string {
-  if (issue.appIssueId !== null) return marvelComicsAppUrl(issue.appIssueId);
-  if (issue.drn && issue.sourceId) {
-    return `https://marvel.smart.link/fiir7ec77?type=issue&drn=${issue.drn}&sourceId=${issue.sourceId}`;
-  }
-  return `https://read.marvel.com/#/book/${issue.digitalBookId}`;
 }
 
 export default function ComicsClient({ storyline, initialReadIds }: Props) {
@@ -105,7 +95,7 @@ export default function ComicsClient({ storyline, initialReadIds }: Props) {
     () =>
       storyline.issues.map((issue, idx) => {
         const isRead = readIds.has(issue.id);
-        const url = readerUrl(issue);
+        const url = marvelComicsAppUrl(issue.appIssueId);
         return (
           <li
             key={issue.id}
