@@ -26,7 +26,7 @@ function Asked({ by }: { by: Asker | null }) {
   );
 }
 
-const PENDING_POLL_MS = 3000;
+const POLL_MS = 3000;
 
 const STARTERS = [
   "What's left to buy?",
@@ -81,6 +81,7 @@ export default function HelperClient({ initial }: { initial: Status }) {
   const [error, setError] = useState<string | null>(null);
   const [undoing, setUndoing] = useState<number | null>(null);
   const liveRef = useRef(false);
+  const lastSeen = useRef("");
   const listRef = useRef<HTMLOListElement>(null);
   const boxRef = useRef<HTMLTextAreaElement>(null);
 
@@ -93,28 +94,38 @@ export default function HelperClient({ initial }: { initial: Status }) {
       }
       if (!res.ok) return;
       const data = (await res.json()) as Status;
+      // Skip a re-render when nothing moved. Only a copy that reached the
+      // screen counts as seen: one read mid-answer is not shown (liveRef).
+      const seen = JSON.stringify(data);
+      if (seen === lastSeen.current) return;
       setStatus(data);
-      if (!liveRef.current) setTurns(data.turns);
+      if (!liveRef.current) {
+        setTurns(data.turns);
+        lastSeen.current = seen;
+      }
     } catch {
       // offline: keep what is on screen
     }
   }, []);
 
+  // The thread is shared, so keep it current while the page is on screen: the
+  // other person's questions, answers and undos appear within a few seconds,
+  // the way the list does. Paused in the background; caught up on return.
+  // New turns never move the page (see the scroll rule below).
   useEffect(() => {
-    const onVisible = () => {
+    const tick = () => {
       if (document.visibilityState === "visible") refresh();
     };
-    document.addEventListener("visibilitychange", onVisible);
-    return () => document.removeEventListener("visibilitychange", onVisible);
+    const timer = setInterval(tick, POLL_MS);
+    document.addEventListener("visibilitychange", tick);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", tick);
+    };
   }, [refresh]);
 
   // A question asked here or on the other phone, still being answered.
   const waiting = !live && status.pending;
-  useEffect(() => {
-    if (!waiting) return;
-    const timer = setInterval(refresh, PENDING_POLL_MS);
-    return () => clearInterval(timer);
-  }, [waiting, refresh]);
 
   // The newest question goes to the top of the screen on arriving and when one
   // is asked — never while the answer streams in (BookAskClient explains why).
