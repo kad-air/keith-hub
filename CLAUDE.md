@@ -81,8 +81,8 @@ npm run check:books:app-token    # Books app token gate: the REAL middleware wit
 npm run check:books:discworld    # Discworld map gate: the closed canon + publication order, the library match anchored on the real epubs' OPF, manual-mark precedence, map geometry (same)
 npm run check:christmas          # Christmas list gate: the REAL middleware (no cookie → passcode form / 401, the
                                  #   passcode cookie opens /christmas + /api/christmas/* and nothing else, fails closed),
-                                 #   the store's seed + validation in a throwaway DB, the helper reply parser (only the
-                                 #   six ops survive), the rate limiter (same)
+                                 #   the store's seed + validation in a throwaway DB, the helper's six tools run for real
+                                 #   (batch undo restores the list exactly, the strict-schema budget), the rate limiter (same)
 npm run check:feed               # Feed gate: a dismissed Verge review stays dismissed when the reviews feed picks it up later
                                  #   (state moves to the winning copy; matched by post id, not URL), retention never resurrects
                                  #   what a deep feed still carries (tombstones), never-seen items survive retention, dead ids
@@ -2151,21 +2151,21 @@ iOS standalone PWAs have a long-standing quirk: `window.open(url, "_blank")` ope
 - `components/ServiceWorkerRegister.tsx` registers the SW on the client.
 - `skipWaiting: true` and `clientsClaim: true` mean a fresh build replaces the previous SW on next launch — but iOS PWAs may need a force-quit (not just close) to actually pick up the new bundle.
 
-### Christmas — the shared gift list (`/christmas`)
+### Christmas — the shared gift list (`/christmas`, `/christmas/helper`)
 
-Ported (2026-11-19) from a Claude artifact (`christmas-list.html`) so Kim can use it from her phone
-with no Claude account. Layout, copy and behaviour follow the original; it keeps its OWN look
-(Bricolage Grotesque + Inter via `next/font` in `app/christmas/layout.tsx`, the green/berry/gold
-tokens in `app/christmas/christmas.css`, everything scoped under `.xmas` so nothing leaks into the
-hub). Theme follows the hub's `data-theme` switch.
+Started life as a Claude artifact; ported (2026-11-19) so Kim can use it from her phone with no Claude
+account. Hub type and tokens, with a Christmas palette: `cat-xmas` (pine) and `cat-xmas-gold` beside
+the hub's red accent (all three theme blocks in `app/globals.css`), a little CSS snow over the header
+(`.xmas-snow`, off under reduced motion) and a candy-cane stripe for money spent against a budget
+(`.xmas-candy`; solid red once over). Two tabs, `ChristmasHeader` (`1` / `2`): **List** and **Helper**.
 
 - 🔴 **Its own passcode, separate from the hub password** (`lib/christmas/auth.ts`, checked in
   `middleware.ts` BEFORE the `FEED_PASSWORD` bypass). `CHRISTMAS_PASSCODE` → `xmas-auth` cookie
-  (HMAC of the passcode, ~400 days); the passcode cookie opens `/christmas` and `/api/christmas/*`
+  (HMAC of the passcode, ~400 days); the passcode cookie opens `/christmas*` and `/api/christmas/*`
   ONLY. The hub cookie opens it too. **Fails CLOSED**: unset passcode = no passcode cookie is valid,
-  and an unset `FEED_PASSWORD` does NOT open this page (it holds the kids' names and an endpoint
+  and an unset `FEED_PASSWORD` does NOT open this section (it holds the kids' names and an endpoint
   that spends the API key). `/christmas/login` + `POST /api/christmas/auth` (303, attempts
-  rate-limited per address) are the only public paths. A passcode-only visitor gets the page without
+  rate-limited per address) are the only public paths. A passcode-only visitor gets the pages without
   the masthead and rail (`GuestChrome`, rendered when the hub cookie is absent; needs the
   `hub-masthead` class on the Masthead header).
 - **Storage**: `xmas_people` + `xmas_gifts`; total budget, revision counter and the one-time seed
@@ -2173,24 +2173,27 @@ hub). Theme follows the hub's `data-theme` switch.
   validates every write (status one of five, money finite cents, ids `ID_RE`, strings capped) and
   bumps the rev in the same transaction. The seed runs once ever, keyed on the flag — an emptied list
   is never re-filled.
-- **API** keeps the artifact's doc names: `GET /api/christmas[?since=rev]` (`{unchanged:true}` when
-  nothing moved), `PUT|PATCH|DELETE /api/christmas/gifts/[id]` and `/people/[id]`, `PUT|DELETE
-  /api/christmas/config`. PUT is create-or-replace (also how Undo restores). Ids are made by the
-  client so a write shows before the server answers.
+- **API**: `GET /api/christmas[?since=rev]` (`{unchanged:true}` when nothing moved), `PUT|PATCH|DELETE
+  /api/christmas/gifts/[id]` and `/people/[id]`, `PUT|DELETE /api/christmas/config`. PUT is
+  create-or-replace. Ids are made by the client so a write shows before the server answers.
 - **Live updates** (`components/christmas/ChristmasClient.tsx`): poll every 3 s while visible.
   Writes apply locally first, queue one at a time per document, and a poll that started before or
   during a write is discarded; once writes settle the page re-reads the full list. 🔴 `Field` keeps a
   local draft while focused, so an incoming edit never replaces what someone is typing.
-- **The helper** (`POST /api/christmas/helper`) replaces the artifact's `sample.json`: RULES (in
-  `lib/christmas/shared.ts`, the original's text) as the system prompt, the list JSON **read from the
-  database on the server** (never from the request), the last 10 turns and the request go to
-  `claude-opus-5-5` (effort medium, server-side refusal fallback); the reply's `{reply, ops}` is parsed
-  (`parseHelperReply`) and ops not among the six are dropped. 🔴 **The route never writes.** The page
-  validates each op (`cleanGift`) and applies it through the same routes a hand edit uses, then
-  offers Undo for the batch — the original's `applyOps`/`runUndo`, unchanged in substance. JSON is
-  asked for in the prompt rather than via structured outputs, as the original did. Limits: 6/min and
-  40/hour per device, a durable `CHRISTMAS_HELPER_DAILY_CAP` (default 150) per UTC day in `kv`,
-  request text ≤1000 chars. No `ANTHROPIC_API_KEY` → `sampling_disabled` and the chat hides its box.
+- **The helper** (`lib/christmas/helper.ts`, `app/api/christmas/helper/route.ts`,
+  `components/christmas/HelperClient.tsx`) — the books "Ask" chat adapted: ONE shared thread
+  (`xmas_helper_turns`, `helperStore.ts`), NDJSON streaming, finished and saved even if the browser
+  goes away, orphaned questions dropped. Claude (`claude-opus-5-5`, effort medium, server-side refusal
+  fallback, top-level `cache_control`) runs in the SDK's **tool runner** with six `strict` tools —
+  `add_gift`, `update_gift`, `delete_gift`, `set_budget`, `remove_person`, `set_total_budget` — which
+  are the whole of what it can change. 🔴 Each tool writes through the same validating store as a
+  hand edit; a store refusal goes back to the model as a `ToolError`. Each change records a line
+  (streamed as `{t:"change"}`, shown under the answer) and an undo step; `POST
+  /api/christmas/helper/undo {turnId}` puts one answer's changes back in one transaction. The list
+  JSON is read from the database on the server, never from the request. 🔴 Strict schemas share a
+  per-request budget (20 strict tools, 24 optional params, 16 union/nullable params); the tools use
+  6/13/3 and `check:christmas` pins it. Limits: 6/min and 40/hour per device, a durable
+  `CHRISTMAS_HELPER_DAILY_CAP` (default 150) per UTC day in `kv`, questions ≤1000 chars.
 
 ### Charts (the chord-chart library + setlists)
 The **Charts** section (`/charts`) is a personal library of guitar chord charts plus named **setlists** built from that library. It's the one section explicitly built to work offline — the use case is playing a gig with no signal.

@@ -9,8 +9,10 @@
 //  2. The store, in a throwaway database through the real schema: the seed
 //     (once, and never again after the list is emptied), validation (status,
 //     money, ids, names), the revision counter, the helper's daily cap.
-//  3. The helper's reply parser: only the six ops survive, fences tolerated,
-//     junk refused; cleanGift matches the original's rules.
+//  3. The helper's six tools, run for real (no model call): each writes
+//     through the store, records a line and an undo step, and undoing a batch
+//     restores the list exactly; errors reach the model as tool errors; the
+//     schemas stay inside Anthropic's strict-tool budget.
 //  4. The rate limiter's windows.
 import fs from "node:fs";
 import os from "node:os";
@@ -122,18 +124,67 @@ assert(store.getListState().totalBudget === null, "total can be cleared");
 assert(store.takeHelperAllowance(2) && store.takeHelperAllowance(2) && !store.takeHelperAllowance(2), "helper daily cap holds");
 assert(store.takeHelperAllowance(2, new Date(Date.now() + 86_400_000)), "…and resets the next day");
 
-console.log("3. helper reply");
-const { parseHelperReply, cleanGift, HELPER_OPS } = await import("../lib/christmas/shared.ts");
-const r1 = parseHelperReply(
-  JSON.stringify({ reply: "ok", ops: [{ op: "add_gift", idea: "a" }, { op: "eval", code: "x" }, "junk", { op: "set_total_budget", amount: 1 }] }),
+console.log("3. helper tools");
+// The six tools run for real against the throwaway database (no model call):
+// each writes through the validating store, records a line and an undo step,
+// and one answer's steps put the list back exactly.
+const { helperTools, historyMessages } = await import("../lib/christmas/helper.ts");
+const { applyUndo } = store;
+store.setPerson("hudson", { name: "Hudson", role: "Age 4", budget: 370, order: 1 });
+store.setTotalBudget({ totalBudget: 2520 });
+const before = JSON.stringify((({ rev: _r, ...x }) => x)(store.getListState()));
+const batch = { changes: [] as string[], undo: [] as { t: "del"; path: string }[] as never[] };
+const lines: string[] = [];
+const tools = helperTools(batch as never, (l: string) => lines.push(l));
+const byName = Object.fromEntries(tools.map((t) => [t.name, t]));
+assert(
+  Object.keys(byName).sort().join(",") === "add_gift,delete_gift,remove_person,set_budget,set_total_budget,update_gift",
+  "exactly the six tools",
 );
-assert(r1?.ops.length === 2 && r1.ops.every((o) => (HELPER_OPS as readonly string[]).includes(String(o.op))), "only the six ops survive");
-assert(parseHelperReply('```json\n{"reply":"hi","ops":[]}\n```')?.reply === "hi", "fenced JSON accepted");
-assert(parseHelperReply('Sure! {"reply":"hi","ops":[]}')?.reply === "hi", "stray text around the object tolerated");
-assert(parseHelperReply("no json here") === null && parseHelperReply("[1,2]") === null, "non-objects refused");
-assert(parseHelperReply(JSON.stringify({ reply: "x", ops: Array(60).fill({ op: "delete_gift", id: "a" }) }))?.ops.length === 40, "ops capped at 40");
-const cg = cleanGift({ idea: " a ", est: "$12", status: "purchased", recipient: 5, bogus: 1 });
-assert(cg.idea === "a" && cg.est === 12 && cg.status === "Purchased" && !("recipient" in cg) && !("bogus" in cg), "cleanGift as the original");
+const run = async (name: string, input: Record<string, unknown>) => String(await byName[name].run(input as never));
+const added = JSON.parse(await run("add_gift", { recipient: "hudson", idea: "Lego set", from: "Parents", est: 40 }));
+assert(added.added.recipient === "Hudson", "add_gift reuses the recipient's name as written on the list");
+await run("update_gift", { id: added.added.id, status: "Purchased", actual: 38 });
+await run("set_budget", { person: "Hudson", budget: 420 });
+await run("set_budget", { person: "Grandma", budget: 100, role: "Grandma" });
+await run("set_total_budget", { amount: 3000 });
+const mid = store.getListState();
+assert(mid.gifts.some((g) => g.idea === "Lego set" && g.actual === 38 && g.status === "Purchased"), "tools change the list");
+assert(mid.people.find((p) => p.name === "Hudson")?.budget === 420 && mid.people.some((p) => p.name === "Grandma"), "set_budget updates and creates");
+let threw = "";
+try {
+  await run("update_gift", { id: "nope", idea: "x" });
+} catch (e) {
+  threw = e instanceof Error ? e.constructor.name : "";
+}
+assert(threw === "ToolError", "a bad id comes back to the model as a tool error, not a crash");
+try {
+  await run("add_gift", { recipient: "Hudson", idea: "x", status: "Lost" });
+  threw = "";
+} catch (e) {
+  threw = e instanceof Error ? e.constructor.name : "";
+}
+assert(threw === "ToolError", "the store's validation reaches the model as a tool error");
+assert(lines.length === 5 && batch.changes.length === 5 && batch.undo.length === 5, "every change records a line and an undo step");
+applyUndo(batch.undo as never);
+assert(JSON.stringify((({ rev: _r, ...x }) => x)(store.getListState())) === before, "undoing the batch puts the list back exactly");
+const hist = historyMessages([
+  { id: 1, role: "user", content: "q", changes: [], undoable: false, undone: false, createdAt: 0 },
+  { id: 2, role: "assistant", content: "a", changes: ["Added x"], undoable: true, undone: false, createdAt: 0 },
+]);
+assert(String(hist[1].content).includes("[Changes made: Added x]"), "earlier answers carry what they changed");
+// Anthropic's strict-schema budget, per request: 20 strict tools, 24 optional
+// parameters, 16 nullable/union parameters. Over it, every request is a 400.
+let optional = 0, unions = 0;
+for (const t of tools) {
+  const sch = (t as unknown as { input_schema: unknown }).input_schema as { properties: Record<string, { type?: unknown; anyOf?: unknown }>; required?: string[] };
+  for (const [k, v] of Object.entries(sch.properties)) {
+    if (!(sch.required ?? []).includes(k)) optional++;
+    if (Array.isArray(v.type) || v.anyOf) unions++;
+  }
+}
+assert(tools.every((t) => (t as { strict?: boolean }).strict === true) && tools.length <= 20, "all tools strict, within 20");
+assert(optional <= 24 && unions <= 16, `strict budget: ${optional}/24 optional, ${unions}/16 union`);
 
 console.log("4. rate limiter");
 const { allow } = await import("../lib/christmas/rateLimit.ts");

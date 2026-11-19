@@ -65,8 +65,8 @@ The **Library** section indexes Marvel Unlimited reading orders (Hickman-era X-M
 
 A shared gift list and budget for the two of us (`/christmas`): a section per person with
 their budget, spent and left, gifts edited in place, and a helper you can ask in plain
-English ("add a $40 Lego set for Hudson", "who's over budget?") that makes the changes and
-offers Undo. It has its own family passcode, so it can be shared without the hub password;
+English ("add a $40 Lego set for Hudson", "who's over budget?") that makes the changes itself
+and lets you undo them. It has its own family passcode, so it can be shared without the hub password;
 whoever has only the passcode sees just this page. Edits from one phone show up on the
 other within a few seconds.
 

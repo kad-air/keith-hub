@@ -105,7 +105,7 @@ export function answerBlocks(text: string): Block[] {
   return blocks;
 }
 
-function Answer({ text }: { text: string }) {
+export function Answer({ text }: { text: string }) {
   return (
     <div className="space-y-4">
       {answerBlocks(text).map((b, i) => {

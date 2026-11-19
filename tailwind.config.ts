@@ -53,6 +53,8 @@ const config: Config = {
           games: "rgb(var(--cat-games) / <alpha-value>)",
           tv: "rgb(var(--cat-tv) / <alpha-value>)",
           hoops: "rgb(var(--cat-hoops) / <alpha-value>)",
+          xmas: "rgb(var(--cat-xmas) / <alpha-value>)",
+          "xmas-gold": "rgb(var(--cat-xmas-gold) / <alpha-value>)",
           practice: "rgb(var(--cat-practice) / <alpha-value>)",
           "practice-root": "rgb(var(--cat-practice-root) / <alpha-value>)",
           "practice-chord": "rgb(var(--cat-practice-chord) / <alpha-value>)",

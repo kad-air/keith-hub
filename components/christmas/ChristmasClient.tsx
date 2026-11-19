@@ -12,7 +12,6 @@ import {
 import {
   BOUGHT,
   STATUSES,
-  cleanGift,
   key,
   money,
   num,
@@ -22,51 +21,22 @@ import {
   type Person,
 } from "@/lib/christmas/shared";
 
-// The shared Christmas gift list — a port of the Claude artifact
-// christmas-list.html. Layout, copy and behaviour follow the original; what
-// changed is everything it got from the artifact platform:
-//   • storage: the `db` capability → /api/christmas/* over the hub's SQLite
-//     (lib/christmas/store.ts). Paths keep the original's doc names
-//     ("gifts/<id>", "people/<id>", "config/main") so applyOps and Undo read
-//     the same as before.
-//   • live updates: db snapshots → a poll every few seconds that asks "has
-//     anything changed since rev N?". Writes show at once (applied locally
-//     first); a poll never lands while a write is still in flight, and a
-//     field being typed in keeps its draft whatever arrives (Field, below).
-//   • the helper: `sample.json` → POST /api/christmas/helper, which calls the
-//     Anthropic API on the server. Its ops are validated and applied here,
-//     exactly as the original did.
-//   • identity: no `user` capability and no read-only mode — whoever is past
-//     the passcode can edit.
+// The shared Christmas gift list (/christmas). First built as a Claude
+// artifact; ported here so the whole family can use it from a phone:
+//   • storage: /api/christmas/* over the hub's SQLite (lib/christmas/store.ts).
+//     Paths keep the artifact's doc names ("gifts/<id>", "people/<id>",
+//     "config/main").
+//   • live updates: a poll every few seconds that asks "has anything changed
+//     since rev N?". Writes show at once (applied locally first); a poll never
+//     lands while a write is still in flight, and a field being typed in keeps
+//     its draft whatever arrives (Field, below).
+//   • the helper lives on its own tab (/christmas/helper) and changes the list
+//     on the server; its edits arrive here like the other parent's.
 
 type Data = { people: Person[]; gifts: Gift[]; total: number | null; rev: number };
-type UndoStep = { t: "del"; path: string } | { t: "set"; path: string; data: Record<string, unknown> };
-type Msg = {
-  id: number;
-  cls: "u" | "a" | "a err";
-  text: string;
-  done?: string[];
-  undo?: UndoStep[];
-  undoState?: "idle" | "busy" | "done";
-};
 type Group = { name: string; person: Person | null; gifts: Gift[] };
 
 const POLL_MS = 3000;
-
-const COPY: Record<string, string> = {
-  sampling_disabled: "The helper isn't available on this account.",
-  rate_limited: "Too many requests right now. Try again in a little while.",
-  session_expired: "Please sign in again, then retry.",
-  refused: "I can't help with that request.",
-  invalid_json: "I got muddled on that one. Try rephrasing.",
-  prompt_too_large: "The list is too big for me to read in one go.",
-};
-
-const CHIPS = [
-  "What's left to buy?",
-  "Who is over or close to budget?",
-  "Suggest 3 stocking stuffers for each kid and add them as ideas",
-];
 
 function newId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return crypto.randomUUID();
@@ -130,7 +100,6 @@ export default function ChristmasClient({ initial }: { initial: ListState }) {
   const [confirm, setConfirm] = useState<string | null>(null);
   const [banner, setBanner] = useState<string | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
-  const [countdown, setCountdown] = useState("");
   const [focusNext, setFocusNext] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout>>();
 
@@ -142,15 +111,6 @@ export default function ChristmasClient({ initial }: { initial: ListState }) {
 
   const signedOut = useCallback(() => {
     setBanner("You've been signed out of this list. Reload the page to enter the passcode again.");
-  }, []);
-
-  /* ---------- countdown ---------- */
-  useEffect(() => {
-    const now = new Date();
-    let x = new Date(now.getFullYear(), 11, 25);
-    if (now > x && now.toDateString() !== x.toDateString()) x = new Date(now.getFullYear() + 1, 11, 25);
-    const d = Math.round((x.getTime() - new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()) / 864e5);
-    setCountdown(d === 0 ? "It's Christmas Day" : d + (d === 1 ? " day" : " days") + " until Christmas");
   }, []);
 
   /* ---------- local copy ---------- */
@@ -329,180 +289,6 @@ export default function ChristmasClient({ initial }: { initial: ListState }) {
     setTimeout(() => setConfirm((c) => (c === ck ? null : c)), 4000);
   }
 
-  /* ---------- helper chat ---------- */
-  const turns = useRef<{ role: "user" | "assistant"; content: string }[]>([]);
-  const [busy, setBusy] = useState(false);
-  const [msgs, setMsgs] = useState<Msg[]>([]);
-  const [chipsHidden, setChipsHidden] = useState(false);
-  const [askHidden, setAskHidden] = useState(false);
-  const [chatOpen, setChatOpen] = useState(false);
-  const [box, setBox] = useState("");
-  const msgSeq = useRef(0);
-  const msgsEl = useRef<HTMLDivElement>(null);
-  const boxEl = useRef<HTMLTextAreaElement>(null);
-
-  useEffect(() => {
-    const el = msgsEl.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [msgs, chipsHidden]);
-
-  const addMsg = (m: Omit<Msg, "id">) => {
-    const id = ++msgSeq.current;
-    setMsgs((list) => [...list, { ...m, id }]);
-    return id;
-  };
-  const editMsg = (id: number, patch: Partial<Msg>) =>
-    setMsgs((list) => list.map((m) => (m.id === id ? { ...m, ...patch } : m)));
-
-  async function applyOps(ops: Record<string, unknown>[]) {
-    const done: string[] = [], undo: UndoStep[] = [];
-    for (const o of ops.slice(0, 40)) {
-      if (!o || typeof o !== "object") continue;
-      try {
-        if (o.op === "add_gift") {
-          const d = cleanGift(o);
-          if (!d.idea) continue;
-          if (!d.recipient) d.recipient = "Family";
-          const ex = model().groups.find((G) => key(G.name) === key(d.recipient));
-          if (ex) d.recipient = ex.name;
-          d.createdAt = Date.now() + done.length;
-          const [id, saved] = newGift(d);
-          await saved;
-          undo.push({ t: "del", path: "gifts/" + id });
-          done.push("Added “" + d.idea + "” for " + d.recipient + (d.est != null ? " (" + money(d.est) + ")" : ""));
-        } else if (o.op === "update_gift") {
-          const g = D.current.gifts.find((x) => x.id === String(o.id));
-          if (!g) continue;
-          const d = cleanGift(o);
-          if (!Object.keys(d).length) continue;
-          const prev: Record<string, unknown> = { ...g };
-          delete prev.id;
-          await updGift(g.id, d);
-          undo.push({ t: "set", path: "gifts/" + g.id, data: prev });
-          done.push(
-            "Updated “" + (d.idea || g.idea || "gift") + "”: " +
-              Object.keys(d)
-                .map((f) => {
-                  const v = (d as Record<string, unknown>)[f];
-                  return f + " → " + (f === "est" || f === "actual" ? (v == null ? "blank" : money(v as number)) : v);
-                })
-                .join(", "),
-          );
-        } else if (o.op === "delete_gift") {
-          const g = D.current.gifts.find((x) => x.id === String(o.id));
-          if (!g) continue;
-          const prev: Record<string, unknown> = { ...g };
-          delete prev.id;
-          await docDel("gifts/" + g.id);
-          undo.push({ t: "set", path: "gifts/" + g.id, data: prev });
-          done.push("Deleted “" + (g.idea || "gift") + "” (" + g.recipient + ")");
-        } else if (o.op === "set_budget") {
-          const name = String(o.person || "").trim();
-          if (!name) continue;
-          const b = o.budget == null ? null : num(o.budget);
-          const p = D.current.people.find((x) => key(x.name) === key(name));
-          if (p) {
-            const prev: Record<string, unknown> = { ...p };
-            delete prev.id;
-            const patch: Record<string, unknown> = { budget: b };
-            if (typeof o.role === "string") patch.role = o.role.slice(0, 60);
-            await docUpd("people/" + p.id, patch);
-            undo.push({ t: "set", path: "people/" + p.id, data: prev });
-            done.push(p.name + " budget → " + (b == null ? "none" : money(b)));
-          } else {
-            const id = uniqueId(name);
-            await setPerson(id, {
-              name: name.slice(0, 60),
-              role: typeof o.role === "string" ? o.role.slice(0, 60) : "",
-              budget: b,
-              order: nextOrder() + done.length,
-            });
-            undo.push({ t: "del", path: "people/" + id });
-            done.push("Added " + name + " with budget " + (b == null ? "none" : money(b)));
-          }
-        } else if (o.op === "remove_person") {
-          const p = D.current.people.find((x) => key(x.name) === key(o.person));
-          if (!p) continue;
-          const prev: Record<string, unknown> = { ...p };
-          delete prev.id;
-          await docDel("people/" + p.id);
-          undo.push({ t: "set", path: "people/" + p.id, data: prev });
-          done.push("Removed " + p.name + " from the budget");
-        } else if (o.op === "set_total_budget") {
-          const n = num(o.amount);
-          if (n == null) continue;
-          const prev = D.current.total;
-          await setTotal(n);
-          undo.push(prev == null ? { t: "del", path: "config/main" } : { t: "set", path: "config/main", data: { totalBudget: prev } });
-          done.push("Total budget → " + money(n));
-        }
-      } catch {
-        done.push("Couldn't apply one change (" + String(o.op) + ")");
-      }
-    }
-    return { done, undo };
-  }
-
-  async function runUndo(steps: UndoStep[]) {
-    for (const u of steps.slice().reverse()) {
-      if (u.t === "del") await docDel(u.path);
-      else await docSet(u.path, u.data);
-    }
-  }
-
-  async function ask(text: string) {
-    if (busy || !text.trim()) return;
-    setBusy(true);
-    setChipsHidden(true);
-    addMsg({ cls: "u", text });
-    const wait = addMsg({ cls: "a", text: "Thinking…" });
-    try {
-      // Let any edit still on its way land first, so the helper reads it.
-      await Promise.all(Object.values(q.current));
-      const r = await fetch("/api/christmas/helper", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, turns: turns.current.slice(-10) }),
-      });
-      if (r.status === 401) {
-        signedOut();
-        throw new ApiError("session_expired", 401);
-      }
-      const res = (await r.json().catch(() => ({ error: { code: "upstream" } }))) as {
-        reply?: unknown;
-        ops?: unknown;
-        error?: { code?: string };
-      };
-      if (res.error) throw new ApiError(res.error.code || "upstream", r.status);
-      const reply = String(res.reply || "Done.");
-      const ops = Array.isArray(res.ops) ? (res.ops as Record<string, unknown>[]) : [];
-      const { done, undo } = await applyOps(ops);
-      editMsg(wait, { text: reply, done, undo, undoState: "idle" });
-      turns.current.push(
-        { role: "user", content: text },
-        { role: "assistant", content: reply + (done.length ? "\n[Changes made: " + done.join("; ") + "]" : "") },
-      );
-    } catch (e) {
-      const code = e instanceof ApiError ? e.code : "";
-      editMsg(wait, { cls: "a err", text: COPY[code] || "Something went wrong reaching the helper. Try again." });
-      if (code === "sampling_disabled") setAskHidden(true);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function undoBatch(m: Msg) {
-    if (!m.undo) return;
-    editMsg(m.id, { undoState: "busy" });
-    try {
-      await runUndo(m.undo);
-      editMsg(m.id, { undoState: "done" });
-    } catch {
-      editMsg(m.id, { undoState: "idle" });
-      toast("Couldn't undo everything.");
-    }
-  }
-
   /* ---------- render ---------- */
   const m = model();
   const total = D.current.total;
@@ -524,204 +310,156 @@ export default function ChristmasClient({ initial }: { initial: ListState }) {
     setPerson(uniqueId(name), { name, role: "", budget: null, order: nextOrder() }).catch(() => {});
   }
 
+  const isNewGift = (id: string) => focusNext === "g:" + id + ":idea";
+
   return (
     <>
-      <div className="wrap">
-        <header className="top">
-          <h1>Adair Christmas 2026</h1>
-          <span className="count">{countdown}</span>
-        </header>
-        {banner && <div className="banner">{banner}</div>}
-
-        <div className="tiles">
-          <div className="tile">
-            <div className="lab">Total budget</div>
-            <Field
-              className="val"
-              inputMode="decimal"
-              aria-label="Total budget"
-              placeholder="Set budget"
-              value={total == null ? "" : money(total)}
-              onCommit={(v) => setTotal(num(v)).catch(() => {})}
-            />
-            <div className="sub">{money(alloc)} assigned to people</div>
-          </div>
-          <div className="tile">
-            <div className="lab">Estimated</div>
-            <div className="val">{money(m.est)}</div>
-            <div className={"sub" + (unplanned != null && unplanned < 0 ? " neg" : "")}>
-              {unplanned == null ? " " : unplanned >= 0 ? money(unplanned) + " not yet planned" : money(-unplanned) + " over budget"}
-            </div>
-          </div>
-          <div className="tile">
-            <div className="lab">Remaining</div>
-            <div className={"val" + (rem != null && rem < 0 ? " neg" : "")}>{rem == null ? "—" : money(rem)}</div>
-            <div className="sub">{money(m.spent)} spent so far</div>
-          </div>
-          <div className="tile">
-            <div className="lab">Gifts purchased</div>
-            <div className="val">{m.bought}</div>
-            <div className="sub">
-              of {m.gifts.length} planned gift{m.gifts.length === 1 ? "" : "s"}
-            </div>
-          </div>
-        </div>
-
-        <div className="cols">
-          <main className="list">
-            {!m.groups.length && (
-              <div className="empty">No one on the list yet. Add a person below, or ask the helper to set things up.</div>
-            )}
-            {m.groups.map((G) => (
-              <RecipientSection
-                key={G.person ? "p:" + G.person.id : "n:" + key(G.name)}
-                G={G}
-                confirm={confirm}
-                focusNext={focusNext}
-                onFocused={() => setFocusNext(null)}
-                onBudget={(v) => {
-                  const b = num(v);
-                  if (G.person) docUpd("people/" + G.person.id, { budget: b }).catch(() => {});
-                  else if (b != null)
-                    setPerson(uniqueId(G.name), { name: G.name, role: "", budget: b, order: nextOrder() }).catch(() => {});
-                }}
-                onAddGift={() => {
-                  const [id, saved] = newGift({ recipient: G.name });
-                  setFocusNext("g:" + id + ":idea");
-                  saved.catch(() => {});
-                }}
-                onRemovePerson={() => {
-                  const p = G.person!;
-                  const ck = "rm:" + p.id;
-                  if (confirm === ck) {
-                    setConfirm(null);
-                    docDel("people/" + p.id).catch(() => {});
-                  } else armConfirm(ck);
-                }}
-                onGift={(g, patch) => updGift(g.id, patch).catch(() => {})}
-                onDeleteGift={(g) => {
-                  const ck = "del:" + g.id;
-                  if (confirm === ck) {
-                    setConfirm(null);
-                    docDel("gifts/" + g.id).catch(() => {});
-                  } else armConfirm(ck);
-                }}
-              />
-            ))}
-            <form className="addp" onSubmit={addPerson}>
-              <input
-                ref={newName}
-                placeholder="Add a person or group (e.g. Grandma, Teachers)"
-                aria-label="New recipient name"
-                maxLength={60}
-              />
-              <button className="btn ghost" type="submit">
-                Add recipient
-              </button>
-            </form>
-          </main>
-
-          <aside className={"chat" + (chatOpen ? " open" : "")} aria-label="List helper">
-            <div className="chead">
-              <div>
-                <h2>List helper</h2>
-                <p>Adds, edits and tidies gifts and budgets.</p>
-              </div>
-              <button className="x" id="closeChat" type="button" aria-label="Close helper" onClick={() => setChatOpen(false)}>
-                ✕
-              </button>
-            </div>
-            <div className="msgs" ref={msgsEl}>
-              <div className="m a">
-                Tell me what to change — “add a $40 Lego set for Hudson from Parents”, “mark the game table purchased at
-                $185”, “give each kid $50 more budget”.
-              </div>
-              {!chipsHidden && (
-                <div className="chips">
-                  {CHIPS.map((c) => (
-                    <button key={c} className="chip" type="button" onClick={() => ask(c)}>
-                      {c}
-                    </button>
-                  ))}
-                </div>
-              )}
-              {msgs.map((msg) => (
-                <div key={msg.id} className={"m " + msg.cls}>
-                  {msg.text}
-                  {msg.done && msg.done.length > 0 && (
-                    <>
-                      <ul>
-                        {msg.done.map((d, i) => (
-                          <li key={i}>{d}</li>
-                        ))}
-                      </ul>
-                      <button
-                        className="undo"
-                        type="button"
-                        disabled={msg.undoState !== "idle"}
-                        onClick={() => undoBatch(msg)}
-                      >
-                        {msg.undoState === "done" ? "Undone" : "Undo"}
-                      </button>
-                    </>
-                  )}
-                </div>
-              ))}
-            </div>
-            {!askHidden && (
-              <form
-                className="ask"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  const v = box;
-                  setBox("");
-                  void ask(v);
-                }}
-              >
-                <textarea
-                  ref={boxEl}
-                  value={box}
-                  onChange={(e) => setBox(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      e.currentTarget.form?.requestSubmit();
-                    }
-                  }}
-                  placeholder="Ask the helper…"
-                  aria-label="Message the helper"
-                  maxLength={1000}
-                />
-                <button className="btn" type="submit" disabled={busy}>
-                  Send
-                </button>
-              </form>
-            )}
-          </aside>
-        </div>
-      </div>
-      {!chatOpen && (
-        <button
-          className="btn"
-          id="fab"
-          type="button"
-          onClick={() => {
-            setChatOpen(true);
-            setTimeout(() => boxEl.current?.focus(), 0);
-          }}
-        >
-          Ask helper
-        </button>
+      {banner && (
+        <p className="mb-4 border border-accent/50 px-3 py-2 font-mono text-[0.7rem] text-accent">{banner}</p>
       )}
-      {toastMsg && <div id="toast">{toastMsg}</div>}
+
+      {/* The four numbers, one ledger strip. */}
+      <div className="grid grid-cols-2 gap-px overflow-hidden border border-rule/60 bg-rule/60 sm:grid-cols-4">
+        <Tile label="Total budget" sub={`${money(alloc)} assigned to people`}>
+          <Field
+            className="w-full min-w-0 border-b border-dashed border-rule bg-transparent p-0 font-display text-[1.65rem] leading-tight tabular-nums text-cream placeholder:text-cream-dimmer focus:border-accent focus:outline-none"
+            inputMode="decimal"
+            aria-label="Total budget"
+            placeholder="Set budget"
+            value={total == null ? "" : money(total)}
+            onCommit={(v) => setTotal(num(v)).catch(() => {})}
+          />
+        </Tile>
+        <Tile
+          label="Estimated"
+          value={money(m.est)}
+          sub={unplanned == null ? " " : unplanned >= 0 ? `${money(unplanned)} not yet planned` : `${money(-unplanned)} over budget`}
+          subNeg={unplanned != null && unplanned < 0}
+        />
+        <Tile label="Remaining" value={rem == null ? "—" : money(rem)} neg={rem != null && rem < 0} sub={`${money(m.spent)} spent so far`} />
+        <Tile
+          label="Wrapped up"
+          value={
+            <>
+              {m.bought}
+              <span className="text-cream-dimmer"> / {m.gifts.length}</span>
+            </>
+          }
+          sub={`gift${m.gifts.length === 1 ? "" : "s"} bought`}
+        />
+      </div>
+
+      <div className="mt-6 space-y-4">
+        {!m.groups.length && (
+          <p className="border border-dashed border-rule px-4 py-8 text-center font-display italic text-cream-dim">
+            No one on the list yet. Add someone below, or ask the helper to set things up.
+          </p>
+        )}
+        {m.groups.map((G) => (
+          <RecipientSection
+            key={G.person ? "p:" + G.person.id : "n:" + key(G.name)}
+            G={G}
+            confirm={confirm}
+            isNew={isNewGift}
+            onFocused={() => setFocusNext(null)}
+            onBudget={(v) => {
+              const b = num(v);
+              if (G.person) docUpd("people/" + G.person.id, { budget: b }).catch(() => {});
+              else if (b != null) setPerson(uniqueId(G.name), { name: G.name, role: "", budget: b, order: nextOrder() }).catch(() => {});
+            }}
+            onAddGift={() => {
+              const [id, saved] = newGift({ recipient: G.name });
+              setFocusNext("g:" + id + ":idea");
+              saved.catch(() => {});
+            }}
+            onRemovePerson={() => {
+              const p = G.person!;
+              const ck = "rm:" + p.id;
+              if (confirm === ck) {
+                setConfirm(null);
+                docDel("people/" + p.id).catch(() => {});
+              } else armConfirm(ck);
+            }}
+            onGift={(g, patch) => updGift(g.id, patch).catch(() => {})}
+            onDeleteGift={(g) => {
+              const ck = "del:" + g.id;
+              if (confirm === ck) {
+                setConfirm(null);
+                docDel("gifts/" + g.id).catch(() => {});
+              } else armConfirm(ck);
+            }}
+          />
+        ))}
+
+        <form className="flex items-end gap-3 pt-2" onSubmit={addPerson}>
+          <input
+            ref={newName}
+            className="min-w-0 flex-1 border-b border-rule bg-transparent px-1 py-2 font-display text-[1.05rem] text-cream placeholder:italic placeholder:text-cream-dimmer focus:border-accent focus:outline-none"
+            placeholder="Add someone — Grandma, the teachers…"
+            aria-label="New recipient name"
+            maxLength={60}
+          />
+          <button
+            type="submit"
+            className="shrink-0 border border-rule/60 px-3 py-2 font-mono text-[0.68rem] uppercase tracking-kicker text-cream-dim transition-colors hover:border-cat-xmas/60 hover:text-cat-xmas"
+          >
+            Add
+          </button>
+        </form>
+      </div>
+
+      {toastMsg && (
+        <div className="fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom))] left-1/2 z-40 max-w-[calc(100%-2rem)] -translate-x-1/2 border border-rule bg-ink-raised px-4 py-2 font-mono text-[0.7rem] text-cream shadow-lg lg:left-[calc(50%+6.5rem)]">
+          {toastMsg}
+        </div>
+      )}
     </>
   );
 }
 
+function Tile({
+  label,
+  value,
+  sub,
+  neg,
+  subNeg,
+  children,
+}: {
+  label: string;
+  value?: React.ReactNode;
+  sub: string;
+  neg?: boolean;
+  subNeg?: boolean;
+  children?: React.ReactNode;
+}) {
+  return (
+    <div className="min-w-0 bg-ink px-4 py-3">
+      <div className="font-mono text-[0.6rem] uppercase tracking-kicker text-cream-dimmer">{label}</div>
+      <div className={`mt-1 font-display text-[1.65rem] leading-tight tabular-nums ${neg ? "text-accent" : "text-cream"}`}>
+        {children ?? value}
+      </div>
+      <div className={`mt-0.5 font-mono text-[0.62rem] leading-snug ${subNeg ? "text-accent" : "text-cream-dim"}`}>{sub}</div>
+    </div>
+  );
+}
+
+const STATUS_STYLE: Record<string, string> = {
+  Idea: "border-cat-xmas-gold/50 text-cat-xmas-gold",
+  Planned: "border-rule-strong text-cream-dim",
+  Ordered: "border-rule-strong text-cream",
+  Purchased: "border-cat-xmas/60 text-cat-xmas",
+  Wrapped: "border-accent/60 bg-accent/10 text-accent",
+};
+
+const INPUT =
+  "w-full min-w-0 border-b border-transparent bg-transparent px-1 py-1 text-cream placeholder:text-cream-dimmer/70 hover:border-rule focus:border-accent focus:outline-none";
+const MONEY = `${INPUT} font-mono text-[0.85rem] tabular-nums sm:text-right`;
+const LABEL = "block px-1 font-mono text-[0.55rem] uppercase tracking-kicker text-cream-dimmer sm:hidden";
+
 function RecipientSection({
   G,
   confirm,
-  focusNext,
+  isNew,
   onFocused,
   onBudget,
   onAddGift,
@@ -731,7 +469,7 @@ function RecipientSection({
 }: {
   G: Group;
   confirm: string | null;
-  focusNext: string | null;
+  isNew: (giftId: string) => boolean;
   onFocused: () => void;
   onBudget: (v: string) => void;
   onAddGift: () => void;
@@ -744,17 +482,19 @@ function RecipientSection({
   const spent = G.gifts.reduce((s, g) => s + (num(g.actual) || 0), 0);
   const bought = G.gifts.filter((g) => BOUGHT.has(g.status)).length;
   const budget = p ? num(p.budget) : null;
+  const left = budget != null ? budget - spent : null;
+  const over = budget != null && spent > budget;
   const ck = "rm:" + (p ? p.id : "");
   return (
-    <section className="rcp">
-      <div className="rhead">
-        <h2>{G.name}</h2>
-        {p && p.role ? <span className="role">{p.role}</span> : null}
-        <div className="stats">
-          <label className="bud">
-            Budget
+    <section className="border border-rule/60 bg-ink-raised/40">
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-4 pb-2.5 pt-3">
+        <h2 className="font-display text-[1.35rem] leading-tight text-cream">{G.name}</h2>
+        {p && p.role ? <span className="font-mono text-[0.6rem] uppercase tracking-kicker text-cream-dimmer">{p.role}</span> : null}
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 font-mono text-[0.68rem] tabular-nums text-cream-dim max-sm:w-full sm:ml-auto">
+          <label className="inline-flex items-baseline gap-1">
+            budget
             <Field
-              className="fi money"
+              className="w-[5.5rem] border-b border-dashed border-rule bg-transparent px-0.5 text-right text-[0.8rem] text-cream placeholder:text-cream-dimmer focus:border-accent focus:outline-none"
               inputMode="decimal"
               placeholder="none"
               aria-label={"Budget for " + G.name}
@@ -763,57 +503,67 @@ function RecipientSection({
             />
           </label>
           <span>
-            Spent <b>{money(spent)}</b>
+            spent <b className="font-medium text-cream">{money(spent)}</b>
           </span>
-          {budget != null ? (
-            <span className={budget - spent < 0 ? "neg" : ""}>
-              Left <b className={budget - spent < 0 ? "neg" : ""}>{money(budget - spent)}</b>
+          {left != null ? (
+            <span className={left < 0 ? "text-accent" : ""}>
+              left <b className={`font-medium ${left < 0 ? "text-accent" : "text-cream"}`}>{money(left)}</b>
             </span>
           ) : (
             <span>
-              Est. <b>{money(est)}</b>
+              est. <b className="font-medium text-cream">{money(est)}</b>
             </span>
           )}
           <span>
-            {bought} of {G.gifts.length} bought
+            {bought}/{G.gifts.length} bought
           </span>
         </div>
       </div>
       {budget ? (
-        <div className={"bar" + (spent > budget ? " over" : "")} role="img" aria-label={money(spent) + " spent of " + money(budget)}>
-          <i className="est" style={{ width: Math.min(100, (est / budget) * 100) + "%" }} />
-          <i className="spent" style={{ width: Math.min(100, (spent / budget) * 100) + "%" }} />
+        <div className="relative h-1.5 bg-rule/40" role="img" aria-label={`${money(spent)} spent of ${money(budget)}`}>
+          <i className="absolute inset-y-0 left-0 bg-cat-xmas/35" style={{ width: Math.min(100, (est / budget) * 100) + "%" }} />
+          <i
+            className={`absolute inset-y-0 left-0 ${over ? "bg-accent" : "xmas-candy"}`}
+            style={{ width: Math.min(100, (spent / budget) * 100) + "%" }}
+          />
         </div>
-      ) : null}
+      ) : (
+        <div className="h-px bg-rule/50" />
+      )}
       {G.gifts.length > 0 && (
-        <div className="colhead">
+        <div className="hidden grid-cols-[1.25rem_minmax(0,2.2fr)_minmax(0,1fr)_5.5rem_5.5rem_6.5rem_1.75rem] gap-2 px-4 pt-2.5 font-mono text-[0.55rem] uppercase tracking-kicker text-cream-dimmer sm:grid">
           <span />
-          <span>Gift</span>
-          <span>From</span>
-          <span>Est.</span>
-          <span>Actual</span>
-          <span>Status</span>
+          <span className="px-1">Gift</span>
+          <span className="px-1">From</span>
+          <span className="px-1 text-right">Est.</span>
+          <span className="px-1 text-right">Actual</span>
+          <span className="text-center">Status</span>
           <span />
         </div>
       )}
-      {G.gifts.map((g) => (
+      {G.gifts.map((g, i) => (
         <GiftRow
           key={g.id}
           g={g}
+          first={i === 0}
           confirming={confirm === "del:" + g.id}
-          autoFocusIdea={focusNext === "g:" + g.id + ":idea"}
+          autoFocusIdea={isNew(g.id)}
           onFocused={onFocused}
           onPatch={(patch) => onGift(g, patch)}
           onDelete={() => onDeleteGift(g)}
         />
       ))}
-      <div className="rfoot">
-        <button className="link" type="button" onClick={onAddGift}>
+      <div className="flex items-center justify-between gap-2 px-3 pb-2.5 pt-1.5 font-mono text-[0.66rem] uppercase tracking-kicker">
+        <button type="button" onClick={onAddGift} className="px-1 py-1.5 text-cat-xmas hover:text-cream">
           + Add gift
         </button>
         {p ? (
-          <button className="link quiet" type="button" onClick={onRemovePerson}>
-            {confirm === ck ? "Tap again to remove " + G.name : "Remove from budget"}
+          <button
+            type="button"
+            onClick={onRemovePerson}
+            className={`px-1 py-1.5 ${confirm === ck ? "text-accent" : "text-cream-dimmer hover:text-accent"}`}
+          >
+            {confirm === ck ? `Tap again to remove ${G.name}` : "Remove from budget"}
           </button>
         ) : null}
       </div>
@@ -823,6 +573,7 @@ function RecipientSection({
 
 function GiftRow({
   g,
+  first,
   confirming,
   autoFocusIdea,
   onFocused,
@@ -830,6 +581,7 @@ function GiftRow({
   onDelete,
 }: {
   g: Gift;
+  first: boolean;
   confirming: boolean;
   autoFocusIdea: boolean;
   onFocused: () => void;
@@ -837,6 +589,7 @@ function GiftRow({
   onDelete: () => void;
 }) {
   const st = (STATUSES as readonly string[]).includes(g.status) ? g.status : "Idea";
+  const done = BOUGHT.has(st);
   const ideaRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (autoFocusIdea) {
@@ -845,23 +598,26 @@ function GiftRow({
     }
   }, [autoFocusIdea, onFocused]);
   return (
-    <div className={"gift" + (BOUGHT.has(st) ? " done" : "")}>
+    <div
+      className={`grid grid-cols-[1.25rem_minmax(0,1fr)_minmax(0,1fr)_1.75rem] items-center gap-x-2 gap-y-1 px-4 py-2.5 sm:grid-cols-[1.25rem_minmax(0,2.2fr)_minmax(0,1fr)_5.5rem_5.5rem_6.5rem_1.75rem] sm:py-1.5 ${
+        first ? "max-sm:border-t max-sm:border-rule/40" : "border-t border-rule/40"
+      }`}
+    >
       <input
-        className="chk"
+        className="h-4 w-4 cursor-pointer justify-self-center accent-cat-xmas max-sm:row-[1]"
         type="checkbox"
         aria-label="Purchased"
         title="Mark purchased"
-        checked={BOUGHT.has(st)}
+        checked={done}
         onChange={(e) => {
           const patch: Record<string, unknown> = { status: e.target.checked ? "Purchased" : "Planned" };
           if (e.target.checked && num(g.actual) == null && num(g.est) != null) patch.actual = num(g.est);
           onPatch(patch);
         }}
       />
-      <label className="f idea">
-        <span>Gift</span>
+      <label className="min-w-0 max-sm:col-[2/4]">
         <Field
-          className="fi"
+          className={`${INPUT} font-display text-[1.05rem] ${done ? "text-cream-dim line-through decoration-cream-dimmer" : ""}`}
           inputRef={ideaRef}
           value={g.idea || ""}
           placeholder="Gift idea"
@@ -869,48 +625,51 @@ function GiftRow({
           onCommit={(v) => onPatch({ idea: v.trim() })}
         />
       </label>
-      <label className="f from">
-        <span>From</span>
-        <Field className="fi" value={g.from || ""} placeholder="From" aria-label="From" onCommit={(v) => onPatch({ from: v.trim() })} />
+      <label className="min-w-0 max-sm:col-[1/3] max-sm:row-[2]">
+        <span className={LABEL}>From</span>
+        <Field className={`${INPUT} font-display text-[0.95rem]`} value={g.from || ""} placeholder="From" aria-label="From" onCommit={(v) => onPatch({ from: v.trim() })} />
       </label>
-      <label className="f est">
-        <span>Est.</span>
-        <Field
-          className="fi money"
-          inputMode="decimal"
-          value={money(num(g.est))}
-          placeholder="$"
-          aria-label="Estimated cost"
-          onCommit={(v) => onPatch({ est: num(v) })}
-        />
+      <label className="min-w-0 max-sm:col-[1/3] max-sm:row-[3]">
+        <span className={LABEL}>Est.</span>
+        <Field className={MONEY} inputMode="decimal" value={money(num(g.est))} placeholder="$" aria-label="Estimated cost" onCommit={(v) => onPatch({ est: num(v) })} />
       </label>
-      <label className="f actual">
-        <span>Actual</span>
-        <Field
-          className="fi money"
-          inputMode="decimal"
-          value={money(num(g.actual))}
-          placeholder="$"
-          aria-label="Actual cost"
-          onCommit={(v) => onPatch({ actual: num(v) })}
-        />
+      <label className="min-w-0 max-sm:col-[3/5] max-sm:row-[3]">
+        <span className={LABEL}>Actual</span>
+        <Field className={MONEY} inputMode="decimal" value={money(num(g.actual))} placeholder="$" aria-label="Actual cost" onCommit={(v) => onPatch({ actual: num(v) })} />
       </label>
-      <label className="f status">
-        <span>Status</span>
-        <select className={"fi s-" + st.toLowerCase()} aria-label="Status" value={st} onChange={(e) => onPatch({ status: e.target.value })}>
+      <label className="min-w-0 max-sm:col-[3/5] max-sm:row-[2]">
+        <span className={LABEL}>Status</span>
+        <select
+          className={`w-full cursor-pointer appearance-none rounded-full border bg-transparent px-2 py-0.5 text-center font-mono text-[0.6rem] uppercase tracking-kicker [text-align-last:center] max-sm:w-auto max-sm:px-3 ${STATUS_STYLE[st]}`}
+          aria-label="Status"
+          value={st}
+          onChange={(e) => onPatch({ status: e.target.value })}
+        >
           {STATUSES.map((s) => (
             <option key={s} value={s}>
-              {s}
+              {s === "Wrapped" ? "Wrapped ✶" : s}
             </option>
           ))}
         </select>
       </label>
-      <button className={"x" + (confirming ? " sure" : "")} type="button" aria-label="Delete gift" onClick={onDelete}>
-        {confirming ? "Delete?" : "✕"}
+      <button
+        type="button"
+        aria-label="Delete gift"
+        onClick={onDelete}
+        className={`justify-self-end font-mono max-sm:col-[4] max-sm:row-[1] ${
+          confirming ? "whitespace-nowrap bg-accent px-1.5 py-0.5 text-[0.6rem] uppercase tracking-kicker text-ink" : "px-1 text-[1rem] text-cream-dimmer hover:text-accent"
+        }`}
+      >
+        {confirming ? "Delete?" : "×"}
       </button>
-      <label className="f notes">
-        <span>Notes</span>
-        <Field className="fi" value={g.notes || ""} placeholder="Notes, links, sizes…" aria-label="Notes" onCommit={(v) => onPatch({ notes: v.trim() })} />
+      <label className="col-span-full min-w-0 sm:col-start-2">
+        <Field
+          className={`${INPUT} py-0.5 font-display text-[0.85rem] italic text-cream-dim`}
+          value={g.notes || ""}
+          placeholder="Notes, links, sizes…"
+          aria-label="Notes"
+          onCommit={(v) => onPatch({ notes: v.trim() })}
+        />
       </label>
     </div>
   );

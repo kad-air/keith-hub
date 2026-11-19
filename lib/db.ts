@@ -160,6 +160,21 @@ export function getDb(): Database.Database {
       created_at INTEGER NOT NULL
     );
 
+    -- The Christmas list helper's conversation (/christmas/helper): ONE thread,
+    -- shared by everyone with the list, like book_ask_turns is one per book.
+    -- An assistant turn carries what it changed (changes_json, the lines the
+    -- page lists) and how to put it back (undo_json, applied by
+    -- POST /api/christmas/helper/undo; undone_at once it has been).
+    CREATE TABLE IF NOT EXISTS xmas_helper_turns (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
+      content TEXT NOT NULL,
+      changes_json TEXT,
+      undo_json TEXT,
+      undone_at INTEGER,
+      created_at INTEGER NOT NULL
+    );
+
     -- Setlist: uploaded guitar chord charts displayed as clean mono text with
     -- a configurable-speed autoscroll viewer. content is the raw chart text,
     -- preserved verbatim (chord-over-lyric alignment matters). sort_order is

@@ -311,3 +311,25 @@ export function takeHelperAllowance(dailyCap: number, now = new Date()): boolean
   db.prepare("DELETE FROM kv WHERE key LIKE 'christmas_helper_day:%' AND key < ?").run(k);
   return ok;
 }
+
+// --- undo --------------------------------------------------------------------------
+
+/**
+ * Put back what a helper answer changed, last change first. Steps name docs the
+ * way the page always has: "gifts/<id>", "people/<id>", "config/main".
+ */
+export function applyUndo(steps: ({ t: "del"; path: string } | { t: "set"; path: string; data: Record<string, unknown> })[]): void {
+  for (const u of steps.slice().reverse()) {
+    const [kind, id] = u.path.split("/");
+    if (kind === "config") {
+      if (u.t === "del") clearTotalBudget();
+      else setTotalBudget(u.data);
+    } else if (kind === "gifts") {
+      if (u.t === "del") deleteGift(id);
+      else setGift(id, u.data);
+    } else if (kind === "people") {
+      if (u.t === "del") deletePerson(id);
+      else setPerson(id, u.data);
+    }
+  }
+}
