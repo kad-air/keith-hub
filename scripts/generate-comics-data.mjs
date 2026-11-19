@@ -11,6 +11,16 @@ const storylines = JSON.parse(
   fs.readFileSync(path.join(SRC, "storylines.json"), "utf8"),
 );
 
+// marvelIssueId -> issue id in the new Marvel Comics app (marvelcomicsapp.com).
+// Lives in this repo; see scripts/comics-data-pipeline.md, Step 6.
+const APP_IDS = JSON.parse(
+  fs.readFileSync(
+    path.join(path.dirname(new URL(import.meta.url).pathname), "marvel-comics-app-ids.json"),
+    "utf8",
+  ),
+);
+const missingAppIds = [];
+
 function readJsonOrEmpty(p) {
   if (!fs.existsSync(p)) return null;
   return JSON.parse(fs.readFileSync(p, "utf8"));
@@ -38,6 +48,8 @@ function loadStoryline(meta) {
       const digital = row.slug ? applinks[row.slug] : null;
       if (!digital || !row.id || !row.slug) return null;
       const drn = drns[digital] ?? null;
+      const appIssueId = APP_IDS[row.id] ?? null;
+      if (appIssueId === null) missingAppIds.push(`${meta.slug}: ${row.title} (${row.id})`);
       return {
         id: digital,
         title: row.title,
@@ -46,6 +58,7 @@ function loadStoryline(meta) {
         slug: row.slug,
         drn: drn?.drn ?? null,
         sourceId: drn?.sourceId ?? null,
+        appIssueId,
       };
     })
     .filter(Boolean);
@@ -66,6 +79,7 @@ export interface ComicIssue {
   slug: string;
   drn: string | null;
   sourceId: string | null;
+  appIssueId: number | null;
 }
 
 export interface Storyline {
@@ -89,3 +103,10 @@ console.log(
   `Wrote ${dest} (${built.length} storylines, ${total} issues total)`,
 );
 for (const s of built) console.log(`  ${s.slug}: ${s.issues.length} issues`);
+if (missingAppIds.length) {
+  console.warn(
+    `\n${missingAppIds.length} issue(s) have no Marvel Comics app id yet (they fall back to the old Marvel links).` +
+      ` Look them up and add them to scripts/marvel-comics-app-ids.json:`,
+  );
+  for (const m of missingAppIds) console.warn(`  ${m}`);
+}
