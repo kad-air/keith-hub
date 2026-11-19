@@ -2,7 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { Answer } from "@/components/BookAskClient";
-import type { HelperTurn } from "@/lib/christmas/helperStore";
+import type { Asker, HelperTurn } from "@/lib/christmas/helperStore";
 
 // The list helper's conversation, adapted from the books "Ask" page
 // (components/BookAskClient.tsx): the thread lives on the server and is shared
@@ -14,7 +14,17 @@ import type { HelperTurn } from "@/lib/christmas/helperStore";
 // its tools — lib/christmas/helper.ts). Each change shows under the answer as
 // it lands, and an answer's changes can be undone together.
 
-type Status = { turns: HelperTurn[]; pending: boolean; configured: boolean };
+type Status = { turns: HelperTurn[]; pending: boolean; configured: boolean; me: Asker };
+
+/** Whose question it is, above the question: Keith in gold, Kim in pine. */
+function Asked({ by }: { by: Asker | null }) {
+  if (!by) return null;
+  return (
+    <li className={`-mb-6 font-mono text-[0.6rem] uppercase tracking-kicker ${by === "Kim" ? "text-cat-xmas" : "text-cat-xmas-gold"}`}>
+      {by} asked
+    </li>
+  );
+}
 
 const PENDING_POLL_MS = 3000;
 
@@ -262,6 +272,7 @@ export default function HelperClient({ initial }: { initial: Status }) {
         <ol ref={listRef} className="mt-4 space-y-7">
           {turns.map((t, i) => (
             <Fragment key={t.id}>
+              {t.role === "user" && <Asked by={t.author} />}
               {t.role === "user" ? (
                 <li className={QUESTION} {...(!live && i === lastIndex ? { "data-last-question": "" } : {})}>
                   {t.content}
@@ -280,6 +291,7 @@ export default function HelperClient({ initial }: { initial: Status }) {
           ))}
           {live && (
             <>
+              <Asked by={status.me} />
               <li className={QUESTION} data-last-question="">
                 {live.question}
               </li>

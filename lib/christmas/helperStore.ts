@@ -10,9 +10,13 @@ export type UndoStep =
   | { t: "del"; path: string }
   | { t: "set"; path: string; data: Record<string, unknown> };
 
+export type Asker = "Keith" | "Kim";
+
 export type HelperTurn = {
   id: number;
   role: "user" | "assistant";
+  /** Who asked: "Keith" or "Kim". Questions only; null on answers. */
+  author: Asker | null;
   content: string;
   /** What the answer changed, one line each. Assistant turns only. */
   changes: string[];
@@ -26,6 +30,7 @@ export type HelperTurn = {
 type Row = {
   id: number;
   role: "user" | "assistant";
+  author: string | null;
   content: string;
   changes_json: string | null;
   undo_json: string | null;
@@ -43,6 +48,7 @@ function toTurn(r: Row): HelperTurn {
   return {
     id: r.id,
     role: r.role,
+    author: r.author === "Keith" || r.author === "Kim" ? r.author : null,
     content: r.content,
     changes,
     undoable: Boolean(r.undo_json) && r.undone_at == null,
@@ -56,7 +62,7 @@ export function listTurns(): HelperTurn[] {
 }
 
 /** Store a new question; null while an earlier one is still being answered. */
-export function beginQuestion(question: string, at = now()): number | null {
+export function beginQuestion(question: string, author: Asker, at = now()): number | null {
   const db = getDb();
   return db.transaction(() => {
     const last = db.prepare("SELECT id, role, created_at FROM xmas_helper_turns ORDER BY id DESC LIMIT 1").get() as
@@ -67,8 +73,8 @@ export function beginQuestion(question: string, at = now()): number | null {
       db.prepare("DELETE FROM xmas_helper_turns WHERE id = ?").run(last.id);
     }
     const r = db
-      .prepare("INSERT INTO xmas_helper_turns (role, content, created_at) VALUES ('user', ?, ?)")
-      .run(question, at);
+      .prepare("INSERT INTO xmas_helper_turns (role, author, content, created_at) VALUES ('user', ?, ?, ?)")
+      .run(author, question, at);
     return Number(r.lastInsertRowid);
   })();
 }

@@ -13,6 +13,7 @@ import {
 import { takeHelperAllowance } from "@/lib/christmas/store";
 import { XMAS_COOKIE } from "@/lib/christmas/auth";
 import { allow, clientAddress } from "@/lib/christmas/rateLimit";
+import { whoIsAsking } from "@/lib/christmas/identity";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -50,10 +51,10 @@ function liveTurns() {
   return turns;
 }
 
-export function GET() {
+export async function GET() {
   const turns = liveTurns();
   return NextResponse.json(
-    { turns, pending: isPending(turns), configured: Boolean(process.env.ANTHROPIC_API_KEY) },
+    { turns, pending: isPending(turns), configured: Boolean(process.env.ANTHROPIC_API_KEY), me: await whoIsAsking() },
     { headers: { "Cache-Control": "no-store" } },
   );
 }
@@ -87,7 +88,8 @@ export async function POST(request: Request): Promise<Response> {
 
   const earlier = liveTurns().slice(-MAX_TURNS_SENT);
   while (earlier.length && earlier[0].role !== "user") earlier.shift();
-  const questionId = beginQuestion(question);
+  const asker = await whoIsAsking();
+  const questionId = beginQuestion(question, asker);
   if (questionId == null) {
     return NextResponse.json({ error: "The last question is still being answered." }, { status: 409 });
   }
@@ -112,6 +114,7 @@ export async function POST(request: Request): Promise<Response> {
     try {
       const result = await runHelper(
         question,
+        asker,
         earlier,
         batch,
         (v) => send({ t: "text", v }),

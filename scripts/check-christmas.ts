@@ -169,10 +169,23 @@ assert(lines.length === 5 && batch.changes.length === 5 && batch.undo.length ===
 applyUndo(batch.undo as never);
 assert(JSON.stringify((({ rev: _r, ...x }) => x)(store.getListState())) === before, "undoing the batch puts the list back exactly");
 const hist = historyMessages([
-  { id: 1, role: "user", content: "q", changes: [], undoable: false, undone: false, createdAt: 0 },
-  { id: 2, role: "assistant", content: "a", changes: ["Added x"], undoable: true, undone: false, createdAt: 0 },
+  { id: 1, role: "user", author: "Kim", content: "q", changes: [], undoable: false, undone: false, createdAt: 0 },
+  { id: 2, role: "assistant", author: null, content: "a", changes: ["Added x"], undoable: true, undone: false, createdAt: 0 },
 ]);
 assert(String(hist[1].content).includes("[Changes made: Added x]"), "earlier answers carry what they changed");
+assert(hist[0].content === "Kim asks: q", "earlier questions say who asked");
+// Who is asking: a hub login is Keith (whatever else the device has); anyone
+// else past the middleware came in by passcode and is Kim.
+const { askerFor } = await import("../lib/christmas/identity.ts");
+const hubToken = await deriveAuthToken(PASSWORD);
+assert((await askerFor(hubToken, PASSWORD)) === "Keith", "hub login → Keith");
+assert((await askerFor(undefined, PASSWORD)) === "Kim", "passcode only → Kim");
+assert((await askerFor("forged", PASSWORD)) === "Kim", "a wrong hub cookie → Kim, never Keith");
+assert((await askerFor(hubToken, undefined)) === "Kim", "no hub password configured → Kim");
+const hs = await import("../lib/christmas/helperStore.ts");
+const qid = hs.beginQuestion("who am I?", "Kim");
+assert(qid != null && hs.listTurns().at(-1)?.author === "Kim", "the asker is stored with the question");
+hs.clearTurns();
 // Anthropic's strict-schema budget, per request: 20 strict tools, 24 optional
 // parameters, 16 nullable/union parameters. Over it, every request is a 400.
 let optional = 0, unions = 0;

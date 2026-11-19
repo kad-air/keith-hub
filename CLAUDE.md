@@ -2190,7 +2190,11 @@ the hub's red accent (all three theme blocks in `app/globals.css`), a little CSS
   hand edit; a store refusal goes back to the model as a `ToolError`. Each change records a line
   (streamed as `{t:"change"}`, shown under the answer) and an undo step; `POST
   /api/christmas/helper/undo {turnId}` puts one answer's changes back in one transaction. The list
-  JSON is read from the database on the server, never from the request. 🔴 Strict schemas share a
+  JSON is read from the database on the server, never from the request. 🔴 **Who asked** (`lib/christmas/identity.ts`):
+  a valid hub cookie means **Keith** (even with the passcode cookie too); anyone else past the
+  middleware came in by passcode and is **Kim**. Decided on the server per request, stored on the
+  question (`xmas_helper_turns.author`), shown above it ("Kim asked"), and given to the model ("Kim
+  asks: …") so it knows who it is talking to. 🔴 Strict schemas share a
   per-request budget (20 strict tools, 24 optional params, 16 union/nullable params); the tools use
   6/13/3 and `check:christmas` pins it. Limits: 6/min and 40/hour per device, a durable
   `CHRISTMAS_HELPER_DAILY_CAP` (default 150) per UTC day in `kv`, questions ≤1000 chars.

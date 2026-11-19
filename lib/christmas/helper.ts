@@ -14,7 +14,7 @@ import {
   updateGift,
   updatePerson,
 } from "@/lib/christmas/store";
-import type { HelperTurn, UndoStep } from "@/lib/christmas/helperStore";
+import type { Asker, HelperTurn, UndoStep } from "@/lib/christmas/helperStore";
 
 // The list helper: Claude with six tools, run by the SDK's tool runner (the
 // approach Anthropic's docs recommend over a hand-written loop). The tools ARE
@@ -30,7 +30,7 @@ import type { HelperTurn, UndoStep } from "@/lib/christmas/helperStore";
 
 export const MODEL = "claude-opus-5-5";
 
-export const INSTRUCTIONS = `You are the helper on a family's shared Christmas gift list and budget page. Keith and Kim, the parents, plan Christmas on it together; either of them may be asking.
+export const INSTRUCTIONS = `You are the helper on a family's shared Christmas gift list and budget page. Keith and Kim, the parents, plan Christmas on it together. Each question says which of them is asking; speak to that person by name when it's natural, and remember the other one can read this conversation too.
 
 You can read the whole list: it comes with every question, as JSON. You can change it only with your tools: add, update and delete gifts, set or remove a person's budget line, and set the total budget. You cannot change how the page works or looks; if asked, say that needs a change to the page itself.
 
@@ -254,9 +254,11 @@ export function historyMessages(turns: HelperTurn[]): Anthropic.Beta.BetaMessage
   return turns.map((t) => ({
     role: t.role,
     content:
-      t.role === "assistant" && t.changes.length
-        ? `${t.content}\n\n[Changes made: ${t.changes.join("; ")}${t.undone ? " — later undone" : ""}]`
-        : t.content,
+      t.role === "user"
+        ? `${t.author ?? "Someone"} asks: ${t.content}`
+        : t.changes.length
+          ? `${t.content}\n\n[Changes made: ${t.changes.join("; ")}${t.undone ? " — later undone" : ""}]`
+          : t.content,
   }));
 }
 
@@ -269,6 +271,7 @@ export type HelperResult = { answer: string; refused: boolean; truncated: boolea
  */
 export async function runHelper(
   question: string,
+  asker: Asker,
   earlier: HelperTurn[],
   batch: Batch,
   onText: (delta: string) => void,
@@ -291,7 +294,7 @@ export async function runHelper(
     tools: helperTools(batch, onChange),
     messages: [
       ...historyMessages(earlier),
-      { role: "user", content: `THE LIST RIGHT NOW:\n${stateForHelper(getListState())}\n\n${question}` },
+      { role: "user", content: `THE LIST RIGHT NOW:\n${stateForHelper(getListState())}\n\n${asker} asks: ${question}` },
     ],
   });
 

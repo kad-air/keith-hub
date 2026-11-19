@@ -168,6 +168,9 @@ export function getDb(): Database.Database {
     CREATE TABLE IF NOT EXISTS xmas_helper_turns (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
+      -- Who asked (questions only): 'Keith' (signed in to the hub) or 'Kim'
+      -- (in by the family passcode) — lib/christmas/identity.ts.
+      author TEXT,
       content TEXT NOT NULL,
       changes_json TEXT,
       undo_json TEXT,
