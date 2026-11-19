@@ -1,0 +1,1052 @@
+{
+  "slug": "hickman-x-men",
+  "title": "Jonathan Hickman's X-Men",
+  "description": "House of X / Powers of X through the X of Swords crossover.",
+  "source": {
+    "kind": "legacy",
+    "name": "Built from Marvel Unlimited data before it closed; ids moved to the Marvel Comics app in Nov 2026",
+    "url": null
+  },
+  "issues": [
+    {
+      "title": "House of X #1",
+      "series": "House of X",
+      "year": null,
+      "number": "1",
+      "appIssueId": 30604
+    },
+    {
+      "title": "Powers of X #1",
+      "series": "Powers of X",
+      "year": null,
+      "number": "1",
+      "appIssueId": 30618
+    },
+    {
+      "title": "House of X #2",
+      "series": "House of X",
+      "year": null,
+      "number": "2",
+      "appIssueId": 30608
+    },
+    {
+      "title": "Powers of X #2",
+      "series": "Powers of X",
+      "year": null,
+      "number": "2",
+      "appIssueId": 30617
+    },
+    {
+      "title": "Powers of X #3",
+      "series": "Powers of X",
+      "year": null,
+      "number": "3",
+      "appIssueId": 30622
+    },
+    {
+      "title": "House of X #3",
+      "series": "House of X",
+      "year": null,
+      "number": "3",
+      "appIssueId": 35890
+    },
+    {
+      "title": "House of X #4",
+      "series": "House of X",
+      "year": null,
+      "number": "4",
+      "appIssueId": 30605
+    },
+    {
+      "title": "Marvel Comics #1000",
+      "series": "Marvel Comics",
+      "year": null,
+      "number": "1000",
+      "appIssueId": 30629
+    },
+    {
+      "title": "Powers of X #4",
+      "series": "Powers of X",
+      "year": null,
+      "number": "4",
+      "appIssueId": 30624
+    },
+    {
+      "title": "House of X #5",
+      "series": "House of X",
+      "year": null,
+      "number": "5",
+      "appIssueId": 30610
+    },
+    {
+      "title": "Powers of X #5",
+      "series": "Powers of X",
+      "year": null,
+      "number": "5",
+      "appIssueId": 35885
+    },
+    {
+      "title": "House of X #6",
+      "series": "House of X",
+      "year": null,
+      "number": "6",
+      "appIssueId": 30615
+    },
+    {
+      "title": "Powers of X #6",
+      "series": "Powers of X",
+      "year": null,
+      "number": "6",
+      "appIssueId": 30623
+    },
+    {
+      "title": "X-Men (2019) #1",
+      "series": "X-Men",
+      "year": 2019,
+      "number": "1",
+      "appIssueId": 31938
+    },
+    {
+      "title": "Marauders (2019) #1",
+      "series": "Marauders",
+      "year": 2019,
+      "number": "1",
+      "appIssueId": 31948
+    },
+    {
+      "title": "Excalibur (2019) #1",
+      "series": "Excalibur",
+      "year": 2019,
+      "number": "1",
+      "appIssueId": 31994
+    },
+    {
+      "title": "New Mutants (2019) #1",
+      "series": "New Mutants",
+      "year": 2019,
+      "number": "1",
+      "appIssueId": 32013
+    },
+    {
+      "title": "X-Force (2019) #1",
+      "series": "X-Force",
+      "year": 2019,
+      "number": "1",
+      "appIssueId": 32044
+    },
+    {
+      "title": "Fallen Angels (2019) #1",
+      "series": "Fallen Angels",
+      "year": 2019,
+      "number": "1",
+      "appIssueId": 32106
+    },
+    {
+      "title": "X-Men (2019) #2",
+      "series": "X-Men",
+      "year": 2019,
+      "number": "2",
+      "appIssueId": 31935
+    },
+    {
+      "title": "Marauders (2019) #2",
+      "series": "Marauders",
+      "year": 2019,
+      "number": "2",
+      "appIssueId": 31951
+    },
+    {
+      "title": "Excalibur (2019) #2",
+      "series": "Excalibur",
+      "year": 2019,
+      "number": "2",
+      "appIssueId": 31996
+    },
+    {
+      "title": "New Mutants (2019) #2",
+      "series": "New Mutants",
+      "year": 2019,
+      "number": "2",
+      "appIssueId": 32016
+    },
+    {
+      "title": "X-Force (2019) #2",
+      "series": "X-Force",
+      "year": 2019,
+      "number": "2",
+      "appIssueId": 32047
+    },
+    {
+      "title": "Fallen Angels (2019) #2",
+      "series": "Fallen Angels",
+      "year": 2019,
+      "number": "2",
+      "appIssueId": 32102
+    },
+    {
+      "title": "X-Men (2019) #3",
+      "series": "X-Men",
+      "year": 2019,
+      "number": "3",
+      "appIssueId": 31939
+    },
+    {
+      "title": "Marauders (2019) #3",
+      "series": "Marauders",
+      "year": 2019,
+      "number": "3",
+      "appIssueId": 31952
+    },
+    {
+      "title": "Excalibur (2019) #3",
+      "series": "Excalibur",
+      "year": 2019,
+      "number": "3",
+      "appIssueId": 31992
+    },
+    {
+      "title": "New Mutants (2019) #3",
+      "series": "New Mutants",
+      "year": 2019,
+      "number": "3",
+      "appIssueId": 32017
+    },
+    {
+      "title": "X-Force (2019) #3",
+      "series": "X-Force",
+      "year": 2019,
+      "number": "3",
+      "appIssueId": 32048
+    },
+    {
+      "title": "Fallen Angels (2019) #3",
+      "series": "Fallen Angels",
+      "year": 2019,
+      "number": "3",
+      "appIssueId": 32104
+    },
+    {
+      "title": "Marauders (2019) #4",
+      "series": "Marauders",
+      "year": 2019,
+      "number": "4",
+      "appIssueId": 31955
+    },
+    {
+      "title": "X-Force (2019) #4",
+      "series": "X-Force",
+      "year": 2019,
+      "number": "4",
+      "appIssueId": 32054
+    },
+    {
+      "title": "New Mutants (2019) #4",
+      "series": "New Mutants",
+      "year": 2019,
+      "number": "4",
+      "appIssueId": 32021
+    },
+    {
+      "title": "Excalibur (2019) #4",
+      "series": "Excalibur",
+      "year": 2019,
+      "number": "4",
+      "appIssueId": 31999
+    },
+    {
+      "title": "Fallen Angels (2019) #4",
+      "series": "Fallen Angels",
+      "year": 2019,
+      "number": "4",
+      "appIssueId": 32108
+    },
+    {
+      "title": "Incoming #1",
+      "series": "Incoming",
+      "year": null,
+      "number": "1",
+      "appIssueId": 35891
+    },
+    {
+      "title": "Gwenpool Strikes Back #5",
+      "series": "Gwenpool Strikes Back",
+      "year": null,
+      "number": "5",
+      "appIssueId": 31815
+    },
+    {
+      "title": "X-Men (2019) #4",
+      "series": "X-Men",
+      "year": 2019,
+      "number": "4",
+      "appIssueId": 31941
+    },
+    {
+      "title": "Marauders (2019) #5",
+      "series": "Marauders",
+      "year": 2019,
+      "number": "5",
+      "appIssueId": 31956
+    },
+    {
+      "title": "New Mutants (2019) #5",
+      "series": "New Mutants",
+      "year": 2019,
+      "number": "5",
+      "appIssueId": 32019
+    },
+    {
+      "title": "X-Force (2019) #5",
+      "series": "X-Force",
+      "year": 2019,
+      "number": "5",
+      "appIssueId": 32049
+    },
+    {
+      "title": "Excalibur (2019) #5",
+      "series": "Excalibur",
+      "year": 2019,
+      "number": "5",
+      "appIssueId": 32001
+    },
+    {
+      "title": "Fallen Angels (2019) #5",
+      "series": "Fallen Angels",
+      "year": 2019,
+      "number": "5",
+      "appIssueId": 32110
+    },
+    {
+      "title": "Excalibur (2019) #6",
+      "series": "Excalibur",
+      "year": 2019,
+      "number": "6",
+      "appIssueId": 32002
+    },
+    {
+      "title": "Marvel's Voices #1",
+      "series": "Marvel's Voices",
+      "year": null,
+      "number": "1",
+      "appIssueId": 32436
+    },
+    {
+      "title": "X-Men/Fantastic Four (2020) #1",
+      "series": "X-Men/Fantastic Four",
+      "year": 2020,
+      "number": "1",
+      "appIssueId": 32346
+    },
+    {
+      "title": "X-Men/Fantastic Four (2020) #2",
+      "series": "X-Men/Fantastic Four",
+      "year": 2020,
+      "number": "2",
+      "appIssueId": 35896
+    },
+    {
+      "title": "X-Men/Fantastic Four (2020) #3",
+      "series": "X-Men/Fantastic Four",
+      "year": 2020,
+      "number": "3",
+      "appIssueId": 32343
+    },
+    {
+      "title": "X-Men/Fantastic Four (2020) #4",
+      "series": "X-Men/Fantastic Four",
+      "year": 2020,
+      "number": "4",
+      "appIssueId": 32347
+    },
+    {
+      "title": "Wolverine (2020) #1",
+      "series": "Wolverine",
+      "year": 2020,
+      "number": "1",
+      "appIssueId": 32378
+    },
+    {
+      "title": "Marauders (2019) #6",
+      "series": "Marauders",
+      "year": 2019,
+      "number": "6",
+      "appIssueId": 31957
+    },
+    {
+      "title": "Fallen Angels (2019) #6",
+      "series": "Fallen Angels",
+      "year": 2019,
+      "number": "6",
+      "appIssueId": 32111
+    },
+    {
+      "title": "New Mutants (2019) #6",
+      "series": "New Mutants",
+      "year": 2019,
+      "number": "6",
+      "appIssueId": 32022
+    },
+    {
+      "title": "X-Force (2019) #6",
+      "series": "X-Force",
+      "year": 2019,
+      "number": "6",
+      "appIssueId": 32052
+    },
+    {
+      "title": "Weapon Plus: World War IV #1",
+      "series": "Weapon Plus: World War IV",
+      "year": null,
+      "number": "1",
+      "appIssueId": 32335
+    },
+    {
+      "title": "X-Men (2019) #5",
+      "series": "X-Men",
+      "year": 2019,
+      "number": "5",
+      "appIssueId": 31942
+    },
+    {
+      "title": "Marauders (2019) #7",
+      "series": "Marauders",
+      "year": 2019,
+      "number": "7",
+      "appIssueId": 31961
+    },
+    {
+      "title": "Excalibur (2019) #7",
+      "series": "Excalibur",
+      "year": 2019,
+      "number": "7",
+      "appIssueId": 32004
+    },
+    {
+      "title": "X-Force (2019) #7",
+      "series": "X-Force",
+      "year": 2019,
+      "number": "7",
+      "appIssueId": 32060
+    },
+    {
+      "title": "X-Men (2019) #6",
+      "series": "X-Men",
+      "year": 2019,
+      "number": "6",
+      "appIssueId": 31944
+    },
+    {
+      "title": "Savage Avengers #0",
+      "series": "Savage Avengers",
+      "year": null,
+      "number": "0",
+      "appIssueId": 31704
+    },
+    {
+      "title": "Marauders (2019) #8",
+      "series": "Marauders",
+      "year": 2019,
+      "number": "8",
+      "appIssueId": 31963
+    },
+    {
+      "title": "New Mutants (2019) #7",
+      "series": "New Mutants",
+      "year": 2019,
+      "number": "7",
+      "appIssueId": 32027
+    },
+    {
+      "title": "Deadpool (2018) #6",
+      "series": "Deadpool",
+      "year": 2018,
+      "number": "6",
+      "appIssueId": 29797
+    },
+    {
+      "title": "Giant-Size X-Men: Jean Grey and Emma Frost #1",
+      "series": "Giant-Size X-Men: Jean Grey and Emma Frost",
+      "year": null,
+      "number": "1",
+      "appIssueId": 32445
+    },
+    {
+      "title": "X-Men (2019) #7",
+      "series": "X-Men",
+      "year": 2019,
+      "number": "7",
+      "appIssueId": 31943
+    },
+    {
+      "title": "X-Force (2019) #8",
+      "series": "X-Force",
+      "year": 2019,
+      "number": "8",
+      "appIssueId": 32058
+    },
+    {
+      "title": "New Mutants (2019) #8",
+      "series": "New Mutants",
+      "year": 2019,
+      "number": "8",
+      "appIssueId": 32029
+    },
+    {
+      "title": "Excalibur (2019) #8",
+      "series": "Excalibur",
+      "year": 2019,
+      "number": "8",
+      "appIssueId": 32008
+    },
+    {
+      "title": "Marauders (2019) #9",
+      "series": "Marauders",
+      "year": 2019,
+      "number": "9",
+      "appIssueId": 31964
+    },
+    {
+      "title": "Cable (2020) #1",
+      "series": "Cable",
+      "year": 2020,
+      "number": "1",
+      "appIssueId": 32480
+    },
+    {
+      "title": "New Mutants (2019) #9",
+      "series": "New Mutants",
+      "year": 2019,
+      "number": "9",
+      "appIssueId": 32024
+    },
+    {
+      "title": "X-Men (2019) #8",
+      "series": "X-Men",
+      "year": 2019,
+      "number": "8",
+      "appIssueId": 31950
+    },
+    {
+      "title": "Excalibur (2019) #9",
+      "series": "Excalibur",
+      "year": 2019,
+      "number": "9",
+      "appIssueId": 32003
+    },
+    {
+      "title": "X-Force (2019) #9",
+      "series": "X-Force",
+      "year": 2019,
+      "number": "9",
+      "appIssueId": 32056
+    },
+    {
+      "title": "Giant-Size X-Men: Nightcrawler #1",
+      "series": "Giant-Size X-Men: Nightcrawler",
+      "year": null,
+      "number": "1",
+      "appIssueId": 32563
+    },
+    {
+      "title": "Hellions (2020) #1",
+      "series": "Hellions",
+      "year": 2020,
+      "number": "1",
+      "appIssueId": 32561
+    },
+    {
+      "title": "Wolverine (2020) #2",
+      "series": "Wolverine",
+      "year": 2020,
+      "number": "2",
+      "appIssueId": 32375
+    },
+    {
+      "title": "X-Men (2019) #9",
+      "series": "X-Men",
+      "year": 2019,
+      "number": "9",
+      "appIssueId": 31953
+    },
+    {
+      "title": "Excalibur (2019) #10",
+      "series": "Excalibur",
+      "year": 2019,
+      "number": "10",
+      "appIssueId": 32010
+    },
+    {
+      "title": "Black Cat (2019) #9",
+      "series": "Black Cat",
+      "year": 2019,
+      "number": "9",
+      "appIssueId": 31724
+    },
+    {
+      "title": "Black Cat (2019) #10",
+      "series": "Black Cat",
+      "year": 2019,
+      "number": "10",
+      "appIssueId": 31725
+    },
+    {
+      "title": "New Mutants (2019) #10",
+      "series": "New Mutants",
+      "year": 2019,
+      "number": "10",
+      "appIssueId": 32034
+    },
+    {
+      "title": "Marauders (2019) #10",
+      "series": "Marauders",
+      "year": 2019,
+      "number": "10",
+      "appIssueId": 31965
+    },
+    {
+      "title": "X-Force (2019) #10",
+      "series": "X-Force",
+      "year": 2019,
+      "number": "10",
+      "appIssueId": 32062
+    },
+    {
+      "title": "Giant-Size X-Men: Magneto #1",
+      "series": "Giant-Size X-Men: Magneto",
+      "year": null,
+      "number": "1",
+      "appIssueId": 32617
+    },
+    {
+      "title": "Free Comic Book Day 2020 – X-Men",
+      "appIssueId": 32623
+    },
+    {
+      "title": "New Mutants (2019) #11",
+      "series": "New Mutants",
+      "year": 2019,
+      "number": "11",
+      "appIssueId": 32035
+    },
+    {
+      "title": "Wolverine (2020) #3",
+      "series": "Wolverine",
+      "year": 2020,
+      "number": "3",
+      "appIssueId": 32382
+    },
+    {
+      "title": "Hellions (2020) #2",
+      "series": "Hellions",
+      "year": 2020,
+      "number": "2",
+      "appIssueId": 32567
+    },
+    {
+      "title": "X-Men (2019) #10",
+      "series": "X-Men",
+      "year": 2019,
+      "number": "10",
+      "appIssueId": 31954
+    },
+    {
+      "title": "Empyre: X-Men (2020) #1",
+      "series": "Empyre: X-Men",
+      "year": 2020,
+      "number": "1",
+      "appIssueId": 32632
+    },
+    {
+      "title": "Empyre: X-Men (2020) #2",
+      "series": "Empyre: X-Men",
+      "year": 2020,
+      "number": "2",
+      "appIssueId": 32636
+    },
+    {
+      "title": "Empyre: X-Men (2020) #3",
+      "series": "Empyre: X-Men",
+      "year": 2020,
+      "number": "3",
+      "appIssueId": 32637
+    },
+    {
+      "title": "Empyre: X-Men (2020) #4",
+      "series": "Empyre: X-Men",
+      "year": 2020,
+      "number": "4",
+      "appIssueId": 32641
+    },
+    {
+      "title": "X-Men (2019) #11",
+      "series": "X-Men",
+      "year": 2019,
+      "number": "11",
+      "appIssueId": 31949
+    },
+    {
+      "title": "Immortal She-Hulk #1",
+      "series": "Immortal She-Hulk",
+      "year": null,
+      "number": "1",
+      "appIssueId": 32716
+    },
+    {
+      "title": "X-Factor (2020) #1",
+      "series": "X-Factor",
+      "year": 2020,
+      "number": "1",
+      "appIssueId": 32640
+    },
+    {
+      "title": "Cable (2020) #2",
+      "series": "Cable",
+      "year": 2020,
+      "number": "2",
+      "appIssueId": 32482
+    },
+    {
+      "title": "Giant-Size X-Men: Fantomex #1",
+      "series": "Giant-Size X-Men: Fantomex",
+      "year": null,
+      "number": "1",
+      "appIssueId": 32669
+    },
+    {
+      "title": "Marauders (2019) #11",
+      "series": "Marauders",
+      "year": 2019,
+      "number": "11",
+      "appIssueId": 31969
+    },
+    {
+      "title": "X-Force (2019) #11",
+      "series": "X-Force",
+      "year": 2019,
+      "number": "11",
+      "appIssueId": 32067
+    },
+    {
+      "title": "Cable (2020) #3",
+      "series": "Cable",
+      "year": 2020,
+      "number": "3",
+      "appIssueId": 32484
+    },
+    {
+      "title": "Cable (2020) #4",
+      "series": "Cable",
+      "year": 2020,
+      "number": "4",
+      "appIssueId": 32487
+    },
+    {
+      "title": "Wolverine (2020) #4",
+      "series": "Wolverine",
+      "year": 2020,
+      "number": "4",
+      "appIssueId": 32380
+    },
+    {
+      "title": "Wolverine (2020) #5",
+      "series": "Wolverine",
+      "year": 2020,
+      "number": "5",
+      "appIssueId": 32385
+    },
+    {
+      "title": "Hellions (2020) #3",
+      "series": "Hellions",
+      "year": 2020,
+      "number": "3",
+      "appIssueId": 32564
+    },
+    {
+      "title": "X-Factor (2020) #2",
+      "series": "X-Factor",
+      "year": 2020,
+      "number": "2",
+      "appIssueId": 32648
+    },
+    {
+      "title": "X-Factor (2020) #3",
+      "series": "X-Factor",
+      "year": 2020,
+      "number": "3",
+      "appIssueId": 32650
+    },
+    {
+      "title": "New Mutants (2019) #12",
+      "series": "New Mutants",
+      "year": 2019,
+      "number": "12",
+      "appIssueId": 32037
+    },
+    {
+      "title": "X-Force (2019) #12",
+      "series": "X-Force",
+      "year": 2019,
+      "number": "12",
+      "appIssueId": 32065
+    },
+    {
+      "title": "Marauders (2019) #12",
+      "series": "Marauders",
+      "year": 2019,
+      "number": "12",
+      "appIssueId": 31970
+    },
+    {
+      "title": "Hellions (2020) #4",
+      "series": "Hellions",
+      "year": 2020,
+      "number": "4",
+      "appIssueId": 32568
+    },
+    {
+      "title": "Juggernaut (2020) #1",
+      "series": "Juggernaut",
+      "year": 2020,
+      "number": "1",
+      "appIssueId": 32714
+    },
+    {
+      "title": "Juggernaut (2020) #2",
+      "series": "Juggernaut",
+      "year": 2020,
+      "number": "2",
+      "appIssueId": 32723
+    },
+    {
+      "title": "Juggernaut (2020) #3",
+      "series": "Juggernaut",
+      "year": 2020,
+      "number": "3",
+      "appIssueId": 32725
+    },
+    {
+      "title": "Juggernaut (2020) #4",
+      "series": "Juggernaut",
+      "year": 2020,
+      "number": "4",
+      "appIssueId": 32726
+    },
+    {
+      "title": "Juggernaut (2020) #5",
+      "series": "Juggernaut",
+      "year": 2020,
+      "number": "5",
+      "appIssueId": 35734
+    },
+    {
+      "title": "Marvel Voices: Indigenous Voices #1",
+      "series": "Marvel Voices: Indigenous Voices",
+      "year": null,
+      "number": "1",
+      "appIssueId": 32796
+    },
+    {
+      "title": "Avengers (2018) #37",
+      "series": "Avengers",
+      "year": 2018,
+      "number": "37",
+      "appIssueId": 31301
+    },
+    {
+      "title": "Giant-Size X-Men: Storm #1",
+      "series": "Giant-Size X-Men: Storm",
+      "year": null,
+      "number": "1",
+      "appIssueId": 32708
+    },
+    {
+      "title": "Excalibur (2019) #11",
+      "series": "Excalibur",
+      "year": 2019,
+      "number": "11",
+      "appIssueId": 32012
+    },
+    {
+      "title": "Excalibur (2019) #12",
+      "series": "Excalibur",
+      "year": 2019,
+      "number": "12",
+      "appIssueId": 32015
+    },
+    {
+      "title": "X-Men (2019) #12",
+      "series": "X-Men",
+      "year": 2019,
+      "number": "12",
+      "appIssueId": 31958
+    },
+    {
+      "title": "X of Swords: Creation (2020) #1",
+      "series": "X of Swords: Creation",
+      "year": 2020,
+      "number": "1",
+      "appIssueId": 32721
+    },
+    {
+      "title": "X-Factor (2020) #4",
+      "series": "X-Factor",
+      "year": 2020,
+      "number": "4",
+      "appIssueId": 32647
+    },
+    {
+      "title": "Wolverine (2020) #6",
+      "series": "Wolverine",
+      "year": 2020,
+      "number": "6",
+      "appIssueId": 32390
+    },
+    {
+      "title": "X-Force (2019) #13",
+      "series": "X-Force",
+      "year": 2019,
+      "number": "13",
+      "appIssueId": 32068
+    },
+    {
+      "title": "Marauders (2019) #13",
+      "series": "Marauders",
+      "year": 2019,
+      "number": "13",
+      "appIssueId": 31973
+    },
+    {
+      "title": "Hellions (2020) #5",
+      "series": "Hellions",
+      "year": 2020,
+      "number": "5",
+      "appIssueId": 32569
+    },
+    {
+      "title": "New Mutants (2019) #13",
+      "series": "New Mutants",
+      "year": 2019,
+      "number": "13",
+      "appIssueId": 32040
+    },
+    {
+      "title": "Cable (2020) #5",
+      "series": "Cable",
+      "year": 2020,
+      "number": "5",
+      "appIssueId": 32488
+    },
+    {
+      "title": "Excalibur (2019) #13",
+      "series": "Excalibur",
+      "year": 2019,
+      "number": "13",
+      "appIssueId": 32020
+    },
+    {
+      "title": "X-Men (2019) #13",
+      "series": "X-Men",
+      "year": 2019,
+      "number": "13",
+      "appIssueId": 31959
+    },
+    {
+      "title": "X of Swords: Stasis (2020) #1",
+      "series": "X of Swords: Stasis",
+      "year": 2020,
+      "number": "1",
+      "appIssueId": 32776
+    },
+    {
+      "title": "X-Men (2019) #14",
+      "series": "X-Men",
+      "year": 2019,
+      "number": "14",
+      "appIssueId": 31960
+    },
+    {
+      "title": "Marauders (2019) #14",
+      "series": "Marauders",
+      "year": 2019,
+      "number": "14",
+      "appIssueId": 31974
+    },
+    {
+      "title": "Marauders (2019) #15",
+      "series": "Marauders",
+      "year": 2019,
+      "number": "15",
+      "appIssueId": 31981
+    },
+    {
+      "title": "Excalibur (2019) #14",
+      "series": "Excalibur",
+      "year": 2019,
+      "number": "14",
+      "appIssueId": 32018
+    },
+    {
+      "title": "Wolverine (2020) #7",
+      "series": "Wolverine",
+      "year": 2020,
+      "number": "7",
+      "appIssueId": 32387
+    },
+    {
+      "title": "X-Force (2019) #14",
+      "series": "X-Force",
+      "year": 2019,
+      "number": "14",
+      "appIssueId": 32073
+    },
+    {
+      "title": "Hellions (2020) #6",
+      "series": "Hellions",
+      "year": 2020,
+      "number": "6",
+      "appIssueId": 32571
+    },
+    {
+      "title": "Cable (2020) #6",
+      "series": "Cable",
+      "year": 2020,
+      "number": "6",
+      "appIssueId": 32490
+    },
+    {
+      "title": "X-Men (2019) #15",
+      "series": "X-Men",
+      "year": 2019,
+      "number": "15",
+      "appIssueId": 31962
+    },
+    {
+      "title": "Excalibur (2019) #15",
+      "series": "Excalibur",
+      "year": 2019,
+      "number": "15",
+      "appIssueId": 32025
+    },
+    {
+      "title": "X of Swords: Destruction (2020) #1",
+      "series": "X of Swords: Destruction",
+      "year": 2020,
+      "number": "1",
+      "appIssueId": 32811
+    },
+    {
+      "title": "Fantastic Four (2018) #25",
+      "series": "Fantastic Four",
+      "year": 2018,
+      "number": "25",
+      "appIssueId": 35870
+    },
+    {
+      "title": "Fantastic Four (2018) #26",
+      "series": "Fantastic Four",
+      "year": 2018,
+      "number": "26",
+      "appIssueId": 31474
+    }
+  ]
+}

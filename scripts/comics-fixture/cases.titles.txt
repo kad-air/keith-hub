@@ -1,0 +1,28 @@
+// The matcher cases check:comics replays against scripts/comics-fixture/api.json.
+// Record a fresh api.json with (on the Mac Mini):
+//   COMICS_RECORD=scripts/comics-fixture/api.json node scripts/comics-import.mjs \
+//     --slug fixture-cases --title x --titles scripts/comics-fixture/cases.titles.txt --dry-run
+Hawkeye (2012) #5
+House of X (2019) #1
+Marauders (2019) #13
+X of Swords: Creation (2020) #1
+Secret Wars (2015) #1
+Avengers (2012) #34.1
+Ultimate Comics Thor (2010) #1
+Hawkeye Annual (2013) #1
+Fantastic Four (1998) #570
+Uncanny X-Men (1963) #1
+Uncanny X-Men (1963) #141
+Uncanny X-Men (1963) #70
+Uncanny X-Men (2013) #1
+Secret Wars Journal (2015) #4
+Secret Wars Journal (2015) #1
+Weirdworld (2015) #1
+Weirdworld (2015) #6
+Marvel Super Heroes Secret Wars (1984) #1
+Infinity: The Hunt (2013) #1
+Hank Johnson, Agent of Hydra (2015) #1
+AVX: VS (2012) #4
+Infinity: Against the Tide (2013) #1
+S.H.I.E.L.D. by Hickman & Weaver (2018) #5
+Totally Made Up Comic (2019) #1

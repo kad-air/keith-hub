@@ -3,7 +3,8 @@ import { getComicReadState } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 
-// The whole comics read state, for MU Shelf (the iOS reader) to sync against.
+// The whole comics read state (ids are "mca-<Marvel Comics app id>" since
+// Nov 2026), originally for MU Shelf (the iOS reader) to sync against.
 // Gated by the middleware's hub-auth cookie like every other /api route; the
 // app gets that cookie by logging in with the feed password.
 export async function GET(): Promise<NextResponse> {

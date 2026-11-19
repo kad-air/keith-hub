@@ -1,235 +1,154 @@
-# How `lib/comics-data.ts` is built
+# How the Comics reading orders are built
 
-The comic catalog isn't fetched at runtime — it's a static TS file generated
-from a sibling repo (`~/Code/hickman-xmen/`). This doc explains where the
-data comes from and what each link in the catalog is.
-
-## What we want
-
-Each issue in the catalog needs a URL that opens the Marvel Unlimited reader
-directly (not the marvel.com landing page). The format is:
+The Comics section (`/comics`) is a static catalog of reading orders. Each
+issue links into the Marvel Comics app (the WEBTOON-built app that replaced
+Marvel Unlimited; Marvel Unlimited closed on December 28, 2026). Nothing is
+fetched from Marvel at runtime.
 
 ```
-https://read.marvel.com/#/book/{digital_book_id}
+comics/storylines.json        display order: ["hickman-x-men", …]
+comics/<slug>.json            one storyline: title, description, source, issues
+comics/series-aliases.json    fan-list series names the app spells differently
+        │
+        │  node scripts/generate-comics-data.mjs
+        ▼
+lib/comics-data.ts            generated, committed; what the pages import
 ```
 
-The challenge is that `digital_book_id` is internal to Marvel's CMS — it's
-not exposed in the issue's URL slug, the reading-order guides that list
-issues, or the official Marvel API (which is effectively dead).
+`comics/<slug>.json` is the source of truth. Each issue carries its
+`appIssueId`, the issue's id in the Marvel Comics app
+(`www.marvelcomicsapp.com/issues/<appIssueId>`). The hub keys read marks on
+`mca-<appIssueId>`.
 
-For the iOS PWA, `read.marvel.com` URLs are not enough — they get trapped
-in the in-PWA SFSafariViewController and never trigger Marvel Unlimited's
-universal link. To force app handoff we also store a per-issue `drn` and
-`sourceId` and build a `marvel.smart.link` URL (see Step 5).
+## Adding a reading order
 
-## Pipeline
+Reading orders come from fan lists, or from a list you write yourself. Marvel's
+own reading guides are read in the app; the hub doesn't copy them.
 
-The end-to-end pipeline lives in `~/Code/mu-reading-lists/`. Each
-storyline gets its own subdir; the top-level scripts take a storyline
-slug as an argument so the same code drives every list.
-
-```
-~/Code/mu-reading-lists/
-  storylines.json                       (master index: slug, title, description)
-  build.py                              (X-Men only — sitemap-driven)
-  parse_markdown.py                     (any list with marvel.com URLs)
-  fetch_applinks.py <slug>              (issue page → digital_book_id)
-  fetch_drns.py <slug>                  (digital_book_id → drn + sourceId)
-  hickman-x-men/
-    lookup.json applinks.json drns.json
-  hickman-secret-wars/
-    source.md  lookup.json  applinks.json  drns.json
-```
-
-### Step 1 — Reading order
-
-Two ways to source a reading order, depending on what you have:
-
-**Hand-curated list (X-Men).** Edit the `READING_ORDER` Python list in
-`build.py` and run it. It produces `<slug>/lookup.json` by looking up
-each title in Marvel's comic sitemaps (Step 2). Currently used for
-*Jonathan Hickman's X-Men* (House of X / Powers of X through X of
-Swords), based on Comic Book Herald's order plus the X of Swords
-crossover order from Wikipedia.
-
-**Pre-built markdown checklist.** If you already have a markdown file
-where each line is `- [ ] [Title](https://www.marvel.com/comics/issue/{id}/{slug})`,
-drop it at `<slug>/source.md` and run `parse_markdown.py <slug>`. Skips
-Step 2 entirely because the markdown already encodes the marvel.com page
-ID and slug. Used for *Hickman Secret Wars* (sourced from
-[emreparker/marvel-comics](https://github.com/emreparker/marvel-comics/blob/main/data/hickman_full.md)).
-
-### Step 2 — Resolve issue page IDs (slug → marvel.com ID)
-
-Only needed for `build.py`-driven storylines. `parse_markdown.py` skips
-this entirely.
-
-Marvel publishes its full comic catalog as XML sitemaps:
-- https://www.marvel.com/sitemap-comics-0.xml
-- https://www.marvel.com/sitemap-comics-1.xml
-
-Combined, these contain ~56,000 URLs in the form
-`https://www.marvel.com/comics/issue/{ID}/{slug}`. `build.py` downloads
-both once, builds a `{slug → ID}` index (filtering out variant covers),
-then for each reading-order entry generates candidate slugs and looks up
-the issue ID.
-
-### Step 3 — Resolve digital book IDs (issue page → reader URL)
-
-The digital book ID isn't in the sitemap. It only appears embedded in the
-HTML of each issue's landing page, in two forms:
-
-```
-https://applink.marvel.com/issue/{digital_book_id}
-https://read.marvel.com/#/book/{digital_book_id}
-```
-
-`fetch_applinks.py` fetches each issue page (throttled — Marvel.com
-aggressively rate-limits scrapers, so requests are paced 4–7s apart with a
-resumable JSON cache). It extracts the first `applink.marvel.com` ID; if
-absent, it falls back to the first `read.marvel.com/#/book/{id}` ID.
-Output: `applinks.json`, a `{slug → digital_book_id}` map.
-
-### Step 4 — Resolve DRNs and source IDs (digital book → smart.link)
-
-To get the iOS PWA → Marvel Unlimited handoff working, every issue also
-needs a Branch.io smart.link URL. The format is fixed:
-
-```
-https://marvel.smart.link/fiir7ec77?type=issue&drn={drn}&sourceId={sourceId}
-```
-
-`drn` is a Marvel-internal "Distributed Resource Name" (UUID-shaped); it
-isn't on the issue's marvel.com page. We discovered the lookup endpoint by
-reading the marvel.com bundle (`marvel-fitt-*.js`, search for `unison`):
-
-```
-GET https://bifrost.marvel.com/unison/legacy?digitalId={digital_book_id}
-```
-
-Returns JSON like:
-
-```json
-{ "data": { "dynamicQueryOrError": { "entity": { "contents": [{
-  "content": {
-    "id": "drn:src:marvel:unison::prod:6e60b594-…",
-    "externalIds": [
-      { "key": "MarvelDigitalComicID", "value": "51975" },
-      { "key": "SourceId", "value": "72984" }
-    ]
-  }
-}]}}}}
-```
-
-Pull `content.id` (the DRN, used verbatim) and the `SourceId` external id
-(equal to `marvelIssueId` in our spot checks; safer to read from the
-response than assume the equality). Bifrost is unauthenticated and
-permissive — pace the requests anyway (~1/s) to be polite.
-
-### Step 5 — Generate `lib/comics-data.ts`
-
-`scripts/generate-comics-data.mjs` (in this repo) reads
-`storylines.json` and, for each entry, zips its `lookup.json`,
-`applinks.json`, and `drns.json` together. Emits the static TS catalog
-with `{ id, title, digitalBookId, marvelIssueId, drn, sourceId, slug }`
-for each issue inside a `STORYLINES` array.
-
-Storylines whose data is incomplete (missing applinks or drns rows) are
-skipped with a warning so a partial regeneration during a long scrape
-doesn't ship broken data.
-
-### Step 6 — New Marvel Comics app ids (marvelIssueId → appIssueId)
-
-Marvel Unlimited was replaced in November 2026 by the Marvel Comics app
-(built with WEBTOON, `marvelcomicsapp.com`). Its issues have their own
-numeric ids (`https://www.marvelcomicsapp.com/issues/{appIssueId}`) that
-can't be derived from the old ones. The site has a lookup keyed on the
-**marvel.com issue page id** (our `marvelIssueId`):
-
-```
-GET https://www.marvelcomicsapp.com/api/v1/mu/issues/{marvelIssueId}
-→ {"success":true,"data":{"issueId":30604}}      (404 ISS_0001 if unknown)
-```
-
-and a web route, `/mu/issues/{marvelIssueId}`, that redirects to the new
-issue page. Never key it on `digitalBookId`: those numbers fall in the
-same range and silently return a different comic.
-
-The API wants the site's `D-Comics-*` headers and the anonymous
-`d-comics-device-id` cookie the site's JS sets on page load, so a plain
-curl gets a 400. What worked (Nov 19, 2026, all 392 issues, ~1 req/s) was
-loading a marvelcomicsapp.com page in a headless browser and calling
-`fetch()` from inside it. No sign-in is needed.
-
-Results live in `scripts/marvel-comics-app-ids.json` (`{marvelIssueId:
-appIssueId}`), which `generate-comics-data.mjs` joins in. Issues missing
-from it get `appIssueId: null`, are listed when the script runs, and fall
-back to the old Marvel Unlimited links.
-
-**Links.** `www.marvelcomicsapp.com`'s apple-app-site-association has no
-`applinks`, so `/issues/*` opens a web page on iOS (and inside the PWA),
-not the app. The app's universal links live on the AppsFlyer OneLink host
-`goto.marvelcomicsapp.com` (`/w9za/*`). `ComicsClient` builds the same
-OneLink the site's own "open in app" button builds:
-
-```
-https://goto.marvelcomicsapp.com/w9za?pid=MCWeb&c=WtA_IssueHome&af_channel=MoWeb
-  &af_dp=marvelcomicsapp://issueHome?issueId={id}&deep_link_value=…&issueId={id}
-  &af_force_deeplink=true&af_ss_ui=true
-```
-
-(`marvelcomicsapp://viewer?issueId={id}` would open the reader directly
-instead of the issue page.)
-
-## Why three IDs per issue
-
-| Field             | URL pattern                                     | Opens                              |
-|-------------------|-------------------------------------------------|------------------------------------|
-| `digitalBookId`   | `read.marvel.com/#/book/{id}`                   | The reader (web; universal link in Safari only — fails from PWA) |
-| `marvelIssueId`   | `marvel.com/comics/issue/{id}/{slug}`           | The landing page (kept as fallback) |
-| `slug`            | (joins the two)                                 | Used in landing-page URL only      |
-| `drn` + `sourceId`| `marvel.smart.link/fiir7ec77?type=issue&drn={drn}&sourceId={sourceId}` | Marvel Unlimited app on iOS, even from inside the PWA (Marvel Unlimited is retired) |
-| `appIssueId`      | `goto.marvelcomicsapp.com/w9za?…issueId={id}` (OneLink) | The Marvel Comics app's issue page |
-
-The catalog stores all of them so we can change which URL the UI links to
-without re-running the scrape. Currently the UI links to the Marvel Comics
-app OneLink, falling back to smart.link, then read.marvel.com.
-
-## Re-running the pipeline
+**From the fan library.** [DieselTech/CBL-ReadingLists](https://github.com/DieselTech/CBL-ReadingLists)
+collects about 1,150 Marvel reading orders (from Comic Book Reading Orders,
+the Complete Marvel Reading Order, League of Comic Geeks, Marvel Guides and
+others) as `.cbl` files. Each entry gives the series, its start year and the
+issue number. On the Mac Mini, from this repo:
 
 ```bash
-cd ~/Code/mu-reading-lists
-
-# (a) Hand-curated storyline: edit READING_ORDER in build.py, then:
-python3 build.py                                # rewrites hickman-x-men/lookup.json
-
-# (b) Markdown-checklist storyline: drop the file at
-#     <slug>/source.md, add the storyline to storylines.json, then:
-python3 parse_markdown.py <slug>                # writes <slug>/lookup.json
-
-# Then for any storyline (including newly added ones):
-python3 fetch_applinks.py <slug>                # ~5s/issue, resumable
-python3 fetch_drns.py <slug>                    # ~1s/issue, resumable
-
-# In this repo:
-# For new issues, add their Marvel Comics app ids (Step 6) to
-# scripts/marvel-comics-app-ids.json, then in this repo:
-node scripts/generate-comics-data.mjs           # rewrites lib/comics-data.ts
+node scripts/comics-import.mjs --slug hickman-fantastic-four \
+  --title "Hickman's Fantastic Four" \
+  --description "The 2009–2012 run, in order." \
+  --cbl "Marvel/Creator Runs/[Marvel] [2009-2012] Fantastic Four by Jonathan Hickman.cbl"
 ```
 
-## Notes
+`--cbl` takes a path inside that library (as above), a URL to any `.cbl` file
+(a `github.com/…/blob/…` link works), or a local file.
 
-- `applink.marvel.com` has no DNS — it's a pure iOS/Android universal-link
-  prefix the apps intercept. It will not open as a web URL.
-- `read.marvel.com/#/book/{id}` is a real web URL (the Marvel Unlimited
-  reader) and is also a universal link target on iOS/Android.
-- Marvel.com's developer API exists but is effectively unmaintained — the
-  sitemap + page scrape is more reliable.
-- `bifrost.marvel.com` is Marvel.com's internal GraphQL-ish gateway. The
-  `unison/legacy?digitalId=…` resource is what marvel.com itself calls when
-  you tap the share button on an issue page. No auth required, but treat
-  it as undocumented — the path/shape can change without notice.
-- The smart.link template ID `fiir7ec77` is the "issue" default lifted
-  straight from the marvel.com bundle's `renderShareButton`. Other content
-  types use different templates (series=`jahtrdori`, character=`7p9nz1ef0`,
-  reading-list=`3u1vpwc6p`, creator=`3c7b95oqa`, comic=`o5a7ja652`).
+**From your own list.** One issue per line, `Series (Year) #N`; blank lines and
+lines starting with `#` or `//` are ignored, and checklist markers are fine:
+
+```
+- [ ] Hawkeye (2012) #1
+- [ ] Hawkeye (2012) #2
+- [ ] Hawkeye Annual (2013) #1
+```
+
+```bash
+node scripts/comics-import.mjs --slug my-list --title "My list" --titles my-list.txt
+```
+
+The year is the series' start year (how the app tells "Hawkeye (2012)" from
+"Hawkeye (1983)"). It's optional, but leave it in.
+
+**What the importer does.** It opens `www.marvelcomicsapp.com` in headless
+Chrome, finds each issue, writes `comics/<slug>.json`, adds the slug to
+`comics/storylines.json`, and regenerates `lib/comics-data.ts`. It paces itself at
+about one request a second, which comes to roughly a second an issue: a
+588-issue Hickman list took 12 minutes. Then commit
+`comics/` and `lib/comics-data.ts` and open a PR.
+
+It has to run on the Mac Mini (or anywhere with Google Chrome; set
+`CHROME_PATH` for another browser). The app's API refuses plain HTTP clients:
+it wants the site's `D-Comics-*` headers and an anonymous device-id cookie
+that the site's own JS sets on page load, so the importer calls it from inside
+a real page with `fetch()`. No sign-in is involved.
+
+## How an issue is matched
+
+`scripts/lib/comics-match.mjs`, in order:
+
+1. **Issue search** on the full title, `"Hawkeye (2012) #5"`. Accepted only if a
+   result has exactly that series name, start year and number.
+2. **Series route.** Search series by name, keep every series with that exact
+   name and start year (±1 if none is exact), and look for the number in each
+   one's issue list. Every candidate series is checked because the app splits
+   some series (Secret Wars Journal (2015) #4 sits alone in its own series).
+   The app's search misses some exact names, so when nothing turns up it
+   searches again with the part after the last colon ("The Hunt" for
+   Infinity: The Hunt) or before the first comma ("Hank Johnson" for Hank
+   Johnson, Agent of Hydra), still requiring the full name to match.
+3. **Several matches** (a reprint or facsimile series that reuses the
+   original's title, e.g. X-Men (1963) #1 also exists as 2019 and 2023
+   printings): the issue published nearest the list's cover year wins, if it's
+   clearly nearest. A hand-written list has no cover year, so there the
+   earliest printing wins when every other match is five or more years later.
+   Anything closer is left for you (Weirdworld (2015) and Silk (2015) are each
+   two app series that both started in 2015).
+4. **No exact match**: the issue is kept with `"appIssueId": null` and a
+   `"review"` block giving the reason and the closest candidates. Nothing is
+   guessed.
+
+Names compare on letters and digits only (the app title-cases everything:
+"Ff", "S.h.i.e.l.d.", "Secret Wars Ii"); numbers compare as strings, so point
+issues like `#34.1` work.
+
+**Renamed series.** The app spells some series differently from the fan lists:
+Uncanny X-Men (1963) is "X-Men", Ultimate Comics Thor (2010) is "Ultimate
+Thor", Marvel Super Heroes Secret Wars (1984) is "Secret Wars".
+`comics/series-aliases.json` maps these; key them with the year, because names
+get reused (the app's "X-Men (2013)" is a different book from Uncanny X-Men
+(2013)). Give the value a year when the app files the series under another
+start year: S.H.I.E.L.D. by Hickman & Weaver (2018) is the app's
+"S.H.I.E.L.D. (2011)".
+
+**Known gaps in the app's catalog.** X-Men (1963) #67–93 (the 1970–75
+all-reprint issues) aren't in the app.
+
+## Fixing the misses
+
+A storyline with any unmatched issue is left off the hub (the generator says
+which) until each one is fixed in `comics/<slug>.json`:
+
+- set its `"appIssueId"` (one of the `review.candidates`, or an id you found in
+  the app: it's the number in `www.marvelcomicsapp.com/issues/<id>`), or
+- set `"skip": true` to drop it from the list (e.g. an issue the app doesn't
+  have).
+
+Then `node scripts/generate-comics-data.mjs`. Re-running the importer on the
+same slug keeps every id already set, so fixes stick; run it with just
+`--slug <slug>` to re-try only the misses (after adding an alias, say).
+
+## Links
+
+`www.marvelcomicsapp.com/issues/<id>` isn't a universal link on iOS (the site's
+apple-app-site-association has no `applinks`), so from the PWA it would open a
+web page. `components/ComicsClient.tsx` links the same AppsFlyer OneLink the
+site's own "open in app" button builds, on `goto.marvelcomicsapp.com/w9za`, with
+`af_dp=marvelcomicsapp://issueHome?issueId=<id>`.
+(`marvelcomicsapp://viewer?issueId=<id>` would open the reader directly.)
+
+## Read marks from before the switch
+
+Before November 2026 the catalog was built from Marvel Unlimited data and read
+marks were keyed on Marvel Unlimited's digital book ids. `lib/comics-rekey.ts`
+moves any such mark to its `mca-` key the first time the Comics section reads
+the database after a start, using the frozen map in `lib/comics-legacy-ids.ts`
+(392 issues: the Hickman X-Men, Hickman Secret Wars and Fraction Hawkeye lists).
+It does nothing once those ids are gone. The old pipeline (marvel.com sitemaps,
+issue-page scrapes, `bifrost.marvel.com`, Branch smart.links, and the app's
+`/api/v1/mu/issues/<marvelIssueId>` migration lookup) is retired.
+
+## Tests
+
+`npm run check:comics` (in prebuild) checks the catalog against `comics/`, the
+generator's guards, the read-mark move, and the matcher against recorded app
+answers in `scripts/comics-fixture/` (`cases.json`, and `api.json` recorded with
+`COMICS_RECORD=scripts/comics-fixture/api.json` on an importer run over
+`cases.titles.txt`).
