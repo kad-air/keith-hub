@@ -93,11 +93,6 @@ assert(
     "Get Out Pass/Family/Parents/720/Idea,Game table/Family/Parents/200/Idea",
   "seed: the two Family gifts",
 );
-for (const p of s0.people) store.deletePerson(p.id);
-for (const g of s0.gifts) store.deleteGift(g.id);
-const s1 = store.getListState();
-assert(s1.people.length === 0 && s1.gifts.length === 0, "an emptied list stays empty (never re-seeded)");
-assert(s1.rev > s0.rev, "every write bumps the revision");
 const bad = (fn: () => unknown) => {
   try {
     fn();
@@ -106,6 +101,27 @@ const bad = (fn: () => unknown) => {
     return e instanceof store.ChristmasInputError;
   }
 };
+// The six can't be removed, renamed, or doubled; Family can't have a line of its own.
+const coreIds = s0.people.map((p) => p.id);
+assert(coreIds.join(",") === "keith,kim,addie,lydia,scarlett,hudson", "the six have fixed ids");
+assert(coreIds.every((id) => bad(() => store.deletePerson(id))), "none of the six can be removed");
+assert(bad(() => store.updatePerson("kim", { name: "Kimberly" })), "a core member can't be renamed");
+assert(bad(() => store.setPerson("family", { name: "Family", budget: 100 })), "Family can't get its own budget line");
+assert(bad(() => store.setPerson("family-2", { name: " family " })), "…in any spelling");
+assert(bad(() => store.setPerson("addie-2", { name: "Addie", budget: 5 })), "no second person with a core member's name");
+assert(!bad(() => store.updatePerson("kim", { budget: 400, role: "Mom" })), "a core member's budget and role still change");
+store.setPerson("grandma", { name: "Grandma", role: "", budget: 50, order: 7 });
+assert(!bad(() => store.deletePerson("grandma")), "someone added by hand can be removed");
+// A core member deleted before the rule existed comes back on the next read; the rest are untouched.
+const { getDb } = await import("../lib/db.ts");
+getDb().prepare("DELETE FROM xmas_people WHERE id = 'lydia'").run();
+const restored = store.getListState().people;
+assert(restored.some((p) => p.id === "lydia" && p.budget === 370), "a missing core member is put back");
+assert(restored.find((p) => p.id === "kim")?.budget === 400, "…without touching the others");
+for (const g of s0.gifts) store.deleteGift(g.id);
+const s1 = store.getListState();
+assert(s1.gifts.length === 0, "emptied gifts stay empty (never re-seeded)");
+assert(s1.rev > s0.rev, "every write bumps the revision");
 assert(bad(() => store.setGift("g1", { status: "Lost" })), "unknown status refused");
 assert(bad(() => store.setGift("g1", { est: "lots" })), "non-numeric money refused");
 assert(bad(() => store.setGift("../x", {})), "bad id refused");
@@ -123,6 +139,25 @@ store.setTotalBudget({ totalBudget: null });
 assert(store.getListState().totalBudget === null, "total can be cleared");
 assert(store.takeHelperAllowance(2) && store.takeHelperAllowance(2) && !store.takeHelperAllowance(2), "helper daily cap holds");
 assert(store.takeHelperAllowance(2, new Date(Date.now() + 86_400_000)), "…and resets the next day");
+
+console.log("2b. the family split");
+// Worked longhand: Family gifts actual 600 + 30 = 630 (estimates 720 + 200 + 60 = 980) over six people
+// is 105 spent and 163.33 planned each. Hudson's own 40 adds to his share; Grandma, added by hand, gets none.
+const { personTotals, familySplit, CORE_PEOPLE } = await import("../lib/christmas/shared.ts");
+const P = (id: string, name: string, budget: number) => ({ id, name, role: "", budget, order: 0 });
+const G = (recipient: string, est: number | null, actual: number | null) =>
+  ({ id: Math.random().toString(36), recipient, group: "", idea: "x", from: "", est, actual, status: "Idea", notes: "", createdAt: 0 });
+const people = [...CORE_PEOPLE.map((c) => P(c.id, c.name, 370)), P("grandma", "Grandma", 50)];
+const gifts = [G("Family", 720, 600), G("family", 200, null), G(" FAMILY ", 60, 30), G("Hudson", 45, 40), G("Grandma", 30, 25)];
+const fam = familySplit(gifts);
+assert(fam.spent === 630 && fam.est === 980 && fam.eachSpent === 105, "family totals, any spelling of Family");
+const tot = personTotals(people, gifts);
+assert(tot.get("hudson")!.spent === 145 && tot.get("hudson")!.left === 225, "a core member carries own + a sixth (Hudson 40 + 105)");
+assert(tot.get("keith")!.spent === 105 && tot.get("keith")!.ownSpent === 0, "…even with no gifts of their own");
+assert(Math.abs(tot.get("kim")!.est - 980 / 6) < 1e-9, "estimates split the same way");
+assert(tot.get("grandma")!.spent === 25 && tot.get("grandma")!.familySpent === 0, "someone added by hand is outside the split");
+const shares = CORE_PEOPLE.reduce((s, c) => s + tot.get(c.id)!.familySpent, 0);
+assert(Math.abs(shares - fam.spent) < 1e-9, "the six shares add back up to the Family total");
 
 console.log("3. helper tools");
 // The six tools run for real against the throwaway database (no model call):
@@ -165,6 +200,15 @@ try {
   threw = e instanceof Error ? e.constructor.name : "";
 }
 assert(threw === "ToolError", "the store's validation reaches the model as a tool error");
+for (const [name, input] of [["remove_person", { person: "Keith" }], ["set_budget", { person: "Family", budget: 100 }]] as const) {
+  try {
+    await run(name, input);
+    threw = "";
+  } catch (e) {
+    threw = e instanceof Error ? e.constructor.name : "";
+  }
+  assert(threw === "ToolError", `the helper can't ${name === "remove_person" ? "remove a core member" : "give Family a budget line"}`);
+}
 assert(lines.length === 5 && batch.changes.length === 5 && batch.undo.length === 5, "every change records a line and an undo step");
 applyUndo(batch.undo as never);
 assert(JSON.stringify((({ rev: _r, ...x }) => x)(store.getListState())) === before, "undoing the batch puts the list back exactly");

@@ -37,7 +37,10 @@ You can read the whole list: it comes with every question, as JSON. You can chan
 How the list works:
 - Each gift has a recipient, an idea, who it is from, an estimated cost (est), an actual cost (actual), a status (Idea, Planned, Ordered, Purchased or Wrapped) and notes.
 - Purchased and Wrapped count as bought. Spent is the sum of actual costs; estimated is the sum of estimates. A person's "left" is their budget minus what has been spent on their gifts.
-- Some recipients (like "Family") have gifts but no budget line.
+- The family's six members — Keith, Kim, Addie, Lydia, Scarlett and Hudson — are the core members (core: true). They are always on the list and can't be removed.
+- Gifts for "Family" are for all six together. Their cost is split equally: each core member carries a sixth of every Family gift's estimate and actual cost, and that share counts against their budget. The list JSON already works this out for you (family_split, and each person's own_spent, family_share_spent, spent and left), so use those figures rather than recomputing.
+- Family has no budget line of its own and can't be given one; to make room for a Family gift, change the core members' budgets.
+- Anyone else on the list (grandparents, teachers…) was added by hand. They are outside the family split: they carry only their own gifts.
 - Amounts are US dollars.
 
 When asked a question, answer it from the list and do the arithmetic carefully. When asked to change something, make the change with your tools, then say in a sentence or two what you did. Use gift ids exactly as they appear in the list, and reuse recipient names exactly as written. Only delete when clearly asked. If a request is ambiguous, ask a short question instead of guessing.
@@ -205,7 +208,7 @@ export function helperTools(batch: Batch, onChange: (line: string) => void) {
     }),
     betaTool({
       name: "remove_person",
-      description: "Remove a person's budget line. Their gifts stay on the list.",
+      description: "Remove the budget line of someone added by hand. Their gifts stay on the list. The six core members can't be removed.",
       strict: true,
       inputSchema: {
         type: "object",
@@ -217,7 +220,11 @@ export function helperTools(batch: Batch, onChange: (line: string) => void) {
         const p = getListState().people.find((x) => key(x.name) === key(a.person));
         if (!p) throw new ToolError(`No budget line for "${a.person}".`);
         const { id: _id, ...prev } = p;
-        deletePerson(p.id);
+        try {
+          deletePerson(p.id);
+        } catch (e) {
+          fail(e);
+        }
         note(`Removed ${p.name} from the budget`, { t: "set", path: `people/${p.id}`, data: prev });
         return JSON.stringify({ removed: p.name });
       },

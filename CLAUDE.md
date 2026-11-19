@@ -81,7 +81,8 @@ npm run check:books:app-token    # Books app token gate: the REAL middleware wit
 npm run check:books:discworld    # Discworld map gate: the closed canon + publication order, the library match anchored on the real epubs' OPF, manual-mark precedence, map geometry (same)
 npm run check:christmas          # Christmas list gate: the REAL middleware (no cookie → passcode form / 401, the
                                  #   passcode cookie opens /christmas + /api/christmas/* and nothing else, fails closed),
-                                 #   the store's seed + validation in a throwaway DB, the helper's six tools run for real
+                                 #   the store's seed + validation in a throwaway DB, the six can't be removed and Family
+                                 #   splits six ways (worked longhand, shares add back to the total), the helper's six tools run for real
                                  #   (batch undo restores the list exactly, the strict-schema budget), the rate limiter (same)
 npm run check:feed               # Feed gate: a dismissed Verge review stays dismissed when the reviews feed picks it up later
                                  #   (state moves to the winning copy; matched by post id, not URL), retention never resurrects
@@ -2173,6 +2174,15 @@ the hub's red accent (all three theme blocks in `app/globals.css`), a little CSS
   validates every write (status one of five, money finite cents, ids `ID_RE`, strings capped) and
   bumps the rev in the same transaction. The seed runs once ever, keyed on the flag — an emptied list
   is never re-filled.
+- 🔴 **The six and the Family split** (`lib/christmas/shared.ts`: `CORE_PEOPLE`, `familySplit`,
+  `personTotals` — the ONE place a person's numbers are worked out; the page and the helper's list
+  JSON both read it). Keith, Kim, Addie, Lydia, Scarlett and Hudson are core members with fixed ids:
+  they can't be removed or renamed (`store.ts` refuses; the page offers no remove button), and one
+  missing from an older volume is put back on the next read. Gifts for **Family** are shared by the
+  six: each core member's spent / estimate / left includes an equal sixth of every Family gift (the
+  section says so on screen). Family is never a budget line (the store refuses the name). Anyone
+  added by hand sits after Family and is outside the split. Page order: the six, Family, everyone
+  else.
 - **API**: `GET /api/christmas[?since=rev]` (`{unchanged:true}` when nothing moved), `PUT|PATCH|DELETE
   /api/christmas/gifts/[id]` and `/people/[id]`, `PUT|DELETE /api/christmas/config`. PUT is
   create-or-replace. Ids are made by the client so a write shows before the server answers.

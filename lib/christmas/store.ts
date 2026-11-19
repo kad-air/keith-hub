@@ -1,7 +1,11 @@
 import { getDb } from "@/lib/db";
 import {
+  CORE_PEOPLE,
   ID_RE,
   STATUSES,
+  isCore,
+  isFamily,
+  key,
   cleanMoney,
   num,
   type Gift,
@@ -65,15 +69,6 @@ function writeTx(fn: () => void): number {
 
 // --- first run -----------------------------------------------------------------
 
-const SEED_PEOPLE: [string, string][] = [
-  ["Keith", "Dad"],
-  ["Kim", "Mom"],
-  ["Addie", "Age 14"],
-  ["Lydia", "Age 11"],
-  ["Scarlett", "Age 9"],
-  ["Hudson", "Age 4"],
-];
-
 /**
  * Seeds the list once, ever. The flag (not an empty table) decides, so a list
  * someone has cleared out by hand is never re-filled behind their back.
@@ -84,7 +79,7 @@ export function ensureSeeded() {
   db.transaction(() => {
     if (kvGet(KV_SEEDED)) return;
     const insP = db.prepare("INSERT OR IGNORE INTO xmas_people (id, name, role, budget, sort_order) VALUES (?, ?, ?, ?, ?)");
-    SEED_PEOPLE.forEach(([name, role], i) => insP.run(name.toLowerCase(), name, role, 370, i + 1));
+    CORE_PEOPLE.forEach((p, i) => insP.run(p.id, p.name, p.role, 370, i + 1));
     const insG = db.prepare(
       "INSERT OR IGNORE INTO xmas_gifts (id, recipient, group_name, idea, from_name, est, actual, status, notes, created_at) VALUES (?, 'Family', '', ?, 'Parents', ?, NULL, 'Idea', '', ?)",
     );
@@ -97,15 +92,33 @@ export function ensureSeeded() {
   })();
 }
 
+/**
+ * The six of us are always on the list (they can't be removed). One deleted
+ * before that rule existed comes back with the seed's role and budget; the
+ * others are left exactly as they are. Writes only when someone is missing.
+ */
+function ensureCorePeople() {
+  const db = getDb();
+  const have = new Set((db.prepare("SELECT id FROM xmas_people").all() as { id: string }[]).map((r) => r.id));
+  const missing = CORE_PEOPLE.map((p, i) => ({ ...p, order: i + 1 })).filter((p) => !have.has(p.id));
+  if (!missing.length) return;
+  writeTx(() => {
+    const ins = db.prepare("INSERT OR IGNORE INTO xmas_people (id, name, role, budget, sort_order) VALUES (?, ?, ?, 370, ?)");
+    for (const p of missing) ins.run(p.id, p.name, p.role, p.order);
+  });
+}
+
 // --- reads ---------------------------------------------------------------------
 
 export function getRev(): number {
   ensureSeeded();
+  ensureCorePeople();
   return currentRev();
 }
 
 export function getListState(): ListState {
   ensureSeeded();
+  ensureCorePeople();
   const db = getDb();
   const people = (db.prepare("SELECT * FROM xmas_people ORDER BY sort_order, name").all() as PersonRow[]).map(
     (r): Person => ({ id: r.id, name: r.name, role: r.role, budget: r.budget, order: r.sort_order }),
@@ -245,9 +258,29 @@ function personCols(o: Record<string, unknown>, partial: boolean): Record<string
   return cols;
 }
 
+/**
+ * The rules a budget line has to keep: a core member keeps their own name (the
+ * Family split follows their id, gifts follow their name); nobody may be called
+ * "Family" (its gifts are split across the six, so it can't have a line of its
+ * own); and no two people may share a name (gifts would land on both).
+ */
+function checkPersonName(id: string, name: unknown) {
+  if (typeof name !== "string") return;
+  const core = CORE_PEOPLE.find((p) => p.id === id);
+  if (core && key(name) !== key(core.name)) throw new ChristmasInputError(`${core.name} can't be renamed.`);
+  if (isFamily(name)) {
+    throw new ChristmasInputError("Family gifts are split across the six of you, so Family can't have its own budget line.");
+  }
+  const clash = getDb()
+    .prepare("SELECT name FROM xmas_people WHERE id != ? AND lower(trim(name)) = ?")
+    .get(id, key(name)) as { name: string } | undefined;
+  if (clash) throw new ChristmasInputError(`${clash.name} is already on the list.`);
+}
+
 export function setPerson(id: string, body: unknown): number {
   checkId(id);
   const cols = personCols(asObject(body), false);
+  checkPersonName(id, cols.name);
   return writeTx(() => {
     getDb()
       .prepare(
@@ -261,6 +294,7 @@ export function setPerson(id: string, body: unknown): number {
 export function updatePerson(id: string, body: unknown): number | null {
   checkId(id);
   const cols = personCols(asObject(body), true);
+  checkPersonName(id, cols.name);
   const keys = Object.keys(cols);
   if (!keys.length) throw new ChristmasInputError("Nothing to change.");
   if (!getDb().prepare("SELECT 1 FROM xmas_people WHERE id = ?").get(id)) return null;
@@ -271,6 +305,10 @@ export function updatePerson(id: string, body: unknown): number | null {
 
 export function deletePerson(id: string): number {
   checkId(id);
+  if (isCore(id)) {
+    const name = CORE_PEOPLE.find((p) => p.id === id)!.name;
+    throw new ChristmasInputError(`${name} is one of the six and stays on the list.`);
+  }
   return writeTx(() => {
     getDb().prepare("DELETE FROM xmas_people WHERE id = ?").run(id);
   });
