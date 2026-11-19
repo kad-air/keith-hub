@@ -605,6 +605,15 @@ export function getDb(): Database.Database {
     dbInstance.exec(`ALTER TABLE sources ADD COLUMN last_error TEXT`);
   }
 
+  // xmas_helper_turns.author (who asked: Keith or Kim). The table shipped with
+  // the column, but a volume whose table predates it must not lose the helper.
+  const xmasTurnCols = (
+    dbInstance.prepare(`PRAGMA table_info(xmas_helper_turns)`).all() as Array<{ name: string }>
+  ).map((c) => c.name);
+  if (!xmasTurnCols.includes("author")) {
+    dbInstance.exec(`ALTER TABLE xmas_helper_turns ADD COLUMN author TEXT`);
+  }
+
   // books.word_count: the denominator that turns an opaque kosync percentage
   // into a number of pages. Extracted from the epub's own text at ingest (see
   // lib/books/epubText.ts) and backfilled lazily for books ingested before

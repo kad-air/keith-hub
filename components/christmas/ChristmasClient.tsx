@@ -11,7 +11,14 @@ import {
 } from "react";
 import {
   BOUGHT,
+  CORE_PEOPLE,
+  budgetPeople,
+  FAMILY,
   STATUSES,
+  familySplit,
+  isCore,
+  isFamily,
+  personTotals,
   key,
   money,
   num,
@@ -19,6 +26,7 @@ import {
   type Gift,
   type ListState,
   type Person,
+  type Totals,
 } from "@/lib/christmas/shared";
 
 // The shared Christmas gift list (/christmas). First built as a Claude
@@ -34,7 +42,8 @@ import {
 //     on the server; its edits arrive here like the other parent's.
 
 type Data = { people: Person[]; gifts: Gift[]; total: number | null; rev: number };
-type Group = { name: string; person: Person | null; gifts: Gift[] };
+/** core: one of the six · family: the shared Family gifts · other: anyone added by hand, or a gift-only recipient. */
+type Group = { name: string; person: Person | null; gifts: Gift[]; kind: "core" | "family" | "other" };
 
 const POLL_MS = 3000;
 
@@ -259,13 +268,19 @@ export default function ChristmasClient({ initial }: { initial: ListState }) {
 
   /* ---------- derived ---------- */
   function model() {
-    const people = D.current.people.slice().sort((a, b) => (a.order || 0) - (b.order || 0));
+    const people = budgetPeople(D.current.people).sort((a, b) => (a.order || 0) - (b.order || 0));
     const gifts = D.current.gifts.slice().sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+    // The six first, then the Family gifts they share, then everyone added by
+    // hand, then any recipient that only has gifts.
     const groups = new Map<string, Group>();
-    for (const p of people) groups.set(key(p.name), { name: p.name, person: p, gifts: [] });
+    for (const p of people.filter((p) => isCore(p.id))) groups.set(key(p.name), { name: p.name, person: p, gifts: [], kind: "core" });
+    groups.set(key(FAMILY), { name: FAMILY, person: null, gifts: [], kind: "family" });
+    for (const p of people.filter((p) => !isCore(p.id))) {
+      if (!groups.has(key(p.name))) groups.set(key(p.name), { name: p.name, person: p, gifts: [], kind: "other" });
+    }
     for (const g of gifts) {
       const k = key(g.recipient) || "(unassigned)";
-      if (!groups.has(k)) groups.set(k, { name: g.recipient || "Unassigned", person: null, gifts: [] });
+      if (!groups.has(k)) groups.set(k, { name: g.recipient || "Unassigned", person: null, gifts: [], kind: "other" });
       groups.get(k)!.gifts.push(g);
     }
     let est = 0, spent = 0, bought = 0;
@@ -274,7 +289,9 @@ export default function ChristmasClient({ initial }: { initial: ListState }) {
       spent += num(g.actual) || 0;
       if (BOUGHT.has(g.status)) bought++;
     }
-    return { people, gifts, groups: [...groups.values()], est, spent, bought };
+    const totals = personTotals(people, gifts);
+    const fam = familySplit(gifts);
+    return { people, gifts, groups: [...groups.values()], est, spent, bought, totals, fam };
   }
   const nextOrder = () => D.current.people.reduce((m, p) => Math.max(m, p.order || 0), 0) + 1;
   function uniqueId(name: string) {
@@ -302,6 +319,10 @@ export default function ChristmasClient({ initial }: { initial: ListState }) {
     const el = newName.current;
     const name = (el?.value || "").trim();
     if (!name || !el) return;
+    if (isFamily(name)) {
+      toast("Family is already on the list — its gifts are split across the six of you.");
+      return;
+    }
     if (m.groups.some((G) => key(G.name) === key(name) && G.person)) {
       toast(name + " is already on the list.");
       return;
@@ -359,6 +380,8 @@ export default function ChristmasClient({ initial }: { initial: ListState }) {
           <RecipientSection
             key={G.person ? "p:" + G.person.id : "n:" + key(G.name)}
             G={G}
+            totals={G.person ? m.totals.get(G.person.id) ?? null : null}
+            fam={m.fam}
             confirm={confirm}
             isNew={isNewGift}
             onFocused={() => setFocusNext(null)}
@@ -374,6 +397,7 @@ export default function ChristmasClient({ initial }: { initial: ListState }) {
             }}
             onRemovePerson={() => {
               const p = G.person!;
+              if (isCore(p.id)) return;
               const ck = "rm:" + p.id;
               if (confirm === ck) {
                 setConfirm(null);
@@ -458,6 +482,8 @@ const LABEL = "block px-1 font-mono text-[0.55rem] uppercase tracking-kicker tex
 
 function RecipientSection({
   G,
+  totals,
+  fam,
   confirm,
   isNew,
   onFocused,
@@ -468,6 +494,8 @@ function RecipientSection({
   onDeleteGift,
 }: {
   G: Group;
+  totals: Totals | null;
+  fam: ReturnType<typeof familySplit>;
   confirm: string | null;
   isNew: (giftId: string) => boolean;
   onFocused: () => void;
@@ -478,46 +506,80 @@ function RecipientSection({
   onDeleteGift: (g: Gift) => void;
 }) {
   const p = G.person;
-  const est = G.gifts.reduce((s, g) => s + (num(g.est) || 0), 0);
-  const spent = G.gifts.reduce((s, g) => s + (num(g.actual) || 0), 0);
+  const family = G.kind === "family";
+  // A person's numbers come from personTotals (own gifts + a core member's
+  // sixth of Family); a gift-only recipient just sums its own gifts.
+  const ownEst = G.gifts.reduce((s, g) => s + (num(g.est) || 0), 0);
+  const ownSpent = G.gifts.reduce((s, g) => s + (num(g.actual) || 0), 0);
+  const est = totals ? totals.est : ownEst;
+  const spent = totals ? totals.spent : ownSpent;
+  const share = totals && (totals.familySpent > 0 || totals.familyEst > 0) ? totals : null;
   const bought = G.gifts.filter((g) => BOUGHT.has(g.status)).length;
   const budget = p ? num(p.budget) : null;
   const left = budget != null ? budget - spent : null;
   const over = budget != null && spent > budget;
   const ck = "rm:" + (p ? p.id : "");
   return (
-    <section className="border border-rule/60 bg-ink-raised/40">
+    <section className={`border bg-ink-raised/40 ${family ? "border-cat-xmas/40" : "border-rule/60"}`}>
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-4 pb-2.5 pt-3">
         <h2 className="font-display text-[1.35rem] leading-tight text-cream">{G.name}</h2>
-        {p && p.role ? <span className="font-mono text-[0.6rem] uppercase tracking-kicker text-cream-dimmer">{p.role}</span> : null}
+        {family ? (
+          <span className="font-mono text-[0.6rem] uppercase tracking-kicker text-cat-xmas">Shared by all six</span>
+        ) : p && p.role ? (
+          <span className="font-mono text-[0.6rem] uppercase tracking-kicker text-cream-dimmer">{p.role}</span>
+        ) : null}
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 font-mono text-[0.68rem] tabular-nums text-cream-dim max-sm:w-full sm:ml-auto">
-          <label className="inline-flex items-baseline gap-1">
-            budget
-            <Field
-              className="w-[5.5rem] border-b border-dashed border-rule bg-transparent px-0.5 text-right text-[0.8rem] text-cream placeholder:text-cream-dimmer focus:border-accent focus:outline-none"
-              inputMode="decimal"
-              placeholder="none"
-              aria-label={"Budget for " + G.name}
-              value={budget == null ? "" : money(budget)}
-              onCommit={onBudget}
-            />
-          </label>
-          <span>
-            spent <b className="font-medium text-cream">{money(spent)}</b>
-          </span>
-          {left != null ? (
-            <span className={left < 0 ? "text-accent" : ""}>
-              left <b className={`font-medium ${left < 0 ? "text-accent" : "text-cream"}`}>{money(left)}</b>
-            </span>
+          {family ? (
+            <>
+              <span>
+                spent <b className="font-medium text-cream">{money(fam.spent)}</b>
+              </span>
+              <span>
+                est. <b className="font-medium text-cream">{money(fam.est)}</b>
+              </span>
+            </>
           ) : (
-            <span>
-              est. <b className="font-medium text-cream">{money(est)}</b>
-            </span>
+            <>
+              <label className="inline-flex items-baseline gap-1">
+                budget
+                <Field
+                  className="w-[5.5rem] border-b border-dashed border-rule bg-transparent px-0.5 text-right text-[0.8rem] text-cream placeholder:text-cream-dimmer focus:border-accent focus:outline-none"
+                  inputMode="decimal"
+                  placeholder="none"
+                  aria-label={"Budget for " + G.name}
+                  value={budget == null ? "" : money(budget)}
+                  onCommit={onBudget}
+                />
+              </label>
+              <span>
+                spent <b className="font-medium text-cream">{money(spent)}</b>
+              </span>
+              {left != null ? (
+                <span className={left < 0 ? "text-accent" : ""}>
+                  left <b className={`font-medium ${left < 0 ? "text-accent" : "text-cream"}`}>{money(left)}</b>
+                </span>
+              ) : (
+                <span>
+                  est. <b className="font-medium text-cream">{money(est)}</b>
+                </span>
+              )}
+            </>
           )}
           <span>
             {bought}/{G.gifts.length} bought
           </span>
         </div>
+        {family ? (
+          <p className="w-full font-mono text-[0.62rem] leading-snug text-cat-xmas">
+            Split six ways: {money(fam.eachSpent)} spent and {money(fam.eachEst)} planned against each of{" "}
+            {CORE_PEOPLE.map((c) => c.name).join(", ").replace(/, ([^,]*)$/, " and $1")}.
+          </p>
+        ) : share ? (
+          <p className="w-full font-mono text-[0.62rem] leading-snug text-cream-dimmer">
+            includes <span className="text-cat-xmas">{money(share.familySpent)}</span> spent
+            {share.familyEst ? <> ({money(share.familyEst)} planned)</> : null} as a sixth of the Family gifts
+          </p>
+        ) : null}
       </div>
       {budget ? (
         <div className="relative h-1.5 bg-rule/40" role="img" aria-label={`${money(spent)} spent of ${money(budget)}`}>
@@ -557,7 +619,7 @@ function RecipientSection({
         <button type="button" onClick={onAddGift} className="px-1 py-1.5 text-cat-xmas hover:text-cream">
           + Add gift
         </button>
-        {p ? (
+        {p && G.kind !== "core" ? (
           <button
             type="button"
             onClick={onRemovePerson}
